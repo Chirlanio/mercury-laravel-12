@@ -86,7 +86,6 @@ export default function UserAvatar({
                         className={`
                             absolute inset-0 items-center justify-center rounded-full text-white font-medium
                             ${bgColor}
-                            hidden
                         `}
                         style={{ display: 'none' }}
                     >

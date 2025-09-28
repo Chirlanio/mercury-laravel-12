@@ -1,60 +1,128 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Mercury Laravel
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Mercury Laravel is a web application built with the Laravel framework and a React frontend using Inertia.js. It provides a starting point for applications requiring user authentication, user management, activity logging, and more.
 
-## About Laravel
+## Key Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+*   **User Authentication**: Secure login, registration, and password reset functionality.
+*   **User Management**: Easily create, read, update, and delete users.
+*   **Profile Management**: Users can update their profile information and upload an avatar.
+*   **Activity Logging**: Track user actions within the application.
+*   **Dashboard**: A central hub displaying application statistics and recent activities.
+*   **Role-Based Access Control (RBAC)**: Control user access to features based on roles and permissions.
+*   **Modern Tech Stack**: Built with the latest versions of Laravel, React, and Vite.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Technologies Used
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### Backend
 
-## Learning Laravel
+*   [Laravel](https://laravel.com/)
+*   [Inertia.js (Server-side)](https://inertiajs.com/)
+*   [Intervention Image](https://image.intervention.io/)
+*   [Laravel Sanctum](https://laravel.com/docs/sanctum)
+*   [Ziggy](https://github.com/tightenco/ziggy)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+### Frontend
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+*   [React](https://reactjs.org/)
+*   [Inertia.js (Client-side)](https://inertiajs.com/)
+*   [Tailwind CSS](https://tailwindcss.com/)
+*   [Vite](https://vitejs.dev/)
+*   [Axios](https://axios-http.com/)
+*   [React Toastify](https://fkhadra.github.io/react-toastify/introduction)
+*   [Heroicons](https://heroicons.com/)
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Getting Started
 
-## Laravel Sponsors
+These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### Prerequisites
 
-### Premium Partners
+*   PHP >= 8.2
+*   Node.js and npm
+*   Composer
+*   A database (e.g., MySQL, PostgreSQL, SQLite)
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+### Installation
+
+1.  **Clone the repository**
+
+    ```bash
+    git clone https://github.com/your-username/mercury-laravel.git
+    cd mercury-laravel
+    ```
+
+2.  **Install backend dependencies**
+
+    ```bash
+    composer install
+    ```
+
+3.  **Install frontend dependencies**
+
+    ```bash
+    npm install
+    ```
+
+4.  **Set up your environment**
+
+    *   Copy the `.env.example` file to `.env`:
+
+        ```bash
+        cp .env.example .env
+        ```
+
+    *   Generate an application key:
+
+        ```bash
+        php artisan key:generate
+        ```
+
+    *   Configure your database connection in the `.env` file.
+
+5.  **Run database migrations and seeders**
+
+    ```bash
+    php artisan migrate --seed
+    ```
+
+6.  **Build frontend assets**
+
+    ```bash
+    npm run build
+    ```
+
+## Usage
+
+To start the development server, you can use the following command:
+
+```bash
+composer run dev
+```
+
+This will concurrently start the PHP development server, the Vite development server, and the queue listener.
+
+You can then access the application in your browser at the address provided by the `php artisan serve` command (usually `http://127.0.0.1:8000`).
+
+### Running Tests
+
+To run the application's test suite, use the following command:
+
+```bash
+composer run test
+```
 
 ## Contributing
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
-## Code of Conduct
+If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement".
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+1.  Fork the Project
+2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4.  Push to the Branch (`git push origin feature/AmazingFeature`)
+5.  Open a Pull Request
 
 ## License
 

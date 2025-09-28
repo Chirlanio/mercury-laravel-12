@@ -15,19 +15,20 @@ export default function UpdateProfileInformation({
 }) {
     const user = usePage().props.auth.user;
 
-    const { data, setData, patch, errors, processing, recentlySuccessful } =
+    const { data, setData, post, errors, processing, recentlySuccessful } =
         useForm({
             name: user.name,
             email: user.email,
             avatar: null,
             remove_avatar: false,
+            _method: 'patch',
         });
 
     const submit = (e) => {
         e.preventDefault();
 
-        patch(route('profile.update'), {
-            forceFormData: true
+        post(route('profile.update'), {
+            forceFormData: true,
         });
     };
 

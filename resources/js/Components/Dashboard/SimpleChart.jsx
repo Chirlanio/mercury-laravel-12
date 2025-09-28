@@ -83,7 +83,7 @@ export default function SimpleChart({
                             points={
                                 data.map((item, index) => {
                                     const value = typeof item === 'object' ? (item.value || item.users || item.activities || item.count || 0) : item;
-                                    const x = (index / (data.length - 1)) * 100;
+                                    const x = data.length > 1 ? (index / (data.length - 1)) * 100 : 50;
                                     const y = 100 - (value / maxValue) * 100;
                                     return `${x},${y}`;
                                 }).join(' ') + ` 100,100 0,100`
@@ -98,14 +98,12 @@ export default function SimpleChart({
                             points={
                                 data.map((item, index) => {
                                     const value = typeof item === 'object' ? (item.value || item.users || item.activities || item.count || 0) : item;
-                                    const x = (index / (data.length - 1)) * 100;
-                                    const y = 100 - (value / maxValue) * 100;
+                                    const x = data.length > 1 ? (index / (data.length - 1)) * 100 : 50;
+                                    const y = maxValue > 0 ? 100 - (value / maxValue) * 100 : 100;
                                     return `${x},${y}`;
                                 }).join(' ')
                             }
                         />
-
-                        {/* Pontos */}
                         {data.map((item, index) => {
                             const value = typeof item === 'object' ? (item.value || item.users || item.activities || item.count || 0) : item;
                             const x = (index / (data.length - 1)) * 100;

@@ -1,4 +1,5 @@
 import Modal from '@/Components/Modal';
+import UserAvatar from '@/Components/UserAvatar';
 
 export default function UserViewModal({ show, onClose, user, roles = {} }) {
     const getRoleBadgeColor = (role) => {
@@ -19,11 +20,7 @@ export default function UserViewModal({ show, onClose, user, roles = {} }) {
                 {/* Avatar e informações básicas */}
                 <div className="flex items-center space-x-4">
                     <div className="flex-shrink-0">
-                        <div className="h-20 w-20 rounded-full bg-gray-300 flex items-center justify-center">
-                            <span className="text-2xl font-medium text-gray-700">
-                                {user.name.charAt(0).toUpperCase()}
-                            </span>
-                        </div>
+                        <UserAvatar user={user} size="2xl" />
                     </div>
                     <div className="flex-1">
                         <h3 className="text-xl font-semibold text-gray-900">{user.name}</h3>

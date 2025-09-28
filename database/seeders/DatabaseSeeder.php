@@ -15,6 +15,23 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             SuperAdminSeeder::class,
+            EmailConfigurationSeeder::class,
+            ColorThemeSeeder::class,
+            StatusSeeder::class,
+            PageStatusSeeder::class,
+            EmploymentRelationshipSeeder::class,
+            EducationLevelSeeder::class,
+            GenderSeeder::class,
+            ManagerSeeder::class,
+            SectorSeeder::class,
+            MenuSeeder::class,
+            AdditionalAccessLevelsSeeder::class,
+            PositionLevelSeeder::class,
+            PageGroupSeeder::class,
+            PageSeeder::class,
+            AccessLevelPageSeeder::class,
+            EmployeeSeeder::class,
+            EmploymentContractSeeder::class,
         ]);
 
         // Cria um usuário de teste comum
