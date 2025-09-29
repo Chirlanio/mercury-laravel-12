@@ -16,14 +16,32 @@ class Menu extends Model
         'icon',
         'order',
         'is_active',
+        'parent_id',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'order' => 'integer',
+        'parent_id' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+
+    // Relacionamentos
+    public function parent()
+    {
+        return $this->belongsTo(Menu::class, 'parent_id');
+    }
+
+    public function children()
+    {
+        return $this->hasMany(Menu::class, 'parent_id')->where('is_active', true)->orderBy('order');
+    }
+
+    public function allChildren()
+    {
+        return $this->hasMany(Menu::class, 'parent_id')->orderBy('order');
+    }
 
     public static function getOptions(): array
     {
@@ -48,6 +66,16 @@ class Menu extends Model
     public function scopeOrdered($query)
     {
         return $query->orderBy('order');
+    }
+
+    public function scopeParentMenus($query)
+    {
+        return $query->whereNull('parent_id');
+    }
+
+    public function scopeSubmenus($query)
+    {
+        return $query->whereNotNull('parent_id');
     }
 
     public function getIconClassAttribute(): string

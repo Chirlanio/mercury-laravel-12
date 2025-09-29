@@ -7,12 +7,12 @@ export default function Sidebar({ isOpen, onClose }) {
     const { hasPermission } = usePermissions();
     const [menuGroups, setMenuGroups] = useState({});
     const [expandedGroups, setExpandedGroups] = useState({
-        navigation: true,
         main: true,
         hr: false,
         utility: false,
         system: false,
     });
+    const [expandedSubmenus, setExpandedSubmenus] = useState({});
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -38,9 +38,15 @@ export default function Sidebar({ isOpen, onClose }) {
         }));
     };
 
+    const toggleSubmenu = (menuId) => {
+        setExpandedSubmenus((prev) => ({
+            ...prev,
+            [menuId]: !prev[menuId],
+        }));
+    };
+
     const getGroupTitle = (groupKey) => {
         const titles = {
-            navigation: "Navegação",
             main: "Menu Principal",
             hr: "Recursos Humanos",
             utility: "Utilidades",
@@ -51,7 +57,6 @@ export default function Sidebar({ isOpen, onClose }) {
 
     const getGroupColor = (groupKey) => {
         const colors = {
-            navigation: "text-indigo-600",
             main: "text-blue-600",
             hr: "text-purple-600",
             utility: "text-green-600",
@@ -62,25 +67,49 @@ export default function Sidebar({ isOpen, onClose }) {
 
     const getMenuRoute = (menuName) => {
         const menuRoutes = {
-            Home: "/dashboard",
-            Usuário: "/users",
-            "Dashboard's": "/dashboard",
-            Configurações: "/admin",
-            "FAQ's": "/support",
-            Páginas: "/pages",
-            "Níveis de Acesso": "/access-levels",
-            // Adicione mais mapeamentos conforme necessário
+            // Menu Principal
+            Home: { route: "/dashboard", permission: null },
+            Usuário: { route: "/users", permission: PERMISSIONS.VIEW_USERS },
+
+            // Utilidades
+            "FAQ's": { route: "/support", permission: PERMISSIONS.ACCESS_SUPPORT_PANEL },
+
+            // Sistema
+            "Dashboard's": { route: "/dashboard", permission: null },
+            Configurações: { route: "/admin", permission: PERMISSIONS.ACCESS_ADMIN_PANEL },
+
+            // Páginas básicas
+            Produto: { route: "/produto", permission: null },
+            Planejamento: { route: "/planejamento", permission: null },
+            Financeiro: { route: "/financeiro", permission: null },
+            "Ativo Fixo": { route: "/ativo-fixo", permission: null },
+            Comercial: { route: "/comercial", permission: null },
+            Delivery: { route: "/delivery", permission: null },
+            Rotas: { route: "/rotas", permission: null },
+            "E-commerce": { route: "/ecommerce", permission: null },
+            Qualidade: { route: "/qualidade", permission: null },
+            "Pessoas & Cultura": { route: "/pessoas-cultura", permission: null },
+            "Departamento Pessoal": { route: "/departamento-pessoal", permission: null },
+            "Escola Digital": { route: "/escola-digital", permission: null },
+            Movidesk: { route: "/movidesk", permission: null },
+            "Biblioteca de Processos": { route: "/biblioteca-processos", permission: null },
+            "Listar Funcionários": { route: "/employees", permission: PERMISSIONS.VIEW_USERS },
         };
         return menuRoutes[menuName] || null;
     };
 
     const handleMenuClick = (menuName) => {
-        const route = getMenuRoute(menuName);
+        const menuConfig = getMenuRoute(menuName);
 
-        if (route) {
-            router.get(route);
+        if (menuConfig) {
+            // Verificar permissão se necessário
+            if (!menuConfig.permission || hasPermission(menuConfig.permission)) {
+                router.get(menuConfig.route);
+            } else {
+                console.warn(`Sem permissão para acessar "${menuName}"`);
+                return;
+            }
         } else {
-            // Para menus sem rota definida, mostrar mensagem
             console.log(`Navegação para "${menuName}" ainda não implementada`);
         }
 
@@ -94,63 +123,6 @@ export default function Sidebar({ isOpen, onClose }) {
         router.post("/logout");
     };
 
-    const getNavigationItems = () => {
-        const items = [
-            {
-                id: "dashboard",
-                name: "Dashboard",
-                icon: "fas fa-tachometer-alt",
-                route: "/dashboard",
-                permission: null,
-            },
-            {
-                id: "users",
-                name: "Gerenciar Usuários",
-                icon: "fas fa-users",
-                route: "/users",
-                permission: PERMISSIONS.VIEW_USERS,
-            },
-            {
-                id: "admin",
-                name: "Administração",
-                icon: "fas fa-cogs",
-                route: "/admin",
-                permission: PERMISSIONS.ACCESS_ADMIN_PANEL,
-            },
-            {
-                id: "support",
-                name: "Suporte",
-                icon: "fas fa-headset",
-                route: "/support",
-                permission: PERMISSIONS.ACCESS_SUPPORT_PANEL,
-            },
-            {
-                id: "activity-logs",
-                name: "Logs de Atividade",
-                icon: "fas fa-list-alt",
-                route: "/activity-logs",
-                permission: PERMISSIONS.VIEW_ACTIVITY_LOGS,
-            },
-            {
-                id: "pages",
-                name: "Páginas",
-                icon: "fas fa-file-alt",
-                route: "/pages",
-                permission: PERMISSIONS.VIEW_USERS,
-            },
-            {
-                id: "access-levels",
-                name: "Níveis de Acesso",
-                icon: "fas fa-shield-alt",
-                route: "/access-levels",
-                permission: PERMISSIONS.VIEW_USERS,
-            },
-        ];
-
-        return items.filter(
-            (item) => !item.permission || hasPermission(item.permission)
-        );
-    };
 
     if (loading) {
         return (
@@ -209,35 +181,6 @@ export default function Sidebar({ isOpen, onClose }) {
 
                 {/* Navigation */}
                 <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-                    {/* Navigation Items */}
-                    <div className="mb-4">
-                        <button
-                            onClick={() => toggleGroup('navigation')}
-                            className="flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
-                        >
-                            <span className="text-indigo-600">Navegação</span>
-                            {expandedGroups.navigation ? (
-                                <ChevronDownIcon className="h-4 w-4" />
-                            ) : (
-                                <ChevronRightIcon className="h-4 w-4" />
-                            )}
-                        </button>
-
-                        {expandedGroups.navigation && (
-                            <div className="ml-4 mt-1 space-y-1">
-                                {getNavigationItems().map((item) => (
-                                    <Link
-                                        key={item.id}
-                                        href={item.route}
-                                        className="flex items-center w-full px-3 py-2 text-sm rounded-md group text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                                    >
-                                        <i className={`${item.icon} mr-3 flex-shrink-0 text-gray-400 group-hover:text-gray-500`}></i>
-                                        <span className="truncate">{item.name}</span>
-                                    </Link>
-                                ))}
-                            </div>
-                        )}
-                    </div>
 
                     {/* Menu Groups from API */}
                     {Object.entries(menuGroups).map(
@@ -265,56 +208,125 @@ export default function Sidebar({ isOpen, onClose }) {
                                     {expandedGroups[groupKey] && (
                                         <div className="ml-4 mt-1 space-y-1">
                                             {menus.map((menu) => {
-                                                const hasRoute =
-                                                    getMenuRoute(menu.name) ||
-                                                    menu.name === "Sair";
+                                                const menuConfig = getMenuRoute(menu.name);
+                                                const hasRoute = menuConfig || menu.name === "Sair";
+                                                const hasMenuPermission = !menuConfig?.permission || hasPermission(menuConfig.permission);
+                                                const isAccessible = hasRoute && (menu.name === "Sair" || hasMenuPermission);
+                                                const hasSubmenus = menu.children && menu.children.length > 0;
+
                                                 return (
-                                                    <button
-                                                        key={menu.id}
-                                                        onClick={() =>
-                                                            menu.name === "Sair"
-                                                                ? handleLogout()
-                                                                : handleMenuClick(
-                                                                      menu.name
-                                                                  )
-                                                        }
-                                                        className={`flex items-center w-full px-3 py-2 text-sm rounded-md group ${
-                                                            hasRoute
-                                                                ? "text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer"
-                                                                : "text-gray-400 cursor-not-allowed"
-                                                        }`}
-                                                        disabled={!hasRoute}
-                                                    >
-                                                        <i
-                                                            className={`${
-                                                                menu.icon
-                                                            } mr-3 flex-shrink-0 ${
-                                                                hasRoute
-                                                                    ? "text-gray-400 group-hover:text-gray-500"
-                                                                    : "text-gray-300"
+                                                    <div key={menu.id}>
+                                                        <button
+                                                            onClick={() => {
+                                                                if (hasSubmenus) {
+                                                                    toggleSubmenu(menu.id);
+                                                                } else if (menu.name === "Sair") {
+                                                                    handleLogout();
+                                                                } else {
+                                                                    handleMenuClick(menu.name);
+                                                                }
+                                                            }}
+                                                            className={`flex items-center w-full px-3 py-2 text-sm rounded-md group ${
+                                                                isAccessible || hasSubmenus
+                                                                    ? "text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer"
+                                                                    : "text-gray-400 cursor-not-allowed"
                                                             }`}
-                                                        ></i>
-                                                        <span className="truncate">
-                                                            {menu.name}
-                                                        </span>
-                                                        {hasRoute && (
-                                                            <svg
-                                                                className="ml-auto h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                fill="none"
-                                                                stroke="currentColor"
-                                                                viewBox="0 0 24 24"
-                                                            >
-                                                                <path
-                                                                    strokeLinecap="round"
-                                                                    strokeLinejoin="round"
-                                                                    strokeWidth={
-                                                                        2
-                                                                    }
-                                                                    d="M9 5l7 7-7 7"
-                                                                />
-                                                            </svg>
+                                                            disabled={!isAccessible && !hasSubmenus}
+                                                        >
+                                                            <i
+                                                                className={`${
+                                                                    menu.icon
+                                                                } mr-3 flex-shrink-0 ${
+                                                                    isAccessible || hasSubmenus
+                                                                        ? "text-gray-400 group-hover:text-gray-500"
+                                                                        : "text-gray-300"
+                                                                }`}
+                                                            ></i>
+                                                            <span className="truncate">
+                                                                {menu.name}
+                                                            </span>
+                                                            {hasSubmenus ? (
+                                                                expandedSubmenus[menu.id] ? (
+                                                                    <ChevronDownIcon className="ml-auto h-4 w-4" />
+                                                                ) : (
+                                                                    <ChevronRightIcon className="ml-auto h-4 w-4" />
+                                                                )
+                                                            ) : (
+                                                                isAccessible && (
+                                                                    <svg
+                                                                        className="ml-auto h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                        fill="none"
+                                                                        stroke="currentColor"
+                                                                        viewBox="0 0 24 24"
+                                                                    >
+                                                                        <path
+                                                                            strokeLinecap="round"
+                                                                            strokeLinejoin="round"
+                                                                            strokeWidth={2}
+                                                                            d="M9 5l7 7-7 7"
+                                                                        />
+                                                                    </svg>
+                                                                )
+                                                            )}
+                                                        </button>
+
+                                                        {/* Renderizar submenus */}
+                                                        {hasSubmenus && expandedSubmenus[menu.id] && (
+                                                            <div className="ml-6 mt-1 space-y-1">
+                                                                {menu.children.map((submenu) => {
+                                                                    const submenuConfig = getMenuRoute(submenu.name);
+                                                                    const hasSubmenuRoute = submenuConfig || submenu.name === "Sair";
+                                                                    const hasSubmenuPermission = !submenuConfig?.permission || hasPermission(submenuConfig.permission);
+                                                                    const isSubmenuAccessible = hasSubmenuRoute && (submenu.name === "Sair" || hasSubmenuPermission);
+
+                                                                    return (
+                                                                        <button
+                                                                            key={submenu.id}
+                                                                            onClick={() =>
+                                                                                submenu.name === "Sair"
+                                                                                    ? handleLogout()
+                                                                                    : handleMenuClick(submenu.name)
+                                                                            }
+                                                                            className={`flex items-center w-full px-3 py-2 text-sm rounded-md group ${
+                                                                                isSubmenuAccessible
+                                                                                    ? "text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer"
+                                                                                    : "text-gray-400 cursor-not-allowed"
+                                                                            }`}
+                                                                            disabled={!isSubmenuAccessible}
+                                                                        >
+                                                                            <i
+                                                                                className={`${
+                                                                                    submenu.icon
+                                                                                } mr-3 flex-shrink-0 text-sm ${
+                                                                                    isSubmenuAccessible
+                                                                                        ? "text-gray-400 group-hover:text-gray-500"
+                                                                                        : "text-gray-300"
+                                                                                }`}
+                                                                            ></i>
+                                                                            <span className="truncate text-sm">
+                                                                                {submenu.name}
+                                                                            </span>
+                                                                            {isSubmenuAccessible && (
+                                                                                <svg
+                                                                                    className="ml-auto h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                                    fill="none"
+                                                                                    stroke="currentColor"
+                                                                                    viewBox="0 0 24 24"
+                                                                                >
+                                                                                    <path
+                                                                                        strokeLinecap="round"
+                                                                                        strokeLinejoin="round"
+                                                                                        strokeWidth={2}
+                                                                                        d="M9 5l7 7-7 7"
+                                                                                    />
+                                                                                </svg>
+                                                                            )}
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            </div>
                                                         )}
-                                                    </button>
+                                                    </div>
                                                 );
                                             })}
                                         </div>

@@ -7,6 +7,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\AccessLevelController;
+use App\Http\Controllers\EmployeeController;
 use App\Enums\Permission;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -170,6 +171,83 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
 
     // Visualizar nível de acesso específico
     Route::get('/access-levels/{accessLevel}', [AccessLevelController::class, 'show'])->name('access-levels.show');
+});
+
+// Rotas para funcionários
+Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
+    // Listar funcionários
+    Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
+
+    // Criar funcionário
+    Route::post('/employees', [EmployeeController::class, 'store'])
+        ->middleware('permission:' . Permission::CREATE_USERS->value)
+        ->name('employees.store');
+
+    // Visualizar funcionário específico
+    Route::get('/employees/{employee}', [EmployeeController::class, 'show'])->name('employees.show');
+});
+
+// Rotas para páginas básicas ainda não implementadas (placeholder)
+Route::middleware(['auth'])->group(function () {
+    // Menu Principal
+    Route::get('/produto', function () {
+        return Inertia::render('ComingSoon', ['title' => 'Produto']);
+    })->name('produto');
+
+    Route::get('/planejamento', function () {
+        return Inertia::render('ComingSoon', ['title' => 'Planejamento']);
+    })->name('planejamento');
+
+    Route::get('/financeiro', function () {
+        return Inertia::render('ComingSoon', ['title' => 'Financeiro']);
+    })->name('financeiro');
+
+    Route::get('/ativo-fixo', function () {
+        return Inertia::render('ComingSoon', ['title' => 'Ativo Fixo']);
+    })->name('ativo-fixo');
+
+    Route::get('/comercial', function () {
+        return Inertia::render('ComingSoon', ['title' => 'Comercial']);
+    })->name('comercial');
+
+    Route::get('/delivery', function () {
+        return Inertia::render('ComingSoon', ['title' => 'Delivery']);
+    })->name('delivery');
+
+    Route::get('/rotas', function () {
+        return Inertia::render('ComingSoon', ['title' => 'Rotas']);
+    })->name('rotas');
+
+    Route::get('/ecommerce', function () {
+        return Inertia::render('ComingSoon', ['title' => 'E-commerce']);
+    })->name('ecommerce');
+
+    // Sistema
+    Route::get('/qualidade', function () {
+        return Inertia::render('ComingSoon', ['title' => 'Qualidade']);
+    })->name('qualidade');
+
+    // Recursos Humanos
+    Route::get('/pessoas-cultura', function () {
+        return Inertia::render('ComingSoon', ['title' => 'Pessoas & Cultura']);
+    })->name('pessoas-cultura');
+
+    Route::get('/departamento-pessoal', function () {
+        return Inertia::render('ComingSoon', ['title' => 'Departamento Pessoal']);
+    })->name('departamento-pessoal');
+
+    // Utilidades
+    Route::get('/escola-digital', function () {
+        return Inertia::render('ComingSoon', ['title' => 'Escola Digital']);
+    })->name('escola-digital');
+
+    Route::get('/movidesk', function () {
+        return Inertia::render('ComingSoon', ['title' => 'Movidesk']);
+    })->name('movidesk');
+
+    Route::get('/biblioteca-processos', function () {
+        return Inertia::render('ComingSoon', ['title' => 'Biblioteca de Processos']);
+    })->name('biblioteca-processos');
 });
 
 require __DIR__.'/auth.php';

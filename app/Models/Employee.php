@@ -201,6 +201,22 @@ class Employee extends Model
     }
 
     /**
+     * Get the position for this employee
+     */
+    public function position(): BelongsTo
+    {
+        return $this->belongsTo(Position::class);
+    }
+
+    /**
+     * Get the store for this employee
+     */
+    public function store(): BelongsTo
+    {
+        return $this->belongsTo(Store::class, 'store_id', 'code');
+    }
+
+    /**
      * Get all available levels
      */
     public static function getLevels(): array

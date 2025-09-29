@@ -151,10 +151,10 @@ class MenuController extends Controller
     public function getSidebarMenus()
     {
         $menuGroups = [
-            'main' => Menu::active()->mainMenu()->ordered()->get(['id', 'name', 'icon']),
-            'hr' => Menu::active()->hrMenu()->ordered()->get(['id', 'name', 'icon']),
-            'utility' => Menu::active()->utilityMenu()->ordered()->get(['id', 'name', 'icon']),
-            'system' => Menu::active()->systemMenu()->ordered()->get(['id', 'name', 'icon']),
+            'main' => Menu::active()->mainMenu()->parentMenus()->ordered()->with('children')->get(['id', 'name', 'icon', 'parent_id']),
+            'hr' => Menu::active()->hrMenu()->parentMenus()->ordered()->with('children')->get(['id', 'name', 'icon', 'parent_id']),
+            'utility' => Menu::active()->utilityMenu()->parentMenus()->ordered()->with('children')->get(['id', 'name', 'icon', 'parent_id']),
+            'system' => Menu::active()->systemMenu()->parentMenus()->ordered()->with('children')->get(['id', 'name', 'icon', 'parent_id']),
         ];
 
         return response()->json($menuGroups);
