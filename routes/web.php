@@ -4,6 +4,9 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\MenuController;
+use App\Http\Controllers\PageController;
+use App\Http\Controllers\AccessLevelController;
 use App\Enums\Permission;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -106,6 +109,67 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_ACTIVITY_LOGS->value
     Route::delete('/activity-logs/cleanup', [ActivityLogController::class, 'cleanup'])
         ->middleware('permission:' . Permission::MANAGE_SYSTEM_SETTINGS->value)
         ->name('activity-logs.cleanup');
+});
+
+// Rotas para gerenciamento de menus
+// API para sidebar (acessível para qualquer usuário autenticado)
+Route::middleware('auth')->get('/api/menus/sidebar', [MenuController::class, 'getSidebarMenus'])->name('menus.sidebar');
+
+Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
+    // Listar menus
+    Route::get('/menus', [MenuController::class, 'index'])->name('menus.index');
+
+    // Visualizar menu específico
+    Route::get('/menus/{menu}', [MenuController::class, 'show'])->name('menus.show');
+
+    // Ações de gerenciamento de menu (requer permissões administrativas)
+    Route::middleware('permission:' . Permission::MANAGE_SYSTEM_SETTINGS->value)->group(function () {
+        // Ativar/Desativar menu
+        Route::post('/menus/{menu}/activate', [MenuController::class, 'activate'])->name('menus.activate');
+        Route::post('/menus/{menu}/deactivate', [MenuController::class, 'deactivate'])->name('menus.deactivate');
+
+        // Mover menu para cima/baixo
+        Route::post('/menus/{menu}/move-up', [MenuController::class, 'moveUp'])->name('menus.moveUp');
+        Route::post('/menus/{menu}/move-down', [MenuController::class, 'moveDown'])->name('menus.moveDown');
+
+        // Reordenar menus
+        Route::post('/menus/reorder', [MenuController::class, 'reorder'])->name('menus.reorder');
+    });
+});
+
+// Rotas para gerenciamento de páginas
+Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
+    // Listar páginas
+    Route::get('/pages', [PageController::class, 'index'])->name('pages.index');
+
+    // Criar nova página
+    Route::post('/pages', [PageController::class, 'store'])->name('pages.store');
+
+    // Visualizar página específica
+    Route::get('/pages/{page}', [PageController::class, 'show'])->name('pages.show');
+
+    // Atualizar página
+    Route::patch('/pages/{page}', [PageController::class, 'update'])->name('pages.update');
+
+    // Ações de gerenciamento de página (requer permissões administrativas)
+    Route::middleware('permission:' . Permission::MANAGE_SYSTEM_SETTINGS->value)->group(function () {
+        // Ativar/Desativar página
+        Route::post('/pages/{page}/activate', [PageController::class, 'activate'])->name('pages.activate');
+        Route::post('/pages/{page}/deactivate', [PageController::class, 'deactivate'])->name('pages.deactivate');
+
+        // Tornar página pública/privada
+        Route::post('/pages/{page}/make-public', [PageController::class, 'makePublic'])->name('pages.makePublic');
+        Route::post('/pages/{page}/make-private', [PageController::class, 'makePrivate'])->name('pages.makePrivate');
+    });
+});
+
+// Rotas para gerenciamento de níveis de acesso
+Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
+    // Listar níveis de acesso
+    Route::get('/access-levels', [AccessLevelController::class, 'index'])->name('access-levels.index');
+
+    // Visualizar nível de acesso específico
+    Route::get('/access-levels/{accessLevel}', [AccessLevelController::class, 'show'])->name('access-levels.show');
 });
 
 require __DIR__.'/auth.php';

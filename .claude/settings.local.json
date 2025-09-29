@@ -4,7 +4,8 @@
       "Bash(php artisan migrate:*)",
       "Bash(composer show:*)",
       "Bash(php artisan make:test:*)",
-      "Bash(php:*)"
+      "Bash(php:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

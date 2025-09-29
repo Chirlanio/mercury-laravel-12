@@ -2,6 +2,7 @@ import ApplicationLogo from '@/Components/ApplicationLogo';
 import Dropdown from '@/Components/Dropdown';
 import NavLink from '@/Components/NavLink';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink';
+import Sidebar from '@/Components/Sidebar';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import { Link, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
@@ -16,6 +17,7 @@ export default function AuthenticatedLayout({ header, children }) {
 
     const [showingNavigationDropdown, setShowingNavigationDropdown] =
         useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     useEffect(() => {
         if (flash?.success) {
@@ -27,61 +29,34 @@ export default function AuthenticatedLayout({ header, children }) {
     }, [flash]);
 
     return (
-        <div className="min-h-screen bg-gray-100">
-            <nav className="border-b border-gray-100 bg-white">
+        <div className="min-h-screen bg-gray-100 flex">
+            {/* Sidebar */}
+            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+            {/* Main Content */}
+            <div className="flex-1 flex flex-col lg:ml-0">
+                <nav className="border-b border-gray-100 bg-white">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div className="flex h-16 justify-between">
                         <div className="flex">
+                            {/* Mobile sidebar toggle */}
+                            <div className="flex shrink-0 items-center lg:hidden mr-4">
+                                <button
+                                    onClick={() => setSidebarOpen(true)}
+                                    className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 focus:text-gray-500"
+                                >
+                                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                    </svg>
+                                </button>
+                            </div>
+
                             <div className="flex shrink-0 items-center">
                                 <Link href="/">
                                     <ApplicationLogo className="block h-9 w-auto fill-current text-gray-800" />
                                 </Link>
                             </div>
 
-                            <div className="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
-                                <NavLink
-                                    href={route('dashboard')}
-                                    active={route().current('dashboard')}
-                                >
-                                    Dashboard
-                                </NavLink>
-
-                                {hasPermission(PERMISSIONS.VIEW_USERS) && (
-                                    <NavLink
-                                        href={route('users.index')}
-                                        active={route().current('users.*')}
-                                    >
-                                        Gerenciar Usuários
-                                    </NavLink>
-                                )}
-
-                                {hasPermission(PERMISSIONS.ACCESS_ADMIN_PANEL) && (
-                                    <NavLink
-                                        href={route('admin')}
-                                        active={route().current('admin')}
-                                    >
-                                        Administração
-                                    </NavLink>
-                                )}
-
-                                {hasPermission(PERMISSIONS.ACCESS_SUPPORT_PANEL) && (
-                                    <NavLink
-                                        href={route('support')}
-                                        active={route().current('support')}
-                                    >
-                                        Suporte
-                                    </NavLink>
-                                )}
-
-                                {hasPermission(PERMISSIONS.VIEW_ACTIVITY_LOGS) && (
-                                    <NavLink
-                                        href={route('activity-logs.index')}
-                                        active={route().current('activity-logs.*')}
-                                    >
-                                        Logs de Atividade
-                                    </NavLink>
-                                )}
-                            </div>
                         </div>
 
                         <div className="hidden sm:ms-6 sm:flex sm:items-center">
@@ -91,9 +66,40 @@ export default function AuthenticatedLayout({ header, children }) {
                                         <span className="inline-flex rounded-md">
                                             <button
                                                 type="button"
-                                                className="inline-flex items-center rounded-md border border-transparent bg-white px-3 py-2 text-sm font-medium leading-4 text-gray-500 transition duration-150 ease-in-out hover:text-gray-700 focus:outline-none"
+                                                className="inline-flex items-center rounded-md border border-transparent bg-white px-3 py-2 text-sm font-medium leading-4 text-gray-700 transition duration-150 ease-in-out hover:text-gray-900 focus:outline-none"
                                             >
-                                                {user.name}
+                                                {/* Avatar */}
+                                                <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center mr-3 overflow-hidden">
+                                                    {user.avatar_url ? (
+                                                        <img
+                                                            className="h-8 w-8 rounded-full object-cover"
+                                                            src={user.avatar_url}
+                                                            alt={user.name}
+                                                            onError={(e) => {
+                                                                e.target.style.display = 'none';
+                                                                e.target.nextSibling.style.display = 'flex';
+                                                            }}
+                                                        />
+                                                    ) : null}
+                                                    <svg
+                                                        className={`h-5 w-5 text-gray-600 ${user.avatar_url ? 'hidden' : 'block'}`}
+                                                        fill="currentColor"
+                                                        viewBox="0 0 20 20"
+                                                        style={{ display: user.avatar_url ? 'none' : 'block' }}
+                                                    >
+                                                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                                                    </svg>
+                                                </div>
+
+                                                {/* User Info */}
+                                                <div className="text-left">
+                                                    <div className="text-sm font-medium text-gray-900">
+                                                        {user.name}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500">
+                                                        {user.role?.name || 'Usuário'}
+                                                    </div>
+                                                </div>
 
                                                 <svg
                                                     className="-me-0.5 ms-2 h-4 w-4"
@@ -178,58 +184,41 @@ export default function AuthenticatedLayout({ header, children }) {
                         ' sm:hidden'
                     }
                 >
-                    <div className="space-y-1 pb-3 pt-2">
-                        <ResponsiveNavLink
-                            href={route('dashboard')}
-                            active={route().current('dashboard')}
-                        >
-                            Dashboard
-                        </ResponsiveNavLink>
-
-                        {hasPermission(PERMISSIONS.VIEW_USERS) && (
-                            <ResponsiveNavLink
-                                href={route('users.index')}
-                                active={route().current('users.*')}
-                            >
-                                Gerenciar Usuários
-                            </ResponsiveNavLink>
-                        )}
-
-                        {hasPermission(PERMISSIONS.ACCESS_ADMIN_PANEL) && (
-                            <ResponsiveNavLink
-                                href={route('admin')}
-                                active={route().current('admin')}
-                            >
-                                Administração
-                            </ResponsiveNavLink>
-                        )}
-
-                        {hasPermission(PERMISSIONS.ACCESS_SUPPORT_PANEL) && (
-                            <ResponsiveNavLink
-                                href={route('support')}
-                                active={route().current('support')}
-                            >
-                                Suporte
-                            </ResponsiveNavLink>
-                        )}
-
-                        {hasPermission(PERMISSIONS.VIEW_ACTIVITY_LOGS) && (
-                            <ResponsiveNavLink
-                                href={route('activity-logs.index')}
-                                active={route().current('activity-logs.*')}
-                            >
-                                Logs de Atividade
-                            </ResponsiveNavLink>
-                        )}
-                    </div>
 
                     <div className="border-t border-gray-200 pb-1 pt-4">
-                        <div className="px-4">
-                            <div className="text-base font-medium text-gray-800">
-                                {user.name}
+                        <div className="px-4 flex items-center">
+                            {/* Avatar */}
+                            <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center mr-3 overflow-hidden">
+                                {user.avatar_url ? (
+                                    <img
+                                        className="h-10 w-10 rounded-full object-cover"
+                                        src={user.avatar_url}
+                                        alt={user.name}
+                                        onError={(e) => {
+                                            e.target.style.display = 'none';
+                                            e.target.nextSibling.style.display = 'flex';
+                                        }}
+                                    />
+                                ) : null}
+                                <svg
+                                    className={`h-6 w-6 text-gray-600 ${user.avatar_url ? 'hidden' : 'block'}`}
+                                    fill="currentColor"
+                                    viewBox="0 0 20 20"
+                                    style={{ display: user.avatar_url ? 'none' : 'block' }}
+                                >
+                                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                                </svg>
                             </div>
-                            <div className="text-sm font-medium text-gray-500">
-                                {user.email}
+                            <div>
+                                <div className="text-base font-medium text-gray-800">
+                                    {user.name}
+                                </div>
+                                <div className="text-sm font-medium text-gray-500">
+                                    {user.email}
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                    {user.role?.name || 'Usuário'}
+                                </div>
                             </div>
                         </div>
 
@@ -257,20 +246,21 @@ export default function AuthenticatedLayout({ header, children }) {
                 </header>
             )}
 
-            <main>{children}</main>
+                <main>{children}</main>
 
-            <ToastContainer
-                position="top-right"
-                autoClose={5000}
-                hideProgressBar={false}
-                newestOnTop={false}
-                closeOnClick
-                rtl={false}
-                pauseOnFocusLoss
-                draggable
-                pauseOnHover
-                theme="light"
-            />
+                <ToastContainer
+                    position="top-right"
+                    autoClose={5000}
+                    hideProgressBar={false}
+                    newestOnTop={false}
+                    closeOnClick
+                    rtl={false}
+                    pauseOnFocusLoss
+                    draggable
+                    pauseOnHover
+                    theme="light"
+                />
+            </div>
         </div>
     );
 }

@@ -35,7 +35,15 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $user,
+                'user' => $user ? [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'avatar' => $user->avatar,
+                    'avatar_url' => $user->avatar_url,
+                    'has_custom_avatar' => $user->hasCustomAvatar(),
+                ] : null,
                 'permissions' => $user ? PermissionHelper::getUserPermissions($user) : [],
             ],
             'flash' => [

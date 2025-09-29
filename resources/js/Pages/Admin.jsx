@@ -79,6 +79,64 @@ export default function Admin({ auth }) {
                                     </div>
                                 )}
 
+                                {/* Card de Gerenciamento de Menus */}
+                                {hasPermission(PERMISSIONS.VIEW_USERS) && (
+                                    <div className="bg-white p-6 border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                                        <div className="flex items-center">
+                                            <div className="flex-shrink-0">
+                                                <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                                </svg>
+                                            </div>
+                                            <div className="ml-3">
+                                                <h3 className="text-lg font-medium text-gray-900">
+                                                    Gerenciar Menus
+                                                </h3>
+                                                <p className="text-sm text-gray-600">
+                                                    Configurar e organizar itens de menu do sistema
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="mt-4">
+                                            <a
+                                                href={route('menus.index')}
+                                                className="text-purple-600 hover:text-purple-900 text-sm font-medium"
+                                            >
+                                                Acessar →
+                                            </a>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Card de Gerenciamento de Páginas */}
+                                {hasPermission(PERMISSIONS.VIEW_USERS) && (
+                                    <div className="bg-white p-6 border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                                        <div className="flex items-center">
+                                            <div className="flex-shrink-0">
+                                                <svg className="h-6 w-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                            </div>
+                                            <div className="ml-3">
+                                                <h3 className="text-lg font-medium text-gray-900">
+                                                    Gerenciar Páginas
+                                                </h3>
+                                                <p className="text-sm text-gray-600">
+                                                    Visualizar e gerenciar páginas cadastradas no sistema
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="mt-4">
+                                            <a
+                                                href={route('pages.index')}
+                                                className="text-teal-600 hover:text-teal-900 text-sm font-medium"
+                                            >
+                                                Acessar →
+                                            </a>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Card de Logs de Atividade */}
                                 {hasPermission(PERMISSIONS.VIEW_ACTIVITY_LOGS) && (
                                     <div className="bg-white p-6 border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
