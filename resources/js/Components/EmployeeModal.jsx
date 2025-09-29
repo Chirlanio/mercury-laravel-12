@@ -189,7 +189,7 @@ export default function EmployeeModal({ show, onClose, employeeId }) {
                             )}
                             <div>
                                 <span className="font-medium text-gray-600">Loja:</span>
-                                <span className="ml-2 text-gray-900">{employee.store_id || 'Não informado'}</span>
+                                <span className="ml-2 text-gray-900">{employee.store || 'Não informado'}</span>
                             </div>
                             <div>
                                 <span className="font-medium text-gray-600">Cupom Site:</span>

@@ -3,17 +3,17 @@ import { useState } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import EmployeeModal from "@/Components/EmployeeModal";
 import EmployeeCreateModal from "@/Components/EmployeeCreateModal";
+import EmployeeEditModal from "@/Components/EmployeeEditModal";
 import DataTable from "@/Components/DataTable";
 import EmployeeAvatar from "@/Components/EmployeeAvatar";
 import Button from "@/Components/Button";
 
 export default function Index({ auth, employees, positions, stores, filters }) {
-    // Debug: Log the received props
-    console.log('Index received props:', { positions, stores, positionsLength: positions?.length, storesLength: stores?.length });
-
     const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [selectedEmployee, setSelectedEmployee] = useState(null);
 
     const viewEmployee = (employee) => {
         setSelectedEmployeeId(employee.id);
@@ -35,6 +35,32 @@ export default function Index({ auth, employees, positions, stores, filters }) {
 
     const handleEmployeeCreated = () => {
         // Recarregar a página para mostrar o novo funcionário
+        router.reload();
+    };
+
+    const editEmployee = async (employee) => {
+        try {
+            // Buscar os dados completos do funcionário para edição
+            const response = await fetch(`/employees/${employee.id}/edit`);
+            const data = await response.json();
+
+            setSelectedEmployee(data.employee);
+            setIsEditModalOpen(true);
+        } catch (error) {
+            console.error('Erro ao carregar dados do funcionário para edição:', error);
+        }
+    };
+
+    const closeEditModal = () => {
+        setIsEditModalOpen(false);
+        setSelectedEmployee(null);
+    };
+
+    const handleEmployeeUpdated = () => {
+        console.log('handleEmployeeUpdated called');
+        // Fechar modal primeiro
+        closeEditModal();
+        // Recarregar a página para mostrar as alterações
         router.reload();
     };
 
@@ -135,23 +161,39 @@ export default function Index({ auth, employees, positions, stores, filters }) {
             field: "actions",
             sortable: false,
             render: (employee) => (
-                <Button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        viewEmployee(employee);
-                    }}
-                    variant="secondary"
-                    size="sm"
-                    iconOnly={true}
-                    icon={({ className }) => (
-                        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                    )}
-                    id="view-employee-button"
-                    title="Visualizar detalhes do funcionário"
-                />
+                <div className="flex space-x-2">
+                    <Button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            viewEmployee(employee);
+                        }}
+                        variant="secondary"
+                        size="sm"
+                        iconOnly={true}
+                        icon={({ className }) => (
+                            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                        )}
+                        title="Visualizar detalhes do funcionário"
+                    />
+                    <Button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            editEmployee(employee);
+                        }}
+                        variant="warning"
+                        size="sm"
+                        iconOnly={true}
+                        icon={({ className }) => (
+                            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                        )}
+                        title="Editar funcionário"
+                    />
+                </div>
             )
         }
     ];
@@ -213,6 +255,16 @@ export default function Index({ auth, employees, positions, stores, filters }) {
                 show={isCreateModalOpen}
                 onClose={closeCreateModal}
                 onSuccess={handleEmployeeCreated}
+                positions={positions}
+                stores={stores}
+            />
+
+            {/* Employee Edit Modal */}
+            <EmployeeEditModal
+                show={isEditModalOpen}
+                onClose={closeEditModal}
+                onSuccess={handleEmployeeUpdated}
+                employee={selectedEmployee}
                 positions={positions}
                 stores={stores}
             />

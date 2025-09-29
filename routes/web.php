@@ -185,6 +185,16 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
 
     // Visualizar funcionário específico
     Route::get('/employees/{employee}', [EmployeeController::class, 'show'])->name('employees.show');
+
+    // Editar funcionário (obter dados para edição)
+    Route::get('/employees/{employee}/edit', [EmployeeController::class, 'edit'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('employees.edit');
+
+    // Atualizar funcionário (aceita PUT e POST para method spoofing)
+    Route::match(['put', 'post'], '/employees/{employee}', [EmployeeController::class, 'update'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('employees.update');
 });
 
 // Rotas para páginas básicas ainda não implementadas (placeholder)

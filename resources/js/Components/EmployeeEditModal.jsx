@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from '@inertiajs/react';
 import Modal from '@/Components/Modal';
 import Button from '@/Components/Button';
 
-export default function EmployeeCreateModal({ show, onClose, onSuccess, positions = [], stores = [] }) {
+export default function EmployeeEditModal({ show, onClose, onSuccess, employee, positions = [], stores = [] }) {
     const { data, setData, post, processing, errors, reset, clearErrors } = useForm({
         name: '',
         short_name: '',
@@ -23,14 +23,81 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
         profile_image: null,
     });
 
+    const wasProcessing = useRef(false);
+
     const levels = [
         { value: 'Junior', label: 'Júnior' },
         { value: 'Pleno', label: 'Pleno' },
         { value: 'Senior', label: 'Sênior' },
     ];
 
+    // Preencher o formulário quando o funcionário for carregado
+    useEffect(() => {
+        if (employee && show) {
+            // Formatar CPF se vier sem máscara
+            const formattedCpf = employee.cpf ? formatCPF(employee.cpf) : '';
+
+            setData({
+                name: employee.name || '',
+                short_name: employee.short_name || '',
+                cpf: formattedCpf,
+                admission_date: employee.admission_date ? formatDateForInput(employee.admission_date) : '',
+                birth_date: employee.birth_date ? formatDateForInput(employee.birth_date) : '',
+                dismissal_date: employee.dismissal_date ? formatDateForInput(employee.dismissal_date) : '',
+                position_id: employee.position_id ? String(employee.position_id) : '',
+                level: employee.level || '',
+                store_id: employee.store_id || '',
+                site_coupon: employee.site_coupon || '',
+                education_level_id: employee.education_level_id ? String(employee.education_level_id) : '',
+                gender_id: employee.gender_id ? String(employee.gender_id) : '',
+                area_id: employee.area_id ? String(employee.area_id) : '',
+                is_pcd: Boolean(employee.is_pcd),
+                is_apprentice: Boolean(employee.is_apprentice),
+                profile_image: null, // Imagem será tratada separadamente
+            });
+        }
+    }, [employee, show]);
+
+    // Detectar quando o processing termina com sucesso (desabilitado temporariamente)
+    // useEffect(() => {
+    //     console.log('Processing state changed:', {
+    //         wasProcessing: wasProcessing.current,
+    //         processing,
+    //         errorsCount: Object.keys(errors).length,
+    //         errors
+    //     });
+
+    //     if (wasProcessing.current && !processing && Object.keys(errors).length === 0) {
+    //         console.log('Processing finished successfully, closing modal');
+    //         wasProcessing.current = false;
+    //         reset();
+    //         clearErrors();
+    //         if (onSuccess) {
+    //             onSuccess();
+    //         }
+    //     }
+    //     if (processing) {
+    //         wasProcessing.current = true;
+    //     }
+    // }, [processing, errors, onSuccess, reset, clearErrors]);
+
+    const formatDateForInput = (dateString) => {
+        if (!dateString) return '';
+
+        // Se a data estiver no formato DD/MM/YYYY, converter para YYYY-MM-DD
+        if (dateString.includes('/')) {
+            const [day, month, year] = dateString.split('/');
+            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+
+        // Se já estiver no formato correto ou for um objeto Date
+        return dateString.split('T')[0]; // Remove a parte do tempo se existir
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
+
+        if (!employee?.id) return;
 
         // Preparar dados para envio - limpar CPF
         const cleanedData = {
@@ -38,8 +105,15 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
             cpf: data.cpf ? data.cpf.replace(/\D/g, '') : '', // Remove máscara do CPF
         };
 
+        console.log('Dados originais:', data);
+        console.log('CPF original:', data.cpf);
+        console.log('CPF limpo:', cleanedData.cpf);
+        console.log('Dados para envio:', cleanedData);
+        console.log('CSRF Token:', document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'));
+
         // Criar FormData manualmente para garantir que o CPF limpo seja enviado
         const formData = new FormData();
+        formData.append('_method', 'PUT');
         formData.append('name', cleanedData.name || '');
         formData.append('short_name', cleanedData.short_name || '');
         formData.append('cpf', cleanedData.cpf || ''); // CPF já limpo
@@ -61,18 +135,26 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
             formData.append('profile_image', cleanedData.profile_image);
         }
 
-        console.log('Create FormData CPF value:', formData.get('cpf'));
+        console.log('FormData CPF value:', formData.get('cpf'));
 
-        // Para upload de arquivo, usar forceFormData: true
-        post('/employees', formData, {
+        // Usar post com FormData manual
+        post(`/employees/${employee.id}`, formData, {
             forceFormData: true,
-            onSuccess: () => {
+            onSuccess: (response) => {
+                console.log('onSuccess callback - resposta:', response);
                 reset();
-                onClose();
-                if (onSuccess) onSuccess();
+                clearErrors();
+                if (onSuccess) {
+                    console.log('Chamando onSuccess callback para fechar modal');
+                    onSuccess();
+                }
             },
             onError: (errors) => {
-                console.error('Erro ao criar funcionário:', errors);
+                console.log('onError callback - erros:', errors);
+                // Não fazer nada, deixar a modal aberta para mostrar erros
+            },
+            onFinish: () => {
+                console.log('onFinish chamado - Requisição finalizada');
             }
         });
     };
@@ -84,10 +166,20 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
     };
 
     const formatCPF = (value) => {
+        if (!value) return '';
+
         // Remove tudo que não é número
         const cleanValue = value.replace(/\D/g, '');
 
-        // Aplica a máscara
+        // Aplica a máscara apenas se tiver 11 dígitos
+        if (cleanValue.length === 11) {
+            return cleanValue
+                .replace(/(\d{3})(\d)/, '$1.$2')
+                .replace(/(\d{3})(\d)/, '$1.$2')
+                .replace(/(\d{3})(\d{2})/, '$1-$2');
+        }
+
+        // Se tiver menos de 11 dígitos, aplica máscara parcial
         if (cleanValue.length <= 11) {
             return cleanValue
                 .replace(/(\d{3})(\d)/, '$1.$2')
@@ -95,7 +187,11 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
                 .replace(/(\d{3})(\d{1,2})/, '$1-$2');
         }
 
-        return value;
+        // Se vier com mais de 11 dígitos, retorna apenas os primeiros 11 formatados
+        return cleanValue.substring(0, 11)
+            .replace(/(\d{3})(\d)/, '$1.$2')
+            .replace(/(\d{3})(\d)/, '$1.$2')
+            .replace(/(\d{3})(\d{2})/, '$1-$2');
     };
 
     const handleCPFChange = (e) => {
@@ -103,8 +199,10 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
         setData('cpf', formatted);
     };
 
+    if (!employee) return null;
+
     return (
-        <Modal show={show} onClose={handleClose} title="Cadastrar Funcionário" maxWidth="2xl">
+        <Modal show={show} onClose={handleClose} title="Editar Funcionário" maxWidth="2xl">
             <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Informações Pessoais */}
                 <div className="bg-gray-50 p-4 rounded-lg">
@@ -197,12 +295,23 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
                                         errors.profile_image ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
                                     }`}
                                 />
-                                {data.profile_image && (
+                                {data.profile_image ? (
                                     <div className="flex-shrink-0">
                                         <img
                                             src={URL.createObjectURL(data.profile_image)}
                                             alt="Preview"
                                             className="h-12 w-12 rounded-full object-cover border-2 border-gray-200"
+                                        />
+                                    </div>
+                                ) : employee?.avatar_url && (
+                                    <div className="flex-shrink-0">
+                                        <img
+                                            src={employee.avatar_url}
+                                            alt="Foto atual"
+                                            className="h-12 w-12 rounded-full object-cover border-2 border-gray-200"
+                                            onError={(e) => {
+                                                e.target.style.display = 'none';
+                                            }}
                                         />
                                     </div>
                                 )}
@@ -295,6 +404,7 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
                                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
                                     errors.store_id ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
                                 }`}
+                                required
                             >
                                 <option value="">Selecione uma loja</option>
                                 {stores.map((store) => (
@@ -484,11 +594,11 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
                         loading={processing}
                         icon={processing ? null : ({ className }) => (
                             <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
                         )}
                     >
-                        {processing ? 'Salvando...' : 'Cadastrar Funcionário'}
+                        {processing ? 'Salvando...' : 'Salvar Alterações'}
                     </Button>
                 </div>
             </form>
