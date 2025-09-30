@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Modal from '@/Components/Modal';
 import EmployeeAvatar from '@/Components/EmployeeAvatar';
 
-export default function EmployeeModal({ show, onClose, employeeId }) {
+export default function EmployeeModal({ show, onClose, employeeId, onEdit }) {
     const [employee, setEmployee] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);

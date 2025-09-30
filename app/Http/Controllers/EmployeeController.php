@@ -77,6 +77,12 @@ class EmployeeController extends Controller
 
     public function store(Request $request)
     {
+        // Limpar CPF removendo máscara
+        $cleanCpf = $request->cpf ? preg_replace('/[^0-9]/', '', $request->cpf) : '';
+
+        // Substituir o CPF no request pelo CPF limpo
+        $request->merge(['cpf' => $cleanCpf]);
+
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100',
             'short_name' => 'nullable|string|max:40',
@@ -93,7 +99,7 @@ class EmployeeController extends Controller
             'area_id' => 'nullable|integer',
             'is_pcd' => 'boolean',
             'is_apprentice' => 'boolean',
-            'profile_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'profile_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:20480', // 20MB
         ]);
 
         if ($validator->fails()) {
@@ -103,18 +109,11 @@ class EmployeeController extends Controller
         try {
             $data = $request->all();
 
-            // CPF já vem limpo do frontend, apenas verificar se está válido
-            if (isset($data['cpf']) && strlen($data['cpf']) !== 11) {
-                return redirect()->back()->withErrors([
-                    'cpf' => 'O CPF deve conter exatamente 11 dígitos.'
-                ])->withInput();
-            }
-
             // Processar upload de imagem se existir
             if ($request->hasFile('profile_image')) {
                 $image = $request->file('profile_image');
                 $imageName = time() . '.' . $image->getClientOriginalExtension();
-                $image->storeAs('public/employees', $imageName);
+                $image->storeAs('employees', $imageName, 'public');
                 $data['profile_image'] = $imageName;
             }
 
@@ -138,7 +137,7 @@ class EmployeeController extends Controller
 
             $employee = Employee::create($data);
 
-            return redirect()->back()->with('success', 'Funcionário cadastrado com sucesso!');
+            return redirect()->route('employees.index')->with('success', 'Funcionário cadastrado com sucesso!');
 
         } catch (\Exception $e) {
             return redirect()->back()->withErrors([
@@ -210,20 +209,29 @@ class EmployeeController extends Controller
     {
         \Log::info('Update employee request', [
             'id' => $id,
-            'data' => $request->all()
+            'data' => $request->all(),
+            'has_file' => $request->hasFile('profile_image'),
+            'file_info' => $request->hasFile('profile_image') ? [
+                'name' => $request->file('profile_image')->getClientOriginalName(),
+                'size' => $request->file('profile_image')->getSize(),
+                'mime' => $request->file('profile_image')->getMimeType(),
+            ] : null
         ]);
 
         $employee = Employee::findOrFail($id);
 
-        // Limpar CPF para validação de unicidade
+        // Limpar CPF removendo máscara
         $cleanCpf = $request->cpf ? preg_replace('/[^0-9]/', '', $request->cpf) : '';
 
-        \Log::info('Cleaned CPF', ['original' => $request->cpf, 'cleaned' => $cleanCpf]);
+        // Substituir o CPF no request pelo CPF limpo
+        $request->merge(['cpf' => $cleanCpf]);
+
+        \Log::info('Cleaned CPF', ['original_cpf' => $request->cpf, 'cleaned' => $cleanCpf, 'length' => strlen($cleanCpf)]);
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100',
             'short_name' => 'nullable|string|max:40',
-            'cpf' => 'required|string|min:11|max:14',
+            'cpf' => 'required|string|size:11',
             'admission_date' => 'required|date',
             'birth_date' => 'nullable|date|before:today',
             'dismissal_date' => 'nullable|date|after:admission_date',
@@ -236,7 +244,7 @@ class EmployeeController extends Controller
             'area_id' => 'nullable|integer',
             'is_pcd' => 'boolean',
             'is_apprentice' => 'boolean',
-            'profile_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'profile_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:20480', // 20MB
         ]);
 
         if ($validator->fails()) {
@@ -249,43 +257,60 @@ class EmployeeController extends Controller
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
-        // Verificar unicidade do CPF
-        if ($request->cpf && strlen($request->cpf) === 11) {
-            $existingEmployee = Employee::where('cpf', $request->cpf)
-                ->where('id', '!=', $employee->id)
-                ->first();
+        // Verificar unicidade do CPF (agora já está limpo)
+        $existingEmployee = Employee::where('cpf', $cleanCpf)
+            ->where('id', '!=', $employee->id)
+            ->first();
 
-            if ($existingEmployee) {
-                return redirect()->back()->withErrors([
-                    'cpf' => 'Este CPF já está cadastrado para outro funcionário.'
-                ])->withInput();
-            }
+        if ($existingEmployee) {
+            return redirect()->back()->withErrors([
+                'cpf' => 'Este CPF já está cadastrado para outro funcionário.'
+            ])->withInput();
         }
 
         try {
-            $data = $request->all();
-
-            // CPF já vem limpo do frontend, apenas verificar se está válido
-            if (isset($data['cpf']) && strlen($data['cpf']) !== 11) {
-                return redirect()->back()->withErrors([
-                    'cpf' => 'O CPF deve conter exatamente 11 dígitos.'
-                ])->withInput();
-            }
+            $data = $request->except(['_method', '_token']);
 
             // Processar upload de imagem se existir
             if ($request->hasFile('profile_image')) {
+                \Log::info('Processing profile image upload');
+
                 // Remover imagem antiga se existir
                 if ($employee->profile_image) {
                     $oldImagePath = storage_path('app/public/employees/' . $employee->profile_image);
+                    \Log::info('Checking old image', ['path' => $oldImagePath, 'exists' => file_exists($oldImagePath)]);
                     if (file_exists($oldImagePath)) {
                         unlink($oldImagePath);
+                        \Log::info('Old image deleted');
                     }
                 }
 
                 $image = $request->file('profile_image');
                 $imageName = time() . '.' . $image->getClientOriginalExtension();
-                $image->storeAs('public/employees', $imageName);
+
+                \Log::info('Attempting to save image', [
+                    'original_name' => $image->getClientOriginalName(),
+                    'temp_path' => $image->getRealPath(),
+                    'new_name' => $imageName,
+                    'target_dir' => storage_path('app/public/employees')
+                ]);
+
+                // Usar o disk 'public' explicitamente
+                $storedPath = $image->storeAs('employees', $imageName, 'public');
+
+                if ($storedPath === false) {
+                    \Log::error('Failed to store image');
+                    throw new \Exception('Falha ao salvar imagem');
+                }
+
                 $data['profile_image'] = $imageName;
+
+                \Log::info('New image saved', [
+                    'name' => $imageName,
+                    'stored_path' => $storedPath,
+                    'full_path' => storage_path('app/public/employees/' . $imageName),
+                    'file_exists' => file_exists(storage_path('app/public/employees/' . $imageName))
+                ]);
             }
 
             // Definir valores padrão para campos obrigatórios se estiverem vazios
@@ -311,13 +336,9 @@ class EmployeeController extends Controller
                 $data['status_id'] = 2;
             }
 
-            // Remover campos vazios (mas manter os que têm valores padrão)
-            $data = array_filter($data, function($value, $key) {
-                if (in_array($key, ['short_name', 'birth_date', 'position_id', 'store_id', 'education_level_id', 'gender_id', 'area_id', 'level', 'status_id'])) {
-                    return true; // Manter campos obrigatórios mesmo se vazios
-                }
-                return $value !== null && $value !== '';
-            }, ARRAY_FILTER_USE_BOTH);
+            // Converter booleanos
+            $data['is_pcd'] = isset($data['is_pcd']) && ($data['is_pcd'] === '1' || $data['is_pcd'] === true);
+            $data['is_apprentice'] = isset($data['is_apprentice']) && ($data['is_apprentice'] === '1' || $data['is_apprentice'] === true);
 
             \Log::info('Updating employee with data', ['data' => $data]);
 
@@ -325,12 +346,49 @@ class EmployeeController extends Controller
 
             \Log::info('Employee updated successfully', ['id' => $employee->id]);
 
-            return redirect()->back()->with('success', 'Funcionário atualizado com sucesso!');
+            return redirect()->route('employees.index')->with('success', 'Funcionário atualizado com sucesso!');
 
         } catch (\Exception $e) {
             return redirect()->back()->withErrors([
                 'general' => 'Erro ao atualizar funcionário: ' . $e->getMessage()
             ])->withInput();
+        }
+    }
+
+    public function destroy($id)
+    {
+        try {
+            $employee = Employee::findOrFail($id);
+
+            \Log::info('Deleting employee', [
+                'id' => $employee->id,
+                'name' => $employee->name
+            ]);
+
+            // Deletar imagem do perfil se existir
+            if ($employee->profile_image) {
+                $imagePath = storage_path('app/public/employees/' . $employee->profile_image);
+                if (file_exists($imagePath)) {
+                    unlink($imagePath);
+                    \Log::info('Profile image deleted', ['path' => $imagePath]);
+                }
+            }
+
+            $employee->delete();
+
+            \Log::info('Employee deleted successfully', ['id' => $id]);
+
+            return redirect()->route('employees.index')->with('success', 'Funcionário excluído com sucesso!');
+
+        } catch (\Exception $e) {
+            \Log::error('Error deleting employee', [
+                'id' => $id,
+                'error' => $e->getMessage()
+            ]);
+
+            return redirect()->back()->withErrors([
+                'general' => 'Erro ao excluir funcionário: ' . $e->getMessage()
+            ]);
         }
     }
 }

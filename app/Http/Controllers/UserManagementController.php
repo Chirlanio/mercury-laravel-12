@@ -230,70 +230,7 @@ class UserManagementController extends Controller
         return redirect()->route('users.index')->with('success', 'Usuário atualizado com sucesso!');
     }
 
-    /**
-     * Update user with file uploads (uses POST instead of PATCH to handle files properly)
-     */
-    public function updateWithFiles(Request $request, User $user)
-    {
-        $currentUser = auth()->user();
 
-        // Verificar se pode editar este usuário
-        if (!$currentUser->canEditUser($user)) {
-            abort(403, 'Você não tem permissão para editar este usuário.');
-        }
-
-        $validatedData = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
-            'role' => 'required|string|in:super_admin,admin,support,user',
-            'avatar' => ['nullable', ValidImageRule::avatar()],
-            'remove_avatar' => 'boolean',
-        ]);
-
-        $updateData = [
-            'name' => $validatedData['name'],
-            'email' => $validatedData['email'],
-        ];
-
-        // Verificar e atualizar role se presente e permitido
-        $newRole = Role::from($validatedData['role']);
-        if (!$currentUser->canManageRole($newRole) || !$currentUser->canManageRole($user->role)) {
-            return back()->withErrors([
-                'role' => 'Você não pode alterar o nível de acesso deste usuário.'
-            ]);
-        }
-        $updateData['role'] = $newRole;
-
-        // Remover avatar se solicitado
-        if ($request->boolean('remove_avatar') && $user->avatar) {
-            try {
-                $imageUploadService = app(ImageUploadService::class);
-                $imageUploadService->deleteFile($user->avatar);
-                $updateData['avatar'] = null;
-            } catch (Exception $e) {
-                return back()->withErrors(['avatar' => 'Erro ao remover a imagem: ' . $e->getMessage()]);
-            }
-        }
-
-        // Upload do avatar se fornecido
-        if ($request->hasFile('avatar')) {
-            try {
-                $imageUploadService = app(ImageUploadService::class);
-                $avatarPath = $imageUploadService->uploadUserAvatar(
-                    $request->file('avatar'),
-                    $user->avatar // Remove avatar antigo
-                );
-                $updateData['avatar'] = $avatarPath;
-            }
-            catch (Exception $e) {
-                return back()->withErrors(['avatar' => 'Erro no upload da imagem: ' . $e->getMessage()]);
-            }
-        }
-
-        $user->update($updateData);
-
-        return redirect()->route('users.index')->with('success', 'Usuário atualizado com sucesso!');
-    }
 
     public function destroy(User $user)
     {

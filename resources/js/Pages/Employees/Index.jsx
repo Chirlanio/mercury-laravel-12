@@ -1,6 +1,7 @@
 import { Head, router } from "@inertiajs/react";
 import { useState } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
+import Modal from "@/Components/Modal";
 import EmployeeModal from "@/Components/EmployeeModal";
 import EmployeeCreateModal from "@/Components/EmployeeCreateModal";
 import EmployeeEditModal from "@/Components/EmployeeEditModal";
@@ -14,6 +15,8 @@ export default function Index({ auth, employees, positions, stores, filters }) {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState(null);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [employeeToDelete, setEmployeeToDelete] = useState(null);
 
     const viewEmployee = (employee) => {
         setSelectedEmployeeId(employee.id);
@@ -62,6 +65,32 @@ export default function Index({ auth, employees, positions, stores, filters }) {
         closeEditModal();
         // Recarregar a página para mostrar as alterações
         router.reload();
+    };
+
+    const openDeleteModal = (employee) => {
+        setEmployeeToDelete(employee);
+        setIsDeleteModalOpen(true);
+    };
+
+    const closeDeleteModal = () => {
+        setIsDeleteModalOpen(false);
+        setEmployeeToDelete(null);
+    };
+
+    const handleDeleteEmployee = () => {
+        if (!employeeToDelete) return;
+
+        router.delete(`/employees/${employeeToDelete.id}`, {
+            preserveState: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                console.log('Funcionário deletado com sucesso');
+                closeDeleteModal();
+            },
+            onError: (errors) => {
+                console.error('Erro ao deletar funcionário:', errors);
+            }
+        });
     };
 
     // Definição das colunas da tabela
@@ -193,6 +222,21 @@ export default function Index({ auth, employees, positions, stores, filters }) {
                         )}
                         title="Editar funcionário"
                     />
+                    <Button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            openDeleteModal(employee);
+                        }}
+                        variant="danger"
+                        size="sm"
+                        iconOnly={true}
+                        icon={({ className }) => (
+                            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        )}
+                        title="Excluir funcionário"
+                    />
                 </div>
             )
         }
@@ -268,6 +312,55 @@ export default function Index({ auth, employees, positions, stores, filters }) {
                 positions={positions}
                 stores={stores}
             />
+
+            {/* Delete Confirmation Modal */}
+            <Modal show={isDeleteModalOpen} onClose={closeDeleteModal} title="Confirmar Exclusão" maxWidth="md">
+                <div className="space-y-6">
+                    <div className="flex items-start space-x-4">
+                        <div className="flex-shrink-0">
+                            <svg className="h-12 w-12 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                Tem certeza que deseja excluir este funcionário?
+                            </h3>
+                            {employeeToDelete && (
+                                <div className="text-sm text-gray-600 space-y-1">
+                                    <p><strong>Nome:</strong> {employeeToDelete.name}</p>
+                                    <p><strong>Cargo:</strong> {employeeToDelete.position}</p>
+                                </div>
+                            )}
+                            <p className="mt-4 text-sm text-red-600 font-semibold">
+                                Esta ação não pode ser desfeita. Todos os dados do funcionário serão permanentemente excluídos.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end space-x-3 pt-4 border-t">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={closeDeleteModal}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="danger"
+                            onClick={handleDeleteEmployee}
+                            icon={({ className }) => (
+                                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            )}
+                        >
+                            Excluir Funcionário
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </AuthenticatedLayout>
     );
 }

@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { useForm } from '@inertiajs/react';
+import { useForm, router } from '@inertiajs/react';
 import Modal from '@/Components/Modal';
 import Button from '@/Components/Button';
 
 export default function EmployeeCreateModal({ show, onClose, onSuccess, positions = [], stores = [] }) {
-    const { data, setData, post, processing, errors, reset, clearErrors } = useForm({
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const { data, setData, errors, reset, clearErrors, setError } = useForm({
         name: '',
         short_name: '',
         cpf: '',
@@ -38,41 +39,32 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
             cpf: data.cpf ? data.cpf.replace(/\D/g, '') : '', // Remove máscara do CPF
         };
 
-        // Criar FormData manualmente para garantir que o CPF limpo seja enviado
-        const formData = new FormData();
-        formData.append('name', cleanedData.name || '');
-        formData.append('short_name', cleanedData.short_name || '');
-        formData.append('cpf', cleanedData.cpf || ''); // CPF já limpo
-        formData.append('admission_date', cleanedData.admission_date || '');
-        formData.append('birth_date', cleanedData.birth_date || '');
-        formData.append('dismissal_date', cleanedData.dismissal_date || '');
-        formData.append('position_id', cleanedData.position_id || '');
-        formData.append('level', cleanedData.level || '');
-        formData.append('store_id', cleanedData.store_id || '');
-        formData.append('site_coupon', cleanedData.site_coupon || '');
-        formData.append('education_level_id', cleanedData.education_level_id || '');
-        formData.append('gender_id', cleanedData.gender_id || '');
-        formData.append('area_id', cleanedData.area_id || '');
-        formData.append('is_pcd', cleanedData.is_pcd ? '1' : '0');
-        formData.append('is_apprentice', cleanedData.is_apprentice ? '1' : '0');
+        console.log('Create employee data:', cleanedData);
+        console.log('CPF limpo:', cleanedData.cpf);
 
-        // Adicionar arquivo se selecionado
-        if (cleanedData.profile_image) {
-            formData.append('profile_image', cleanedData.profile_image);
-        }
+        setIsSubmitting(true);
 
-        console.log('Create FormData CPF value:', formData.get('cpf'));
-
-        // Para upload de arquivo, usar forceFormData: true
-        post('/employees', formData, {
-            forceFormData: true,
+        // Usar router.post diretamente para melhor controle
+        router.post('/employees', cleanedData, {
+            preserveState: false, // Não preservar o estado para forçar reload completo
+            preserveScroll: false,
             onSuccess: () => {
+                console.log('Create successful, closing modal');
+                setIsSubmitting(false);
                 reset();
-                onClose();
-                if (onSuccess) onSuccess();
+                clearErrors();
+                if (onSuccess) {
+                    onSuccess();
+                }
             },
             onError: (errors) => {
                 console.error('Erro ao criar funcionário:', errors);
+                setIsSubmitting(false);
+                setError(errors);
+            },
+            onFinish: () => {
+                console.log('Requisição finalizada');
+                setIsSubmitting(false);
             }
         });
     };
@@ -192,7 +184,19 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
                                     type="file"
                                     id="profile_image"
                                     accept="image/jpeg,image/png,image/jpg,image/gif"
-                                    onChange={(e) => setData('profile_image', e.target.files[0])}
+                                    onChange={(e) => {
+                                        const file = e.target.files[0];
+                                        if (file) {
+                                            // Verificar tamanho do arquivo (20MB = 20 * 1024 * 1024 bytes)
+                                            if (file.size > 20 * 1024 * 1024) {
+                                                setError('profile_image', 'O arquivo deve ter no máximo 20MB');
+                                                e.target.value = ''; // Limpar o input
+                                                return;
+                                            }
+                                            clearErrors('profile_image');
+                                            setData('profile_image', file);
+                                        }
+                                    }}
                                     className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
                                         errors.profile_image ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
                                     }`}
@@ -209,7 +213,7 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
                             </div>
                             {errors.profile_image && <p className="mt-1 text-sm text-red-600">{errors.profile_image}</p>}
                             <p className="mt-1 text-xs text-gray-500">
-                                Formatos aceitos: JPEG, PNG, JPG, GIF. Tamanho máximo: 2MB
+                                Formatos aceitos: JPEG, PNG, JPG, GIF. Tamanho máximo: 20MB
                             </p>
                         </div>
                     </div>
@@ -473,7 +477,7 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
                         type="button"
                         variant="outline"
                         onClick={handleClose}
-                        disabled={processing}
+                        disabled={isSubmitting}
                     >
                         Cancelar
                     </Button>
@@ -481,14 +485,14 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
                     <Button
                         type="submit"
                         variant="primary"
-                        loading={processing}
-                        icon={processing ? null : ({ className }) => (
+                        loading={isSubmitting}
+                        icon={isSubmitting ? null : ({ className }) => (
                             <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                             </svg>
                         )}
                     >
-                        {processing ? 'Salvando...' : 'Cadastrar Funcionário'}
+                        {isSubmitting ? 'Salvando...' : 'Cadastrar Funcionário'}
                     </Button>
                 </div>
             </form>

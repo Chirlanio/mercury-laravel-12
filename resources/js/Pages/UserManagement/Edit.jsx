@@ -25,33 +25,16 @@ export default function Edit({ auth, user = {}, roles = {} }) {
         console.log('Avatar instanceof File:', data.avatar instanceof File);
         console.log('Avatar value:', data.avatar);
 
-        // Se há arquivo, usa o endpoint especial POST, senão usa PATCH normal
-        if (data.avatar instanceof File) {
-            console.log('✅ Using updateWithFiles endpoint for file upload');
-            console.log('Route:', route('users.updateWithFiles', user.id));
-            post(route('users.updateWithFiles', user.id), {
-                forceFormData: true,
-                preserveScroll: true,
-                onError: (errors) => {
-                    console.log('❌ Validation errors:', errors);
-                },
-                onSuccess: (response) => {
-                    console.log('✅ Success:', response);
-                }
-            });
-        } else {
-            console.log('🔄 Using regular update endpoint');
-            console.log('Route:', route('users.update', user.id));
-            patch(route('users.update', user.id), {
-                preserveScroll: true,
-                onError: (errors) => {
-                    console.log('❌ Validation errors:', errors);
-                },
-                onSuccess: (response) => {
-                    console.log('✅ Success:', response);
-                }
-            });
-        }
+        post(route('users.update', user.id), {
+            forceFormData: true,
+            preserveScroll: true,
+            onError: (errors) => {
+                console.log('❌ Validation errors:', errors);
+            },
+            onSuccess: (response) => {
+                console.log('✅ Success:', response);
+            }
+        });
     };
 
     const removeAvatar = () => {

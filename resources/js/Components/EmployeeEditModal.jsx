@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
-import { useForm } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
+import { useForm, router } from '@inertiajs/react';
 import Modal from '@/Components/Modal';
 import Button from '@/Components/Button';
 
 export default function EmployeeEditModal({ show, onClose, onSuccess, employee, positions = [], stores = [] }) {
-    const { data, setData, post, processing, errors, reset, clearErrors } = useForm({
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const { data, setData, errors, reset, clearErrors, setError } = useForm({
         name: '',
         short_name: '',
         cpf: '',
@@ -22,8 +23,6 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
         is_apprentice: false,
         profile_image: null,
     });
-
-    const wasProcessing = useRef(false);
 
     const levels = [
         { value: 'Junior', label: 'Júnior' },
@@ -58,28 +57,6 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
         }
     }, [employee, show]);
 
-    // Detectar quando o processing termina com sucesso (desabilitado temporariamente)
-    // useEffect(() => {
-    //     console.log('Processing state changed:', {
-    //         wasProcessing: wasProcessing.current,
-    //         processing,
-    //         errorsCount: Object.keys(errors).length,
-    //         errors
-    //     });
-
-    //     if (wasProcessing.current && !processing && Object.keys(errors).length === 0) {
-    //         console.log('Processing finished successfully, closing modal');
-    //         wasProcessing.current = false;
-    //         reset();
-    //         clearErrors();
-    //         if (onSuccess) {
-    //             onSuccess();
-    //         }
-    //     }
-    //     if (processing) {
-    //         wasProcessing.current = true;
-    //     }
-    // }, [processing, errors, onSuccess, reset, clearErrors]);
 
     const formatDateForInput = (dateString) => {
         if (!dateString) return '';
@@ -103,58 +80,48 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
         const cleanedData = {
             ...data,
             cpf: data.cpf ? data.cpf.replace(/\D/g, '') : '', // Remove máscara do CPF
+            _method: 'PUT'
         };
 
-        console.log('Dados originais:', data);
-        console.log('CPF original:', data.cpf);
-        console.log('CPF limpo:', cleanedData.cpf);
-        console.log('Dados para envio:', cleanedData);
-        console.log('CSRF Token:', document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'));
-
-        // Criar FormData manualmente para garantir que o CPF limpo seja enviado
-        const formData = new FormData();
-        formData.append('_method', 'PUT');
-        formData.append('name', cleanedData.name || '');
-        formData.append('short_name', cleanedData.short_name || '');
-        formData.append('cpf', cleanedData.cpf || ''); // CPF já limpo
-        formData.append('admission_date', cleanedData.admission_date || '');
-        formData.append('birth_date', cleanedData.birth_date || '');
-        formData.append('dismissal_date', cleanedData.dismissal_date || '');
-        formData.append('position_id', cleanedData.position_id || '');
-        formData.append('level', cleanedData.level || '');
-        formData.append('store_id', cleanedData.store_id || '');
-        formData.append('site_coupon', cleanedData.site_coupon || '');
-        formData.append('education_level_id', cleanedData.education_level_id || '');
-        formData.append('gender_id', cleanedData.gender_id || '');
-        formData.append('area_id', cleanedData.area_id || '');
-        formData.append('is_pcd', cleanedData.is_pcd ? '1' : '0');
-        formData.append('is_apprentice', cleanedData.is_apprentice ? '1' : '0');
-
-        // Adicionar arquivo se selecionado
-        if (cleanedData.profile_image) {
-            formData.append('profile_image', cleanedData.profile_image);
+        // Se não há um arquivo novo (apenas string com nome do arquivo antigo), remover o campo
+        if (typeof cleanedData.profile_image === 'string') {
+            delete cleanedData.profile_image;
         }
 
-        console.log('FormData CPF value:', formData.get('cpf'));
+        console.log('Dados originais:', data);
+        console.log('Tipo de profile_image:', typeof data.profile_image);
+        console.log('Profile image é File?', data.profile_image instanceof File);
+        console.log('Dados para envio:', cleanedData);
 
-        // Usar post com FormData manual
-        post(`/employees/${employee.id}`, formData, {
-            forceFormData: true,
-            onSuccess: (response) => {
-                console.log('onSuccess callback - resposta:', response);
+        setIsSubmitting(true);
+
+        // Usar router.post diretamente para melhor controle
+        router.post(`/employees/${employee.id}`, cleanedData, {
+            preserveState: false, // Não preservar o estado para forçar reload completo
+            preserveScroll: false,
+            onBefore: () => {
+                console.log('onBefore - iniciando requisição');
+            },
+            onStart: () => {
+                console.log('onStart - requisição iniciada');
+            },
+            onSuccess: (page) => {
+                console.log('Update successful, closing modal', page);
+                setIsSubmitting(false);
                 reset();
                 clearErrors();
                 if (onSuccess) {
-                    console.log('Chamando onSuccess callback para fechar modal');
                     onSuccess();
                 }
             },
             onError: (errors) => {
-                console.log('onError callback - erros:', errors);
-                // Não fazer nada, deixar a modal aberta para mostrar erros
+                console.error('Erro ao atualizar funcionário:', errors);
+                setIsSubmitting(false);
+                setError(errors);
             },
             onFinish: () => {
-                console.log('onFinish chamado - Requisição finalizada');
+                console.log('Requisição finalizada');
+                setIsSubmitting(false);
             }
         });
     };
@@ -290,7 +257,19 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
                                     type="file"
                                     id="profile_image"
                                     accept="image/jpeg,image/png,image/jpg,image/gif"
-                                    onChange={(e) => setData('profile_image', e.target.files[0])}
+                                    onChange={(e) => {
+                                        const file = e.target.files[0];
+                                        if (file) {
+                                            // Verificar tamanho do arquivo (20MB = 20 * 1024 * 1024 bytes)
+                                            if (file.size > 20 * 1024 * 1024) {
+                                                setError('profile_image', 'O arquivo deve ter no máximo 20MB');
+                                                e.target.value = ''; // Limpar o input
+                                                return;
+                                            }
+                                            clearErrors('profile_image');
+                                            setData('profile_image', file);
+                                        }
+                                    }}
                                     className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
                                         errors.profile_image ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
                                     }`}
@@ -318,7 +297,7 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
                             </div>
                             {errors.profile_image && <p className="mt-1 text-sm text-red-600">{errors.profile_image}</p>}
                             <p className="mt-1 text-xs text-gray-500">
-                                Formatos aceitos: JPEG, PNG, JPG, GIF. Tamanho máximo: 2MB
+                                Formatos aceitos: JPEG, PNG, JPG, GIF. Tamanho máximo: 20MB
                             </p>
                         </div>
                     </div>
@@ -583,7 +562,7 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
                         type="button"
                         variant="outline"
                         onClick={handleClose}
-                        disabled={processing}
+                        disabled={isSubmitting}
                     >
                         Cancelar
                     </Button>
@@ -591,14 +570,14 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
                     <Button
                         type="submit"
                         variant="primary"
-                        loading={processing}
-                        icon={processing ? null : ({ className }) => (
+                        loading={isSubmitting}
+                        icon={isSubmitting ? null : ({ className }) => (
                             <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
                         )}
                     >
-                        {processing ? 'Salvando...' : 'Salvar Alterações'}
+                        {isSubmitting ? 'Salvando...' : 'Salvar Alterações'}
                     </Button>
                 </div>
             </form>

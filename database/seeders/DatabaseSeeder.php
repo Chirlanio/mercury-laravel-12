@@ -27,6 +27,7 @@ class DatabaseSeeder extends Seeder
             MenuSeeder::class,
             AdditionalAccessLevelsSeeder::class,
             PositionLevelSeeder::class,
+            PositionSeeder::class,
             PageGroupSeeder::class,
             PageSeeder::class,
             AccessLevelPageSeeder::class,

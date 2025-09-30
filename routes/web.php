@@ -73,12 +73,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/users/{user}/edit', [UserManagementController::class, 'edit'])
         ->middleware('permission:' . Permission::EDIT_USERS->value . ',' . Permission::EDIT_ANY_PROFILE->value)
         ->name('users.edit');
-    Route::patch('/users/{user}', [UserManagementController::class, 'update'])
+    Route::post('/users/{user}', [UserManagementController::class, 'update'])
         ->middleware('permission:' . Permission::EDIT_USERS->value . ',' . Permission::EDIT_ANY_PROFILE->value)
         ->name('users.update');
-    Route::post('/users/{user}/update-with-files', [UserManagementController::class, 'updateWithFiles'])
-        ->middleware('permission:' . Permission::EDIT_USERS->value . ',' . Permission::EDIT_ANY_PROFILE->value)
-        ->name('users.updateWithFiles');
 
     // Deletar usuários
     Route::delete('/users/{user}', [UserManagementController::class, 'destroy'])
@@ -195,6 +192,11 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
     Route::match(['put', 'post'], '/employees/{employee}', [EmployeeController::class, 'update'])
         ->middleware('permission:' . Permission::EDIT_USERS->value)
         ->name('employees.update');
+
+    // Deletar funcionário
+    Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy'])
+        ->middleware('permission:' . Permission::DELETE_USERS->value)
+        ->name('employees.destroy');
 });
 
 // Rotas para páginas básicas ainda não implementadas (placeholder)

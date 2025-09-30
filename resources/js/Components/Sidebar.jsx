@@ -93,7 +93,7 @@ export default function Sidebar({ isOpen, onClose }) {
             "Escola Digital": { route: "/escola-digital", permission: null },
             Movidesk: { route: "/movidesk", permission: null },
             "Biblioteca de Processos": { route: "/biblioteca-processos", permission: null },
-            "Listar Funcionários": { route: "/employees", permission: PERMISSIONS.VIEW_USERS },
+            "Funcionários": { route: "/employees", permission: PERMISSIONS.VIEW_USERS },
         };
         return menuRoutes[menuName] || null;
     };

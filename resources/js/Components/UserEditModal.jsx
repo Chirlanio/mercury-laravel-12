@@ -36,23 +36,13 @@ export default function UserEditModal({ show, onClose, user, roles = {} }) {
     const submit = (e) => {
         e.preventDefault();
 
-        // Se há arquivo, usa o endpoint especial POST, senão usa PATCH normal
-        if (data.avatar instanceof File) {
-            post(route('users.updateWithFiles', user.id), {
-                forceFormData: true,
-                onSuccess: () => onClose(),
-                onError: (errors) => {
-                    console.log('Validation errors:', errors);
-                },
-            });
-        } else {
-            patch(route('users.update', user.id), {
-                onSuccess: () => onClose(),
-                onError: (errors) => {
-                    console.log('Validation errors:', errors);
-                },
-            });
-        }
+        post(route('users.update', user.id), {
+            forceFormData: true,
+            onSuccess: () => onClose(),
+            onError: (errors) => {
+                console.log('Validation errors:', errors);
+            },
+        });
     };
 
     const getRoleBadgeColor = (role) => {
