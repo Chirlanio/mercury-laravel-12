@@ -8,9 +8,9 @@ import Button from '@/Components/Button';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
-import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline';
 
-export default function Index({ auth, users = { data: [], links: [] }, roles = {}, filters = {} }) {
+export default function Index({ auth, users = { data: [], links: [] }, roles = {}, stores = [], filters = {} }) {
     const [processing, setProcessing] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
@@ -27,6 +27,17 @@ export default function Index({ auth, users = { data: [], links: [] }, roles = {
                 {
                     onFinish: () => setProcessing(false),
                     preserveScroll: true,
+                    onError: (errors) => {
+                        console.error('Erro ao alterar nível de acesso:', errors);
+                        if (errors.role) {
+                            alert(errors.role);
+                        } else {
+                            alert('Erro ao alterar o nível de acesso. Verifique suas permissões.');
+                        }
+                    },
+                    onSuccess: () => {
+                        console.log('Nível de acesso alterado com sucesso');
+                    }
                 }
             );
         }
@@ -136,13 +147,22 @@ export default function Index({ auth, users = { data: [], links: [] }, roles = {
             sortable: false,
             render: (user) => (
                 <div className="flex items-center space-x-2">
+                    <Button
+                        onClick={() => handleViewUser(user)}
+                        variant="secondary"
+                        size="sm"
+                        icon={EyeIcon}
+                        iconOnly
+                        title="Visualizar usuário"
+                    />
                     {canEditUser(user) && (
                         <Button
                             onClick={() => handleEditUser(user)}
-                            variant="info"
+                            variant="warning"
                             size="sm"
                             icon={PencilIcon}
                             iconOnly
+                            title="Editar usuário"
                         />
                     )}
                     {canDeleteUser(user) && hasPermission(PERMISSIONS.DELETE_USERS) && (
@@ -152,6 +172,7 @@ export default function Index({ auth, users = { data: [], links: [] }, roles = {
                             size="sm"
                             icon={TrashIcon}
                             iconOnly
+                            title="Excluir usuário"
                         />
                     )}
                 </div>
@@ -205,6 +226,7 @@ export default function Index({ auth, users = { data: [], links: [] }, roles = {
                 show={showCreateModal}
                 onClose={closeModals}
                 roles={roles}
+                stores={stores}
             />
 
             <UserEditModal
@@ -212,6 +234,7 @@ export default function Index({ auth, users = { data: [], links: [] }, roles = {
                 onClose={closeModals}
                 user={selectedUser}
                 roles={roles}
+                stores={stores}
             />
 
             <UserViewModal
@@ -219,6 +242,16 @@ export default function Index({ auth, users = { data: [], links: [] }, roles = {
                 onClose={closeModals}
                 user={selectedUser}
                 roles={roles}
+                onEdit={(user) => {
+                    closeModals();
+                    handleEditUser(user);
+                }}
+                onDelete={(user) => {
+                    closeModals();
+                    handleDelete(user.id, user.name);
+                }}
+                canEdit={selectedUser && canEditUser(selectedUser)}
+                canDelete={selectedUser && canDeleteUser(selectedUser) && hasPermission(PERMISSIONS.DELETE_USERS)}
             />
         </AuthenticatedLayout>
     );

@@ -169,7 +169,7 @@ class EmployeeController extends Controller
                 'years_of_service' => $employee->years_of_service,
                 'is_pcd' => $employee->is_pcd,
                 'is_apprentice' => $employee->is_apprentice,
-                'education_level' => $employee->educationLevel?->name ?? 'Não informado',
+                'education_level' => $employee->educationLevel?->description_name ?? 'Não informado',
                 'site_coupon' => $employee->site_coupon,
                 'store' => $employee->store?->display_name ?? $employee->store_id ?? 'Não informado',
             ]

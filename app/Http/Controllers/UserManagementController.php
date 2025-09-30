@@ -5,9 +5,10 @@ namespace App\Http\Controllers;
 use App\Enums\Role;
 use App\Enums\Permission;
 use App\Models\User;
+use App\Models\Store;
 use App\Models\ActivityLog;
 use App\Rules\ValidImageRule;
-use App\Services\ImageUploadService;
+
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -51,20 +52,28 @@ class UserManagementController extends Controller
 
         $users = $query->paginate($perPage);
 
+        // Buscar lojas ativas
+        $stores = Store::active()->orderBy('name')->get(['code', 'name'])->values();
+
         return Inertia::render('UserManagement/Index', [
             'users' => $users->through(function ($user) {
                 return [
                     'id' => $user->id,
                     'name' => $user->name,
+                    'nickname' => $user->nickname,
                     'email' => $user->email,
+                    'username' => $user->username,
                     'role' => $user->role->value,
                     'created_at' => $user->created_at,
                     'email_verified_at' => $user->email_verified_at,
                     'avatar_url' => $user->avatar_url,
                     'has_custom_avatar' => $user->hasCustomAvatar(),
+                    'store_id' => $user->store_id,
+                    'status_id' => $user->status_id,
                 ];
             }),
             'roles' => Role::options(),
+            'stores' => $stores,
             'filters' => [
                 'search' => $search,
                 'sort' => $sortField,
@@ -85,26 +94,35 @@ class UserManagementController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
+            'nickname' => 'nullable|string|max:220',
             'email' => 'required|string|email|max:255|unique:users',
+            'username' => 'nullable|string|max:220|unique:users',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'role' => 'required|string|in:super_admin,admin,support,user',
             'avatar' => ['nullable', ValidImageRule::avatar()],
+            'store_id' => 'required|string|exists:stores,code',
+            'status_id' => 'nullable|integer',
         ]);
 
         $userData = [
             'name' => $request->name,
+            'nickname' => $request->nickname,
             'email' => $request->email,
+            'username' => $request->username,
             'password' => Hash::make($request->password),
             'role' => $request->role,
             'email_verified_at' => now(), // Auto-verificar email para usuários criados pelo admin
+            'store_id' => $request->store_id,
+            'status_id' => $request->status_id ?? 1,
         ];
 
         // Upload do avatar se fornecido
         if ($request->hasFile('avatar')) {
             try {
-                $imageUploadService = app(ImageUploadService::class);
-                $avatarPath = $imageUploadService->uploadUserAvatar($request->file('avatar'));
-                $userData['avatar'] = $avatarPath;
+                $image = $request->file('avatar');
+                $imageName = time() . '.' . $image->getClientOriginalExtension();
+                $image->storeAs('avatars', $imageName, 'public');
+                $userData['avatar'] = $imageName;
             } catch (Exception $e) {
                 return back()->withErrors(['avatar' => 'Erro no upload da imagem: ' . $e->getMessage()]);
             }
@@ -169,10 +187,14 @@ class UserManagementController extends Controller
 
         $validatedData = $request->validate([
             'name' => 'sometimes|required|string|max:255',
+            'nickname' => 'nullable|string|max:220',
             'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . $user->id,
+            'username' => 'nullable|string|max:220|unique:users,username,' . $user->id,
             'role' => 'sometimes|required|string|in:super_admin,admin,support,user',
             'avatar' => ['nullable', ValidImageRule::avatar()],
             'remove_avatar' => 'boolean',
+            'store_id' => 'required|string|exists:stores,code',
+            'status_id' => 'nullable|integer',
         ]);
 
         $updateData = [];
@@ -181,8 +203,20 @@ class UserManagementController extends Controller
         if (isset($validatedData['name'])) {
             $updateData['name'] = $validatedData['name'];
         }
+        if (isset($validatedData['nickname'])) {
+            $updateData['nickname'] = $validatedData['nickname'];
+        }
         if (isset($validatedData['email'])) {
             $updateData['email'] = $validatedData['email'];
+        }
+        if (isset($validatedData['username'])) {
+            $updateData['username'] = $validatedData['username'];
+        }
+        if (isset($validatedData['store_id'])) {
+            $updateData['store_id'] = $validatedData['store_id'];
+        }
+        if (isset($validatedData['status_id'])) {
+            $updateData['status_id'] = $validatedData['status_id'];
         }
 
         // Verificar e atualizar role se presente e permitido
@@ -200,8 +234,10 @@ class UserManagementController extends Controller
         // Remover avatar se solicitado
         if ($request->boolean('remove_avatar') && $user->avatar) {
             try {
-                $imageUploadService = app(ImageUploadService::class);
-                $imageUploadService->deleteFile($user->avatar);
+                $imagePath = storage_path('app/public/avatars/' . $user->avatar);
+                if (file_exists($imagePath)) {
+                    unlink($imagePath);
+                }
                 $updateData['avatar'] = null;
             } catch (Exception $e) {
                 return back()->withErrors(['avatar' => 'Erro ao remover a imagem: ' . $e->getMessage()]);
@@ -211,14 +247,19 @@ class UserManagementController extends Controller
         // Upload do avatar se fornecido
         if ($request->hasFile('avatar')) {
             try {
-                $imageUploadService = app(ImageUploadService::class);
-                $avatarPath = $imageUploadService->uploadUserAvatar(
-                    $request->file('avatar'),
-                    $user->avatar // Remove avatar antigo
-                );
-                $updateData['avatar'] = $avatarPath;
-            }
-            catch (Exception $e) {
+                // Remover imagem antiga se existir
+                if ($user->avatar) {
+                    $oldImagePath = storage_path('app/public/avatars/' . $user->avatar);
+                    if (file_exists($oldImagePath)) {
+                        unlink($oldImagePath);
+                    }
+                }
+
+                $image = $request->file('avatar');
+                $imageName = time() . '.' . $image->getClientOriginalExtension();
+                $image->storeAs('avatars', $imageName, 'public');
+                $updateData['avatar'] = $imageName;
+            } catch (Exception $e) {
                 return back()->withErrors(['avatar' => 'Erro no upload da imagem: ' . $e->getMessage()]);
             }
         }
@@ -245,8 +286,10 @@ class UserManagementController extends Controller
 
         // Remove avatar antes de deletar o usuário
         if ($user->avatar) {
-            $imageUploadService = app(ImageUploadService::class);
-            $imageUploadService->deleteFile($user->avatar);
+            $imagePath = storage_path('app/public/avatars/' . $user->avatar);
+            if (file_exists($imagePath)) {
+                unlink($imagePath);
+            }
         }
 
         $user->delete();
@@ -289,8 +332,10 @@ class UserManagementController extends Controller
         }
 
         if ($user->avatar) {
-            $imageUploadService = app(ImageUploadService::class);
-            $imageUploadService->deleteFile($user->avatar);
+            $imagePath = storage_path('app/public/avatars/' . $user->avatar);
+            if (file_exists($imagePath)) {
+                unlink($imagePath);
+            }
 
             $user->update(['avatar' => null]);
 

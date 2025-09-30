@@ -1,7 +1,9 @@
 import Modal from '@/Components/Modal';
 import UserAvatar from '@/Components/UserAvatar';
+import Button from '@/Components/Button';
+import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 
-export default function UserViewModal({ show, onClose, user, roles = {} }) {
+export default function UserViewModal({ show, onClose, user, roles = {}, onEdit, onDelete, canEdit = false, canDelete = false }) {
     const getRoleBadgeColor = (role) => {
         const colors = {
             super_admin: 'bg-red-100 text-red-800',
@@ -15,7 +17,7 @@ export default function UserViewModal({ show, onClose, user, roles = {} }) {
     if (!user) return null;
 
     return (
-        <Modal show={show} onClose={onClose} title="Detalhes do Usuário" maxWidth="2xl">
+        <Modal show={show} onClose={onClose} title="Detalhes do Usuário" maxWidth="85vw">
             <div className="space-y-6">
                 {/* Avatar e informações básicas */}
                 <div className="flex items-center space-x-4">
@@ -24,6 +26,9 @@ export default function UserViewModal({ show, onClose, user, roles = {} }) {
                     </div>
                     <div className="flex-1">
                         <h3 className="text-xl font-semibold text-gray-900">{user.name}</h3>
+                        {user.nickname && (
+                            <p className="text-sm text-gray-500 italic">"{user.nickname}"</p>
+                        )}
                         <p className="text-gray-600">{user.email}</p>
                         <div className="mt-2">
                             <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${getRoleBadgeColor(user.role)}`}>
@@ -48,14 +53,32 @@ export default function UserViewModal({ show, onClose, user, roles = {} }) {
                                 <span className="font-medium text-gray-600">Nome:</span>
                                 <span className="ml-2 text-gray-900">{user.name}</span>
                             </div>
+                            {user.nickname && (
+                                <div>
+                                    <span className="font-medium text-gray-600">Apelido:</span>
+                                    <span className="ml-2 text-gray-900">{user.nickname}</span>
+                                </div>
+                            )}
                             <div>
                                 <span className="font-medium text-gray-600">E-mail:</span>
                                 <span className="ml-2 text-gray-900">{user.email}</span>
                             </div>
+                            {user.username && (
+                                <div>
+                                    <span className="font-medium text-gray-600">Usuário:</span>
+                                    <span className="ml-2 text-gray-900">{user.username}</span>
+                                </div>
+                            )}
                             <div>
                                 <span className="font-medium text-gray-600">Nível de Acesso:</span>
                                 <span className="ml-2 text-gray-900">{roles[user.role] || user.role}</span>
                             </div>
+                            {user.store_id && (
+                                <div>
+                                    <span className="font-medium text-gray-600">Loja:</span>
+                                    <span className="ml-2 text-gray-900">{user.store_id}</span>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -151,7 +174,38 @@ export default function UserViewModal({ show, onClose, user, roles = {} }) {
                     </div>
                 </div>
 
-                <div className="flex justify-end">
+                {/* Ações disponíveis */}
+                {(canEdit || canDelete) && (
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                        <h4 className="text-sm font-medium text-blue-900 mb-3">
+                            Ações Disponíveis
+                        </h4>
+                        <div className="flex flex-wrap gap-3">
+                            {canEdit && onEdit && (
+                                <Button
+                                    onClick={() => onEdit(user)}
+                                    variant="warning"
+                                    size="md"
+                                    icon={PencilIcon}
+                                >
+                                    Editar Usuário
+                                </Button>
+                            )}
+                            {canDelete && onDelete && (
+                                <Button
+                                    onClick={() => onDelete(user)}
+                                    variant="danger"
+                                    size="md"
+                                    icon={TrashIcon}
+                                >
+                                    Excluir Usuário
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                <div className="flex justify-end space-x-3">
                     <button
                         type="button"
                         onClick={onClose}

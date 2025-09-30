@@ -9,23 +9,31 @@ import { useForm, router } from '@inertiajs/react';
 import { useEffect } from 'react';
 import { TrashIcon } from '@heroicons/react/24/outline';
 
-export default function UserEditModal({ show, onClose, user, roles = {} }) {
-    const { data, setData, patch, post, processing, errors, reset } = useForm({
+export default function UserEditModal({ show, onClose, user, roles = {}, stores = [] }) {
+    const { data, setData, processing, errors, reset } = useForm({
         name: '',
+        nickname: '',
         email: '',
+        username: '',
         role: 'user',
         avatar: null,
         remove_avatar: false,
+        store_id: '',
+        status_id: '1',
     });
 
     useEffect(() => {
         if (user && show) {
             setData({
                 name: user.name || '',
+                nickname: user.nickname || '',
                 email: user.email || '',
+                username: user.username || '',
                 role: user.role || 'user',
-                avatar: user.avatar || null,
+                avatar: null,
                 remove_avatar: false,
+                store_id: user.store_id || '',
+                status_id: user.status_id || '1',
             });
         } else if (!show) {
             // Limpar dados quando modal fecha
@@ -36,7 +44,16 @@ export default function UserEditModal({ show, onClose, user, roles = {} }) {
     const submit = (e) => {
         e.preventDefault();
 
-        post(route('users.update', user.id), {
+        const postData = {
+            ...data,
+            _method: 'put',
+        };
+
+        if (!(postData.avatar instanceof File)) {
+            delete postData.avatar;
+        }
+
+        router.post(route('users.update', user.id), postData, {
             forceFormData: true,
             onSuccess: () => onClose(),
             onError: (errors) => {
@@ -63,7 +80,7 @@ export default function UserEditModal({ show, onClose, user, roles = {} }) {
     if (!user) return null;
 
     return (
-        <Modal show={show} onClose={handleClose} title="Editar Usuário" maxWidth="2xl">
+        <Modal show={show} onClose={handleClose} title="Editar Usuário" maxWidth="85vw">
             <div className="mb-4">
                 <div className="bg-gray-50 p-3 rounded-lg">
                     <h4 className="text-sm font-medium text-gray-900 mb-1">
@@ -120,36 +137,84 @@ export default function UserEditModal({ show, onClose, user, roles = {} }) {
                     </p>
                 </div>
 
-                <div>
-                    <InputLabel htmlFor="name" value="Nome Completo" />
-                    <TextInput
-                        id="name"
-                        name="name"
-                        value={data.name}
-                        className="mt-1 block w-full"
-                        autoComplete="name"
-                        isFocused={true}
-                        onChange={(e) => setData('name', e.target.value)}
-                        required
-                        placeholder="Digite o nome completo"
-                    />
-                    <InputError message={errors.name} className="mt-2" />
-                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="lg:col-span-2">
+                        <InputLabel htmlFor="name" value="Nome Completo" />
+                        <TextInput
+                            id="name"
+                            name="name"
+                            value={data.name}
+                            className="mt-1 block w-full"
+                            autoComplete="name"
+                            isFocused={true}
+                            onChange={(e) => setData('name', e.target.value)}
+                            required
+                            placeholder="Digite o nome completo"
+                        />
+                        <InputError message={errors.name} className="mt-2" />
+                    </div>
 
-                <div>
-                    <InputLabel htmlFor="email" value="E-mail" />
-                    <TextInput
-                        id="email"
-                        type="email"
-                        name="email"
-                        value={data.email}
-                        className="mt-1 block w-full"
-                        autoComplete="username"
-                        onChange={(e) => setData('email', e.target.value)}
-                        required
-                        placeholder="Digite o e-mail do usuário"
-                    />
-                    <InputError message={errors.email} className="mt-2" />
+                    <div>
+                        <InputLabel htmlFor="nickname" value="Apelido/Nome Abreviado" />
+                        <TextInput
+                            id="nickname"
+                            name="nickname"
+                            value={data.nickname}
+                            className="mt-1 block w-full"
+                            onChange={(e) => setData('nickname', e.target.value)}
+                            placeholder="Digite o apelido (opcional)"
+                        />
+                        <InputError message={errors.nickname} className="mt-2" />
+                    </div>
+
+                    <div className="lg:col-span-2">
+                        <InputLabel htmlFor="email" value="E-mail" />
+                        <TextInput
+                            id="email"
+                            type="email"
+                            name="email"
+                            value={data.email}
+                            className="mt-1 block w-full"
+                            autoComplete="username"
+                            onChange={(e) => setData('email', e.target.value)}
+                            required
+                            placeholder="Digite o e-mail do usuário"
+                        />
+                        <InputError message={errors.email} className="mt-2" />
+                    </div>
+
+                    <div>
+                        <InputLabel htmlFor="username" value="Nome de Usuário (Login)" />
+                        <TextInput
+                            id="username"
+                            name="username"
+                            value={data.username}
+                            className="mt-1 block w-full"
+                            onChange={(e) => setData('username', e.target.value)}
+                            placeholder="Digite o nome de usuário para login (opcional)"
+                        />
+                        <InputError message={errors.username} className="mt-2" />
+                    </div>
+
+                    <div>
+                        <InputLabel htmlFor="store_id" value="Loja" />
+                        <select
+                            id="store_id"
+                            name="store_id"
+                            value={data.store_id}
+                            onChange={(e) => setData('store_id', e.target.value)}
+                            className="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                            required
+                        >
+                            <option value="">Selecione uma loja</option>
+                            {stores.map((store) => (
+                                <option key={store.code} value={store.code}>
+                                    {store.name}
+                                </option>
+                            ))}
+                        </select>
+                        <InputError message={errors.store_id} className="mt-2" />
+                    </div>
                 </div>
 
                 <div>

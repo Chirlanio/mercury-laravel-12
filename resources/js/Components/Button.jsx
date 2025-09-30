@@ -17,7 +17,7 @@ const Button = forwardRef(({
     // Definir variantes de cores
     const variants = {
         primary: 'text-white bg-indigo-600 hover:bg-indigo-700 border-indigo-600 hover:border-indigo-700 focus:ring-indigo-500',
-        secondary: 'text-white bg-indigo-600 hover:bg-indigo-700 border-indigo-200 hover:border-indigo-600 focus:ring-indigo-500',
+        secondary: 'text-white bg-gray-600 hover:bg-gray-700 border-gray-600 hover:border-gray-700 focus:ring-gray-500',
         success: 'text-white bg-green-600 hover:bg-green-700 border-green-600 hover:border-green-700 focus:ring-green-500',
         warning: 'text-white bg-yellow-600 hover:bg-yellow-700 border-yellow-600 hover:border-yellow-700 focus:ring-yellow-500',
         danger: 'text-white bg-red-600 hover:bg-red-700 border-red-600 hover:border-red-700 focus:ring-red-500',

@@ -3,6 +3,7 @@ import Dropdown from "@/Components/Dropdown";
 import NavLink from "@/Components/NavLink";
 import ResponsiveNavLink from "@/Components/ResponsiveNavLink";
 import Sidebar from "@/Components/Sidebar";
+import UserAvatar from "@/Components/UserAvatar";
 import { usePermissions, PERMISSIONS } from "@/Hooks/usePermissions";
 import { Link, usePage } from "@inertiajs/react";
 import { useState, useEffect } from "react";
@@ -81,45 +82,12 @@ export default function AuthenticatedLayout({ header, children }) {
                                                     className="inline-flex items-center rounded-md border border-transparent bg-white px-3 py-2 text-sm font-medium leading-4 text-gray-700 transition duration-150 ease-in-out hover:text-gray-900 focus:outline-none"
                                                 >
                                                     {/* Avatar */}
-                                                    <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center mr-3 overflow-hidden">
-                                                        {user.avatar_url ? (
-                                                            <img
-                                                                className="h-8 w-8 rounded-full object-cover"
-                                                                src={
-                                                                    user.avatar_url
-                                                                }
-                                                                alt={user.name}
-                                                                onError={(
-                                                                    e
-                                                                ) => {
-                                                                    e.target.style.display =
-                                                                        "none";
-                                                                    e.target.nextSibling.style.display =
-                                                                        "flex";
-                                                                }}
-                                                            />
-                                                        ) : null}
-                                                        <svg
-                                                            className={`h-5 w-5 text-gray-600 ${
-                                                                user.avatar_url
-                                                                    ? "hidden"
-                                                                    : "block"
-                                                            }`}
-                                                            fill="currentColor"
-                                                            viewBox="0 0 20 20"
-                                                            style={{
-                                                                display:
-                                                                    user.avatar_url
-                                                                        ? "none"
-                                                                        : "block",
-                                                            }}
-                                                        >
-                                                            <path
-                                                                fillRule="evenodd"
-                                                                d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
-                                                                clipRule="evenodd"
-                                                            />
-                                                        </svg>
+                                                    <div className="mr-3">
+                                                        <UserAvatar
+                                                            user={user}
+                                                            size="sm"
+                                                            showTooltip={false}
+                                                        />
                                                     </div>
 
                                                     {/* User Info */}
@@ -219,37 +187,12 @@ export default function AuthenticatedLayout({ header, children }) {
                         <div className="border-t border-gray-200 pb-1 pt-4">
                             <div className="px-4 flex items-center">
                                 {/* Avatar */}
-                                <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center mr-3 overflow-hidden">
-                                    {user.avatar_url ? (
-                                        <img
-                                            className="h-10 w-10 rounded-full object-cover"
-                                            src={user.avatar_url}
-                                            alt={user.name}
-                                            onError={(e) => {
-                                                e.target.style.display = "none";
-                                                e.target.nextSibling.style.display =
-                                                    "flex";
-                                            }}
-                                        />
-                                    ) : null}
-                                    <svg
-                                        className={`h-6 w-6 text-gray-600 ${
-                                            user.avatar_url ? "hidden" : "block"
-                                        }`}
-                                        fill="currentColor"
-                                        viewBox="0 0 20 20"
-                                        style={{
-                                            display: user.avatar_url
-                                                ? "none"
-                                                : "block",
-                                        }}
-                                    >
-                                        <path
-                                            fillRule="evenodd"
-                                            d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
-                                            clipRule="evenodd"
-                                        />
-                                    </svg>
+                                <div className="mr-3">
+                                    <UserAvatar
+                                        user={user}
+                                        size="md"
+                                        showTooltip={false}
+                                    />
                                 </div>
                                 <div>
                                     <div className="text-base font-medium text-gray-800">

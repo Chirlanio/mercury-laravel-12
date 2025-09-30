@@ -54,9 +54,15 @@ export default function EmployeeModal({ show, onClose, employeeId, onEdit }) {
         return badges;
     };
 
+    const handleEdit = () => {
+        if (onEdit && employee) {
+            onEdit(employee);
+        }
+    };
+
     if (loading) {
         return (
-            <Modal show={show} onClose={onClose} title="Carregando..." maxWidth="2xl">
+            <Modal show={show} onClose={onClose} title="Carregando..." maxWidth="85vw">
                 <div className="flex items-center justify-center py-12">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
                 </div>
@@ -66,7 +72,7 @@ export default function EmployeeModal({ show, onClose, employeeId, onEdit }) {
 
     if (error) {
         return (
-            <Modal show={show} onClose={onClose} title="Erro" maxWidth="2xl">
+            <Modal show={show} onClose={onClose} title="Erro" maxWidth="85vw">
                 <div className="text-center py-8">
                     <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
                         <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -99,7 +105,7 @@ export default function EmployeeModal({ show, onClose, employeeId, onEdit }) {
     const characteristicBadges = getCharacteristicBadges(employee);
 
     return (
-        <Modal show={show} onClose={onClose} title="Detalhes do Funcionário" maxWidth="2xl">
+        <Modal show={show} onClose={onClose} title="Detalhes do Funcionário" maxWidth="85vw">
             <div className="space-y-6">
                 {/* Avatar e informações básicas */}
                 <div className="flex items-center space-x-4">
@@ -200,33 +206,38 @@ export default function EmployeeModal({ show, onClose, employeeId, onEdit }) {
                 </div>
 
                 {/* Ações disponíveis */}
-                <div className="bg-blue-50 p-4 rounded-lg">
-                    <h4 className="text-sm font-medium text-blue-900 mb-3">
-                        Ações Disponíveis
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <button className="flex items-center justify-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors">
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                            Editar
-                        </button>
+                {onEdit && (
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                        <h4 className="text-sm font-medium text-blue-900 mb-3">
+                            Ações Disponíveis
+                        </h4>
+                        <div className="flex flex-wrap gap-3">
+                            <button
+                                onClick={handleEdit}
+                                className="inline-flex items-center justify-center px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-md hover:bg-yellow-700 transition-colors border border-yellow-600 hover:border-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                            >
+                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                Editar Funcionário
+                            </button>
 
-                        <button className="flex items-center justify-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors">
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            Relatório
-                        </button>
+                            <button className="inline-flex items-center justify-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors border border-green-600 hover:border-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                Gerar Relatório
+                            </button>
 
-                        <button className="flex items-center justify-center px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-md hover:bg-yellow-700 transition-colors">
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Histórico
-                        </button>
+                            <button className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors border border-blue-600 hover:border-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Ver Histórico
+                            </button>
+                        </div>
                     </div>
-                </div>
+                )}
 
                 <div className="flex justify-end">
                     <button

@@ -19,6 +19,17 @@ router.on('before', (event) => {
     }
 });
 
+// Handle 419 CSRF token errors
+router.on('error', (event) => {
+    const { detail } = event;
+    if (detail.page && detail.page.status === 419) {
+        console.error('CSRF token mismatch. A sessão pode ter expirado.');
+        if (confirm('Sua sessão expirou. Deseja recarregar a página?')) {
+            window.location.reload();
+        }
+    }
+});
+
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
     resolve: (name) =>

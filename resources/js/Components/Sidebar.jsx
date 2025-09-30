@@ -246,6 +246,20 @@ export default function Sidebar({ isOpen, onClose }) {
                                                 const isAccessible = hasRoute && (menu.name === "Sair" || hasMenuPermission);
                                                 const hasSubmenus = menu.children && menu.children.length > 0;
 
+                                                // Filtrar submenus acessíveis
+                                                const accessibleSubmenus = hasSubmenus
+                                                    ? menu.children.filter(submenu => {
+                                                        const submenuConfig = getMenuRoute(submenu.name);
+                                                        const hasSubmenuPermission = !submenuConfig?.permission || hasPermission(submenuConfig.permission);
+                                                        return submenu.name === "Sair" || hasSubmenuPermission;
+                                                    })
+                                                    : [];
+
+                                                // Ocultar menu se não tiver permissão e não tiver submenus acessíveis
+                                                if (!isAccessible && (!hasSubmenus || accessibleSubmenus.length === 0)) {
+                                                    return null;
+                                                }
+
                                                 return (
                                                     <div key={menu.id}>
                                                         <button
@@ -258,25 +272,14 @@ export default function Sidebar({ isOpen, onClose }) {
                                                                     handleMenuClick(menu.name);
                                                                 }
                                                             }}
-                                                            className={`flex items-center w-full px-3 py-2 text-sm rounded-md group ${
-                                                                isAccessible || hasSubmenus
-                                                                    ? "text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer"
-                                                                    : "text-gray-400 cursor-not-allowed"
-                                                            } ${
+                                                            className={`flex items-center w-full px-3 py-2 text-sm rounded-md group text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer ${
                                                                 menuConfig && url.startsWith(menuConfig.route)
                                                                     ? "bg-gray-100 text-gray-900"
                                                                     : ""
                                                             }`}
-                                                            disabled={!isAccessible && !hasSubmenus}
                                                         >
                                                             <i
-                                                                className={`${
-                                                                    menu.icon
-                                                                } mr-3 flex-shrink-0 ${
-                                                                    isAccessible || hasSubmenus
-                                                                        ? "text-gray-400 group-hover:text-gray-500"
-                                                                        : "text-gray-300"
-                                                                }`}
+                                                                className={`${menu.icon} mr-3 flex-shrink-0 text-gray-400 group-hover:text-gray-500`}
                                                             ></i>
                                                             <span className="truncate">
                                                                 {menu.name}
@@ -288,32 +291,27 @@ export default function Sidebar({ isOpen, onClose }) {
                                                                     <ChevronRightIcon className="ml-auto h-4 w-4" />
                                                                 )
                                                             ) : (
-                                                                isAccessible && (
-                                                                    <svg
-                                                                        className="ml-auto h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                        fill="none"
-                                                                        stroke="currentColor"
-                                                                        viewBox="0 0 24 24"
-                                                                    >
-                                                                        <path
-                                                                            strokeLinecap="round"
-                                                                            strokeLinejoin="round"
-                                                                            strokeWidth={2}
-                                                                            d="M9 5l7 7-7 7"
-                                                                        />
-                                                                    </svg>
-                                                                )
+                                                                <svg
+                                                                    className="ml-auto h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                    fill="none"
+                                                                    stroke="currentColor"
+                                                                    viewBox="0 0 24 24"
+                                                                >
+                                                                    <path
+                                                                        strokeLinecap="round"
+                                                                        strokeLinejoin="round"
+                                                                        strokeWidth={2}
+                                                                        d="M9 5l7 7-7 7"
+                                                                    />
+                                                                </svg>
                                                             )}
                                                         </button>
 
                                                         {/* Renderizar submenus */}
                                                         {hasSubmenus && expandedSubmenus[menu.id] && (
                                                             <div className="ml-6 mt-1 space-y-1">
-                                                                {menu.children.map((submenu) => {
+                                                                {accessibleSubmenus.map((submenu) => {
                                                                     const submenuConfig = getMenuRoute(submenu.name);
-                                                                    const hasSubmenuRoute = submenuConfig || submenu.name === "Sair";
-                                                                    const hasSubmenuPermission = !submenuConfig?.permission || hasPermission(submenuConfig.permission);
-                                                                    const isSubmenuAccessible = hasSubmenuRoute && (submenu.name === "Sair" || hasSubmenuPermission);
 
                                                                     return (
                                                                         <button
@@ -323,44 +321,31 @@ export default function Sidebar({ isOpen, onClose }) {
                                                                                     ? handleLogout()
                                                                                     : handleMenuClick(submenu.name)
                                                                             }
-                                                                            className={`flex items-center w-full px-3 py-2 text-sm rounded-md group ${
-                                                                                isSubmenuAccessible
-                                                                                    ? "text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer"
-                                                                                    : "text-gray-400 cursor-not-allowed"
-                                                                            } ${
+                                                                            className={`flex items-center w-full px-3 py-2 text-sm rounded-md group text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer ${
                                                                                 submenuConfig && url.startsWith(submenuConfig.route)
                                                                                     ? "bg-gray-100 text-gray-900"
                                                                                     : ""
                                                                             }`}
-                                                                            disabled={!isSubmenuAccessible}
                                                                         >
                                                                             <i
-                                                                                className={`${
-                                                                                    submenu.icon
-                                                                                } mr-3 flex-shrink-0 text-sm ${
-                                                                                    isSubmenuAccessible
-                                                                                        ? "text-gray-400 group-hover:text-gray-500"
-                                                                                        : "text-gray-300"
-                                                                                }`}
+                                                                                className={`${submenu.icon} mr-3 flex-shrink-0 text-sm text-gray-400 group-hover:text-gray-500`}
                                                                             ></i>
                                                                             <span className="truncate text-sm">
                                                                                 {submenu.name}
                                                                             </span>
-                                                                            {isSubmenuAccessible && (
-                                                                                <svg
-                                                                                    className="ml-auto h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                                    fill="none"
-                                                                                    stroke="currentColor"
-                                                                                    viewBox="0 0 24 24"
-                                                                                >
-                                                                                    <path
-                                                                                        strokeLinecap="round"
-                                                                                        strokeLinejoin="round"
-                                                                                        strokeWidth={2}
-                                                                                        d="M9 5l7 7-7 7"
-                                                                                    />
-                                                                                </svg>
-                                                                            )}
+                                                                            <svg
+                                                                                className="ml-auto h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                                fill="none"
+                                                                                stroke="currentColor"
+                                                                                viewBox="0 0 24 24"
+                                                                            >
+                                                                                <path
+                                                                                    strokeLinecap="round"
+                                                                                    strokeLinejoin="round"
+                                                                                    strokeWidth={2}
+                                                                                    d="M9 5l7 7-7 7"
+                                                                                />
+                                                                            </svg>
                                                                         </button>
                                                                     );
                                                                 })}

@@ -6,14 +6,18 @@ import TextInput from '@/Components/TextInput';
 import ImageUpload from '@/Components/ImageUpload';
 import { useForm } from '@inertiajs/react';
 
-export default function UserCreateModal({ show, onClose, roles = {} }) {
+export default function UserCreateModal({ show, onClose, roles = {}, stores = [] }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         name: '',
+        nickname: '',
         email: '',
+        username: '',
         password: '',
         password_confirmation: '',
         role: 'user',
         avatar: null,
+        store_id: '',
+        status_id: '1',
     });
 
     const submit = (e) => {
@@ -46,7 +50,7 @@ export default function UserCreateModal({ show, onClose, roles = {} }) {
     };
 
     return (
-        <Modal show={show} onClose={handleClose} title="Criar Novo Usuário" maxWidth="2xl">
+        <Modal show={show} onClose={handleClose} title="Criar Novo Usuário" maxWidth="85vw">
             <div className="mb-4">
                 <p className="text-sm text-gray-600">
                     Preencha os dados do novo usuário. Uma senha temporária será criada.
@@ -68,76 +72,124 @@ export default function UserCreateModal({ show, onClose, roles = {} }) {
                     </p>
                 </div>
 
-                <div>
-                    <InputLabel htmlFor="name" value="Nome Completo" />
-                    <TextInput
-                        id="name"
-                        name="name"
-                        value={data.name}
-                        className="mt-1 block w-full"
-                        autoComplete="name"
-                        isFocused={true}
-                        onChange={(e) => setData('name', e.target.value)}
-                        required
-                        placeholder="Digite o nome completo"
-                    />
-                    <InputError message={errors.name} className="mt-2" />
-                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="lg:col-span-2">
+                        <InputLabel htmlFor="name" value="Nome Completo" />
+                        <TextInput
+                            id="name"
+                            name="name"
+                            value={data.name}
+                            className="mt-1 block w-full"
+                            autoComplete="name"
+                            isFocused={true}
+                            onChange={(e) => setData('name', e.target.value)}
+                            required
+                            placeholder="Digite o nome completo"
+                        />
+                        <InputError message={errors.name} className="mt-2" />
+                    </div>
 
-                <div>
-                    <InputLabel htmlFor="email" value="E-mail" />
-                    <TextInput
-                        id="email"
-                        type="email"
-                        name="email"
-                        value={data.email}
-                        className="mt-1 block w-full"
-                        autoComplete="username"
-                        onChange={(e) => setData('email', e.target.value)}
-                        required
-                        placeholder="Digite o e-mail do usuário"
-                    />
-                    <InputError message={errors.email} className="mt-2" />
-                </div>
+                    <div>
+                        <InputLabel htmlFor="nickname" value="Apelido/Nome Abreviado" />
+                        <TextInput
+                            id="nickname"
+                            name="nickname"
+                            value={data.nickname}
+                            className="mt-1 block w-full"
+                            onChange={(e) => setData('nickname', e.target.value)}
+                            placeholder="Digite o apelido (opcional)"
+                        />
+                        <InputError message={errors.nickname} className="mt-2" />
+                    </div>
 
-                <div>
-                    <InputLabel htmlFor="password" value="Senha" />
-                    <TextInput
-                        id="password"
-                        type="password"
-                        name="password"
-                        value={data.password}
-                        className="mt-1 block w-full"
-                        autoComplete="new-password"
-                        onChange={(e) => setData('password', e.target.value)}
-                        required
-                        placeholder="Digite uma senha temporária"
-                    />
-                    <InputError message={errors.password} className="mt-2" />
-                </div>
+                    <div className="lg:col-span-2">
+                        <InputLabel htmlFor="email" value="E-mail" />
+                        <TextInput
+                            id="email"
+                            type="email"
+                            name="email"
+                            value={data.email}
+                            className="mt-1 block w-full"
+                            autoComplete="username"
+                            onChange={(e) => setData('email', e.target.value)}
+                            required
+                            placeholder="Digite o e-mail do usuário"
+                        />
+                        <InputError message={errors.email} className="mt-2" />
+                    </div>
 
-                <div>
-                    <InputLabel
-                        htmlFor="password_confirmation"
-                        value="Confirmar Senha"
-                    />
-                    <TextInput
-                        id="password_confirmation"
-                        type="password"
-                        name="password_confirmation"
-                        value={data.password_confirmation}
-                        className="mt-1 block w-full"
-                        autoComplete="new-password"
-                        onChange={(e) =>
-                            setData('password_confirmation', e.target.value)
-                        }
-                        required
-                        placeholder="Confirme a senha"
-                    />
-                    <InputError
-                        message={errors.password_confirmation}
-                        className="mt-2"
-                    />
+                    <div>
+                        <InputLabel htmlFor="username" value="Nome de Usuário (Login)" />
+                        <TextInput
+                            id="username"
+                            name="username"
+                            value={data.username}
+                            className="mt-1 block w-full"
+                            onChange={(e) => setData('username', e.target.value)}
+                            placeholder="Digite o nome de usuário para login (opcional)"
+                        />
+                        <InputError message={errors.username} className="mt-2" />
+                    </div>
+
+                    <div>
+                        <InputLabel htmlFor="store_id" value="Loja" />
+                        <select
+                            id="store_id"
+                            name="store_id"
+                            value={data.store_id}
+                            onChange={(e) => setData('store_id', e.target.value)}
+                            className="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                            required
+                        >
+                            <option value="">Selecione uma loja</option>
+                            {stores.map((store) => (
+                                <option key={store.code} value={store.code}>
+                                    {store.name}
+                                </option>
+                            ))}
+                        </select>
+                        <InputError message={errors.store_id} className="mt-2" />
+                    </div>
+
+                    <div>
+                        <InputLabel htmlFor="password" value="Senha" />
+                        <TextInput
+                            id="password"
+                            type="password"
+                            name="password"
+                            value={data.password}
+                            className="mt-1 block w-full"
+                            autoComplete="new-password"
+                            onChange={(e) => setData('password', e.target.value)}
+                            required
+                            placeholder="Digite uma senha temporária"
+                        />
+                        <InputError message={errors.password} className="mt-2" />
+                    </div>
+
+                    <div>
+                        <InputLabel
+                            htmlFor="password_confirmation"
+                            value="Confirmar Senha"
+                        />
+                        <TextInput
+                            id="password_confirmation"
+                            type="password"
+                            name="password_confirmation"
+                            value={data.password_confirmation}
+                            className="mt-1 block w-full"
+                            autoComplete="new-password"
+                            onChange={(e) =>
+                                setData('password_confirmation', e.target.value)
+                            }
+                            required
+                            placeholder="Confirme a senha"
+                        />
+                        <InputError
+                            message={errors.password_confirmation}
+                            className="mt-2"
+                        />
+                    </div>
                 </div>
 
                 <div>

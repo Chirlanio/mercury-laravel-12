@@ -54,6 +54,13 @@ export default function Index({ auth, employees, positions, stores, filters }) {
         }
     };
 
+    const handleEditFromModal = async (employee) => {
+        // Fechar modal de visualização
+        closeModal();
+        // Abrir modal de edição
+        await editEmployee(employee);
+    };
+
     const closeEditModal = () => {
         setIsEditModalOpen(false);
         setSelectedEmployee(null);
@@ -292,6 +299,7 @@ export default function Index({ auth, employees, positions, stores, filters }) {
                 show={isModalOpen}
                 onClose={closeModal}
                 employeeId={selectedEmployeeId}
+                onEdit={handleEditFromModal}
             />
 
             {/* Employee Create Modal */}

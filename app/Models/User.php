@@ -22,10 +22,17 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'nickname',
         'email',
+        'username',
         'password',
         'role',
         'avatar',
+        'store_id',
+        'area_id',
+        'status_id',
+        'email_confirmation_key',
+        'unsubscribe_key',
     ];
 
     /**
@@ -189,5 +196,13 @@ class User extends Authenticatable
 
         $this->avatar = null;
         return $this->save();
+    }
+
+    /**
+     * Get the store that the user belongs to
+     */
+    public function store(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Store::class, 'store_id', 'code');
     }
 }

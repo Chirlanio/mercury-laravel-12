@@ -8,6 +8,7 @@ use App\Http\Controllers\MenuController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\AccessLevelController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\Admin\EmailSettingsController;
 use App\Enums\Permission;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -41,6 +42,11 @@ Route::middleware(['auth', 'permission:' . Permission::ACCESS_ADMIN_PANEL->value
     Route::get('/admin', function () {
         return Inertia::render('Admin');
     })->name('admin');
+
+    // Configurações de E-mail
+    Route::middleware('permission:' . Permission::MANAGE_SETTINGS->value)->group(function () {
+        Route::get('/admin/email-settings', [EmailSettingsController::class, 'index'])->name('admin.email-settings');
+    });
 });
 
 Route::middleware(['auth', 'permission:' . Permission::ACCESS_SUPPORT_PANEL->value])->group(function () {
@@ -73,7 +79,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/users/{user}/edit', [UserManagementController::class, 'edit'])
         ->middleware('permission:' . Permission::EDIT_USERS->value . ',' . Permission::EDIT_ANY_PROFILE->value)
         ->name('users.edit');
-    Route::post('/users/{user}', [UserManagementController::class, 'update'])
+    Route::match(['put', 'post'], '/users/{user}', [UserManagementController::class, 'update'])
         ->middleware('permission:' . Permission::EDIT_USERS->value . ',' . Permission::EDIT_ANY_PROFILE->value)
         ->name('users.update');
 

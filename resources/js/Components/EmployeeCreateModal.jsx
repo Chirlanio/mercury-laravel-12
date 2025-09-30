@@ -96,7 +96,7 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
     };
 
     return (
-        <Modal show={show} onClose={handleClose} title="Cadastrar Funcionário" maxWidth="2xl">
+        <Modal show={show} onClose={handleClose} title="Cadastrar Funcionário" maxWidth="85vw">
             <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Informações Pessoais */}
                 <div className="bg-gray-50 p-4 rounded-lg">
@@ -104,7 +104,7 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
                         Informações Pessoais
                     </h4>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div>
                             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
                                 Nome Completo *
@@ -174,48 +174,46 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4">
-                        <div>
-                            <label htmlFor="profile_image" className="block text-sm font-medium text-gray-700 mb-1">
-                                Foto do Perfil
-                            </label>
-                            <div className="flex items-center space-x-4">
-                                <input
-                                    type="file"
-                                    id="profile_image"
-                                    accept="image/jpeg,image/png,image/jpg,image/gif"
-                                    onChange={(e) => {
-                                        const file = e.target.files[0];
-                                        if (file) {
-                                            // Verificar tamanho do arquivo (20MB = 20 * 1024 * 1024 bytes)
-                                            if (file.size > 20 * 1024 * 1024) {
-                                                setError('profile_image', 'O arquivo deve ter no máximo 20MB');
-                                                e.target.value = ''; // Limpar o input
-                                                return;
-                                            }
-                                            clearErrors('profile_image');
-                                            setData('profile_image', file);
+                    <div>
+                        <label htmlFor="profile_image" className="block text-sm font-medium text-gray-700 mb-1">
+                            Foto do Perfil
+                        </label>
+                        <div className="flex items-center space-x-4">
+                            <input
+                                type="file"
+                                id="profile_image"
+                                accept="image/jpeg,image/png,image/jpg,image/gif"
+                                onChange={(e) => {
+                                    const file = e.target.files[0];
+                                    if (file) {
+                                        // Verificar tamanho do arquivo (20MB = 20 * 1024 * 1024 bytes)
+                                        if (file.size > 20 * 1024 * 1024) {
+                                            setError('profile_image', 'O arquivo deve ter no máximo 20MB');
+                                            e.target.value = ''; // Limpar o input
+                                            return;
                                         }
-                                    }}
-                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                        errors.profile_image ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                    }`}
-                                />
-                                {data.profile_image && (
-                                    <div className="flex-shrink-0">
-                                        <img
-                                            src={URL.createObjectURL(data.profile_image)}
-                                            alt="Preview"
-                                            className="h-12 w-12 rounded-full object-cover border-2 border-gray-200"
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                            {errors.profile_image && <p className="mt-1 text-sm text-red-600">{errors.profile_image}</p>}
-                            <p className="mt-1 text-xs text-gray-500">
-                                Formatos aceitos: JPEG, PNG, JPG, GIF. Tamanho máximo: 20MB
-                            </p>
+                                        clearErrors('profile_image');
+                                        setData('profile_image', file);
+                                    }
+                                }}
+                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                                    errors.profile_image ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
+                                }`}
+                            />
+                            {data.profile_image && (
+                                <div className="flex-shrink-0">
+                                    <img
+                                        src={URL.createObjectURL(data.profile_image)}
+                                        alt="Preview"
+                                        className="h-12 w-12 rounded-full object-cover border-2 border-gray-200"
+                                    />
+                                </div>
+                            )}
                         </div>
+                        {errors.profile_image && <p className="mt-1 text-sm text-red-600">{errors.profile_image}</p>}
+                        <p className="mt-1 text-xs text-gray-500">
+                            Formatos aceitos: JPEG, PNG, JPG, GIF. Tamanho máximo: 20MB
+                        </p>
                     </div>
                 </div>
 
@@ -225,7 +223,7 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
                         Informações Profissionais
                     </h4>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div>
                             <label htmlFor="admission_date" className="block text-sm font-medium text-gray-700 mb-1">
                                 Data de Admissão *
@@ -334,7 +332,7 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
                         Informações Complementares
                     </h4>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div>
                             <label htmlFor="dismissal_date" className="block text-sm font-medium text-gray-700 mb-1">
                                 Data de Demissão
@@ -442,7 +440,7 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
                         Características Especiais
                     </h4>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div className="flex items-center">
                             <input
                                 type="checkbox"
