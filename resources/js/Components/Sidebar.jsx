@@ -1,23 +1,55 @@
 import { useState, useEffect } from "react";
-import { Link, router } from "@inertiajs/react";
+import { Link, router, usePage } from "@inertiajs/react";
 import { ChevronDownIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import { usePermissions, PERMISSIONS } from "@/Hooks/usePermissions";
 
 export default function Sidebar({ isOpen, onClose }) {
+    const { url } = usePage();
     const { hasPermission } = usePermissions();
     const [menuGroups, setMenuGroups] = useState({});
-    const [expandedGroups, setExpandedGroups] = useState({
-        main: true,
-        hr: false,
-        utility: false,
-        system: false,
-    });
+    const [expandedGroups, setExpandedGroups] = useState({});
     const [expandedSubmenus, setExpandedSubmenus] = useState({});
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         fetchMenus();
     }, []);
+
+    useEffect(() => {
+        if (Object.keys(menuGroups).length > 0) {
+            let activeGroup = null;
+            let activeSubmenu = null;
+
+            for (const [groupKey, menus] of Object.entries(menuGroups)) {
+                for (const menu of menus) {
+                    const menuConfig = getMenuRoute(menu.name);
+                    if (menuConfig && url.startsWith(menuConfig.route)) {
+                        activeGroup = groupKey;
+                        break;
+                    }
+                    if (menu.children) {
+                        for (const submenu of menu.children) {
+                            const submenuConfig = getMenuRoute(submenu.name);
+                            if (submenuConfig && url.startsWith(submenuConfig.route)) {
+                                activeGroup = groupKey;
+                                activeSubmenu = menu.id;
+                                break;
+                            }
+                        }
+                    }
+                    if (activeGroup) break;
+                }
+                if (activeGroup) break;
+            }
+
+            if (activeGroup) {
+                setExpandedGroups({ [activeGroup]: true });
+                if (activeSubmenu) {
+                    setExpandedSubmenus({ [activeSubmenu]: true });
+                }
+            }
+        }
+    }, [menuGroups, url]);
 
     const fetchMenus = async () => {
         try {
@@ -230,6 +262,10 @@ export default function Sidebar({ isOpen, onClose }) {
                                                                 isAccessible || hasSubmenus
                                                                     ? "text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer"
                                                                     : "text-gray-400 cursor-not-allowed"
+                                                            } ${
+                                                                menuConfig && url.startsWith(menuConfig.route)
+                                                                    ? "bg-gray-100 text-gray-900"
+                                                                    : ""
                                                             }`}
                                                             disabled={!isAccessible && !hasSubmenus}
                                                         >
@@ -291,6 +327,10 @@ export default function Sidebar({ isOpen, onClose }) {
                                                                                 isSubmenuAccessible
                                                                                     ? "text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer"
                                                                                     : "text-gray-400 cursor-not-allowed"
+                                                                            } ${
+                                                                                submenuConfig && url.startsWith(submenuConfig.route)
+                                                                                    ? "bg-gray-100 text-gray-900"
+                                                                                    : ""
                                                                             }`}
                                                                             disabled={!isSubmenuAccessible}
                                                                         >
