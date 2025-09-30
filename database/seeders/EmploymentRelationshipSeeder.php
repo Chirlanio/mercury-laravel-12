@@ -24,11 +24,13 @@ class EmploymentRelationshipSeeder extends Seeder
         ];
 
         foreach ($relationships as $relationship) {
-            DB::table('employment_relationships')->insert([
-                'name' => $relationship['name'],
-                'created_at' => $now,
-                'updated_at' => null,
-            ]);
+            DB::table('employment_relationships')->updateOrInsert(
+                ['name' => $relationship['name']],
+                [
+                    'created_at' => $now,
+                    'updated_at' => null,
+                ]
+            );
         }
     }
 }

@@ -29,14 +29,16 @@ class SectorSeeder extends Seeder
         ];
 
         foreach ($sectors as $sector) {
-            DB::table('sectors')->insert([
-                'sector_name' => $sector['sector_name'],
-                'area_manager_id' => $sector['area_manager_id'],
-                'sector_manager_id' => $sector['sector_manager_id'],
-                'is_active' => $sector['is_active'],
-                'created_at' => $now,
-                'updated_at' => null,
-            ]);
+            DB::table('sectors')->updateOrInsert(
+                ['sector_name' => $sector['sector_name']],
+                [
+                    'area_manager_id' => $sector['area_manager_id'],
+                    'sector_manager_id' => $sector['sector_manager_id'],
+                    'is_active' => $sector['is_active'],
+                    'created_at' => $now,
+                    'updated_at' => null,
+                ]
+            );
         }
     }
 }

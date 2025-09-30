@@ -30,12 +30,14 @@ class EducationLevelSeeder extends Seeder
         ];
 
         foreach ($educationLevels as $level) {
-            DB::table('education_levels')->insert([
-                'description_name' => $level['description_name'],
-                'is_active' => $level['is_active'],
-                'created_at' => $now,
-                'updated_at' => null,
-            ]);
+            DB::table('education_levels')->updateOrInsert(
+                ['description_name' => $level['description_name']],
+                [
+                    'is_active' => $level['is_active'],
+                    'created_at' => $now,
+                    'updated_at' => null,
+                ]
+            );
         }
     }
 }

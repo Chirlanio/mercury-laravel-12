@@ -40,14 +40,16 @@ class MenuSeeder extends Seeder
         ];
 
         foreach ($menus as $menu) {
-            DB::table('menus')->insert([
-                'name' => $menu['name'],
-                'icon' => $menu['icon'],
-                'order' => $menu['order'],
-                'is_active' => $menu['is_active'],
-                'created_at' => $now,
-                'updated_at' => null,
-            ]);
+            DB::table('menus')->updateOrInsert(
+                ['name' => $menu['name']],
+                [
+                    'icon' => $menu['icon'],
+                    'order' => $menu['order'],
+                    'is_active' => $menu['is_active'],
+                    'created_at' => $now,
+                    'updated_at' => null,
+                ]
+            );
         }
     }
 }

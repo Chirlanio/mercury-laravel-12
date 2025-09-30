@@ -28,12 +28,14 @@ class ColorThemeSeeder extends Seeder
         ];
 
         foreach ($colorThemes as $colorTheme) {
-            DB::table('color_themes')->insert([
-                'name' => $colorTheme['name'],
-                'color_class' => $colorTheme['color_class'],
-                'created_at' => $now,
-                'updated_at' => null,
-            ]);
+            DB::table('color_themes')->updateOrInsert(
+                ['name' => $colorTheme['name']],
+                [
+                    'color_class' => $colorTheme['color_class'],
+                    'created_at' => $now,
+                    'updated_at' => null,
+                ]
+            );
         }
     }
 }

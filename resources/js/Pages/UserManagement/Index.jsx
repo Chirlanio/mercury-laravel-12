@@ -4,9 +4,11 @@ import UserEditModal from '@/Components/UserEditModal';
 import UserViewModal from '@/Components/UserViewModal';
 import DataTable from '@/Components/DataTable';
 import UserAvatar from '@/Components/UserAvatar';
+import Button from '@/Components/Button';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
+import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 export default function Index({ auth, users = { data: [], links: [] }, roles = {}, filters = {} }) {
     const [processing, setProcessing] = useState(false);
@@ -135,20 +137,22 @@ export default function Index({ auth, users = { data: [], links: [] }, roles = {
             render: (user) => (
                 <div className="flex items-center space-x-2">
                     {canEditUser(user) && (
-                        <button
+                        <Button
                             onClick={() => handleEditUser(user)}
-                            className="text-indigo-600 hover:text-indigo-900 text-sm"
-                        >
-                            Editar
-                        </button>
+                            variant="info"
+                            size="sm"
+                            icon={PencilIcon}
+                            iconOnly
+                        />
                     )}
                     {canDeleteUser(user) && hasPermission(PERMISSIONS.DELETE_USERS) && (
-                        <button
+                        <Button
                             onClick={() => handleDelete(user.id, user.name)}
-                            className="text-red-600 hover:text-red-900 text-sm"
-                        >
-                            Deletar
-                        </button>
+                            variant="danger"
+                            size="sm"
+                            icon={TrashIcon}
+                            iconOnly
+                        />
                     )}
                 </div>
             )
@@ -174,12 +178,13 @@ export default function Index({ auth, users = { data: [], links: [] }, roles = {
                             </p>
                         </div>
                         {hasPermission(PERMISSIONS.CREATE_USERS) && (
-                            <button
+                            <Button
                                 onClick={() => setShowCreateModal(true)}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded transition-colors"
+                                variant="primary"
+                                size="md"
                             >
                                 Novo Usuário
-                            </button>
+                            </Button>
                         )}
                     </div>
 

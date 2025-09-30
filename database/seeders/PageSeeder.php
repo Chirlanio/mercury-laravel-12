@@ -94,20 +94,21 @@ class PageSeeder extends Seeder
         ];
 
         foreach ($pages as $page) {
-            DB::table('pages')->insert([
-                'controller' => $page['controller'],
-                'method' => $page['method'],
-                'menu_controller' => $page['menu_controller'],
-                'menu_method' => $page['menu_method'],
-                'page_name' => $page['page_name'],
-                'notes' => $page['notes'],
-                'is_public' => $page['is_public'],
-                'icon' => $page['icon'],
-                'page_group_id' => $page['page_group_id'],
-                'is_active' => $page['is_active'],
-                'created_at' => $now,
-                'updated_at' => null,
-            ]);
+            DB::table('pages')->updateOrInsert(
+                ['controller' => $page['controller'], 'method' => $page['method']],
+                [
+                    'menu_controller' => $page['menu_controller'],
+                    'menu_method' => $page['menu_method'],
+                    'page_name' => $page['page_name'],
+                    'notes' => $page['notes'],
+                    'is_public' => $page['is_public'],
+                    'icon' => $page['icon'],
+                    'page_group_id' => $page['page_group_id'],
+                    'is_active' => $page['is_active'],
+                    'created_at' => $now,
+                    'updated_at' => null,
+                ]
+            );
         }
     }
 }

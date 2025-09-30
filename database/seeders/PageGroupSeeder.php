@@ -28,11 +28,13 @@ class PageGroupSeeder extends Seeder
         ];
 
         foreach ($pageGroups as $group) {
-            DB::table('page_groups')->insert([
-                'name' => $group['name'],
-                'created_at' => $now,
-                'updated_at' => null,
-            ]);
+            DB::table('page_groups')->updateOrInsert(
+                ['name' => $group['name']],
+                [
+                    'created_at' => $now,
+                    'updated_at' => null,
+                ]
+            );
         }
     }
 }

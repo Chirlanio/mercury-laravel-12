@@ -22,12 +22,14 @@ class GenderSeeder extends Seeder
         ];
 
         foreach ($genders as $gender) {
-            DB::table('genders')->insert([
-                'description_name' => $gender['description_name'],
-                'is_active' => $gender['is_active'],
-                'created_at' => $now,
-                'updated_at' => null,
-            ]);
+            DB::table('genders')->updateOrInsert(
+                ['description_name' => $gender['description_name']],
+                [
+                    'is_active' => $gender['is_active'],
+                    'created_at' => $now,
+                    'updated_at' => null,
+                ]
+            );
         }
     }
 }

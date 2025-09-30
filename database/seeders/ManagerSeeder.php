@@ -41,13 +41,15 @@ class ManagerSeeder extends Seeder
         ];
 
         foreach ($managers as $manager) {
-            DB::table('managers')->insert([
-                'name' => $manager['name'],
-                'email' => $manager['email'],
-                'is_active' => $manager['is_active'],
-                'created_at' => $now,
-                'updated_at' => null,
-            ]);
+            DB::table('managers')->updateOrInsert(
+                ['email' => $manager['email']],
+                [
+                    'name' => $manager['name'],
+                    'is_active' => $manager['is_active'],
+                    'created_at' => $now,
+                    'updated_at' => null,
+                ]
+            );
         }
     }
 }

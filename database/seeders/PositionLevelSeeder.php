@@ -23,11 +23,13 @@ class PositionLevelSeeder extends Seeder
         ];
 
         foreach ($positionLevels as $level) {
-            DB::table('position_levels')->insert([
-                'name' => $level['name'],
-                'created_at' => $now,
-                'updated_at' => null,
-            ]);
+            DB::table('position_levels')->updateOrInsert(
+                ['name' => $level['name']],
+                [
+                    'created_at' => $now,
+                    'updated_at' => null,
+                ]
+            );
         }
     }
 }

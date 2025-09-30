@@ -30,6 +30,8 @@ class DatabaseSeeder extends Seeder
             PageGroupSeeder::class,
             PageSeeder::class,
             AccessLevelPageSeeder::class,
+            NetworkSeeder::class,
+            StoreSeeder::class,
             EmployeeSeeder::class,
             EmploymentContractSeeder::class,
         ]);

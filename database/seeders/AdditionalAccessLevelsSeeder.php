@@ -44,13 +44,15 @@ class AdditionalAccessLevelsSeeder extends Seeder
         ];
 
         foreach ($accessLevels as $level) {
-            DB::table('access_levels')->insert([
-                'name' => $level['name'],
-                'order' => $level['order'],
-                'color_theme_id' => $level['color_theme_id'],
-                'created_at' => $now,
-                'updated_at' => null,
-            ]);
+            DB::table('access_levels')->updateOrInsert(
+                ['name' => $level['name']],
+                [
+                    'order' => $level['order'],
+                    'color_theme_id' => $level['color_theme_id'],
+                    'created_at' => $now,
+                    'updated_at' => null,
+                ]
+            );
         }
     }
 }

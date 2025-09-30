@@ -46,17 +46,21 @@ class AccessLevelPageSeeder extends Seeder
         ];
 
         foreach ($accessLevelPages as $accessLevelPage) {
-            DB::table('access_level_pages')->insert([
-                'permission' => $accessLevelPage['permission'],
-                'order' => $accessLevelPage['order'],
-                'dropdown' => $accessLevelPage['dropdown'],
-                'lib_menu' => $accessLevelPage['lib_menu'],
-                'menu_id' => $accessLevelPage['menu_id'],
-                'access_level_id' => $accessLevelPage['access_level_id'],
-                'page_id' => $accessLevelPage['page_id'],
-                'created_at' => $now,
-                'updated_at' => null,
-            ]);
+            DB::table('access_level_pages')->updateOrInsert(
+                [
+                    'access_level_id' => $accessLevelPage['access_level_id'],
+                    'page_id' => $accessLevelPage['page_id']
+                ],
+                [
+                    'permission' => $accessLevelPage['permission'],
+                    'order' => $accessLevelPage['order'],
+                    'dropdown' => $accessLevelPage['dropdown'],
+                    'lib_menu' => $accessLevelPage['lib_menu'],
+                    'menu_id' => $accessLevelPage['menu_id'],
+                    'created_at' => $now,
+                    'updated_at' => null,
+                ]
+            );
         }
     }
 }

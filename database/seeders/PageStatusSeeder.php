@@ -21,12 +21,14 @@ class PageStatusSeeder extends Seeder
         ];
 
         foreach ($pageStatuses as $pageStatus) {
-            DB::table('page_statuses')->insert([
-                'name' => $pageStatus['name'],
-                'color' => $pageStatus['color'],
-                'created_at' => $pageStatus['created_at'],
-                'updated_at' => $pageStatus['updated_at'],
-            ]);
+            DB::table('page_statuses')->updateOrInsert(
+                ['name' => $pageStatus['name']],
+                [
+                    'color' => $pageStatus['color'],
+                    'created_at' => $pageStatus['created_at'],
+                    'updated_at' => $pageStatus['updated_at'],
+                ]
+            );
         }
     }
 }

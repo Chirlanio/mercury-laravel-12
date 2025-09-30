@@ -86,13 +86,7 @@ const Button = forwardRef(({
 
         const iconClass = `${iconSizes[size]} ${getIconSpacing()} transition-colors duration-300`;
 
-        // Se for um componente React
-        if (typeof Icon === 'function') {
-            return <Icon className={iconClass} />;
-        }
-
-        // Se for um elemento SVG ou string
-        return Icon;
+        return <Icon className={iconClass} />;
     };
 
     // Renderizar conteúdo do botão

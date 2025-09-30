@@ -21,12 +21,14 @@ class StatusSeeder extends Seeder
         ];
 
         foreach ($statuses as $status) {
-            DB::table('statuses')->insert([
-                'name' => $status['name'],
-                'color_theme_id' => $status['color_theme_id'],
-                'created_at' => $status['created_at'],
-                'updated_at' => $status['updated_at'],
-            ]);
+            DB::table('statuses')->updateOrInsert(
+                ['name' => $status['name']],
+                [
+                    'color_theme_id' => $status['color_theme_id'],
+                    'created_at' => $status['created_at'],
+                    'updated_at' => $status['updated_at'],
+                ]
+            );
         }
     }
 }

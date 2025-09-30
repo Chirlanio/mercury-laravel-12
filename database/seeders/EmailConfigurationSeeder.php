@@ -14,16 +14,18 @@ class EmailConfigurationSeeder extends Seeder
      */
     public function run(): void
     {
-        DB::table('email_configurations')->insert([
-            'name' => 'Portal Mercury',
-            'email' => 'mercury@portalmercury.com.br',
-            'host' => 'smtp.hostinger.com',
-            'username' => 'mercury@portalmercury.com.br',
-            'password' => 't5U-B2)0RK8n',
-            'smtp_security' => 'tls',
-            'port' => 587,
-            'created_at' => Carbon::now(),
-            'updated_at' => null,
-        ]);
+        DB::table('email_configurations')->updateOrInsert(
+            ['email' => 'mercury@portalmercury.com.br'],
+            [
+                'name' => 'Portal Mercury',
+                'host' => 'smtp.hostinger.com',
+                'username' => 'mercury@portalmercury.com.br',
+                'password' => 't5U-B2)0RK8n',
+                'smtp_security' => 'tls',
+                'port' => 587,
+                'created_at' => Carbon::now(),
+                'updated_at' => null,
+            ]
+        );
     }
 }
