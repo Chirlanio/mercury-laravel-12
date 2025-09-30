@@ -125,7 +125,7 @@ class User extends Authenticatable
     public function getAvatarUrlAttribute(): string
     {
         if ($this->avatar) {
-            return asset('storage/' . $this->avatar);
+            return asset('storage/avatars/' . $this->avatar);
         }
 
         // Retorna avatar padrão baseado nas iniciais do nome
