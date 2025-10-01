@@ -14,7 +14,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
 
     return (
         <>
-            <Head title="Welcome" />
+            <Head title="Bem-vindo" />
             <div className="bg-gray-50 text-black/50 dark:bg-black dark:text-white/50">
                 <img
                     id="background"
@@ -51,13 +51,13 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                                             href={route('login')}
                                             className="rounded-md px-3 py-2 text-black ring-1 ring-transparent transition hover:text-black/70 focus:outline-none focus-visible:ring-[#FF2D20] dark:text-white dark:hover:text-white/80 dark:focus-visible:ring-white"
                                         >
-                                            Log in
+                                            Entrar
                                         </Link>
                                         <Link
                                             href={route('register')}
                                             className="rounded-md px-3 py-2 text-black ring-1 ring-transparent transition hover:text-black/70 focus:outline-none focus-visible:ring-[#FF2D20] dark:text-white dark:hover:text-white/80 dark:focus-visible:ring-white"
                                         >
-                                            Register
+                                            Registrar
                                         </Link>
                                     </>
                                 )}
@@ -114,18 +114,17 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
 
                                             <div className="pt-3 sm:pt-5 lg:pt-0">
                                                 <h2 className="text-xl font-semibold text-black dark:text-white">
-                                                    Documentation
+                                                    Documentação
                                                 </h2>
 
                                                 <p className="mt-4 text-sm/relaxed">
-                                                    Laravel has wonderful
-                                                    documentation covering every
-                                                    aspect of the framework.
-                                                    Whether you are a newcomer
-                                                    or have prior experience
-                                                    with Laravel, we recommend
-                                                    reading our documentation
-                                                    from beginning to end.
+                                                    O Laravel possui uma documentação
+                                                    maravilhosa cobrindo todos os
+                                                    aspectos do framework. Seja você
+                                                    um iniciante ou tenha experiência
+                                                    prévia com Laravel, recomendamos
+                                                    ler nossa documentação do início
+                                                    ao fim.
                                                 </p>
                                             </div>
                                         </div>
@@ -169,12 +168,11 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                                         </h2>
 
                                         <p className="mt-4 text-sm/relaxed">
-                                            Laracasts offers thousands of video
-                                            tutorials on Laravel, PHP, and
-                                            JavaScript development. Check them
-                                            out, see for yourself, and massively
-                                            level up your development skills in
-                                            the process.
+                                            O Laracasts oferece milhares de tutoriais
+                                            em vídeo sobre desenvolvimento Laravel, PHP
+                                            e JavaScript. Confira, veja por si mesmo e
+                                            aprimore significativamente suas habilidades
+                                            de desenvolvimento no processo.
                                         </p>
                                     </div>
 
@@ -218,12 +216,11 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                                         </h2>
 
                                         <p className="mt-4 text-sm/relaxed">
-                                            Laravel News is a community driven
-                                            portal and newsletter aggregating
-                                            all of the latest and most important
-                                            news in the Laravel ecosystem,
-                                            including new package releases and
-                                            tutorials.
+                                            O Laravel News é um portal e newsletter
+                                            conduzido pela comunidade que agrega todas
+                                            as últimas e mais importantes notícias do
+                                            ecossistema Laravel, incluindo novos
+                                            lançamentos de pacotes e tutoriais.
                                         </p>
                                     </div>
 
@@ -258,13 +255,12 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
 
                                     <div className="pt-3 sm:pt-5">
                                         <h2 className="text-xl font-semibold text-black dark:text-white">
-                                            Vibrant Ecosystem
+                                            Ecossistema Vibrante
                                         </h2>
 
                                         <p className="mt-4 text-sm/relaxed">
-                                            Laravel's robust library of
-                                            first-party tools and libraries,
-                                            such as{' '}
+                                            A robusta biblioteca de ferramentas e
+                                            bibliotecas oficiais do Laravel, como{' '}
                                             <a
                                                 href="https://forge.laravel.com"
                                                 className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white dark:focus-visible:ring-[#FF2D20]"
@@ -299,9 +295,9 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                                             >
                                                 Herd
                                             </a>{' '}
-                                            help you take your projects to the
-                                            next level. Pair them with powerful
-                                            open source libraries like{' '}
+                                            ajudam você a levar seus projetos ao
+                                            próximo nível. Combine-as com poderosas
+                                            bibliotecas de código aberto como{' '}
                                             <a
                                                 href="https://laravel.com/docs/billing"
                                                 className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
@@ -343,7 +339,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                                             >
                                                 Telescope
                                             </a>
-                                            , and more.
+                                            , e muito mais.
                                         </p>
                                     </div>
                                 </div>
