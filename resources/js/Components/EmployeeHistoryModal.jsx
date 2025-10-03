@@ -109,8 +109,6 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
 
             const data = await response.json();
 
-            // Remover contrato da lista
-            setContracts(prev => prev.filter(c => c.id !== contractToDelete.id));
             setIsDeleteModalOpen(false);
             setContractToDelete(null);
 
@@ -125,7 +123,13 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
 
                 if (shouldReactivate) {
                     await handleReactivateContract(data.previousContract.id);
+                } else {
+                    // Recarregar histórico se não reativar
+                    fetchHistory();
                 }
+            } else {
+                // Recarregar histórico após exclusão
+                fetchHistory();
             }
         } catch (err) {
             console.error('Erro ao excluir contrato:', err);
@@ -146,16 +150,8 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
                 throw new Error('Erro ao reativar contrato');
             }
 
-            // Atualizar o contrato na lista para mostrar como ativo e remover data de término
-            setContracts(prev =>
-                prev.map(c => c.id === contractId ? {
-                    ...c,
-                    is_active: true,
-                    end_date: 'Atual',
-                    end_date_formatted: null,
-                    status_label: 'Atual'
-                } : c)
-            );
+            // Recarregar histórico completo após reativação
+            fetchHistory();
         } catch (err) {
             console.error('Erro ao reativar contrato:', err);
             alert('Erro ao reativar contrato. Tente novamente.');

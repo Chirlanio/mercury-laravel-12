@@ -15,6 +15,7 @@ class EmployeeStatus extends Model
 
     protected $fillable = [
         'description_name',
+        'adms_cor_id',
         'color_theme_id',
     ];
 

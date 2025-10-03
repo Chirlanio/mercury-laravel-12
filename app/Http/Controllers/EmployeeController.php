@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Models\EmployeeHistory;
+use App\Models\EmployeeStatus;
 use App\Models\EmploymentContract;
 use App\Models\Position;
 use App\Models\Store;
+use App\Exports\EmployeesExport;
 use App\Rules\ValidImageRule;
 use Carbon\Carbon;
 use Exception;
@@ -23,6 +25,8 @@ class EmployeeController extends Controller
         $search = $request->get('search');
         $sortField = $request->get('sort', 'name');
         $sortDirection = $request->get('direction', 'asc');
+        $storeFilter = $request->get('store');
+        $statusFilter = $request->get('status');
 
         $query = Employee::query()
             ->with(['educationLevel', 'position', 'store'])
@@ -40,6 +44,16 @@ class EmployeeController extends Controller
             });
         }
 
+        // Aplicar filtro de loja
+        if ($storeFilter) {
+            $query->where('store_id', $storeFilter);
+        }
+
+        // Aplicar filtro de status
+        if ($statusFilter !== null && $statusFilter !== '') {
+            $query->where('status_id', $statusFilter);
+        }
+
         // Aplicar ordenação
         $allowedSortFields = ['name', 'admission_date', 'level'];
         if (in_array($sortField, $allowedSortFields)) {
@@ -48,9 +62,10 @@ class EmployeeController extends Controller
 
         $employees = $query->paginate($perPage);
 
-        // Buscar dados para o modal de cadastro
+        // Buscar dados para o modal de cadastro e filtros
         $positions = Position::active()->orderBy('name')->get(['id', 'name', 'level']);
         $stores = Store::active()->orderBy('name')->get(['id', 'code', 'name']);
+        $statuses = EmployeeStatus::orderBy('description_name')->get(['id', 'description_name as name']);
 
         return Inertia::render('Employees/Index', [
             'employees' => $employees->through(function ($employee) {
@@ -62,8 +77,8 @@ class EmployeeController extends Controller
                     'admission_date' => $employee->admission_date?->format('d/m/Y'),
                     'position' => $employee->position?->name ?? 'Não informado',
                     'level' => $employee->level,
-                    'is_active' => $employee->is_active,
-                    'status' => $employee->is_active ? 'Ativo' : 'Inativo',
+                    'is_active' => $employee->status_id == 2,
+                    'status' => $employee->status_id == 2 ? 'Ativo' : ($employee->status_id == 3 ? 'Inativo' : ($employee->status_id == 1 ? 'Pendente' : ($employee->status_id == 4 ? 'Férias' : 'Licença'))),
                     'age' => $employee->birth_date ? $employee->age : null,
                     'years_of_service' => $employee->years_of_service,
                     'is_pcd' => $employee->is_pcd,
@@ -72,11 +87,14 @@ class EmployeeController extends Controller
             }),
             'positions' => $positions,
             'stores' => $stores,
+            'statuses' => $statuses,
             'filters' => [
                 'search' => $search,
                 'sort' => $sortField,
                 'direction' => $sortDirection,
                 'per_page' => $perPage,
+                'store' => $storeFilter,
+                'status' => $statusFilter,
             ],
         ]);
     }
@@ -86,8 +104,13 @@ class EmployeeController extends Controller
         // Limpar CPF removendo máscara
         $cleanCpf = $request->cpf ? preg_replace('/[^0-9]/', '', $request->cpf) : '';
 
-        // Substituir o CPF no request pelo CPF limpo
-        $request->merge(['cpf' => $cleanCpf]);
+        // Aplicar uppercase nos campos de texto
+        $request->merge([
+            'cpf' => $cleanCpf,
+            'name' => $request->name ? strtoupper($request->name) : null,
+            'short_name' => $request->short_name ? strtoupper($request->short_name) : null,
+            'site_coupon' => $request->site_coupon ? strtoupper($request->site_coupon) : null,
+        ]);
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100',
@@ -142,6 +165,24 @@ class EmployeeController extends Controller
             }, ARRAY_FILTER_USE_BOTH);
 
             $employee = Employee::create($data);
+
+            // Criar contrato de admissão automaticamente
+            EmploymentContract::create([
+                'employee_id' => $employee->id,
+                'position_id' => $employee->position_id,
+                'movement_type_id' => 1, // ID 1 = Admissão
+                'store_id' => $employee->store_id,
+                'start_date' => $employee->admission_date,
+                'end_date' => null,
+                'is_active' => true,
+            ]);
+
+            Log::info('Created employee with admission contract', [
+                'employee_id' => $employee->id,
+                'position_id' => $employee->position_id,
+                'store_id' => $employee->store_id,
+                'admission_date' => $employee->admission_date,
+            ]);
 
             return redirect()->route('employees.index')->with('success', 'Funcionário cadastrado com sucesso!');
 
@@ -229,8 +270,13 @@ class EmployeeController extends Controller
         // Limpar CPF removendo máscara
         $cleanCpf = $request->cpf ? preg_replace('/[^0-9]/', '', $request->cpf) : '';
 
-        // Substituir o CPF no request pelo CPF limpo
-        $request->merge(['cpf' => $cleanCpf]);
+        // Aplicar uppercase nos campos de texto
+        $request->merge([
+            'cpf' => $cleanCpf,
+            'name' => $request->name ? strtoupper($request->name) : null,
+            'short_name' => $request->short_name ? strtoupper($request->short_name) : null,
+            'site_coupon' => $request->site_coupon ? strtoupper($request->site_coupon) : null,
+        ]);
 
         Log::info('Cleaned CPF', ['original_cpf' => $request->cpf, 'cleaned' => $cleanCpf, 'length' => strlen($cleanCpf)]);
 
@@ -769,5 +815,23 @@ class EmployeeController extends Controller
                 'message' => 'Erro ao reativar contrato: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Export employees to Excel
+     */
+    public function export(Request $request)
+    {
+        $filters = [
+            'search' => $request->get('search'),
+            'store' => $request->get('store'),
+            'status' => $request->get('status'),
+            'sort' => $request->get('sort', 'name'),
+            'direction' => $request->get('direction', 'asc'),
+        ];
+
+        $fileName = 'funcionarios_' . date('Y-m-d_His') . '.xlsx';
+
+        return (new EmployeesExport($filters))->download($fileName);
     }
 }

@@ -9,7 +9,7 @@ import DataTable from "@/Components/DataTable";
 import EmployeeAvatar from "@/Components/EmployeeAvatar";
 import Button from "@/Components/Button";
 
-export default function Index({ auth, employees, positions, stores, filters }) {
+export default function Index({ auth, employees, positions, stores, statuses, filters }) {
     const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -266,7 +266,21 @@ export default function Index({ auth, employees, positions, stores, filters }) {
                                     Gerencie e visualize informações dos funcionários
                                 </p>
                             </div>
-                            <div>
+                            <div className="flex gap-3">
+                                <Button
+                                    variant="success"
+                                    onClick={() => {
+                                        const currentUrl = new URL(window.location);
+                                        window.location.href = `/employees/export${currentUrl.search}`;
+                                    }}
+                                    icon={({ className }) => (
+                                        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                    )}
+                                >
+                                    Exportar
+                                </Button>
                                 <Button
                                     variant="primary"
                                     onClick={openCreateModal}
@@ -277,6 +291,97 @@ export default function Index({ auth, employees, positions, stores, filters }) {
                                     )}
                                 >
                                     Novo Funcionário
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Filtros */}
+                    <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                            {/* Filtro de Loja */}
+                            <div>
+                                <label htmlFor="store-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                                    Filtrar por Loja
+                                </label>
+                                <select
+                                    id="store-filter"
+                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                    value={filters.store || ''}
+                                    onChange={(e) => {
+                                        const currentUrl = new URL(window.location);
+                                        if (e.target.value) {
+                                            currentUrl.searchParams.set('store', e.target.value);
+                                        } else {
+                                            currentUrl.searchParams.delete('store');
+                                        }
+                                        currentUrl.searchParams.delete('page');
+                                        router.visit(currentUrl.toString(), {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                        });
+                                    }}
+                                >
+                                    <option value="">Todas as lojas</option>
+                                    {stores.map((store) => (
+                                        <option key={store.code} value={store.code}>
+                                            {store.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Filtro de Status */}
+                            <div>
+                                <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                                    Filtrar por Status
+                                </label>
+                                <select
+                                    id="status-filter"
+                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                    value={filters.status || ''}
+                                    onChange={(e) => {
+                                        const currentUrl = new URL(window.location);
+                                        if (e.target.value) {
+                                            currentUrl.searchParams.set('status', e.target.value);
+                                        } else {
+                                            currentUrl.searchParams.delete('status');
+                                        }
+                                        currentUrl.searchParams.delete('page');
+                                        router.visit(currentUrl.toString(), {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                        });
+                                    }}
+                                >
+                                    <option value="">Todos os status</option>
+                                    {statuses.map((status) => (
+                                        <option key={status.id} value={status.id}>
+                                            {status.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Botão Limpar Filtros */}
+                            <div>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => {
+                                        router.visit('/employees', {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                        });
+                                    }}
+                                    disabled={!((filters.store && filters.store !== '') || (filters.status !== null && filters.status !== ''))}
+                                    icon={({ className }) => (
+                                        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    )}
+                                >
+                                    Limpar Filtros
                                 </Button>
                             </div>
                         </div>

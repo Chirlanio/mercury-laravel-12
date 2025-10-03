@@ -178,6 +178,9 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
 
 // Rotas para funcionários
 Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
+    // Exportar funcionários (deve vir antes do show para não conflitar com rotas)
+    Route::get('/employees/export', [EmployeeController::class, 'export'])->name('employees.export');
+
     // Listar funcionários
     Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
 

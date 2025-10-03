@@ -225,6 +225,14 @@ class Employee extends Model
     }
 
     /**
+     * Get the employee status
+     */
+    public function employeeStatus(): BelongsTo
+    {
+        return $this->belongsTo(EmployeeStatus::class, 'status_id');
+    }
+
+    /**
      * Get all available levels
      */
     public static function getLevels(): array
