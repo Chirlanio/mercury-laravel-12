@@ -1,24 +1,24 @@
-import InputError from '@/Components/InputError';
-import InputLabel from '@/Components/InputLabel';
-import PrimaryButton from '@/Components/PrimaryButton';
-import TextInput from '@/Components/TextInput';
-import GuestLayout from '@/Layouts/GuestLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import InputError from "@/Components/InputError";
+import InputLabel from "@/Components/InputLabel";
+import PrimaryButton from "@/Components/PrimaryButton";
+import TextInput from "@/Components/TextInput";
+import GuestLayout from "@/Layouts/GuestLayout";
+import { Head, Link, useForm } from "@inertiajs/react";
 
 export default function Register({ roles }) {
     const { data, setData, post, processing, errors, reset } = useForm({
-        name: '',
-        email: '',
-        password: '',
-        password_confirmation: '',
-        role: 'user',
+        name: "",
+        email: "",
+        password: "",
+        password_confirmation: "",
+        role: "user",
     });
 
     const submit = (e) => {
         e.preventDefault();
 
-        post(route('register'), {
-            onFinish: () => reset('password', 'password_confirmation'),
+        post(route("register"), {
+            onFinish: () => reset("password", "password_confirmation"),
         });
     };
 
@@ -37,7 +37,7 @@ export default function Register({ roles }) {
                         className="mt-1 block w-full"
                         autoComplete="name"
                         isFocused={true}
-                        onChange={(e) => setData('name', e.target.value)}
+                        onChange={(e) => setData("name", e.target.value)}
                         required
                     />
 
@@ -54,7 +54,7 @@ export default function Register({ roles }) {
                         value={data.email}
                         className="mt-1 block w-full"
                         autoComplete="username"
-                        onChange={(e) => setData('email', e.target.value)}
+                        onChange={(e) => setData("email", e.target.value)}
                         required
                     />
 
@@ -71,7 +71,7 @@ export default function Register({ roles }) {
                         value={data.password}
                         className="mt-1 block w-full"
                         autoComplete="new-password"
-                        onChange={(e) => setData('password', e.target.value)}
+                        onChange={(e) => setData("password", e.target.value)}
                         required
                     />
 
@@ -92,7 +92,7 @@ export default function Register({ roles }) {
                         className="mt-1 block w-full"
                         autoComplete="new-password"
                         onChange={(e) =>
-                            setData('password_confirmation', e.target.value)
+                            setData("password_confirmation", e.target.value)
                         }
                         required
                     />
@@ -104,18 +104,14 @@ export default function Register({ roles }) {
                 </div>
 
                 <div className="mt-4">
-<<<<<<< HEAD
                     <InputLabel htmlFor="role" value="Função" />
-=======
-                    <InputLabel htmlFor="role" value="Nível de Acesso" />
->>>>>>> 84c9a03193f1b3486603586c0fd28b83b97a6e75
 
                     <select
                         id="role"
                         name="role"
                         value={data.role}
                         className="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
-                        onChange={(e) => setData('role', e.target.value)}
+                        onChange={(e) => setData("role", e.target.value)}
                         required
                     >
                         {Object.entries(roles).map(([value, label]) => (
@@ -130,14 +126,10 @@ export default function Register({ roles }) {
 
                 <div className="mt-4 flex items-center justify-end">
                     <Link
-                        href={route('login')}
+                        href={route("login")}
                         className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                     >
-<<<<<<< HEAD
                         Já possui uma conta?
-=======
-                        Já possui cadastro?
->>>>>>> 84c9a03193f1b3486603586c0fd28b83b97a6e75
                     </Link>
 
                     <PrimaryButton className="ms-4" disabled={processing}>

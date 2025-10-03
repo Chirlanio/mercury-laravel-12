@@ -1,6 +1,6 @@
-import PrimaryButton from '@/Components/PrimaryButton';
-import GuestLayout from '@/Layouts/GuestLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import PrimaryButton from "@/Components/PrimaryButton";
+import GuestLayout from "@/Layouts/GuestLayout";
+import { Head, Link, useForm } from "@inertiajs/react";
 
 export default function VerifyEmail({ status }) {
     const { post, processing } = useForm({});
@@ -8,7 +8,7 @@ export default function VerifyEmail({ status }) {
     const submit = (e) => {
         e.preventDefault();
 
-        post(route('verification.send'));
+        post(route("verification.send"));
     };
 
     return (
@@ -16,25 +16,16 @@ export default function VerifyEmail({ status }) {
             <Head title="Verificação de E-mail" />
 
             <div className="mb-4 text-sm text-gray-600">
-                Obrigado por se cadastrar! Antes de começar, você poderia verificar
-<<<<<<< HEAD
-                seu endereço de e-mail clicando no link que acabamos de enviar para
-                você? Se você não recebeu o e-mail, teremos prazer em enviar outro.
-=======
-                seu endereço de e-mail clicando no link que acabamos de enviar?
-                Se você não recebeu o e-mail, teremos prazer em enviar outro.
->>>>>>> 84c9a03193f1b3486603586c0fd28b83b97a6e75
+                Obrigado por se cadastrar! Antes de começar, você poderia
+                verificar seu endereço de e-mail clicando no link que acabamos
+                de enviar para você? Se você não recebeu o e-mail, teremos
+                prazer em enviar outro.
             </div>
 
-            {status === 'verification-link-sent' && (
+            {status === "verification-link-sent" && (
                 <div className="mb-4 text-sm font-medium text-green-600">
-<<<<<<< HEAD
-                    Um novo link de verificação foi enviado para o endereço de e-mail
-                    que você forneceu durante o cadastro.
-=======
                     Um novo link de verificação foi enviado para o endereço de
-                    e-mail fornecido durante o registro.
->>>>>>> 84c9a03193f1b3486603586c0fd28b83b97a6e75
+                    e-mail que você forneceu durante o cadastro.
                 </div>
             )}
 
@@ -45,7 +36,7 @@ export default function VerifyEmail({ status }) {
                     </PrimaryButton>
 
                     <Link
-                        href={route('logout')}
+                        href={route("logout")}
                         method="post"
                         as="button"
                         className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"

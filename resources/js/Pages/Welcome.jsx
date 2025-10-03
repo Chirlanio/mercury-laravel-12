@@ -1,15 +1,15 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link } from "@inertiajs/react";
 
 export default function Welcome({ auth, laravelVersion, phpVersion }) {
     const handleImageError = () => {
         document
-            .getElementById('screenshot-container')
-            ?.classList.add('!hidden');
-        document.getElementById('docs-card')?.classList.add('!row-span-1');
+            .getElementById("screenshot-container")
+            ?.classList.add("!hidden");
+        document.getElementById("docs-card")?.classList.add("!row-span-1");
         document
-            .getElementById('docs-card-content')
-            ?.classList.add('!flex-row');
-        document.getElementById('background')?.classList.add('!hidden');
+            .getElementById("docs-card-content")
+            ?.classList.add("!flex-row");
+        document.getElementById("background")?.classList.add("!hidden");
     };
 
     return (
@@ -40,7 +40,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                             <nav className="-mx-3 flex flex-1 justify-end">
                                 {auth.user ? (
                                     <Link
-                                        href={route('dashboard')}
+                                        href={route("dashboard")}
                                         className="rounded-md px-3 py-2 text-black ring-1 ring-transparent transition hover:text-black/70 focus:outline-none focus-visible:ring-[#FF2D20] dark:text-white dark:hover:text-white/80 dark:focus-visible:ring-white"
                                     >
                                         Dashboard
@@ -48,16 +48,16 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                                 ) : (
                                     <>
                                         <Link
-                                            href={route('login')}
+                                            href={route("login")}
                                             className="rounded-md px-3 py-2 text-black ring-1 ring-transparent transition hover:text-black/70 focus:outline-none focus-visible:ring-[#FF2D20] dark:text-white dark:hover:text-white/80 dark:focus-visible:ring-white"
                                         >
-                                            Entrar
+                                            Log in
                                         </Link>
                                         <Link
-                                            href={route('register')}
+                                            href={route("register")}
                                             className="rounded-md px-3 py-2 text-black ring-1 ring-transparent transition hover:text-black/70 focus:outline-none focus-visible:ring-[#FF2D20] dark:text-white dark:hover:text-white/80 dark:focus-visible:ring-white"
                                         >
-                                            Registrar
+                                            Register
                                         </Link>
                                     </>
                                 )}
@@ -118,23 +118,15 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                                                 </h2>
 
                                                 <p className="mt-4 text-sm/relaxed">
-<<<<<<< HEAD
-                                                    O Laravel possui documentação
-                                                    maravilhosa cobrindo todos os
-                                                    aspectos do framework.
-                                                    Seja você um iniciante ou
-                                                    tenha experiência prévia com Laravel,
-                                                    recomendamos ler nossa documentação
-                                                    do início ao fim.
-=======
-                                                    O Laravel possui uma documentação
-                                                    maravilhosa cobrindo todos os
-                                                    aspectos do framework. Seja você
-                                                    um iniciante ou tenha experiência
-                                                    prévia com Laravel, recomendamos
-                                                    ler nossa documentação do início
+                                                    O Laravel possui
+                                                    documentação maravilhosa
+                                                    cobrindo todos os aspectos
+                                                    do framework. Seja você um
+                                                    iniciante ou tenha
+                                                    experiência prévia com
+                                                    Laravel, recomendamos ler
+                                                    nossa documentação do início
                                                     ao fim.
->>>>>>> 84c9a03193f1b3486603586c0fd28b83b97a6e75
                                                 </p>
                                             </div>
                                         </div>
@@ -178,11 +170,12 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                                         </h2>
 
                                         <p className="mt-4 text-sm/relaxed">
-                                            O Laracasts oferece milhares de tutoriais
-                                            em vídeo sobre desenvolvimento Laravel, PHP
-                                            e JavaScript. Confira, veja por si mesmo e
-                                            aprimore significativamente suas habilidades
-                                            de desenvolvimento no processo.
+                                            Laracasts offers thousands of video
+                                            tutorials on Laravel, PHP, and
+                                            JavaScript development. Check them
+                                            out, see for yourself, and massively
+                                            level up your development skills in
+                                            the process.
                                         </p>
                                     </div>
 
@@ -226,11 +219,12 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                                         </h2>
 
                                         <p className="mt-4 text-sm/relaxed">
-                                            O Laravel News é um portal e newsletter
-                                            conduzido pela comunidade que agrega todas
-                                            as últimas e mais importantes notícias do
-                                            ecossistema Laravel, incluindo novos
-                                            lançamentos de pacotes e tutoriais.
+                                            Laravel News is a community driven
+                                            portal and newsletter aggregating
+                                            all of the latest and most important
+                                            news in the Laravel ecosystem,
+                                            including new package releases and
+                                            tutorials.
                                         </p>
                                     </div>
 
@@ -269,93 +263,88 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                                         </h2>
 
                                         <p className="mt-4 text-sm/relaxed">
-<<<<<<< HEAD
                                             A robusta biblioteca de ferramentas
                                             e bibliotecas oficiais do Laravel,
-                                            como{' '}
-=======
-                                            A robusta biblioteca de ferramentas e
-                                            bibliotecas oficiais do Laravel, como{' '}
->>>>>>> 84c9a03193f1b3486603586c0fd28b83b97a6e75
+                                            como{" "}
                                             <a
                                                 href="https://forge.laravel.com"
                                                 className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white dark:focus-visible:ring-[#FF2D20]"
                                             >
                                                 Forge
                                             </a>
-                                            ,{' '}
+                                            ,{" "}
                                             <a
                                                 href="https://vapor.laravel.com"
                                                 className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
                                             >
                                                 Vapor
                                             </a>
-                                            ,{' '}
+                                            ,{" "}
                                             <a
                                                 href="https://nova.laravel.com"
                                                 className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
                                             >
                                                 Nova
                                             </a>
-                                            ,{' '}
+                                            ,{" "}
                                             <a
                                                 href="https://envoyer.io"
                                                 className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
                                             >
                                                 Envoyer
                                             </a>
-                                            , and{' '}
+                                            , and{" "}
                                             <a
                                                 href="https://herd.laravel.com"
                                                 className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
                                             >
                                                 Herd
-                                            </a>{' '}
-                                            ajudam você a levar seus projetos ao
-                                            próximo nível. Combine-as com poderosas
-                                            bibliotecas de código aberto como{' '}
+                                            </a>{" "}
+                                            help you take your projects to the
+                                            next level. Pair them with powerful
+                                            open source libraries like{" "}
                                             <a
                                                 href="https://laravel.com/docs/billing"
                                                 className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
                                             >
                                                 Cashier
                                             </a>
-                                            ,{' '}
+                                            ,{" "}
                                             <a
                                                 href="https://laravel.com/docs/dusk"
                                                 className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
                                             >
                                                 Dusk
                                             </a>
-                                            ,{' '}
+                                            ,{" "}
                                             <a
                                                 href="https://laravel.com/docs/broadcasting"
                                                 className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
                                             >
                                                 Echo
                                             </a>
-                                            ,{' '}
+                                            ,{" "}
                                             <a
                                                 href="https://laravel.com/docs/horizon"
                                                 className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
                                             >
                                                 Horizon
                                             </a>
-                                            ,{' '}
+                                            ,{" "}
                                             <a
                                                 href="https://laravel.com/docs/sanctum"
                                                 className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
                                             >
                                                 Sanctum
                                             </a>
-                                            ,{' '}
+                                            ,{" "}
                                             <a
                                                 href="https://laravel.com/docs/telescope"
                                                 className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white"
                                             >
                                                 Telescope
                                             </a>
-                                            , e muito mais.
+                                            , and more.
                                         </p>
                                     </div>
                                 </div>
