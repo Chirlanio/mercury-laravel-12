@@ -5,15 +5,19 @@ namespace App\Http\Controllers;
 use App\Models\Employee;
 use App\Models\EmployeeHistory;
 use App\Models\EmployeeStatus;
+use App\Models\EmployeeEvent;
+use App\Models\EmployeeEventType;
 use App\Models\EmploymentContract;
 use App\Models\Position;
 use App\Models\Store;
 use App\Exports\EmployeesExport;
 use App\Rules\ValidImageRule;
+use Barryvdh\DomPDF\Facade\Pdf as PDF;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 
@@ -833,5 +837,283 @@ class EmployeeController extends Controller
         $fileName = 'funcionarios_' . date('Y-m-d_His') . '.xlsx';
 
         return (new EmployeesExport($filters))->download($fileName);
+    }
+
+    /**
+     * Listar eventos de um funcionário
+     */
+    public function getEvents($employeeId)
+    {
+        $employee = Employee::findOrFail($employeeId);
+
+        $events = EmployeeEvent::where('employee_id', $employeeId)
+            ->with(['eventType', 'creator'])
+            ->orderBy('start_date', 'desc')
+            ->get()
+            ->map(function ($event) {
+                return [
+                    'id' => $event->id,
+                    'event_type' => $event->eventType->name,
+                    'event_type_id' => $event->event_type_id,
+                    'start_date' => $event->start_date?->format('d/m/Y'),
+                    'end_date' => $event->end_date?->format('d/m/Y'),
+                    'period' => $event->period,
+                    'duration_in_days' => $event->duration_in_days,
+                    'document_url' => $event->document_url,
+                    'has_document' => !is_null($event->document_path),
+                    'notes' => $event->notes,
+                    'created_by' => $event->creator ? $event->creator->name : 'Sistema',
+                    'created_at' => $event->created_at?->format('d/m/Y H:i'),
+                ];
+            });
+
+        $eventTypes = EmployeeEventType::active()->get();
+
+        return response()->json([
+            'events' => $events,
+            'event_types' => $eventTypes,
+        ]);
+    }
+
+    /**
+     * Criar novo evento para um funcionário
+     */
+    public function storeEvent(Request $request, $employeeId)
+    {
+        $employee = Employee::findOrFail($employeeId);
+
+        $eventType = EmployeeEventType::findOrFail($request->event_type_id);
+
+        // Validação dinâmica baseada no tipo de evento
+        $rules = [
+            'event_type_id' => 'required|exists:employee_event_types,id',
+            'notes' => 'nullable|string|max:1000',
+        ];
+
+        if ($eventType->requires_single_date) {
+            $rules['start_date'] = 'required|date';
+        }
+
+        if ($eventType->requires_date_range) {
+            $rules['start_date'] = 'required|date';
+            $rules['end_date'] = 'required|date|after_or_equal:start_date';
+        }
+
+        if ($eventType->requires_document) {
+            $rules['document'] = 'required|file|mimes:pdf,jpg,jpeg,png|max:10240'; // Max 10MB
+        }
+
+        $validator = Validator::make($request->all(), $rules);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Erro de validação',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $data = [
+            'employee_id' => $employeeId,
+            'event_type_id' => $request->event_type_id,
+            'start_date' => $request->start_date,
+            'end_date' => $request->end_date,
+            'notes' => $request->notes,
+            'created_by' => auth()->id(),
+        ];
+
+        // Upload do documento se fornecido
+        if ($request->hasFile('document')) {
+            $file = $request->file('document');
+            $filename = 'employee_' . $employeeId . '_event_' . time() . '.' . $file->getClientOriginalExtension();
+            $path = $file->storeAs('employee_events', $filename, 'public');
+            $data['document_path'] = $path;
+        }
+
+        $event = EmployeeEvent::create($data);
+
+        return response()->json([
+            'message' => 'Evento criado com sucesso',
+            'event' => $event->load('eventType', 'creator'),
+        ], 201);
+    }
+
+    /**
+     * Excluir evento de um funcionário
+     */
+    public function destroyEvent($employeeId, $eventId)
+    {
+        $employee = Employee::findOrFail($employeeId);
+        $event = EmployeeEvent::where('employee_id', $employeeId)
+            ->findOrFail($eventId);
+
+        // Remover documento se existir
+        if ($event->document_path) {
+            Storage::disk('public')->delete($event->document_path);
+        }
+
+        $event->delete();
+
+        return response()->json([
+            'message' => 'Evento excluído com sucesso',
+        ]);
+    }
+
+    public function exportEvents(Request $request, $employeeId)
+    {
+        $employee = Employee::with(['position', 'store'])->findOrFail($employeeId);
+
+        $query = EmployeeEvent::where('employee_id', $employeeId)
+            ->with(['eventType', 'creator']);
+
+        // Filtrar por tipos de eventos
+        if ($request->has('event_type_ids') && is_array($request->event_type_ids)) {
+            $query->whereIn('event_type_id', $request->event_type_ids);
+        }
+
+        // Filtrar por período
+        if ($request->has('start_date') && $request->start_date) {
+            $query->where('start_date', '>=', $request->start_date);
+        }
+
+        if ($request->has('end_date') && $request->end_date) {
+            $query->where(function ($q) use ($request) {
+                $q->where('end_date', '<=', $request->end_date)
+                  ->orWhere(function ($q2) use ($request) {
+                      $q2->whereNull('end_date')
+                         ->where('start_date', '<=', $request->end_date);
+                  });
+            });
+        }
+
+        $events = $query->orderBy('start_date', 'desc')->get();
+
+        // Preparar dados para o PDF
+        $data = [
+            'employee' => [
+                'name' => $employee->name,
+                'cpf' => $employee->cpf,
+                'position' => $employee->position?->name,
+                'store' => $employee->store?->name,
+                'admission_date' => $employee->admission_date?->format('d/m/Y'),
+            ],
+            'events' => $events->map(function ($event) {
+                return [
+                    'event_type' => $event->eventType->name,
+                    'start_date' => $event->start_date?->format('d/m/Y'),
+                    'end_date' => $event->end_date?->format('d/m/Y'),
+                    'period' => $event->period,
+                    'duration_in_days' => $event->duration_in_days,
+                    'has_document' => !is_null($event->document_path),
+                    'notes' => $event->notes,
+                    'created_by' => $event->creator ? $event->creator->name : 'Sistema',
+                    'created_at' => $event->created_at?->format('d/m/Y H:i'),
+                ];
+            }),
+            'filters' => [
+                'event_types' => $request->has('event_type_ids')
+                    ? EmployeeEventType::whereIn('id', $request->event_type_ids)->pluck('name')->toArray()
+                    : null,
+                'start_date' => $request->start_date ? Carbon::parse($request->start_date)->format('d/m/Y') : null,
+                'end_date' => $request->end_date ? Carbon::parse($request->end_date)->format('d/m/Y') : null,
+            ],
+            'generated_at' => now()->format('d/m/Y H:i:s'),
+        ];
+
+        $pdf = PDF::loadView('pdf.employee-events', $data);
+
+        return $pdf->download('eventos_' . str_replace(' ', '_', strtolower($employee->name)) . '_' . now()->format('Y-m-d') . '.pdf');
+    }
+
+    public function exportAllEvents(Request $request)
+    {
+        $query = EmployeeEvent::with(['employee.position', 'employee.store', 'eventType', 'creator']);
+
+        // Filtrar por tipos de eventos
+        if ($request->has('event_type_ids') && is_array($request->event_type_ids)) {
+            $query->whereIn('event_type_id', $request->event_type_ids);
+        }
+
+        // Filtrar por lojas
+        if ($request->has('store_ids') && is_array($request->store_ids)) {
+            $query->whereHas('employee', function ($q) use ($request) {
+                $q->whereIn('store_id', $request->store_ids);
+            });
+        }
+
+        // Filtrar por período
+        if ($request->has('start_date') && $request->start_date) {
+            $query->where('start_date', '>=', $request->start_date);
+        }
+
+        if ($request->has('end_date') && $request->end_date) {
+            $query->where(function ($q) use ($request) {
+                $q->where('end_date', '<=', $request->end_date)
+                  ->orWhere(function ($q2) use ($request) {
+                      $q2->whereNull('end_date')
+                         ->where('start_date', '<=', $request->end_date);
+                  });
+            });
+        }
+
+        $events = $query->orderBy('start_date', 'desc')->get();
+
+        // Agrupar eventos por funcionário
+        $eventsByEmployee = $events->groupBy('employee_id')->map(function ($employeeEvents) {
+            $employee = $employeeEvents->first()->employee;
+            return [
+                'employee' => [
+                    'name' => $employee->name,
+                    'cpf' => $employee->cpf,
+                    'position' => $employee->position?->name,
+                    'store' => $employee->store?->name,
+                ],
+                'events' => $employeeEvents->map(function ($event) {
+                    return [
+                        'event_type' => $event->eventType->name,
+                        'start_date' => $event->start_date?->format('d/m/Y'),
+                        'end_date' => $event->end_date?->format('d/m/Y'),
+                        'period' => $event->period,
+                        'duration_in_days' => $event->duration_in_days,
+                        'has_document' => !is_null($event->document_path),
+                        'notes' => $event->notes,
+                        'created_by' => $event->creator ? $event->creator->name : 'Sistema',
+                        'created_at' => $event->created_at?->format('d/m/Y H:i'),
+                    ];
+                }),
+                'totals' => [
+                    'total_events' => $employeeEvents->count(),
+                    'vacation_days' => $employeeEvents->where('eventType.name', 'Férias')->sum('duration_in_days'),
+                    'leave_days' => $employeeEvents->where('eventType.name', 'Licença')->sum('duration_in_days'),
+                    'absences' => $employeeEvents->where('eventType.name', 'Falta')->count(),
+                ],
+            ];
+        })->values();
+
+        // Preparar dados para o PDF
+        $data = [
+            'employees_data' => $eventsByEmployee,
+            'filters' => [
+                'event_types' => $request->has('event_type_ids')
+                    ? EmployeeEventType::whereIn('id', $request->event_type_ids)->pluck('name')->toArray()
+                    : null,
+                'stores' => $request->has('store_ids')
+                    ? Store::whereIn('id', $request->store_ids)->pluck('name')->toArray()
+                    : null,
+                'start_date' => $request->start_date ? Carbon::parse($request->start_date)->format('d/m/Y') : null,
+                'end_date' => $request->end_date ? Carbon::parse($request->end_date)->format('d/m/Y') : null,
+            ],
+            'summary' => [
+                'total_employees' => $eventsByEmployee->count(),
+                'total_events' => $events->count(),
+                'total_vacation_days' => $events->where('eventType.name', 'Férias')->sum('duration_in_days'),
+                'total_leave_days' => $events->where('eventType.name', 'Licença')->sum('duration_in_days'),
+                'total_absences' => $events->where('eventType.name', 'Falta')->count(),
+            ],
+            'generated_at' => now()->format('d/m/Y H:i:s'),
+        ];
+
+        $pdf = PDF::loadView('pdf.all-employee-events', $data);
+
+        return $pdf->download('eventos_todos_funcionarios_' . now()->format('Y-m-d') . '.pdf');
     }
 }

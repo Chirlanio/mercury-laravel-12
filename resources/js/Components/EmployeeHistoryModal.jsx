@@ -3,13 +3,17 @@ import Modal from '@/Components/Modal';
 import Button from '@/Components/Button';
 import ContractCreateModal from '@/Components/ContractCreateModal';
 import ContractEditModal from '@/Components/ContractEditModal';
+import DocumentViewerModal from '@/Components/DocumentViewerModal';
+import ExportEventsModal from '@/Components/ExportEventsModal';
 
 export default function EmployeeHistoryModal({ show, onClose, employeeId, positions, stores }) {
     const [employee, setEmployee] = useState(null);
     const [histories, setHistories] = useState([]);
     const [contracts, setContracts] = useState([]);
+    const [events, setEvents] = useState([]);
+    const [eventTypes, setEventTypes] = useState([]);
     const [movementTypes, setMovementTypes] = useState([]);
-    const [activeTab, setActiveTab] = useState('contracts'); // 'contracts' ou 'histories'
+    const [activeTab, setActiveTab] = useState('contracts'); // 'contracts', 'histories' ou 'events'
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [isContractModalOpen, setIsContractModalOpen] = useState(false);
@@ -17,16 +21,33 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
     const [selectedContract, setSelectedContract] = useState(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [contractToDelete, setContractToDelete] = useState(null);
+    const [isCreatingEvent, setIsCreatingEvent] = useState(false);
+    const [isDeleteEventModalOpen, setIsDeleteEventModalOpen] = useState(false);
+    const [eventToDelete, setEventToDelete] = useState(null);
+    const [isDocumentViewerOpen, setIsDocumentViewerOpen] = useState(false);
+    const [selectedDocument, setSelectedDocument] = useState(null);
+    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+    const [eventFormData, setEventFormData] = useState({
+        event_type_id: '',
+        start_date: '',
+        end_date: '',
+        document: null,
+        notes: '',
+    });
+    const [eventErrors, setEventErrors] = useState({});
+    const [selectedEventType, setSelectedEventType] = useState(null);
 
     useEffect(() => {
         if (show && employeeId) {
             fetchHistory();
             fetchMovementTypes();
+            fetchEvents();
         } else if (!show) {
             // Reset state when modal closes
             setEmployee(null);
             setHistories([]);
             setContracts([]);
+            setEvents([]);
             setActiveTab('contracts');
             setError(null);
         }
@@ -67,6 +88,157 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
         } catch (err) {
             console.error('Erro ao buscar tipos de movimentação:', err);
         }
+    };
+
+    const fetchEvents = async () => {
+        try {
+            const response = await fetch(`/employees/${employeeId}/events`);
+            const data = await response.json();
+            setEvents(data.events);
+            setEventTypes(data.event_types);
+        } catch (error) {
+            console.error('Erro ao carregar eventos:', error);
+        }
+    };
+
+    const handleEventTypeChange = (e) => {
+        const typeId = e.target.value;
+        setEventFormData({ ...eventFormData, event_type_id: typeId });
+
+        const type = eventTypes.find(t => t.id === parseInt(typeId));
+        setSelectedEventType(type);
+
+        // Limpar campos que não são necessários
+        if (type && !type.requires_date_range) {
+            setEventFormData(prev => ({ ...prev, end_date: '' }));
+        }
+    };
+
+    const handleFileChange = (e) => {
+        setEventFormData({ ...eventFormData, document: e.target.files[0] });
+    };
+
+    const handleEventSubmit = async (e) => {
+        e.preventDefault();
+        setEventErrors({});
+
+        const formDataToSend = new FormData();
+        formDataToSend.append('event_type_id', eventFormData.event_type_id);
+        formDataToSend.append('start_date', eventFormData.start_date);
+
+        if (eventFormData.end_date) {
+            formDataToSend.append('end_date', eventFormData.end_date);
+        }
+
+        if (eventFormData.document) {
+            formDataToSend.append('document', eventFormData.document);
+        }
+
+        if (eventFormData.notes) {
+            formDataToSend.append('notes', eventFormData.notes);
+        }
+
+        try {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+            const response = await fetch(`/employees/${employeeId}/events`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: formDataToSend,
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                if (data.errors) {
+                    setEventErrors(data.errors);
+                }
+                throw new Error(data.message || 'Erro ao criar evento');
+            }
+
+            // Resetar formulário
+            setEventFormData({
+                event_type_id: '',
+                start_date: '',
+                end_date: '',
+                document: null,
+                notes: '',
+            });
+            setSelectedEventType(null);
+            setIsCreatingEvent(false);
+
+            // Recarregar eventos
+            fetchEvents();
+        } catch (error) {
+            console.error('Erro ao criar evento:', error);
+        }
+    };
+
+    const handleDeleteEventClick = (event) => {
+        setEventToDelete(event);
+        setIsDeleteEventModalOpen(true);
+    };
+
+    const handleDeleteEventCancel = () => {
+        setIsDeleteEventModalOpen(false);
+        setEventToDelete(null);
+    };
+
+    const handleDeleteEventConfirm = async () => {
+        if (!eventToDelete) return;
+
+        try {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+            const response = await fetch(`/employees/${employeeId}/events/${eventToDelete.id}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Erro ao excluir evento');
+            }
+
+            fetchEvents();
+            setIsDeleteEventModalOpen(false);
+            setEventToDelete(null);
+        } catch (error) {
+            console.error('Erro ao excluir evento:', error);
+        }
+    };
+
+    const getEmployeeEventIcon = (eventType) => {
+        const icons = {
+            'Férias': '🏖️',
+            'Licença': '🏥',
+            'Falta': '❌',
+            'Atestado Médico': '📄',
+        };
+        return icons[eventType] || '📋';
+    };
+
+    const getEmployeeEventColor = (eventType) => {
+        const colors = {
+            'Férias': 'bg-blue-100 text-blue-800 border-blue-300',
+            'Licença': 'bg-yellow-100 text-yellow-800 border-yellow-300',
+            'Falta': 'bg-red-100 text-red-800 border-red-300',
+            'Atestado Médico': 'bg-green-100 text-green-800 border-green-300',
+        };
+        return colors[eventType] || 'bg-gray-100 text-gray-800 border-gray-300';
+    };
+
+    const handleViewDocument = (event) => {
+        setSelectedDocument({
+            url: event.document_url,
+            eventType: event.event_type,
+            period: event.period,
+        });
+        setIsDocumentViewerOpen(true);
     };
 
     const handleContractCreated = (newContract) => {
@@ -290,17 +462,17 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
                             <span>Contratos ({contracts.length})</span>
                         </button>
                         <button
-                            onClick={() => setActiveTab('histories')}
+                            onClick={() => setActiveTab('events')}
                             className={`${
-                                activeTab === 'histories'
+                                activeTab === 'events'
                                     ? 'border-indigo-500 text-indigo-600'
                                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                             } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2`}
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
-                            <span>Eventos ({histories.length})</span>
+                            <span>Eventos ({events.length})</span>
                         </button>
                     </nav>
                     {activeTab === 'contracts' && (
@@ -317,11 +489,39 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
                             Adicionar Contrato
                         </Button>
                     )}
+                    {activeTab === 'events' && !isCreatingEvent && (
+                        <div className="flex space-x-2">
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => setIsExportModalOpen(true)}
+                                icon={({ className }) => (
+                                    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                )}
+                            >
+                                Exportar
+                            </Button>
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => setIsCreatingEvent(true)}
+                                icon={({ className }) => (
+                                    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                    </svg>
+                                )}
+                            >
+                                Novo Evento
+                            </Button>
+                        </div>
+                    )}
                 </div>
                 </div>
 
                 {/* Conteúdo das Tabs */}
-                {activeTab === 'contracts' ? (
+                {activeTab === 'contracts' && (
                     /* Lista de contratos */
                     contracts.length === 0 ? (
                         <div className="text-center py-12">
@@ -478,7 +678,9 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
                             ))}
                         </div>
                     )
-                ) : (
+                )}
+
+                {activeTab === 'histories' && (
                     /* Lista de histórico */
                     histories.length === 0 ? (
                         <div className="text-center py-12">
@@ -585,6 +787,265 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
                     )
                 )}
 
+                {activeTab === 'events' && (
+                    <div>
+                        {isCreatingEvent && (
+                            <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-6">
+                                <h3 className="text-lg font-semibold text-indigo-900 mb-4">Novo Evento</h3>
+                                <form onSubmit={handleEventSubmit} className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Tipo de Evento *
+                                        </label>
+                                        <select
+                                            value={eventFormData.event_type_id}
+                                            onChange={handleEventTypeChange}
+                                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                            required
+                                        >
+                                            <option value="">Selecione...</option>
+                                            {eventTypes.map((type) => (
+                                                <option key={type.id} value={type.id}>
+                                                    {type.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {eventErrors.event_type_id && (
+                                            <p className="mt-1 text-sm text-red-600">{eventErrors.event_type_id[0]}</p>
+                                        )}
+                                    </div>
+
+                                    {selectedEventType && (
+                                        <>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                        {selectedEventType.requires_date_range ? 'Data de Início *' : 'Data *'}
+                                                    </label>
+                                                    <input
+                                                        type="date"
+                                                        value={eventFormData.start_date}
+                                                        onChange={(e) => setEventFormData({ ...eventFormData, start_date: e.target.value })}
+                                                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                                        required
+                                                    />
+                                                    {eventErrors.start_date && (
+                                                        <p className="mt-1 text-sm text-red-600">{eventErrors.start_date[0]}</p>
+                                                    )}
+                                                </div>
+
+                                                {selectedEventType.requires_date_range && (
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                            Data de Fim *
+                                                        </label>
+                                                        <input
+                                                            type="date"
+                                                            value={eventFormData.end_date}
+                                                            onChange={(e) => setEventFormData({ ...eventFormData, end_date: e.target.value })}
+                                                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                                            required
+                                                        />
+                                                        {eventErrors.end_date && (
+                                                            <p className="mt-1 text-sm text-red-600">{eventErrors.end_date[0]}</p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {selectedEventType.requires_document && (
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                        Documento * (PDF, JPG, PNG - máx. 10MB)
+                                                    </label>
+                                                    <input
+                                                        type="file"
+                                                        onChange={handleFileChange}
+                                                        accept=".pdf,.jpg,.jpeg,.png"
+                                                        className="w-full text-sm text-gray-500
+                                                            file:mr-4 file:py-2 file:px-4
+                                                            file:rounded-md file:border-0
+                                                            file:text-sm file:font-semibold
+                                                            file:bg-indigo-50 file:text-indigo-700
+                                                            hover:file:bg-indigo-100"
+                                                        required
+                                                    />
+                                                    {eventErrors.document && (
+                                                        <p className="mt-1 text-sm text-red-600">{eventErrors.document[0]}</p>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Observações
+                                                </label>
+                                                <textarea
+                                                    value={eventFormData.notes}
+                                                    onChange={(e) => setEventFormData({ ...eventFormData, notes: e.target.value })}
+                                                    rows={3}
+                                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                                    maxLength={1000}
+                                                />
+                                                {eventErrors.notes && (
+                                                    <p className="mt-1 text-sm text-red-600">{eventErrors.notes[0]}</p>
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
+
+                                    <div className="flex justify-end gap-3">
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => {
+                                                setIsCreatingEvent(false);
+                                                setEventFormData({
+                                                    event_type_id: '',
+                                                    start_date: '',
+                                                    end_date: '',
+                                                    document: null,
+                                                    notes: '',
+                                                });
+                                                setSelectedEventType(null);
+                                                setEventErrors({});
+                                            }}
+                                        >
+                                            Cancelar
+                                        </Button>
+                                        <Button
+                                            type="submit"
+                                            variant="primary"
+                                            size="sm"
+                                        >
+                                            Salvar Evento
+                                        </Button>
+                                    </div>
+                                </form>
+                            </div>
+                        )}
+
+                        {loading ? (
+                            <div className="text-center py-12">
+                                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                                <p className="mt-2 text-sm text-gray-600">Carregando eventos...</p>
+                            </div>
+                        ) : events.length === 0 ? (
+                            <div className="text-center py-12">
+                                <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum evento encontrado</h3>
+                                <p className="text-gray-500">Este funcionário ainda não possui eventos registrados.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4 max-h-[60vh] overflow-y-auto overflow-x-hidden pr-2">
+                                {events.map((event, index) => (
+                                    <div
+                                        key={event.id}
+                                        className={`relative bg-white border-2 rounded-lg p-4 hover:shadow-md transition-all duration-200 ${getEmployeeEventColor(event.event_type)}`}
+                                    >
+                                        {/* Linha conectora */}
+                                        {index < events.length - 1 && (
+                                            <div className="absolute left-8 top-20 bottom-0 w-0.5 bg-gray-200 -mb-4"></div>
+                                        )}
+
+                                        <div className="flex items-start space-x-4">
+                                            {/* Ícone do tipo de evento */}
+                                            <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center border-2 relative z-10 bg-white ${getEmployeeEventColor(event.event_type)}`}>
+                                                <span className="text-2xl">{getEmployeeEventIcon(event.event_type)}</span>
+                                            </div>
+
+                                            {/* Conteúdo do evento */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-start justify-between mb-2">
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getEmployeeEventColor(event.event_type)}`}>
+                                                                {event.event_type}
+                                                            </span>
+                                                        </div>
+                                                        <h4 className="text-base font-bold text-gray-900">
+                                                            {event.period}
+                                                        </h4>
+                                                    </div>
+
+                                                    {/* Botão de ação */}
+                                                    <div className="flex items-center space-x-2 ml-4">
+                                                        <button
+                                                            onClick={() => handleDeleteEventClick(event)}
+                                                            className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                                                            title="Excluir evento"
+                                                        >
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Informações do evento */}
+                                                <div className="grid grid-cols-2 gap-3 mb-2">
+                                                    <div className="bg-white rounded-md p-2 border border-gray-100">
+                                                        <div className="flex items-center space-x-1 mb-1">
+                                                            <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                            <span className="text-xs font-medium text-gray-500">Duração</span>
+                                                        </div>
+                                                        <p className="text-sm font-semibold text-gray-900">
+                                                            {event.duration_in_days} {event.duration_in_days === 1 ? 'dia' : 'dias'}
+                                                        </p>
+                                                    </div>
+
+                                                    {event.has_document && (
+                                                        <div className="bg-white rounded-md p-2 border border-gray-100">
+                                                            <div className="flex items-center space-x-1 mb-1">
+                                                                <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                                                </svg>
+                                                                <span className="text-xs font-medium text-gray-500">Documento</span>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => handleViewDocument(event)}
+                                                                className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                                                            >
+                                                                Ver arquivo
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Observações */}
+                                                {event.notes && (
+                                                    <div className="bg-amber-50 rounded-md p-2 border border-amber-100 mb-2">
+                                                        <div className="flex items-center space-x-1 mb-1">
+                                                            <svg className="w-3 h-3 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                                                            </svg>
+                                                            <span className="text-xs font-medium text-amber-700">Observações</span>
+                                                        </div>
+                                                        <p className="text-sm text-gray-800">{event.notes}</p>
+                                                    </div>
+                                                )}
+
+                                                {/* Metadados */}
+                                                <div className="mt-2 flex items-center text-xs text-gray-500">
+                                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <span>Registrado por {event.created_by} em {event.created_at}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Rodapé */}
                 <div className="flex justify-end pt-4 border-t">
                     <Button
@@ -664,6 +1125,70 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
                             )}
                         >
                             Excluir Contrato
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Document Viewer Modal */}
+            <DocumentViewerModal
+                show={isDocumentViewerOpen}
+                onClose={() => setIsDocumentViewerOpen(false)}
+                documentUrl={selectedDocument?.url}
+                eventType={selectedDocument?.eventType}
+            />
+
+            {/* Export Events Modal */}
+            <ExportEventsModal
+                show={isExportModalOpen}
+                onClose={() => setIsExportModalOpen(false)}
+                employeeId={employeeId}
+                employeeName={employee?.name}
+                eventTypes={eventTypes}
+            />
+
+            {/* Delete Event Confirmation Modal */}
+            <Modal show={isDeleteEventModalOpen} onClose={handleDeleteEventCancel} title="Confirmar Exclusão" maxWidth="md">
+                <div className="space-y-4">
+                    <div className="flex items-center space-x-3">
+                        <div className="flex-shrink-0">
+                            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-900">
+                                Tem certeza que deseja excluir este evento?
+                            </h3>
+                            {eventToDelete && (
+                                <p className="text-sm text-gray-600 mt-1">
+                                    <strong>{eventToDelete.event_type}</strong> • {eventToDelete.period}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                        Esta ação não pode ser desfeita. O evento será permanentemente removido do histórico do funcionário.
+                    </p>
+                    <div className="flex justify-end space-x-3 pt-4 border-t">
+                        <Button
+                            variant="outline"
+                            onClick={handleDeleteEventCancel}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            variant="danger"
+                            onClick={handleDeleteEventConfirm}
+                            icon={({ className }) => (
+                                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            )}
+                        >
+                            Excluir Evento
                         </Button>
                     </div>
                 </div>

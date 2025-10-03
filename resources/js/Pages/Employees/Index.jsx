@@ -1,5 +1,5 @@
 import { Head, router } from "@inertiajs/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import Modal from "@/Components/Modal";
 import EmployeeModal from "@/Components/EmployeeModal";
@@ -8,6 +8,7 @@ import EmployeeEditModal from "@/Components/EmployeeEditModal";
 import DataTable from "@/Components/DataTable";
 import EmployeeAvatar from "@/Components/EmployeeAvatar";
 import Button from "@/Components/Button";
+import ExportAllEventsModal from "@/Components/ExportAllEventsModal";
 
 export default function Index({ auth, employees, positions, stores, statuses, filters }) {
     const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
@@ -17,6 +18,23 @@ export default function Index({ auth, employees, positions, stores, statuses, fi
     const [selectedEmployee, setSelectedEmployee] = useState(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [employeeToDelete, setEmployeeToDelete] = useState(null);
+    const [isExportAllEventsModalOpen, setIsExportAllEventsModalOpen] = useState(false);
+    const [eventTypes, setEventTypes] = useState([]);
+
+    useEffect(() => {
+        // Fetch event types
+        const fetchEventTypes = async () => {
+            try {
+                const response = await fetch('/employees/1/events'); // Using any employee to get event types
+                const data = await response.json();
+                setEventTypes(data.event_types);
+            } catch (error) {
+                console.error('Erro ao carregar tipos de eventos:', error);
+            }
+        };
+
+        fetchEventTypes();
+    }, []);
 
     const viewEmployee = (employee) => {
         setSelectedEmployeeId(employee.id);
@@ -268,6 +286,17 @@ export default function Index({ auth, employees, positions, stores, statuses, fi
                             </div>
                             <div className="flex gap-3">
                                 <Button
+                                    variant="secondary"
+                                    onClick={() => setIsExportAllEventsModalOpen(true)}
+                                    icon={({ className }) => (
+                                        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                    )}
+                                >
+                                    Exportar Eventos
+                                </Button>
+                                <Button
                                     variant="success"
                                     onClick={() => {
                                         const currentUrl = new URL(window.location);
@@ -477,6 +506,14 @@ export default function Index({ auth, employees, positions, stores, statuses, fi
                     </div>
                 </div>
             </Modal>
+
+            {/* Export All Events Modal */}
+            <ExportAllEventsModal
+                show={isExportAllEventsModalOpen}
+                onClose={() => setIsExportAllEventsModalOpen(false)}
+                eventTypes={eventTypes}
+                stores={stores}
+            />
         </AuthenticatedLayout>
     );
 }

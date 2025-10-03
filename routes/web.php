@@ -230,6 +230,24 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
     Route::post('/employees/{employee}/contracts/{contract}/reactivate', [EmployeeController::class, 'reactivateContract'])
         ->middleware('permission:' . Permission::EDIT_USERS->value)
         ->name('employees.contracts.reactivate');
+
+    // Eventos do funcionário
+    Route::get('/employees/{employee}/events', [EmployeeController::class, 'getEvents'])
+        ->name('employees.events.index');
+
+    Route::post('/employees/{employee}/events', [EmployeeController::class, 'storeEvent'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('employees.events.store');
+
+    Route::delete('/employees/{employee}/events/{event}', [EmployeeController::class, 'destroyEvent'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('employees.events.destroy');
+
+    Route::get('/employees/{employee}/events/export', [EmployeeController::class, 'exportEvents'])
+        ->name('employees.events.export');
+
+    Route::get('/employees/events/export', [EmployeeController::class, 'exportAllEvents'])
+        ->name('employees.all-events.export');
 });
 
 // Rotas para páginas básicas ainda não implementadas (placeholder)

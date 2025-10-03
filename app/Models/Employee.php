@@ -192,6 +192,14 @@ class Employee extends Model
     }
 
     /**
+     * Get all events for this employee
+     */
+    public function events(): HasMany
+    {
+        return $this->hasMany(EmployeeEvent::class);
+    }
+
+    /**
      * Get the latest employment contract
      */
     public function latestContract(): HasOne
