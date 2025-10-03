@@ -368,6 +368,7 @@ export default function Index({ auth, employees, positions, stores, statuses, fi
                                 <Button
                                     variant="secondary"
                                     size="sm"
+                                    className="h-[42px] w-[150px]"
                                     onClick={() => {
                                         router.visit('/employees', {
                                             preserveState: true,
