@@ -104,7 +104,11 @@ export default function Register({ roles }) {
                 </div>
 
                 <div className="mt-4">
+<<<<<<< HEAD
                     <InputLabel htmlFor="role" value="Função" />
+=======
+                    <InputLabel htmlFor="role" value="Nível de Acesso" />
+>>>>>>> 84c9a03193f1b3486603586c0fd28b83b97a6e75
 
                     <select
                         id="role"
@@ -129,7 +133,11 @@ export default function Register({ roles }) {
                         href={route('login')}
                         className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                     >
+<<<<<<< HEAD
                         Já possui uma conta?
+=======
+                        Já possui cadastro?
+>>>>>>> 84c9a03193f1b3486603586c0fd28b83b97a6e75
                     </Link>
 
                     <PrimaryButton className="ms-4" disabled={processing}>

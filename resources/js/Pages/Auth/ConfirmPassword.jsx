@@ -23,7 +23,11 @@ export default function ConfirmPassword() {
             <Head title="Confirmar Senha" />
 
             <div className="mb-4 text-sm text-gray-600">
+<<<<<<< HEAD
                 Esta é uma área segura do aplicativo. Por favor, confirme sua
+=======
+                Esta é uma área segura da aplicação. Por favor, confirme sua
+>>>>>>> 84c9a03193f1b3486603586c0fd28b83b97a6e75
                 senha antes de continuar.
             </div>
 

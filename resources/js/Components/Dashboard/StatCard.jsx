@@ -112,7 +112,7 @@ export default function StatCard({
                                             <ArrowDownIcon className="self-center flex-shrink-0 h-4 w-4 text-red-500" />
                                         )}
                                         <span className="sr-only">
-                                            {trend.isPositive ? 'Increased' : 'Decreased'} by
+                                            {trend.isPositive ? 'Aumentou' : 'Diminuiu'} em
                                         </span>
                                         {trend.percentage}%
                                     </div>

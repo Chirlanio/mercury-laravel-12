@@ -35,12 +35,20 @@ export default function UpdateProfileInformation({
     return (
         <section className={className}>
             <header>
+<<<<<<< HEAD
 <h2 className="text-lg font-medium text-gray-900">
+=======
+                <h2 className="text-lg font-medium text-gray-900">
+>>>>>>> 84c9a03193f1b3486603586c0fd28b83b97a6e75
                     Informações do Perfil
                 </h2>
 
                 <p className="mt-1 text-sm text-gray-600">
+<<<<<<< HEAD
                     Atualize as informações de perfil e endereço de e-mail da sua conta.
+=======
+                    Atualize as informações do perfil e o endereço de e-mail da sua conta.
+>>>>>>> 84c9a03193f1b3486603586c0fd28b83b97a6e75
                 </p>
             </header>
 
@@ -136,7 +144,11 @@ export default function UpdateProfileInformation({
 
                         {status === 'verification-link-sent' && (
                             <div className="mt-2 text-sm font-medium text-green-600">
+<<<<<<< HEAD
                                 Um novo link de verificação foi enviado para o seu
+=======
+                                Um novo link de verificação foi enviado para seu
+>>>>>>> 84c9a03193f1b3486603586c0fd28b83b97a6e75
                                 endereço de e-mail.
                             </div>
                         )}

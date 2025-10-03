@@ -158,7 +158,7 @@ export default function Edit({ auth, user = {}, roles = {} }) {
                                 </div>
 
                                 <div>
-                                    <InputLabel htmlFor="email" value="Email" />
+                                    <InputLabel htmlFor="email" value="E-mail" />
 
                                     <TextInput
                                         id="email"
