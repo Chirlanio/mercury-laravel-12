@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Employee;
+use App\Models\EmployeeHistory;
+use App\Models\EmploymentContract;
 use App\Models\Position;
 use App\Models\Store;
 use App\Rules\ValidImageRule;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -392,6 +395,379 @@ class EmployeeController extends Controller
             return redirect()->back()->withErrors([
                 'general' => 'Erro ao excluir funcionário: ' . $e->getMessage()
             ]);
+        }
+    }
+
+    /**
+     * Get employee history
+     */
+    public function history($id)
+    {
+        $employee = Employee::findOrFail($id);
+
+        // Buscar históricos
+        $histories = EmployeeHistory::where('employee_id', $id)
+            ->with('createdBy:id,name')
+            ->orderBy('event_date', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function ($history) {
+                return [
+                    'id' => $history->id,
+                    'event_type' => $history->event_type,
+                    'event_type_label' => $history->event_type_label,
+                    'title' => $history->title,
+                    'description' => $history->description,
+                    'old_value' => $history->old_value,
+                    'new_value' => $history->new_value,
+                    'event_date' => $history->event_date->format('d/m/Y'),
+                    'created_by' => $history->createdBy?->name ?? 'Sistema',
+                    'created_at' => $history->created_at->format('d/m/Y H:i'),
+                ];
+            });
+
+        // Buscar contratos de trabalho
+        $contracts = EmploymentContract::where('employee_id', $id)
+            ->with(['position', 'movementType', 'store'])
+            ->orderBy('start_date', 'desc')
+            ->get();
+
+        // Determinar qual é o último contrato (mais recente)
+        $latestContractId = $contracts->first()?->id;
+
+        $contracts = $contracts->map(function ($contract) use ($latestContractId) {
+            $isLatest = $contract->id === $latestContractId;
+
+            return [
+                'id' => $contract->id,
+                'position' => $contract->position?->name ?? 'Não informado',
+                'movement_type' => $contract->movementType?->name ?? 'Não informado',
+                'store' => $contract->store?->name ?? $contract->store_id,
+                'start_date' => $contract->start_date->format('d/m/Y'),
+                'end_date' => $contract->is_active ? 'Atual' : ($contract->end_date ? $contract->end_date->format('d/m/Y') : '-'),
+                'end_date_formatted' => $contract->end_date ? $contract->end_date->format('d/m/Y') : null,
+                'is_active' => $contract->is_active,
+                'is_latest' => $isLatest,
+                'status_label' => $contract->is_active && $isLatest ? 'Atual' : (!$contract->is_active && $isLatest ? 'Último contrato' : 'Encerrado'),
+                'duration' => $contract->duration_text,
+                'date_range' => $contract->date_range,
+                'created_at' => $contract->created_at->format('d/m/Y H:i'),
+            ];
+        });
+
+        return response()->json([
+            'employee' => [
+                'id' => $employee->id,
+                'name' => $employee->name,
+            ],
+            'histories' => $histories,
+            'contracts' => $contracts,
+        ]);
+    }
+
+    /**
+     * Store a new employment contract
+     */
+    public function storeContract(Request $request, $id)
+    {
+        $employee = Employee::findOrFail($id);
+
+        $validator = Validator::make($request->all(), [
+            'position_id' => 'required|exists:positions,id',
+            'movement_type_id' => 'required|exists:type_moviments,id',
+            'store_id' => 'required|exists:stores,code',
+            'start_date' => 'required|date',
+            'end_date' => 'nullable|date|after:start_date',
+        ], [
+            'position_id.required' => 'O cargo é obrigatório.',
+            'position_id.exists' => 'Cargo inválido.',
+            'movement_type_id.required' => 'O tipo de movimentação é obrigatório.',
+            'movement_type_id.exists' => 'Tipo de movimentação inválido.',
+            'store_id.required' => 'A loja é obrigatória.',
+            'store_id.exists' => 'Loja inválida.',
+            'start_date.required' => 'A data de início é obrigatória.',
+            'start_date.date' => 'Data de início inválida.',
+            'end_date.date' => 'Data de término inválida.',
+            'end_date.after' => 'A data de término deve ser posterior à data de início.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Erro de validação',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            // Verificar o tipo de movimentação
+            $isDismissal = $request->movement_type_id == 5; // ID 5 = Demissão
+            $isAdmission = $request->movement_type_id == 1; // ID 1 = Admissão
+
+            // Verificar se existe contrato anterior ativo
+            $previousContract = EmploymentContract::where('employee_id', $id)
+                ->where('is_active', true)
+                ->first();
+
+            // Se existir contrato anterior ativo, inativar e adicionar data de término
+            if ($previousContract) {
+                // Data de término = último dia antes do início do novo contrato
+                $endDate = Carbon::parse($request->start_date)->subDay();
+
+                $previousContract->update([
+                    'is_active' => false,
+                    'end_date' => $endDate
+                ]);
+            }
+
+            // Criar o contrato
+            $contract = EmploymentContract::create([
+                'employee_id' => $id,
+                'position_id' => $request->position_id,
+                'movement_type_id' => $request->movement_type_id,
+                'store_id' => $request->store_id,
+                'start_date' => $request->start_date,
+                'end_date' => $request->end_date ?? ($isDismissal ? $request->start_date : null),
+                'is_active' => !$isDismissal, // Se for demissão, já cria como inativo
+            ]);
+
+            // Se for demissão, inativar o funcionário e registrar data de demissão
+            if ($isDismissal) {
+                $employee->update([
+                    'dismissal_date' => $request->start_date,
+                    'status_id' => 3, // Status inativo
+                ]);
+            }
+
+            // Se for admissão e funcionário está inativo, reativá-lo
+            if ($isAdmission && $employee->status_id == 3) {
+                $employee->update([
+                    'status_id' => 2, // Status ativo
+                    'dismissal_date' => null, // Limpar data de demissão
+                ]);
+            }
+
+            // Verificar se é o último contrato
+            $latestContract = EmploymentContract::where('employee_id', $id)
+                ->orderBy('start_date', 'desc')
+                ->first();
+            $isLatest = $contract->id === $latestContract->id;
+
+            return response()->json([
+                'message' => 'Contrato criado com sucesso!',
+                'contract' => [
+                    'id' => $contract->id,
+                    'position' => $contract->position?->name ?? 'Não informado',
+                    'movement_type' => $contract->movementType?->name ?? 'Não informado',
+                    'store' => $contract->store?->name ?? $contract->store_id,
+                    'start_date' => $contract->start_date->format('d/m/Y'),
+                    'end_date' => $contract->is_active ? 'Atual' : ($contract->end_date ? $contract->end_date->format('d/m/Y') : '-'),
+                    'is_active' => $contract->is_active,
+                    'is_latest' => $isLatest,
+                    'status_label' => $contract->is_active && $isLatest ? 'Atual' : (!$contract->is_active && $isLatest ? 'Último contrato' : 'Encerrado'),
+                    'duration' => $contract->duration_text,
+                    'date_range' => $contract->date_range,
+                    'created_at' => $contract->created_at->format('d/m/Y H:i'),
+                ]
+            ], 201);
+
+        } catch (Exception $e) {
+            Log::error('Error creating employment contract', [
+                'employee_id' => $id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'message' => 'Erro ao criar contrato: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update an employment contract
+     */
+    public function updateContract(Request $request, $employeeId, $contractId)
+    {
+        $employee = Employee::findOrFail($employeeId);
+        $contract = EmploymentContract::where('id', $contractId)
+            ->where('employee_id', $employeeId)
+            ->firstOrFail();
+
+        $validator = Validator::make($request->all(), [
+            'position_id' => 'required|exists:positions,id',
+            'movement_type_id' => 'required|exists:type_moviments,id',
+            'store_id' => 'required|exists:stores,code',
+            'start_date' => 'required|date',
+            'end_date' => 'nullable|date|after:start_date',
+        ], [
+            'position_id.required' => 'O cargo é obrigatório.',
+            'position_id.exists' => 'Cargo inválido.',
+            'movement_type_id.required' => 'O tipo de movimentação é obrigatório.',
+            'movement_type_id.exists' => 'Tipo de movimentação inválido.',
+            'store_id.required' => 'A loja é obrigatória.',
+            'store_id.exists' => 'Loja inválida.',
+            'start_date.required' => 'A data de início é obrigatória.',
+            'start_date.date' => 'Data de início inválida.',
+            'end_date.date' => 'Data de término inválida.',
+            'end_date.after' => 'A data de término deve ser posterior à data de início.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Erro de validação',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $contract->update([
+                'position_id' => $request->position_id,
+                'movement_type_id' => $request->movement_type_id,
+                'store_id' => $request->store_id,
+                'start_date' => $request->start_date,
+                'end_date' => $request->end_date,
+            ]);
+
+            // Reload relationships
+            $contract->load(['position', 'movementType', 'store']);
+
+            // Verificar se é o último contrato
+            $latestContract = EmploymentContract::where('employee_id', $employeeId)
+                ->orderBy('start_date', 'desc')
+                ->first();
+            $isLatest = $contract->id === $latestContract->id;
+
+            return response()->json([
+                'message' => 'Contrato atualizado com sucesso!',
+                'contract' => [
+                    'id' => $contract->id,
+                    'position' => $contract->position?->name ?? 'Não informado',
+                    'movement_type' => $contract->movementType?->name ?? 'Não informado',
+                    'store' => $contract->store?->name ?? $contract->store_id,
+                    'start_date' => $contract->start_date->format('d/m/Y'),
+                    'end_date' => $contract->is_active ? 'Atual' : ($contract->end_date ? $contract->end_date->format('d/m/Y') : '-'),
+                    'is_active' => $contract->is_active,
+                    'is_latest' => $isLatest,
+                    'status_label' => $contract->is_active && $isLatest ? 'Atual' : (!$contract->is_active && $isLatest ? 'Último contrato' : 'Encerrado'),
+                    'duration' => $contract->duration_text,
+                    'date_range' => $contract->date_range,
+                    'created_at' => $contract->created_at->format('d/m/Y H:i'),
+                ]
+            ], 200);
+
+        } catch (Exception $e) {
+            Log::error('Error updating employment contract', [
+                'contract_id' => $contractId,
+                'employee_id' => $employeeId,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'message' => 'Erro ao atualizar contrato: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete an employment contract
+     */
+    public function destroyContract(Request $request, $employeeId, $contractId)
+    {
+        try {
+            $contract = EmploymentContract::where('id', $contractId)
+                ->where('employee_id', $employeeId)
+                ->firstOrFail();
+
+            Log::info('Deleting employment contract', [
+                'contract_id' => $contractId,
+                'employee_id' => $employeeId
+            ]);
+
+            // Verificar se é o último contrato ativo
+            $isLastActiveContract = EmploymentContract::where('employee_id', $employeeId)
+                ->where('is_active', true)
+                ->count() === 1 && $contract->is_active;
+
+            // Buscar contrato anterior (se existir)
+            $previousContract = null;
+            if ($isLastActiveContract) {
+                $previousContract = EmploymentContract::where('employee_id', $employeeId)
+                    ->where('id', '!=', $contractId)
+                    ->orderBy('start_date', 'desc')
+                    ->first();
+            }
+
+            $contract->delete();
+
+            $response = [
+                'message' => 'Contrato excluído com sucesso!',
+                'isLastActiveContract' => $isLastActiveContract,
+                'previousContract' => null
+            ];
+
+            // Se havia contrato anterior, retornar seus dados para possível reativação
+            if ($previousContract) {
+                $response['previousContract'] = [
+                    'id' => $previousContract->id,
+                    'position' => $previousContract->position?->name ?? 'Não informado',
+                    'store' => $previousContract->store?->name ?? $previousContract->store_id,
+                    'start_date' => $previousContract->start_date->format('d/m/Y'),
+                ];
+            }
+
+            return response()->json($response, 200);
+
+        } catch (Exception $e) {
+            Log::error('Error deleting employment contract', [
+                'contract_id' => $contractId,
+                'employee_id' => $employeeId,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'message' => 'Erro ao excluir contrato: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Reactivate a contract
+     */
+    public function reactivateContract($employeeId, $contractId)
+    {
+        try {
+            $contract = EmploymentContract::where('id', $contractId)
+                ->where('employee_id', $employeeId)
+                ->firstOrFail();
+
+            $contract->update([
+                'is_active' => true,
+                'end_date' => null, // Remover data de término ao reativar
+            ]);
+
+            Log::info('Reactivated employment contract', [
+                'contract_id' => $contractId,
+                'employee_id' => $employeeId
+            ]);
+
+            return response()->json([
+                'message' => 'Contrato reativado com sucesso!',
+                'contract' => [
+                    'id' => $contract->id,
+                    'is_active' => $contract->is_active,
+                    'end_date' => null,
+                ]
+            ], 200);
+
+        } catch (Exception $e) {
+            Log::error('Error reactivating employment contract', [
+                'contract_id' => $contractId,
+                'employee_id' => $employeeId,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'message' => 'Erro ao reativar contrato: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

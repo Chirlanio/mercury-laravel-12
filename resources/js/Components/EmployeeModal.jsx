@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import Modal from '@/Components/Modal';
 import EmployeeAvatar from '@/Components/EmployeeAvatar';
+import EmployeeHistoryModal from '@/Components/EmployeeHistoryModal';
 
-export default function EmployeeModal({ show, onClose, employeeId, onEdit }) {
+export default function EmployeeModal({ show, onClose, employeeId, onEdit, positions, stores }) {
     const [employee, setEmployee] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
     useEffect(() => {
         if (show && employeeId) {
@@ -58,6 +60,14 @@ export default function EmployeeModal({ show, onClose, employeeId, onEdit }) {
         if (onEdit && employee) {
             onEdit(employee);
         }
+    };
+
+    const handleViewHistory = () => {
+        setIsHistoryModalOpen(true);
+    };
+
+    const closeHistoryModal = () => {
+        setIsHistoryModalOpen(false);
     };
 
     if (loading) {
@@ -229,7 +239,10 @@ export default function EmployeeModal({ show, onClose, employeeId, onEdit }) {
                                 Gerar Relatório
                             </button>
 
-                            <button className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors border border-blue-600 hover:border-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <button
+                                onClick={handleViewHistory}
+                                className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors border border-blue-600 hover:border-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            >
                                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
@@ -249,6 +262,15 @@ export default function EmployeeModal({ show, onClose, employeeId, onEdit }) {
                     </button>
                 </div>
             </div>
+
+            {/* Employee History Modal */}
+            <EmployeeHistoryModal
+                show={isHistoryModalOpen}
+                onClose={closeHistoryModal}
+                employeeId={employeeId}
+                positions={positions}
+                stores={stores}
+            />
         </Modal>
     );
 }

@@ -24,11 +24,11 @@ export default function Register({ roles }) {
 
     return (
         <GuestLayout>
-            <Head title="Register" />
+            <Head title="Registrar" />
 
             <form onSubmit={submit}>
                 <div>
-                    <InputLabel htmlFor="name" value="Name" />
+                    <InputLabel htmlFor="name" value="Nome" />
 
                     <TextInput
                         id="name"
@@ -45,7 +45,7 @@ export default function Register({ roles }) {
                 </div>
 
                 <div className="mt-4">
-                    <InputLabel htmlFor="email" value="Email" />
+                    <InputLabel htmlFor="email" value="E-mail" />
 
                     <TextInput
                         id="email"
@@ -62,7 +62,7 @@ export default function Register({ roles }) {
                 </div>
 
                 <div className="mt-4">
-                    <InputLabel htmlFor="password" value="Password" />
+                    <InputLabel htmlFor="password" value="Senha" />
 
                     <TextInput
                         id="password"
@@ -81,7 +81,7 @@ export default function Register({ roles }) {
                 <div className="mt-4">
                     <InputLabel
                         htmlFor="password_confirmation"
-                        value="Confirm Password"
+                        value="Confirmar Senha"
                     />
 
                     <TextInput
@@ -104,7 +104,7 @@ export default function Register({ roles }) {
                 </div>
 
                 <div className="mt-4">
-                    <InputLabel htmlFor="role" value="Role" />
+                    <InputLabel htmlFor="role" value="Função" />
 
                     <select
                         id="role"
@@ -129,11 +129,11 @@ export default function Register({ roles }) {
                         href={route('login')}
                         className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                     >
-                        Already registered?
+                        Já possui uma conta?
                     </Link>
 
                     <PrimaryButton className="ms-4" disabled={processing}>
-                        Register
+                        Registrar
                     </PrimaryButton>
                 </div>
             </form>

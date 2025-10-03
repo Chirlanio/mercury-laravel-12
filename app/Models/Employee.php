@@ -163,6 +163,14 @@ class Employee extends Model
     }
 
     /**
+     * Get all history entries for this employee
+     */
+    public function histories(): HasMany
+    {
+        return $this->hasMany(EmployeeHistory::class);
+    }
+
+    /**
      * Get all employment contracts for this employee
      */
     public function employmentContracts(): HasMany

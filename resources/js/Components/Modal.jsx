@@ -31,7 +31,7 @@ export default function Modal({
         '6xl': 'sm:max-w-6xl',
         '7xl': 'sm:max-w-7xl',
         'full': 'sm:max-w-full',
-        '85vw': 'sm:w-[85vw]',
+        '85vw': 'w-[85vw]',
     }[maxWidth];
 
     return (
@@ -62,7 +62,7 @@ export default function Modal({
                     leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
                 >
                     <DialogPanel
-                        className={`mb-6 transform overflow-hidden rounded-lg bg-white shadow-xl transition-all sm:mx-auto sm:w-full ${maxWidthClass} max-h-[95vh] flex flex-col`}
+                        className={`mb-6 transform overflow-hidden rounded-lg bg-white shadow-xl transition-all mx-auto ${maxWidthClass} max-h-[95vh] flex flex-col`}
                     >
                         {title && (
                             <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">

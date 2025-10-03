@@ -14,7 +14,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
 
     return (
         <>
-            <Head title="Welcome" />
+            <Head title="Bem-vindo" />
             <div className="bg-gray-50 text-black/50 dark:bg-black dark:text-white/50">
                 <img
                     id="background"
@@ -114,18 +114,17 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
 
                                             <div className="pt-3 sm:pt-5 lg:pt-0">
                                                 <h2 className="text-xl font-semibold text-black dark:text-white">
-                                                    Documentation
+                                                    Documentação
                                                 </h2>
 
                                                 <p className="mt-4 text-sm/relaxed">
-                                                    Laravel has wonderful
-                                                    documentation covering every
-                                                    aspect of the framework.
-                                                    Whether you are a newcomer
-                                                    or have prior experience
-                                                    with Laravel, we recommend
-                                                    reading our documentation
-                                                    from beginning to end.
+                                                    O Laravel possui documentação
+                                                    maravilhosa cobrindo todos os
+                                                    aspectos do framework.
+                                                    Seja você um iniciante ou
+                                                    tenha experiência prévia com Laravel,
+                                                    recomendamos ler nossa documentação
+                                                    do início ao fim.
                                                 </p>
                                             </div>
                                         </div>
@@ -258,13 +257,13 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
 
                                     <div className="pt-3 sm:pt-5">
                                         <h2 className="text-xl font-semibold text-black dark:text-white">
-                                            Vibrant Ecosystem
+                                            Ecossistema Vibrante
                                         </h2>
 
                                         <p className="mt-4 text-sm/relaxed">
-                                            Laravel's robust library of
-                                            first-party tools and libraries,
-                                            such as{' '}
+                                            A robusta biblioteca de ferramentas
+                                            e bibliotecas oficiais do Laravel,
+                                            como{' '}
                                             <a
                                                 href="https://forge.laravel.com"
                                                 className="rounded-sm underline hover:text-black focus:outline-none focus-visible:ring-1 focus-visible:ring-[#FF2D20] dark:hover:text-white dark:focus-visible:ring-[#FF2D20]"

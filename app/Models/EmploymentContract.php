@@ -20,11 +20,13 @@ class EmploymentContract extends Model
         'start_date',
         'end_date',
         'store_id',
+        'is_active',
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'is_active' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -39,29 +41,28 @@ class EmploymentContract extends Model
 
     /**
      * Get the position for this contract
-     * Note: Position model would need to be created
      */
-    // public function position(): BelongsTo
-    // {
-    //     return $this->belongsTo(Position::class);
-    // }
+    public function position(): BelongsTo
+    {
+        return $this->belongsTo(Position::class);
+    }
 
     /**
      * Get the movement type for this contract
-     * Note: MovementType model would need to be created
      */
-    // public function movementType(): BelongsTo
-    // {
-    //     return $this->belongsTo(MovementType::class);
-    // }
+    public function movementType(): BelongsTo
+    {
+        return $this->belongsTo(TypeMoviment::class, 'movement_type_id');
+    }
 
     /**
-     * Check if contract is currently active
+     * Get the store for this contract
      */
-    public function getIsActiveAttribute(): bool
+    public function store(): BelongsTo
     {
-        return is_null($this->end_date) || $this->end_date->isFuture();
+        return $this->belongsTo(Store::class, 'store_id', 'code');
     }
+
 
     /**
      * Get contract duration in months
@@ -82,6 +83,28 @@ class EmploymentContract extends Model
     }
 
     /**
+     * Get formatted duration text (years and months)
+     */
+    public function getDurationTextAttribute(): string
+    {
+        $endDate = $this->end_date ?? Carbon::now();
+        $totalYears = (int) $this->start_date->diffInYears($endDate, false);
+        $remainingMonths = (int) $this->start_date->copy()->addYears($totalYears)->diffInMonths($endDate, false);
+
+        if ($totalYears === 0 && $remainingMonths === 0) {
+            return 'Menos de 1 mês';
+        } elseif ($totalYears === 0) {
+            return $remainingMonths === 1 ? '1 mês' : "{$remainingMonths} meses";
+        } elseif ($remainingMonths === 0) {
+            return $totalYears === 1 ? '1 ano' : "{$totalYears} anos";
+        } else {
+            $yearText = $totalYears === 1 ? '1 ano' : "{$totalYears} anos";
+            $monthText = $remainingMonths === 1 ? '1 mês' : "{$remainingMonths} meses";
+            return "{$yearText} e {$monthText}";
+        }
+    }
+
+    /**
      * Check if contract has ended
      */
     public function getHasEndedAttribute(): bool
@@ -95,7 +118,7 @@ class EmploymentContract extends Model
     public function getDateRangeAttribute(): string
     {
         $start = $this->start_date->format('d/m/Y');
-        $end = $this->end_date ? $this->end_date->format('d/m/Y') : 'Atual';
+        $end = $this->is_active ? 'Atual' : ($this->end_date ? $this->end_date->format('d/m/Y') : '-');
         return "{$start} - {$end}";
     }
 

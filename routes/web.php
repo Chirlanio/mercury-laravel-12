@@ -203,6 +203,30 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
     Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy'])
         ->middleware('permission:' . Permission::DELETE_USERS->value)
         ->name('employees.destroy');
+
+    // Histórico do funcionário
+    Route::get('/employees/{employee}/history', [EmployeeController::class, 'history'])
+        ->name('employees.history');
+
+    // Adicionar contrato
+    Route::post('/employees/{employee}/contracts', [EmployeeController::class, 'storeContract'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('employees.contracts.store');
+
+    // Atualizar contrato
+    Route::put('/employees/{employee}/contracts/{contract}', [EmployeeController::class, 'updateContract'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('employees.contracts.update');
+
+    // Excluir contrato
+    Route::delete('/employees/{employee}/contracts/{contract}', [EmployeeController::class, 'destroyContract'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('employees.contracts.destroy');
+
+    // Reativar contrato
+    Route::post('/employees/{employee}/contracts/{contract}/reactivate', [EmployeeController::class, 'reactivateContract'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('employees.contracts.reactivate');
 });
 
 // Rotas para páginas básicas ainda não implementadas (placeholder)

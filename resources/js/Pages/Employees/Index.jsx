@@ -300,6 +300,8 @@ export default function Index({ auth, employees, positions, stores, filters }) {
                 onClose={closeModal}
                 employeeId={selectedEmployeeId}
                 onEdit={handleEditFromModal}
+                positions={positions}
+                stores={stores}
             />
 
             {/* Employee Create Modal */}
@@ -322,7 +324,7 @@ export default function Index({ auth, employees, positions, stores, filters }) {
             />
 
             {/* Delete Confirmation Modal */}
-            <Modal show={isDeleteModalOpen} onClose={closeDeleteModal} title="Confirmar Exclusão" maxWidth="md">
+            <Modal show={isDeleteModalOpen} onClose={closeDeleteModal} title="Confirmar Exclusão" maxWidth="85vw">
                 <div className="space-y-6">
                     <div className="flex items-start space-x-4">
                         <div className="flex-shrink-0">
