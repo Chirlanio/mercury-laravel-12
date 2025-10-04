@@ -166,11 +166,9 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
         setData('cpf', formatted);
     };
 
-    if (!employee) return null;
-
     return (
         <Modal show={show} onClose={handleClose} title="Editar Funcionário" maxWidth="85vw">
-            <form onSubmit={handleSubmit} className="space-y-6">
+            {employee && <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Informações Pessoais */}
                 <div className="bg-gray-50 p-4 rounded-lg">
                     <h4 className="text-sm font-medium text-gray-900 mb-4">
@@ -578,7 +576,7 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
                         {isSubmitting ? 'Salvando...' : 'Salvar Alterações'}
                     </Button>
                 </div>
-            </form>
+            </form>}
         </Modal>
     );
 }

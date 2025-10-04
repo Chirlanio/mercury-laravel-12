@@ -8,6 +8,7 @@ use App\Http\Controllers\MenuController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\AccessLevelController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\WorkShiftController;
 use App\Http\Controllers\Admin\EmailSettingsController;
 use App\Enums\Permission;
 use Illuminate\Foundation\Application;
@@ -248,6 +249,29 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
 
     Route::get('/employees/events/export', [EmployeeController::class, 'exportAllEvents'])
         ->name('employees.all-events.export');
+});
+
+// Rotas para controle de jornada
+Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
+    Route::get('/work-shifts', [WorkShiftController::class, 'index'])->name('work-shifts.index');
+
+    Route::post('/work-shifts', [WorkShiftController::class, 'store'])
+        ->middleware('permission:' . Permission::CREATE_USERS->value)
+        ->name('work-shifts.store');
+
+    Route::get('/work-shifts/{workShift}', [WorkShiftController::class, 'show'])->name('work-shifts.show');
+
+    Route::get('/work-shifts/{workShift}/edit', [WorkShiftController::class, 'edit'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('work-shifts.edit');
+
+    Route::match(['put', 'post'], '/work-shifts/{workShift}', [WorkShiftController::class, 'update'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('work-shifts.update');
+
+    Route::delete('/work-shifts/{workShift}', [WorkShiftController::class, 'destroy'])
+        ->middleware('permission:' . Permission::DELETE_USERS->value)
+        ->name('work-shifts.destroy');
 });
 
 // Rotas para páginas básicas ainda não implementadas (placeholder)

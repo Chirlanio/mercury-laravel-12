@@ -450,7 +450,7 @@ export default function Index({ auth, employees, positions, stores, statuses, fi
 
             {/* Employee Edit Modal */}
             <EmployeeEditModal
-                show={isEditModalOpen}
+                show={isEditModalOpen && selectedEmployee !== null}
                 onClose={closeEditModal}
                 onSuccess={handleEmployeeUpdated}
                 employee={selectedEmployee}

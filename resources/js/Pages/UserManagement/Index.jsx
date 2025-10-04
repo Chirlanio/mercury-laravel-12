@@ -230,7 +230,7 @@ export default function Index({ auth, users = { data: [], links: [] }, roles = {
             />
 
             <UserEditModal
-                show={showEditModal}
+                show={showEditModal && selectedUser !== null}
                 onClose={closeModals}
                 user={selectedUser}
                 roles={roles}
@@ -238,7 +238,7 @@ export default function Index({ auth, users = { data: [], links: [] }, roles = {
             />
 
             <UserViewModal
-                show={showViewModal}
+                show={showViewModal && selectedUser !== null}
                 onClose={closeModals}
                 user={selectedUser}
                 roles={roles}

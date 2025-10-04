@@ -14,11 +14,9 @@ export default function UserViewModal({ show, onClose, user, roles = {}, onEdit,
         return colors[role] || 'bg-gray-100 text-gray-800';
     };
 
-    if (!user) return null;
-
     return (
         <Modal show={show} onClose={onClose} title="Detalhes do Usuário" maxWidth="85vw">
-            <div className="space-y-6">
+            {user && <div className="space-y-6">
                 {/* Avatar e informações básicas */}
                 <div className="flex items-center space-x-4">
                     <div className="flex-shrink-0">
@@ -214,7 +212,7 @@ export default function UserViewModal({ show, onClose, user, roles = {}, onEdit,
                         Fechar
                     </button>
                 </div>
-            </div>
+            </div>}
         </Modal>
     );
 }

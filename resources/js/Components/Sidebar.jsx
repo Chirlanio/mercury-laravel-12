@@ -126,6 +126,7 @@ export default function Sidebar({ isOpen, onClose }) {
             Movidesk: { route: "/movidesk", permission: null },
             "Biblioteca de Processos": { route: "/biblioteca-processos", permission: null },
             "Funcionários": { route: "/employees", permission: PERMISSIONS.VIEW_USERS },
+            "Controle de Jornada": { route: "/work-shifts", permission: PERMISSIONS.VIEW_USERS },
         };
         return menuRoutes[menuName] || null;
     };

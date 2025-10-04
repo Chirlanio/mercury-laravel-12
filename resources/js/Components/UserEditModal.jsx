@@ -77,10 +77,9 @@ export default function UserEditModal({ show, onClose, user, roles = {}, stores 
         onClose();
     };
 
-    if (!user) return null;
-
     return (
         <Modal show={show} onClose={handleClose} title="Editar Usuário" maxWidth="85vw">
+            {user && <>
             <div className="mb-4">
                 <div className="bg-gray-50 p-3 rounded-lg">
                     <h4 className="text-sm font-medium text-gray-900 mb-1">
@@ -276,6 +275,7 @@ export default function UserEditModal({ show, onClose, user, roles = {}, stores 
                     </PrimaryButton>
                 </div>
             </form>
+            </>}
         </Modal>
     );
 }
