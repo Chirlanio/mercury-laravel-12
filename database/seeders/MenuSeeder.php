@@ -67,6 +67,33 @@ class MenuSeeder extends Seeder
                     'updated_at' => null,
                 ]
             );
+
+            DB::table('menus')->updateOrInsert(
+                ['name' => 'Controle de Jornada', 'parent_id' => $departamentoPessoal->id],
+                [
+                    'icon' => 'fas fa-clock',
+                    'order' => 2,
+                    'is_active' => true,
+                    'created_at' => $now,
+                    'updated_at' => null,
+                ]
+            );
+        }
+
+        // Criar submenu "Gerenciar Níveis" para "Configurações"
+        $configuracoes = DB::table('menus')->where('name', 'Configurações')->first();
+
+        if ($configuracoes) {
+            DB::table('menus')->updateOrInsert(
+                ['name' => 'Gerenciar Níveis', 'parent_id' => $configuracoes->id],
+                [
+                    'icon' => 'fas fa-shield-alt',
+                    'order' => 1,
+                    'is_active' => true,
+                    'created_at' => $now,
+                    'updated_at' => null,
+                ]
+            );
         }
     }
 }

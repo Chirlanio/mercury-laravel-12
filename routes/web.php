@@ -173,6 +173,14 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
     // Listar níveis de acesso
     Route::get('/access-levels', [AccessLevelController::class, 'index'])->name('access-levels.index');
 
+    // Gerenciar permissões de um nível de acesso
+    Route::get('/access-levels/{accessLevel}/permissions', [AccessLevelController::class, 'getPermissions'])
+        ->name('access-levels.permissions');
+
+    Route::post('/access-levels/{accessLevel}/permissions', [AccessLevelController::class, 'updatePermissions'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('access-levels.permissions.update');
+
     // Visualizar nível de acesso específico
     Route::get('/access-levels/{accessLevel}', [AccessLevelController::class, 'show'])->name('access-levels.show');
 });

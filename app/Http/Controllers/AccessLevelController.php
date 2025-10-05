@@ -3,7 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\AccessLevel;
+use App\Models\AccessLevelPage;
+use App\Models\Page;
+use App\Models\PageGroup;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class AccessLevelController extends Controller
@@ -165,5 +169,111 @@ class AccessLevelController extends Controller
                 }),
             ],
         ]);
+    }
+
+    /**
+     * Get permissions for a specific access level
+     */
+    public function getPermissions(AccessLevel $accessLevel)
+    {
+        // Buscar todas as páginas ativas com seus grupos
+        $pages = Page::with('pageGroup')
+            ->active()
+            ->orderBy('page_name')
+            ->get();
+
+        // Buscar permissões existentes para este perfil
+        $existingPermissions = AccessLevelPage::where('access_level_id', $accessLevel->id)
+            ->with('menu')
+            ->get()
+            ->keyBy('page_id');
+
+        // Buscar todos os menus ativos
+        $menus = \App\Models\Menu::where('is_active', true)
+            ->orderBy('order')
+            ->get(['id', 'name', 'icon']);
+
+        // Formatar páginas para tabela
+        $pagesData = [];
+        foreach ($pages as $page) {
+            $permission = $existingPermissions->get($page->id);
+
+            $pagesData[] = [
+                'id' => $page->id,
+                'page_name' => $page->page_name,
+                'controller' => $page->controller,
+                'method' => $page->method,
+                'icon' => $page->icon,
+                'notes' => $page->notes,
+                'page_group' => $page->pageGroup->name ?? 'Outros',
+                'has_permission' => $permission ? $permission->permission : false,
+                'access_level_page_id' => $permission ? $permission->id : null,
+                'menu_id' => $permission ? $permission->menu_id : null,
+                'menu_name' => $permission && $permission->menu ? $permission->menu->name : null,
+                'dropdown' => $permission ? $permission->dropdown : false,
+                'lib_menu' => $permission ? $permission->lib_menu : false,
+                'order' => $permission ? $permission->order : 0,
+            ];
+        }
+
+        return Inertia::render('AccessLevels/Permissions', [
+            'accessLevel' => [
+                'id' => $accessLevel->id,
+                'name' => $accessLevel->name,
+                'color' => $accessLevel->color,
+                'color_class' => $accessLevel->color_class,
+            ],
+            'pages' => $pagesData,
+            'menus' => $menus,
+            'stats' => [
+                'total_pages' => $pages->count(),
+                'authorized_pages' => $existingPermissions->where('permission', true)->count(),
+            ],
+        ]);
+    }
+
+    /**
+     * Update permissions for a specific access level
+     */
+    public function updatePermissions(Request $request, AccessLevel $accessLevel)
+    {
+        $request->validate([
+            'permissions' => 'required|array',
+            'permissions.*.page_id' => 'required|exists:pages,id',
+            'permissions.*.has_permission' => 'required|boolean',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            foreach ($request->permissions as $permission) {
+                AccessLevelPage::updateOrCreate(
+                    [
+                        'access_level_id' => $accessLevel->id,
+                        'page_id' => $permission['page_id'],
+                    ],
+                    [
+                        'permission' => $permission['has_permission'],
+                        'order' => $permission['order'] ?? 0,
+                        'dropdown' => $permission['dropdown'] ?? false,
+                        'lib_menu' => $permission['lib_menu'] ?? false,
+                        'menu_id' => $permission['menu_id'] ?? null,
+                    ]
+                );
+            }
+
+            DB::commit();
+
+            return redirect()
+                ->route('access-levels.permissions', $accessLevel)
+                ->with('success', 'Permissões atualizadas com sucesso!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return redirect()
+                ->back()
+                ->with('error', 'Erro ao atualizar permissões: ' . $e->getMessage());
+        }
     }
 }

@@ -109,6 +109,7 @@ export default function Sidebar({ isOpen, onClose }) {
             // Sistema
             "Dashboard's": { route: "/dashboard", permission: null },
             Configurações: { route: "/admin", permission: PERMISSIONS.ACCESS_ADMIN_PANEL },
+            "Gerenciar Níveis": { route: "/access-levels", permission: PERMISSIONS.VIEW_USERS },
 
             // Páginas básicas
             Produto: { route: "/produto", permission: null },
