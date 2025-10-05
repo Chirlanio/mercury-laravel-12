@@ -17,6 +17,7 @@ export default function WorkShiftCreateModal({ isOpen, onClose, onSuccess, emplo
         { value: 'abertura', label: 'Abertura' },
         { value: 'fechamento', label: 'Fechamento' },
         { value: 'integral', label: 'Integral' },
+        { value: 'compensar', label: 'Compensar' },
     ];
 
     const handleSubmit = (e) => {

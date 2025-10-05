@@ -7,12 +7,14 @@ import Button from "@/Components/Button";
 import WorkShiftCreateModal from "@/Components/WorkShiftCreateModal";
 import WorkShiftViewModal from "@/Components/WorkShiftViewModal";
 import WorkShiftEditModal from "@/Components/WorkShiftEditModal";
+import WorkShiftExportModal from "@/Components/WorkShiftExportModal";
 
 export default function Index({ auth, workShifts, employees, stores, types, filters }) {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isViewModalOpen, setIsViewModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [selectedWorkShift, setSelectedWorkShift] = useState(null);
     const [workShiftToDelete, setWorkShiftToDelete] = useState(null);
 
@@ -94,6 +96,14 @@ export default function Index({ auth, workShifts, employees, stores, types, filt
         });
     };
 
+    const openExportModal = () => {
+        setIsExportModalOpen(true);
+    };
+
+    const closeExportModal = () => {
+        setIsExportModalOpen(false);
+    };
+
     const columns = [
         {
             field: 'employee_name',
@@ -129,6 +139,7 @@ export default function Index({ auth, workShifts, employees, stores, types, filt
                     'Abertura': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
                     'Fechamento': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
                     'Integral': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+                    'Compensar': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
                 };
                 return (
                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${colors[workShift.type_label] || 'bg-gray-100 text-gray-800'}`}>
@@ -213,6 +224,17 @@ export default function Index({ auth, workShifts, employees, stores, types, filt
                                 </p>
                             </div>
                             <div className="flex gap-3">
+                                <Button
+                                    variant="secondary"
+                                    onClick={openExportModal}
+                                    icon={({ className }) => (
+                                        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                    )}
+                                >
+                                    Exportar
+                                </Button>
                                 <Button
                                     variant="primary"
                                     onClick={openCreateModal}
@@ -383,6 +405,16 @@ export default function Index({ auth, workShifts, employees, stores, types, filt
                     </div>
                 </div>
             </Modal>
+
+            {/* Modal de Exportação */}
+            <WorkShiftExportModal
+                show={isExportModalOpen}
+                onClose={closeExportModal}
+                employees={employees}
+                stores={stores}
+                types={types}
+                currentFilters={filters}
+            />
         </AuthenticatedLayout>
     );
 }

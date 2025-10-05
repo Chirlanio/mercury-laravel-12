@@ -7,8 +7,25 @@ export default function WorkShiftViewModal({ isOpen, onClose, workShift, onEdit 
             'abertura': 'bg-blue-100 text-blue-800',
             'fechamento': 'bg-purple-100 text-purple-800',
             'integral': 'bg-green-100 text-green-800',
+            'compensar': 'bg-orange-100 text-orange-800',
         };
         return colors[type] || 'bg-gray-100 text-gray-800';
+    };
+
+    const calculateDuration = (startTime, endTime) => {
+        if (!startTime || !endTime) return 'N/A';
+
+        const [startHour, startMinute] = startTime.split(':').map(Number);
+        const [endHour, endMinute] = endTime.split(':').map(Number);
+
+        const startInMinutes = startHour * 60 + startMinute;
+        const endInMinutes = endHour * 60 + endMinute;
+
+        const diffInMinutes = endInMinutes - startInMinutes;
+        const hours = Math.floor(diffInMinutes / 60);
+        const minutes = diffInMinutes % 60;
+
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
     };
 
     const handleEdit = () => {
@@ -70,6 +87,12 @@ export default function WorkShiftViewModal({ isOpen, onClose, workShift, onEdit 
                             <div>
                                 <span className="font-medium text-gray-600">Hora de Término:</span>
                                 <span className="ml-2 text-gray-900">{workShift.end_time}</span>
+                            </div>
+                            <div>
+                                <span className="font-medium text-gray-600">Duração:</span>
+                                <span className="ml-2 text-gray-900 font-semibold">
+                                    {calculateDuration(workShift.start_time, workShift.end_time)}
+                                </span>
                             </div>
                         </div>
                     </div>

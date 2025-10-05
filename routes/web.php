@@ -255,6 +255,12 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
 Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
     Route::get('/work-shifts', [WorkShiftController::class, 'index'])->name('work-shifts.index');
 
+    Route::get('/work-shifts/export', [WorkShiftController::class, 'export'])
+        ->name('work-shifts.export');
+
+    Route::get('/work-shifts/print-summary', [WorkShiftController::class, 'printSummary'])
+        ->name('work-shifts.print-summary');
+
     Route::post('/work-shifts', [WorkShiftController::class, 'store'])
         ->middleware('permission:' . Permission::CREATE_USERS->value)
         ->name('work-shifts.store');

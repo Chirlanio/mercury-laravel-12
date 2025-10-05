@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, router } from '@inertiajs/react';
 import Modal from '@/Components/Modal';
 import Button from '@/Components/Button';
@@ -6,17 +6,31 @@ import Button from '@/Components/Button';
 export default function WorkShiftEditModal({ isOpen, onClose, onSuccess, workShift, employees = [] }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { data, setData, errors, reset, clearErrors, setError } = useForm({
-        employee_id: workShift?.employee_id || '',
-        date: workShift?.date || '',
-        start_time: workShift?.start_time || '',
-        end_time: workShift?.end_time || '',
-        type: workShift?.type || '',
+        employee_id: '',
+        date: '',
+        start_time: '',
+        end_time: '',
+        type: '',
     });
+
+    // Atualizar form quando workShift mudar
+    useEffect(() => {
+        if (workShift && isOpen) {
+            setData({
+                employee_id: workShift.employee_id || '',
+                date: workShift.date || '',
+                start_time: workShift.start_time || '',
+                end_time: workShift.end_time || '',
+                type: workShift.type || '',
+            });
+        }
+    }, [workShift, isOpen]);
 
     const types = [
         { value: 'abertura', label: 'Abertura' },
         { value: 'fechamento', label: 'Fechamento' },
         { value: 'integral', label: 'Integral' },
+        { value: 'compensar', label: 'Compensar' },
     ];
 
     const handleSubmit = (e) => {

@@ -154,6 +154,65 @@ export default function WorkShiftExportModal({ show, onClose, employees, stores,
         }
     };
 
+    const handlePrintSummary = async () => {
+        setIsExporting(true);
+
+        try {
+            const params = new URLSearchParams();
+
+            if (filters.employee_ids.length > 0) {
+                filters.employee_ids.forEach(id => {
+                    params.append('employee_ids[]', id);
+                });
+            }
+
+            if (filters.store_ids.length > 0) {
+                filters.store_ids.forEach(id => {
+                    params.append('store_ids[]', id);
+                });
+            }
+
+            if (filters.type_ids.length > 0) {
+                filters.type_ids.forEach(id => {
+                    params.append('type_ids[]', id);
+                });
+            }
+
+            if (filters.start_date) {
+                params.append('start_date', filters.start_date);
+            }
+
+            if (filters.end_date) {
+                params.append('end_date', filters.end_date);
+            }
+
+            const url = `/work-shifts/print-summary?${params.toString()}`;
+
+            // Create a temporary link to download the file
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `resumo_jornadas_${Date.now()}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // Reset and close
+            setFilters({
+                employee_ids: [],
+                store_ids: [],
+                type_ids: [],
+                start_date: '',
+                end_date: '',
+            });
+            onClose();
+        } catch (error) {
+            console.error('Erro ao imprimir resumo:', error);
+            alert('Erro ao imprimir resumo. Tente novamente.');
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     const handleClose = () => {
         setFilters({
             employee_ids: [],
@@ -375,6 +434,18 @@ export default function WorkShiftExportModal({ show, onClose, employees, stores,
                             disabled={isExporting}
                         >
                             Cancelar
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            onClick={handlePrintSummary}
+                            disabled={isExporting}
+                            icon={({ className }) => (
+                                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                </svg>
+                            )}
+                        >
+                            Imprimir Resumo
                         </Button>
                         <Button
                             variant="primary"
