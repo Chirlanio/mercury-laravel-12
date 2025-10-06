@@ -243,6 +243,12 @@ class AccessLevelController extends Controller
      */
     public function updatePermissions(Request $request, AccessLevel $accessLevel)
     {
+        \Log::info('Permissions Update Request', [
+            'access_level_id' => $accessLevel->id,
+            'headers' => $request->headers->all(),
+            'has_csrf' => $request->header('X-CSRF-TOKEN') !== null,
+        ]);
+
         $request->validate([
             'permissions' => 'required|array',
             'permissions.*.page_id' => 'required|exists:pages,id',

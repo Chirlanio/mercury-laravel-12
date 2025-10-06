@@ -273,131 +273,170 @@ export default function Sidebar({ isOpen, onClose }) {
                                     {expandedGroups[groupKey] && (
                                         <div className="ml-4 mt-1 space-y-1">
                                             {menus.map((menu) => {
-                                                // Suportar ambas as estruturas: antiga (children) e nova (items)
+                                                // Nova estrutura com direct_items e dropdown_items
+                                                const directItems = menu.direct_items || [];
+                                                const dropdownItems = menu.dropdown_items || [];
+
+                                                // Fallback para estrutura antiga
                                                 const menuItems = menu.items || menu.children || [];
-                                                const hasItems = menuItems.length > 0;
+                                                const hasOldStructure = menuItems.length > 0 && !menu.direct_items && !menu.dropdown_items;
 
-                                                // Para menus sem items, verificar se tem rota direta
-                                                const menuConfig = getMenuRoute(menu.name);
-                                                const hasRoute = menuConfig || menu.name === "Sair";
-                                                const hasMenuPermission = !menuConfig?.permission || hasPermission(menuConfig.permission);
-                                                const isAccessible = hasRoute && (menu.name === "Sair" || hasMenuPermission);
+                                                // Estrutura antiga - manter comportamento compatível
+                                                if (hasOldStructure) {
+                                                    const menuConfig = getMenuRoute(menu.name);
+                                                    const hasRoute = menuConfig || menu.name === "Sair";
+                                                    const hasMenuPermission = !menuConfig?.permission || hasPermission(menuConfig.permission);
+                                                    const isAccessible = hasRoute && (menu.name === "Sair" || hasMenuPermission);
 
-                                                // Na nova estrutura (items), todos os itens já são filtrados por permissão no backend
-                                                // Na estrutura antiga (children), filtrar aqui
-                                                const accessibleItems = menu.items
-                                                    ? menuItems // Nova estrutura - já filtrado
-                                                    : menuItems.filter(item => { // Estrutura antiga - filtrar
+                                                    const accessibleItems = menuItems.filter(item => {
                                                         const itemConfig = getMenuRoute(item.name);
                                                         const hasItemPermission = !itemConfig?.permission || hasPermission(itemConfig.permission);
                                                         return item.name === "Sair" || hasItemPermission;
                                                     });
 
-                                                // Ocultar menu se não tiver permissão e não tiver items acessíveis
-                                                if (!isAccessible && (!hasItems || accessibleItems.length === 0)) {
-                                                    return null;
+                                                    if (!isAccessible && accessibleItems.length === 0) {
+                                                        return null;
+                                                    }
+
+                                                    return (
+                                                        <div key={menu.id}>
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (accessibleItems.length > 0) {
+                                                                        toggleSubmenu(menu.id);
+                                                                    } else if (menu.name === "Sair") {
+                                                                        handleLogout();
+                                                                    } else {
+                                                                        handleMenuClick(menu.name);
+                                                                    }
+                                                                }}
+                                                                className={`flex items-center w-full px-3 py-2 text-sm rounded-md group text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer ${
+                                                                    menuConfig && url.startsWith(menuConfig.route)
+                                                                        ? "bg-gray-100 text-gray-900"
+                                                                        : ""
+                                                                }`}
+                                                            >
+                                                                <i className={`${menu.icon} mr-3 flex-shrink-0 text-gray-400 group-hover:text-gray-500`}></i>
+                                                                <span className="truncate">{menu.name}</span>
+                                                                {accessibleItems.length > 0 ? (
+                                                                    expandedSubmenus[menu.id] ? (
+                                                                        <ChevronDownIcon className="ml-auto h-4 w-4" />
+                                                                    ) : (
+                                                                        <ChevronRightIcon className="ml-auto h-4 w-4" />
+                                                                    )
+                                                                ) : (
+                                                                    <svg className="ml-auto h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                                                    </svg>
+                                                                )}
+                                                            </button>
+
+                                                            {accessibleItems.length > 0 && expandedSubmenus[menu.id] && (
+                                                                <div className="ml-6 mt-1 space-y-1">
+                                                                    {accessibleItems.map((item) => {
+                                                                        const itemRoute = item.route || (item.name === "Sair" ? "/logout" : getMenuRoute(item.name)?.route);
+                                                                        return (
+                                                                            <button
+                                                                                key={item.id}
+                                                                                onClick={() => {
+                                                                                    if (item.name === "Sair" || itemRoute === "/logout") {
+                                                                                        handleLogout();
+                                                                                    } else if (itemRoute) {
+                                                                                        router.get(itemRoute);
+                                                                                        if (window.innerWidth < 1024) {
+                                                                                            onClose();
+                                                                                        }
+                                                                                    }
+                                                                                }}
+                                                                                className={`flex items-center w-full px-3 py-2 text-sm rounded-md group text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer ${
+                                                                                    itemRoute && url.startsWith(itemRoute) ? "bg-gray-100 text-gray-900" : ""
+                                                                                }`}
+                                                                            >
+                                                                                {item.icon && <i className={`${item.icon} mr-3 flex-shrink-0 text-sm text-gray-400 group-hover:text-gray-500`}></i>}
+                                                                                <span className="truncate text-sm">{item.name}</span>
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
                                                 }
 
+                                                // Nova estrutura - renderizar direct_items e dropdown_items separadamente
                                                 return (
                                                     <div key={menu.id}>
-                                                        <button
-                                                            onClick={() => {
-                                                                if (hasItems) {
-                                                                    toggleSubmenu(menu.id);
-                                                                } else if (menu.name === "Sair") {
-                                                                    handleLogout();
-                                                                } else {
-                                                                    handleMenuClick(menu.name);
-                                                                }
-                                                            }}
-                                                            className={`flex items-center w-full px-3 py-2 text-sm rounded-md group text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer ${
-                                                                menuConfig && url.startsWith(menuConfig.route)
-                                                                    ? "bg-gray-100 text-gray-900"
-                                                                    : ""
-                                                            }`}
-                                                        >
-                                                            <i
-                                                                className={`${menu.icon} mr-3 flex-shrink-0 text-gray-400 group-hover:text-gray-500`}
-                                                            ></i>
-                                                            <span className="truncate">
-                                                                {menu.name}
-                                                            </span>
-                                                            {hasItems ? (
-                                                                expandedSubmenus[menu.id] ? (
-                                                                    <ChevronDownIcon className="ml-auto h-4 w-4" />
-                                                                ) : (
-                                                                    <ChevronRightIcon className="ml-auto h-4 w-4" />
-                                                                )
-                                                            ) : (
-                                                                <svg
-                                                                    className="ml-auto h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                    fill="none"
-                                                                    stroke="currentColor"
-                                                                    viewBox="0 0 24 24"
-                                                                >
-                                                                    <path
-                                                                        strokeLinecap="round"
-                                                                        strokeLinejoin="round"
-                                                                        strokeWidth={2}
-                                                                        d="M9 5l7 7-7 7"
-                                                                    />
+                                                        {/* Renderizar direct items diretamente (sem dropdown) */}
+                                                        {directItems.map((item) => (
+                                                            <button
+                                                                key={item.id}
+                                                                onClick={() => {
+                                                                    if (item.name === "Sair" || item.route === "/logout") {
+                                                                        handleLogout();
+                                                                    } else if (item.route) {
+                                                                        router.get(item.route);
+                                                                        if (window.innerWidth < 1024) {
+                                                                            onClose();
+                                                                        }
+                                                                    }
+                                                                }}
+                                                                className={`flex items-center w-full px-3 py-2 text-sm rounded-md group text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer ${
+                                                                    item.route && url.startsWith(item.route) ? "bg-gray-100 text-gray-900" : ""
+                                                                }`}
+                                                            >
+                                                                {item.icon && <i className={`${item.icon} mr-3 flex-shrink-0 text-gray-400 group-hover:text-gray-500`}></i>}
+                                                                <span className="truncate">{item.name}</span>
+                                                                <svg className="ml-auto h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                                                 </svg>
-                                                            )}
-                                                        </button>
+                                                            </button>
+                                                        ))}
 
-                                                        {/* Renderizar items (nova estrutura) ou submenus (estrutura antiga) */}
-                                                        {hasItems && expandedSubmenus[menu.id] && (
-                                                            <div className="ml-6 mt-1 space-y-1">
-                                                                {accessibleItems.map((item) => {
-                                                                    // Nova estrutura tem 'route' diretamente, antiga precisa de fallback
-                                                                    const itemRoute = item.route || (item.name === "Sair" ? "/logout" : getMenuRoute(item.name)?.route);
+                                                        {/* Renderizar menu com dropdown items (se existir) */}
+                                                        {dropdownItems.length > 0 && (
+                                                            <>
+                                                                <button
+                                                                    onClick={() => toggleSubmenu(menu.id)}
+                                                                    className={`flex items-center w-full px-3 py-2 text-sm rounded-md group text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer`}
+                                                                >
+                                                                    <i className={`${menu.icon} mr-3 flex-shrink-0 text-gray-400 group-hover:text-gray-500`}></i>
+                                                                    <span className="truncate">{menu.name}</span>
+                                                                    {expandedSubmenus[menu.id] ? (
+                                                                        <ChevronDownIcon className="ml-auto h-4 w-4" />
+                                                                    ) : (
+                                                                        <ChevronRightIcon className="ml-auto h-4 w-4" />
+                                                                    )}
+                                                                </button>
 
-                                                                    return (
-                                                                        <button
-                                                                            key={item.id}
-                                                                            onClick={() => {
-                                                                                if (item.name === "Sair" || itemRoute === "/logout") {
-                                                                                    handleLogout();
-                                                                                } else if (itemRoute) {
-                                                                                    router.get(itemRoute);
-                                                                                    if (window.innerWidth < 1024) {
-                                                                                        onClose();
+                                                                {expandedSubmenus[menu.id] && (
+                                                                    <div className="ml-6 mt-1 space-y-1">
+                                                                        {dropdownItems.map((item) => (
+                                                                            <button
+                                                                                key={item.id}
+                                                                                onClick={() => {
+                                                                                    if (item.name === "Sair" || item.route === "/logout") {
+                                                                                        handleLogout();
+                                                                                    } else if (item.route) {
+                                                                                        router.get(item.route);
+                                                                                        if (window.innerWidth < 1024) {
+                                                                                            onClose();
+                                                                                        }
                                                                                     }
-                                                                                } else {
-                                                                                    console.log(`Navegação para "${item.name}" ainda não implementada`);
-                                                                                }
-                                                                            }}
-                                                                            className={`flex items-center w-full px-3 py-2 text-sm rounded-md group text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer ${
-                                                                                itemRoute && url.startsWith(itemRoute)
-                                                                                    ? "bg-gray-100 text-gray-900"
-                                                                                    : ""
-                                                                            }`}
-                                                                        >
-                                                                            {item.icon && (
-                                                                                <i
-                                                                                    className={`${item.icon} mr-3 flex-shrink-0 text-sm text-gray-400 group-hover:text-gray-500`}
-                                                                                ></i>
-                                                                            )}
-                                                                            <span className="truncate text-sm">
-                                                                                {item.name}
-                                                                            </span>
-                                                                            <svg
-                                                                                className="ml-auto h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                                fill="none"
-                                                                                stroke="currentColor"
-                                                                                viewBox="0 0 24 24"
+                                                                                }}
+                                                                                className={`flex items-center w-full px-3 py-2 text-sm rounded-md group text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer ${
+                                                                                    item.route && url.startsWith(item.route) ? "bg-gray-100 text-gray-900" : ""
+                                                                                }`}
                                                                             >
-                                                                                <path
-                                                                                    strokeLinecap="round"
-                                                                                    strokeLinejoin="round"
-                                                                                    strokeWidth={2}
-                                                                                    d="M9 5l7 7-7 7"
-                                                                                />
-                                                                            </svg>
-                                                                        </button>
-                                                                    );
-                                                                })}
-                                                            </div>
+                                                                                {item.icon && <i className={`${item.icon} mr-3 flex-shrink-0 text-sm text-gray-400 group-hover:text-gray-500`}></i>}
+                                                                                <span className="truncate text-sm">{item.name}</span>
+                                                                                <svg className="ml-auto h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                                                                </svg>
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </>
                                                         )}
                                                     </div>
                                                 );

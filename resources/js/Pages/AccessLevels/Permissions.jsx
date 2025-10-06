@@ -4,8 +4,11 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Button from '@/Components/Button';
 import Modal from '@/Components/Modal';
 import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
+import { useConfirm } from '@/Hooks/useConfirm';
 
 export default function Permissions({ auth, accessLevel, pages, menus, stats }) {
+    const { confirm, ConfirmDialogComponent } = useConfirm();
+
     const [permissions, setPermissions] = useState(() => {
         const perms = {};
         pages.forEach(page => {
@@ -108,7 +111,20 @@ export default function Permissions({ auth, accessLevel, pages, menus, stats }) 
     };
 
     // Salvar todas as permissões
-    const handleSaveAll = () => {
+    const handleSaveAll = async () => {
+        const activePermissions = countActivePermissions();
+        const totalPages = Object.keys(permissions).length;
+
+        const confirmed = await confirm({
+            title: 'Salvar Permissões',
+            message: `Você está prestes a salvar ${activePermissions} de ${totalPages} permissões para o perfil "${accessLevel.name}". Esta ação afetará o acesso dos usuários com este nível. Deseja continuar?`,
+            confirmText: 'Sim, Salvar',
+            cancelText: 'Cancelar',
+            type: 'info',
+        });
+
+        if (!confirmed) return;
+
         const formattedPermissions = Object.keys(permissions).map(pageId => ({
             page_id: parseInt(pageId),
             has_permission: permissions[pageId].has_permission,
@@ -773,6 +789,9 @@ export default function Permissions({ auth, accessLevel, pages, menus, stats }) 
                     </div>
                 )}
             </Modal>
+
+            {/* Dialog de Confirmação */}
+            <ConfirmDialogComponent />
         </AuthenticatedLayout>
     );
 }

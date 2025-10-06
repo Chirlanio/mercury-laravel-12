@@ -214,29 +214,35 @@ class MenuService
                 continue;
             }
 
-            // Verificar se algum item tem dropdown = true
-            $hasDropdown = $items->where('dropdown', true)->count() > 0;
+            // Separar items baseado no dropdown
+            $dropdownItems = $items->where('dropdown', true);
+            $directItems = $items->where('dropdown', false);
+
+            // Mapear função para converter item
+            $mapItemFunc = function ($item) {
+                $oldRoute = $item->page->menu_controller . '/' . $item->page->menu_method;
+
+                return [
+                    'id' => $item->page->id,
+                    'name' => $item->page->page_name,
+                    'controller' => $item->page->menu_controller,
+                    'method' => $item->page->menu_method,
+                    'route' => self::convertRoute($oldRoute),
+                    'icon' => $item->page->icon,
+                    'order' => $item->order,
+                    'permission' => $item->permission,
+                    'dropdown' => $item->dropdown,
+                ];
+            };
 
             $menuStructure[] = [
                 'id' => $menu->id,
                 'name' => $menu->name,
                 'icon' => $menu->icon,
                 'order' => $menu->order,
-                'is_dropdown' => $hasDropdown,
-                'items' => $items->map(function ($item) {
-                    $oldRoute = $item->page->menu_controller . '/' . $item->page->menu_method;
-
-                    return [
-                        'id' => $item->page->id,
-                        'name' => $item->page->page_name,
-                        'controller' => $item->page->menu_controller,
-                        'method' => $item->page->menu_method,
-                        'route' => self::convertRoute($oldRoute),
-                        'icon' => $item->page->icon,
-                        'order' => $item->order,
-                        'permission' => $item->permission,
-                    ];
-                })->sortBy('order')->values()->toArray(),
+                'is_dropdown' => $dropdownItems->count() > 0,
+                'direct_items' => $directItems->map($mapItemFunc)->sortBy('order')->values()->toArray(),
+                'dropdown_items' => $dropdownItems->map($mapItemFunc)->sortBy('order')->values()->toArray(),
             ];
         }
 

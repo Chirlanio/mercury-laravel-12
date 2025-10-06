@@ -77,13 +77,13 @@ class PageController extends Controller
                     'icon' => $page->icon,
                     'created_at' => $page->created_at,
                     'updated_at' => $page->updated_at,
-                    'page_group' => [
+                    'page_group' => $page->pageGroup ? [
                         'id' => $page->pageGroup->id,
                         'name' => $page->pageGroup->name,
-                    ],
+                    ] : null,
                     'route' => $page->route,
                     'menu_route' => $page->menu_route,
-                    'full_name' => $page->full_name,
+                    'full_name' => $page->pageGroup ? $page->full_name : $page->page_name,
                 ];
             }),
             'pageGroups' => PageGroup::orderBy('name')->pluck('name', 'id'),

@@ -7,6 +7,7 @@ import { useState } from 'react';
 import ViewModal from '@/Components/Pages/ViewModal';
 import CreateModal from '@/Components/Pages/CreateModal';
 import EditModal from '@/Components/Pages/EditModal';
+import { useConfirm } from '@/Hooks/useConfirm';
 
 export default function Index({
     auth,
@@ -18,6 +19,7 @@ export default function Index({
     filters = {},
     stats = {}
 }) {
+    const { confirm, ConfirmDialogComponent } = useConfirm();
     const [processing, setProcessing] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showViewModal, setShowViewModal] = useState(false);
@@ -52,30 +54,50 @@ export default function Index({
 
     const handleToggleStatus = async (pageId, currentStatus) => {
         const action = currentStatus ? 'desativar' : 'ativar';
-        if (confirm(`Tem certeza que deseja ${action} esta página?`)) {
-            setProcessing(true);
+        const actionText = currentStatus ? 'Desativar' : 'Ativar';
 
-            const url = currentStatus ? `/pages/${pageId}/deactivate` : `/pages/${pageId}/activate`;
+        const confirmed = await confirm({
+            title: `${actionText} Página`,
+            message: `Tem certeza que deseja ${action} esta página? ${currentStatus ? 'Usuários não poderão mais acessá-la.' : 'Usuários com permissão poderão acessá-la novamente.'}`,
+            confirmText: `Sim, ${actionText}`,
+            cancelText: 'Cancelar',
+            type: currentStatus ? 'warning' : 'success',
+        });
 
-            router.post(url, {}, {
-                onFinish: () => setProcessing(false),
-                preserveScroll: true,
-            });
-        }
+        if (!confirmed) return;
+
+        setProcessing(true);
+
+        const url = currentStatus ? `/pages/${pageId}/deactivate` : `/pages/${pageId}/activate`;
+
+        router.post(url, {}, {
+            onFinish: () => setProcessing(false),
+            preserveScroll: true,
+        });
     };
 
     const handleTogglePublic = async (pageId, currentPublic) => {
         const action = currentPublic ? 'tornar privada' : 'tornar pública';
-        if (confirm(`Tem certeza que deseja ${action} esta página?`)) {
-            setProcessing(true);
+        const actionText = currentPublic ? 'Tornar Privada' : 'Tornar Pública';
 
-            const url = currentPublic ? `/pages/${pageId}/make-private` : `/pages/${pageId}/make-public`;
+        const confirmed = await confirm({
+            title: `${actionText}`,
+            message: `Tem certeza que deseja ${action} esta página? ${currentPublic ? 'Apenas usuários autenticados poderão acessá-la.' : 'Esta página ficará acessível publicamente sem autenticação.'}`,
+            confirmText: `Sim, ${actionText}`,
+            cancelText: 'Cancelar',
+            type: currentPublic ? 'info' : 'warning',
+        });
 
-            router.post(url, {}, {
-                onFinish: () => setProcessing(false),
-                preserveScroll: true,
-            });
-        }
+        if (!confirmed) return;
+
+        setProcessing(true);
+
+        const url = currentPublic ? `/pages/${pageId}/make-private` : `/pages/${pageId}/make-public`;
+
+        router.post(url, {}, {
+            onFinish: () => setProcessing(false),
+            preserveScroll: true,
+        });
     };
 
     const getGroupBadge = (groupName) => {
@@ -237,17 +259,17 @@ export default function Index({
                     <Button
                         onClick={() => handleTogglePublic(page.id, page.is_public)}
                         disabled={processing}
-                        variant={page.is_public ? 'warning' : 'info'}
+                        variant={page.is_public ? 'dark' : 'light'}
                         size="sm"
                         iconOnly={true}
                         icon={({ className }) => (
                             page.is_public ? (
                                 <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6.364-6.364l-1.414-1.414M20.364 8.636l-1.414-1.414M12 3v2m-6.364 12.364l-1.414 1.414M20.364 15.364l-1.414 1.414M4 12H2m18 0h-2" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                                 </svg>
                             ) : (
                                 <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                                 </svg>
                             )
                         )}
@@ -571,6 +593,9 @@ export default function Index({
                 pageGroups={pageGroups}
                 iconSuggestions={iconSuggestions}
             />
+
+            {/* Dialog de Confirmação Personalizado */}
+            <ConfirmDialogComponent />
         </AuthenticatedLayout>
     );
 }
