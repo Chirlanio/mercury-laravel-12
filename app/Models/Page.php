@@ -114,6 +114,11 @@ class Page extends Model
         return $query->where('method', $method);
     }
 
+    public function scopeOrdered($query)
+    {
+        return $query->orderBy('page_name', 'asc');
+    }
+
     public function getRouteAttribute(): string
     {
         return $this->controller . '@' . $this->method;

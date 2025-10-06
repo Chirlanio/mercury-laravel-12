@@ -67,7 +67,13 @@ class AccessLevelController extends Controller
 
         $accessLevels = $query->paginate($perPage);
 
+        // Buscar todos os menus ativos para o modal de seleção
+        $menus = \App\Models\Menu::where('is_active', true)
+            ->orderBy('order')
+            ->get(['id', 'name', 'icon']);
+
         return Inertia::render('AccessLevels/Index', [
+            'menus' => $menus,
             'accessLevels' => $accessLevels->through(function ($accessLevel) {
                 return [
                     'id' => $accessLevel->id,

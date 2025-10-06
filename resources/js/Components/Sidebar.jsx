@@ -27,10 +27,15 @@ export default function Sidebar({ isOpen, onClose }) {
                         activeGroup = groupKey;
                         break;
                     }
-                    if (menu.children) {
-                        for (const submenu of menu.children) {
-                            const submenuConfig = getMenuRoute(submenu.name);
-                            if (submenuConfig && url.startsWith(submenuConfig.route)) {
+
+                    // Suportar ambas as estruturas: items (nova) e children (antiga)
+                    const menuItems = menu.items || menu.children || [];
+
+                    if (menuItems.length > 0) {
+                        for (const item of menuItems) {
+                            // Nova estrutura tem 'route' diretamente, antiga precisa de fallback
+                            const itemRoute = item.route || (item.name === "Sair" ? "/logout" : getMenuRoute(item.name)?.route);
+                            if (itemRoute && itemRoute !== "/logout" && url.startsWith(itemRoute)) {
                                 activeGroup = groupKey;
                                 activeSubmenu = menu.id;
                                 break;
@@ -53,11 +58,33 @@ export default function Sidebar({ isOpen, onClose }) {
 
     const fetchMenus = async () => {
         try {
-            const response = await fetch("/api/menus/sidebar");
+            // Usar endpoint dinâmico baseado em access_level_pages
+            const response = await fetch("/api/menus/dynamic-sidebar");
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
             const data = await response.json();
-            setMenuGroups(data);
+
+            // Garantir que data é um objeto com as chaves esperadas
+            const validatedData = {
+                main: Array.isArray(data?.main) ? data.main : [],
+                hr: Array.isArray(data?.hr) ? data.hr : [],
+                utility: Array.isArray(data?.utility) ? data.utility : [],
+                system: Array.isArray(data?.system) ? data.system : [],
+            };
+
+            setMenuGroups(validatedData);
         } catch (error) {
             console.error("Erro ao carregar menus:", error);
+            // Em caso de erro, usar estrutura vazia mas válida
+            setMenuGroups({
+                main: [],
+                hr: [],
+                utility: [],
+                system: [],
+            });
         } finally {
             setLoading(false);
         }
@@ -110,6 +137,10 @@ export default function Sidebar({ isOpen, onClose }) {
             "Dashboard's": { route: "/dashboard", permission: null },
             Configurações: { route: "/admin", permission: PERMISSIONS.ACCESS_ADMIN_PANEL },
             "Gerenciar Níveis": { route: "/access-levels", permission: PERMISSIONS.VIEW_USERS },
+            "Gerenciar Menus": { route: "/menus", permission: PERMISSIONS.VIEW_USERS },
+            "Gerenciar Páginas": { route: "/pages", permission: PERMISSIONS.VIEW_USERS },
+            "Logs de Atividade": { route: "/activity-logs", permission: PERMISSIONS.VIEW_ACTIVITY_LOGS },
+            "Configurações de Email": { route: "/admin/email-settings", permission: PERMISSIONS.MANAGE_SETTINGS },
 
             // Páginas básicas
             Produto: { route: "/produto", permission: null },
@@ -242,23 +273,28 @@ export default function Sidebar({ isOpen, onClose }) {
                                     {expandedGroups[groupKey] && (
                                         <div className="ml-4 mt-1 space-y-1">
                                             {menus.map((menu) => {
+                                                // Suportar ambas as estruturas: antiga (children) e nova (items)
+                                                const menuItems = menu.items || menu.children || [];
+                                                const hasItems = menuItems.length > 0;
+
+                                                // Para menus sem items, verificar se tem rota direta
                                                 const menuConfig = getMenuRoute(menu.name);
                                                 const hasRoute = menuConfig || menu.name === "Sair";
                                                 const hasMenuPermission = !menuConfig?.permission || hasPermission(menuConfig.permission);
                                                 const isAccessible = hasRoute && (menu.name === "Sair" || hasMenuPermission);
-                                                const hasSubmenus = menu.children && menu.children.length > 0;
 
-                                                // Filtrar submenus acessíveis
-                                                const accessibleSubmenus = hasSubmenus
-                                                    ? menu.children.filter(submenu => {
-                                                        const submenuConfig = getMenuRoute(submenu.name);
-                                                        const hasSubmenuPermission = !submenuConfig?.permission || hasPermission(submenuConfig.permission);
-                                                        return submenu.name === "Sair" || hasSubmenuPermission;
-                                                    })
-                                                    : [];
+                                                // Na nova estrutura (items), todos os itens já são filtrados por permissão no backend
+                                                // Na estrutura antiga (children), filtrar aqui
+                                                const accessibleItems = menu.items
+                                                    ? menuItems // Nova estrutura - já filtrado
+                                                    : menuItems.filter(item => { // Estrutura antiga - filtrar
+                                                        const itemConfig = getMenuRoute(item.name);
+                                                        const hasItemPermission = !itemConfig?.permission || hasPermission(itemConfig.permission);
+                                                        return item.name === "Sair" || hasItemPermission;
+                                                    });
 
-                                                // Ocultar menu se não tiver permissão e não tiver submenus acessíveis
-                                                if (!isAccessible && (!hasSubmenus || accessibleSubmenus.length === 0)) {
+                                                // Ocultar menu se não tiver permissão e não tiver items acessíveis
+                                                if (!isAccessible && (!hasItems || accessibleItems.length === 0)) {
                                                     return null;
                                                 }
 
@@ -266,7 +302,7 @@ export default function Sidebar({ isOpen, onClose }) {
                                                     <div key={menu.id}>
                                                         <button
                                                             onClick={() => {
-                                                                if (hasSubmenus) {
+                                                                if (hasItems) {
                                                                     toggleSubmenu(menu.id);
                                                                 } else if (menu.name === "Sair") {
                                                                     handleLogout();
@@ -286,7 +322,7 @@ export default function Sidebar({ isOpen, onClose }) {
                                                             <span className="truncate">
                                                                 {menu.name}
                                                             </span>
-                                                            {hasSubmenus ? (
+                                                            {hasItems ? (
                                                                 expandedSubmenus[menu.id] ? (
                                                                     <ChevronDownIcon className="ml-auto h-4 w-4" />
                                                                 ) : (
@@ -309,31 +345,41 @@ export default function Sidebar({ isOpen, onClose }) {
                                                             )}
                                                         </button>
 
-                                                        {/* Renderizar submenus */}
-                                                        {hasSubmenus && expandedSubmenus[menu.id] && (
+                                                        {/* Renderizar items (nova estrutura) ou submenus (estrutura antiga) */}
+                                                        {hasItems && expandedSubmenus[menu.id] && (
                                                             <div className="ml-6 mt-1 space-y-1">
-                                                                {accessibleSubmenus.map((submenu) => {
-                                                                    const submenuConfig = getMenuRoute(submenu.name);
+                                                                {accessibleItems.map((item) => {
+                                                                    // Nova estrutura tem 'route' diretamente, antiga precisa de fallback
+                                                                    const itemRoute = item.route || (item.name === "Sair" ? "/logout" : getMenuRoute(item.name)?.route);
 
                                                                     return (
                                                                         <button
-                                                                            key={submenu.id}
-                                                                            onClick={() =>
-                                                                                submenu.name === "Sair"
-                                                                                    ? handleLogout()
-                                                                                    : handleMenuClick(submenu.name)
-                                                                            }
+                                                                            key={item.id}
+                                                                            onClick={() => {
+                                                                                if (item.name === "Sair" || itemRoute === "/logout") {
+                                                                                    handleLogout();
+                                                                                } else if (itemRoute) {
+                                                                                    router.get(itemRoute);
+                                                                                    if (window.innerWidth < 1024) {
+                                                                                        onClose();
+                                                                                    }
+                                                                                } else {
+                                                                                    console.log(`Navegação para "${item.name}" ainda não implementada`);
+                                                                                }
+                                                                            }}
                                                                             className={`flex items-center w-full px-3 py-2 text-sm rounded-md group text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer ${
-                                                                                submenuConfig && url.startsWith(submenuConfig.route)
+                                                                                itemRoute && url.startsWith(itemRoute)
                                                                                     ? "bg-gray-100 text-gray-900"
                                                                                     : ""
                                                                             }`}
                                                                         >
-                                                                            <i
-                                                                                className={`${submenu.icon} mr-3 flex-shrink-0 text-sm text-gray-400 group-hover:text-gray-500`}
-                                                                            ></i>
+                                                                            {item.icon && (
+                                                                                <i
+                                                                                    className={`${item.icon} mr-3 flex-shrink-0 text-sm text-gray-400 group-hover:text-gray-500`}
+                                                                                ></i>
+                                                                            )}
                                                                             <span className="truncate text-sm">
-                                                                                {submenu.name}
+                                                                                {item.name}
                                                                             </span>
                                                                             <svg
                                                                                 className="ml-auto h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity"

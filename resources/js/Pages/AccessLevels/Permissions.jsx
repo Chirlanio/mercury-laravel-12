@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Head, router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import DataTable from '@/Components/DataTable';
 import Button from '@/Components/Button';
 import Modal from '@/Components/Modal';
+import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 
 export default function Permissions({ auth, accessLevel, pages, menus, stats }) {
     const [permissions, setPermissions] = useState(() => {
@@ -19,6 +19,12 @@ export default function Permissions({ auth, accessLevel, pages, menus, stats }) 
         });
         return perms;
     });
+
+    const [sortField, setSortField] = useState('id');
+    const [sortDirection, setSortDirection] = useState('asc');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [perPage, setPerPage] = useState(50);
 
     const [editingPage, setEditingPage] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
@@ -79,6 +85,17 @@ export default function Permissions({ auth, accessLevel, pages, menus, stats }) 
         }));
     };
 
+    // Alternar dropdown
+    const toggleDropdown = (pageId) => {
+        setPermissions(prev => ({
+            ...prev,
+            [pageId]: {
+                ...prev[pageId],
+                dropdown: !prev[pageId].dropdown
+            }
+        }));
+    };
+
     // Alterar ordem
     const changeOrder = (pageId, direction) => {
         setPermissions(prev => ({
@@ -117,6 +134,143 @@ export default function Permissions({ auth, accessLevel, pages, menus, stats }) 
     // Contar permissões ativas
     const countActivePermissions = () => {
         return Object.values(permissions).filter(p => p.has_permission).length;
+    };
+
+    // Ações em lote
+    const toggleAllDropdown = (value) => {
+        setPermissions(prev => {
+            const updated = { ...prev };
+            Object.keys(updated).forEach(pageId => {
+                if (updated[pageId].has_permission) {
+                    updated[pageId] = {
+                        ...updated[pageId],
+                        dropdown: value
+                    };
+                }
+            });
+            return updated;
+        });
+    };
+
+    const toggleAllLibMenu = (value) => {
+        setPermissions(prev => {
+            const updated = { ...prev };
+            Object.keys(updated).forEach(pageId => {
+                if (updated[pageId].has_permission) {
+                    updated[pageId] = {
+                        ...updated[pageId],
+                        lib_menu: value
+                    };
+                }
+            });
+            return updated;
+        });
+    };
+
+    const toggleAllPermissions = (value) => {
+        setPermissions(prev => {
+            const updated = { ...prev };
+            Object.keys(updated).forEach(pageId => {
+                updated[pageId] = {
+                    ...updated[pageId],
+                    has_permission: value
+                };
+            });
+            return updated;
+        });
+    };
+
+    // Função de ordenação local
+    const handleSort = (field) => {
+        if (!field) return;
+
+        let direction = 'asc';
+        if (sortField === field && sortDirection === 'asc') {
+            direction = 'desc';
+        }
+
+        setSortField(field);
+        setSortDirection(direction);
+        setCurrentPage(1); // Reset para primeira página ao ordenar
+    };
+
+    // Filtrar e ordenar dados localmente
+    const getFilteredAndSortedPages = () => {
+        let filtered = [...pages];
+
+        // Aplicar busca
+        if (searchTerm) {
+            filtered = filtered.filter(page =>
+                page.page_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                page.page_group?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                page.controller?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                page.method?.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+
+        // Aplicar ordenação
+        if (sortField) {
+            filtered.sort((a, b) => {
+                let aValue, bValue;
+
+                switch (sortField) {
+                    case 'id':
+                        aValue = a.id;
+                        bValue = b.id;
+                        break;
+                    case 'page_name':
+                        aValue = a.page_name || '';
+                        bValue = b.page_name || '';
+                        break;
+                    case 'has_permission':
+                        aValue = permissions[a.id]?.has_permission ? 1 : 0;
+                        bValue = permissions[b.id]?.has_permission ? 1 : 0;
+                        break;
+                    case 'menu_name':
+                        const menuA = menus.find(m => m.id === permissions[a.id]?.menu_id);
+                        const menuB = menus.find(m => m.id === permissions[b.id]?.menu_id);
+                        aValue = menuA?.name || '';
+                        bValue = menuB?.name || '';
+                        break;
+                    case 'dropdown':
+                        aValue = permissions[a.id]?.dropdown ? 1 : 0;
+                        bValue = permissions[b.id]?.dropdown ? 1 : 0;
+                        break;
+                    case 'order':
+                        aValue = permissions[a.id]?.order || 0;
+                        bValue = permissions[b.id]?.order || 0;
+                        break;
+                    default:
+                        return 0;
+                }
+
+                if (typeof aValue === 'string' && typeof bValue === 'string') {
+                    return sortDirection === 'asc'
+                        ? aValue.localeCompare(bValue)
+                        : bValue.localeCompare(aValue);
+                } else {
+                    return sortDirection === 'asc'
+                        ? aValue - bValue
+                        : bValue - aValue;
+                }
+            });
+        }
+
+        return filtered;
+    };
+
+    const filteredPages = getFilteredAndSortedPages();
+
+    // Paginação local
+    const totalPages = Math.ceil(filteredPages.length / perPage);
+    const startIndex = (currentPage - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    const paginatedPages = filteredPages.slice(startIndex, endIndex);
+
+    // Reset para primeira página quando busca muda
+    const handleSearchChange = (value) => {
+        setSearchTerm(value);
+        setCurrentPage(1);
     };
 
     const columns = [
@@ -199,12 +353,18 @@ export default function Permissions({ auth, accessLevel, pages, menus, stats }) 
             label: 'Dropdown',
             sortable: true,
             render: (page) => (
-                <div className="text-center">
-                    {permissions[page.id]?.dropdown ? (
-                        <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Sim</span>
-                    ) : (
-                        <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">Não</span>
-                    )}
+                <div className="flex items-center justify-center">
+                    <button
+                        onClick={() => toggleDropdown(page.id)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                            permissions[page.id]?.dropdown
+                                ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                        title="Clique para alternar"
+                    >
+                        {permissions[page.id]?.dropdown ? 'Sim' : 'Não'}
+                    </button>
                 </div>
             )
         },
@@ -292,14 +452,198 @@ export default function Permissions({ auth, accessLevel, pages, menus, stats }) 
                         </div>
                     </div>
 
+                    {/* Card de Ajuda */}
+                    <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="flex items-start">
+                            <svg className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <div className="text-sm">
+                                <p className="font-medium text-blue-900 mb-2">Como funcionam os campos:</p>
+                                <ul className="space-y-1 text-blue-800">
+                                    <li><strong>Permissão:</strong> Define se o usuário pode acessar esta página</li>
+                                    <li><strong>Exibir no Menu:</strong> Se marcado, a página aparece na barra lateral</li>
+                                    <li><strong>Menu:</strong> Em qual menu a página será exibida</li>
+                                    <li><strong>Dropdown:</strong> Se marcado, a página é exibida como um submenu dropdown (clique para expandir)</li>
+                                    <li><strong>Ordem:</strong> Define a posição da página no menu (menor número = primeiro)</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Ações em Lote */}
+                    <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                        <h3 className="text-sm font-medium text-gray-900 mb-3">Ações em Lote</h3>
+                        <div className="flex flex-wrap gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => toggleAllPermissions(true)}
+                            >
+                                Permitir Todas
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => toggleAllPermissions(false)}
+                            >
+                                Bloquear Todas
+                            </Button>
+                            <span className="border-l border-gray-300 mx-2"></span>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => toggleAllLibMenu(true)}
+                            >
+                                Exibir Todas no Menu
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => toggleAllLibMenu(false)}
+                            >
+                                Ocultar Todas do Menu
+                            </Button>
+                            <span className="border-l border-gray-300 mx-2"></span>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => toggleAllDropdown(true)}
+                            >
+                                Marcar Todas como Dropdown
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => toggleAllDropdown(false)}
+                            >
+                                Desmarcar Todas como Dropdown
+                            </Button>
+                        </div>
+                        <p className="mt-3 text-xs text-gray-500">
+                            <strong>Nota:</strong> As ações de "Exibir/Ocultar no Menu" e "Dropdown" afetam apenas páginas com permissão ativada.
+                        </p>
+                    </div>
+
                     {/* Tabela de Permissões */}
-                    <DataTable
-                        data={{ data: pages }}
-                        columns={columns}
-                        searchPlaceholder="Buscar páginas..."
-                        emptyMessage="Nenhuma página encontrada"
-                        perPageOptions={[10, 25, 50, 100]}
-                    />
+                    <div className="bg-white overflow-hidden shadow-sm rounded-lg">
+                        {/* Busca e controles */}
+                        <div className="p-6 border-b border-gray-200">
+                            <div className="flex items-center justify-between gap-4">
+                                <input
+                                    type="text"
+                                    placeholder="Buscar páginas..."
+                                    className="flex-1 max-w-md rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                    value={searchTerm}
+                                    onChange={(e) => handleSearchChange(e.target.value)}
+                                />
+                                <select
+                                    value={perPage}
+                                    onChange={(e) => {
+                                        setPerPage(Number(e.target.value));
+                                        setCurrentPage(1);
+                                    }}
+                                    className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                >
+                                    <option value={25}>25 por página</option>
+                                    <option value={50}>50 por página</option>
+                                    <option value={100}>100 por página</option>
+                                    <option value={filteredPages.length}>Todos</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Tabela */}
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        {columns.map((column, index) => (
+                                            <th
+                                                key={index}
+                                                className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                                                    column.sortable ? 'cursor-pointer hover:bg-gray-100' : ''
+                                                }`}
+                                                onClick={() => column.sortable && handleSort(column.field)}
+                                            >
+                                                <div className="flex items-center space-x-1">
+                                                    <span>{column.label}</span>
+                                                    {column.sortable && (
+                                                        <span>
+                                                            {sortField === column.field ? (
+                                                                sortDirection === 'asc' ? (
+                                                                    <ChevronUpIcon className="w-4 h-4 text-gray-600" />
+                                                                ) : (
+                                                                    <ChevronDownIcon className="w-4 h-4 text-gray-600" />
+                                                                )
+                                                            ) : (
+                                                                <ChevronUpIcon className="w-4 h-4 text-gray-400" />
+                                                            )}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {paginatedPages.length > 0 ? (
+                                        paginatedPages.map((page) => (
+                                            <tr key={page.id} className="hover:bg-gray-50">
+                                                {columns.map((column, colIndex) => (
+                                                    <td key={colIndex} className="px-6 py-4 whitespace-nowrap">
+                                                        {column.render(page)}
+                                                    </td>
+                                                ))}
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={columns.length} className="px-6 py-12 text-center text-gray-500">
+                                                Nenhuma página encontrada
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Footer com paginação */}
+                        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm text-gray-700">
+                                    Mostrando <span className="font-medium">{startIndex + 1}</span> a{' '}
+                                    <span className="font-medium">{Math.min(endIndex, filteredPages.length)}</span> de{' '}
+                                    <span className="font-medium">{filteredPages.length}</span> páginas
+                                    {searchTerm && ` (filtradas de ${pages.length} no total)`}
+                                </p>
+
+                                {totalPages > 1 && (
+                                    <div className="flex items-center space-x-2">
+                                        <button
+                                            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                                            disabled={currentPage === 1}
+                                            className="px-3 py-1 rounded-md border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Anterior
+                                        </button>
+
+                                        <span className="text-sm text-gray-700">
+                                            Página {currentPage} de {totalPages}
+                                        </span>
+
+                                        <button
+                                            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                                            disabled={currentPage === totalPages}
+                                            className="px-3 py-1 rounded-md border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Próxima
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
 
                     {/* Botões de ação */}
                     <div className="mt-6 flex justify-end space-x-4">

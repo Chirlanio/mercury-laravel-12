@@ -28,6 +28,7 @@ class User extends Authenticatable
         'password',
         'role',
         'avatar',
+        'access_level_id',
         'store_id',
         'area_id',
         'status_id',
@@ -204,5 +205,13 @@ class User extends Authenticatable
     public function store(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(\App\Models\Store::class, 'store_id', 'code');
+    }
+
+    /**
+     * Get the access level that the user belongs to
+     */
+    public function accessLevel(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(\App\Models\AccessLevel::class);
     }
 }

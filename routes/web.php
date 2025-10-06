@@ -7,6 +7,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\AccessLevelController;
+use App\Http\Controllers\AccessLevelPageController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\WorkShiftController;
 use App\Http\Controllers\Admin\EmailSettingsController;
@@ -119,6 +120,7 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_ACTIVITY_LOGS->value
 // Rotas para gerenciamento de menus
 // API para sidebar (acessível para qualquer usuário autenticado)
 Route::middleware('auth')->get('/api/menus/sidebar', [MenuController::class, 'getSidebarMenus'])->name('menus.sidebar');
+Route::middleware('auth')->get('/api/menus/dynamic-sidebar', [MenuController::class, 'getDynamicSidebarMenus'])->name('menus.dynamic-sidebar');
 
 Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
     // Listar menus
@@ -129,6 +131,12 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
 
     // Ações de gerenciamento de menu (requer permissões administrativas)
     Route::middleware('permission:' . Permission::MANAGE_SYSTEM_SETTINGS->value)->group(function () {
+        // Criar novo menu
+        Route::post('/menus', [MenuController::class, 'store'])->name('menus.store');
+
+        // Atualizar menu
+        Route::put('/menus/{menu}', [MenuController::class, 'update'])->name('menus.update');
+
         // Ativar/Desativar menu
         Route::post('/menus/{menu}/activate', [MenuController::class, 'activate'])->name('menus.activate');
         Route::post('/menus/{menu}/deactivate', [MenuController::class, 'deactivate'])->name('menus.deactivate');
@@ -183,6 +191,17 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
 
     // Visualizar nível de acesso específico
     Route::get('/access-levels/{accessLevel}', [AccessLevelController::class, 'show'])->name('access-levels.show');
+
+    // Gerenciar páginas de um menu para um nível de acesso
+    Route::get('/access-levels/{accessLevel}/menus/{menu}/pages', [AccessLevelPageController::class, 'manage'])
+        ->name('access-levels.menus.pages.manage');
+
+    Route::get('/access-levels/{accessLevel}/menus/{menu}/pages/json', [AccessLevelPageController::class, 'getPages'])
+        ->name('access-levels.menus.pages.get');
+
+    Route::post('/access-levels/{accessLevel}/menus/{menu}/pages', [AccessLevelPageController::class, 'updatePermissions'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('access-levels.menus.pages.update');
 });
 
 // Rotas para funcionários

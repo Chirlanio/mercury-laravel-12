@@ -80,7 +80,7 @@ class MenuSeeder extends Seeder
             );
         }
 
-        // Criar submenu "Gerenciar Níveis" para "Configurações"
+        // Criar submenus para "Configurações"
         $configuracoes = DB::table('menus')->where('name', 'Configurações')->first();
 
         if ($configuracoes) {
@@ -89,6 +89,50 @@ class MenuSeeder extends Seeder
                 [
                     'icon' => 'fas fa-shield-alt',
                     'order' => 1,
+                    'is_active' => true,
+                    'created_at' => $now,
+                    'updated_at' => null,
+                ]
+            );
+
+            DB::table('menus')->updateOrInsert(
+                ['name' => 'Gerenciar Menus', 'parent_id' => $configuracoes->id],
+                [
+                    'icon' => 'fas fa-bars',
+                    'order' => 2,
+                    'is_active' => true,
+                    'created_at' => $now,
+                    'updated_at' => null,
+                ]
+            );
+
+            DB::table('menus')->updateOrInsert(
+                ['name' => 'Gerenciar Páginas', 'parent_id' => $configuracoes->id],
+                [
+                    'icon' => 'fas fa-file-alt',
+                    'order' => 3,
+                    'is_active' => true,
+                    'created_at' => $now,
+                    'updated_at' => null,
+                ]
+            );
+
+            DB::table('menus')->updateOrInsert(
+                ['name' => 'Logs de Atividade', 'parent_id' => $configuracoes->id],
+                [
+                    'icon' => 'fas fa-history',
+                    'order' => 4,
+                    'is_active' => true,
+                    'created_at' => $now,
+                    'updated_at' => null,
+                ]
+            );
+
+            DB::table('menus')->updateOrInsert(
+                ['name' => 'Configurações de Email', 'parent_id' => $configuracoes->id],
+                [
+                    'icon' => 'fas fa-envelope-open-text',
+                    'order' => 5,
                     'is_active' => true,
                     'created_at' => $now,
                     'updated_at' => null,

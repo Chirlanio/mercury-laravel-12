@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import DataTable from '@/Components/DataTable';
+import Button from '@/Components/Button';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -117,12 +118,22 @@ export default function Index({ auth, logs = { data: [], links: [] }, filters = 
             field: 'actions',
             sortable: false,
             render: (log) => (
-                <button
-                    onClick={() => router.visit(`/activity-logs/${log.id}`)}
-                    className="text-indigo-600 hover:text-indigo-900 text-sm"
-                >
-                    Ver detalhes
-                </button>
+                <Button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        router.visit(`/activity-logs/${log.id}`);
+                    }}
+                    variant="secondary"
+                    size="sm"
+                    iconOnly={true}
+                    icon={({ className }) => (
+                        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                    )}
+                    title="Ver detalhes"
+                />
             )
         }
     ];
