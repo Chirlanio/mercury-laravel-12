@@ -127,3 +127,77 @@ If you have a suggestion that would make this better, please fork the repo and c
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+## Deploy on Hostinger VPS
+
+These instructions will guide you through deploying the project on a Hostinger VPS.
+
+### Prerequisites
+
+*   A Hostinger VPS with root access.
+*   Git, Composer, and Node.js installed on the VPS.
+*   A database (e.g., MySQL, PostgreSQL) set up on the VPS.
+
+### Deployment Steps
+
+1.  **Clone the repository**
+
+    ```bash
+    git clone https://github.com/your-username/mercury-laravel.git
+    cd mercury-laravel
+    ```
+
+2.  **Install backend dependencies**
+
+    ```bash
+    composer install --no-dev --optimize-autoloader
+    ```
+
+3.  **Install frontend dependencies**
+
+    ```bash
+    npm install && npm run build
+    ```
+
+4.  **Set up your environment**
+
+    *   Copy the `.env.example` file to `.env`:
+
+        ```bash
+        cp .env.example .env
+        ```
+
+    *   Generate an application key:
+
+        ```bash
+        php artisan key:generate
+        ```
+
+    *   Configure your database connection and other settings in the `.env` file.
+
+5.  **Run database migrations and seeders**
+
+    ```bash
+    php artisan migrate --seed
+    ```
+
+6.  **Configure the web server**
+
+    You will need to configure your web server (e.g., Apache, Nginx) to point to the `public` directory of your application.
+
+7.  **Set file permissions**
+
+    Ensure that the `storage` and `bootstrap/cache` directories are writable by the web server.
+
+    ```bash
+    sudo chown -R www-data:www-data storage bootstrap/cache
+    sudo chmod -R 775 storage bootstrap/cache
+    ```
+
+8.  **Set up the scheduler**
+
+    Add the following cron job to your server to run the Laravel scheduler every minute:
+
+    ```bash
+    * * * * * cd /path-to-your-project && php artisan schedule:run >> /dev/null 2>&1
+    ```
