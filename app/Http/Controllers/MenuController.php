@@ -225,34 +225,47 @@ class MenuController extends Controller
      */
     public function getDynamicSidebarMenus()
     {
-        // Sempre retornar estrutura padrão mesmo sem usuário
-        $menuGroups = [
-            'main' => [],
-            'hr' => [],
-            'utility' => [],
-            'system' => [],
-        ];
-
         $user = auth()->user();
 
-        if (!$user || !$user->access_level_id) {
-            return response()->json($menuGroups);
+        if (!$user) {
+            return response()->json([
+                'main' => [],
+                'hr' => [],
+                'utility' => [],
+                'system' => [],
+            ]);
         }
 
         try {
-            // Usar MenuService para obter a estrutura de menu
-            $menuStructure = \App\Services\MenuService::getMenuForAccessLevel($user->access_level_id);
+            if ($user->isSuperAdmin()) {
+                $menuStructure = \App\Services\MenuService::getSuperAdminMenu();
+            } else {
+                if (!$user->access_level_id) {
+                    return response()->json([
+                        'main' => [],
+                        'hr' => [],
+                        'utility' => [],
+                        'system' => [],
+                    ]);
+                }
+                $menuStructure = \App\Services\MenuService::getMenuForAccessLevel($user->access_level_id);
+            }
+
+            $menuGroups = [
+                'main' => [],
+                'hr' => [],
+                'utility' => [],
+                'system' => [],
+            ];
 
             foreach ($menuStructure as $menu) {
-                // Carregar o menu completo para verificar suas flags
                 $menuModel = Menu::find($menu['id']);
 
                 if (!$menuModel) {
                     continue;
                 }
 
-                // Determinar em qual grupo colocar o menu
-                $group = 'main'; // padrão
+                $group = 'main';
                 if ($menuModel->is_hr_menu) {
                     $group = 'hr';
                 } elseif ($menuModel->is_utility_menu) {
@@ -263,10 +276,16 @@ class MenuController extends Controller
 
                 $menuGroups[$group][] = $menu;
             }
+
+            return response()->json($menuGroups);
         } catch (\Exception $e) {
             \Log::error('Erro ao carregar menus dinâmicos: ' . $e->getMessage());
+            return response()->json([
+                'main' => [],
+                'hr' => [],
+                'utility' => [],
+                'system' => [],
+            ], 500);
         }
-
-        return response()->json($menuGroups);
     }
 }
