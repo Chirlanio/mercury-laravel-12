@@ -190,7 +190,6 @@ export default function DataTable({
                         <div className="flex space-x-1">
                             {data.links
                                 .filter(link => link.url !== null)
-<<<<<<< HEAD
                                 .map((link, index) => {
                                     // Manter todos os parâmetros da URL atual ao navegar entre páginas
                                     let url = link.url;
@@ -225,24 +224,6 @@ export default function DataTable({
                                         />
                                     );
                                 })
-=======
-                                .map((link, index) => (
-                                    <button
-                                        key={index}
-                                        onClick={() => router.visit(link.url, {
-                                            preserveState: true,
-                                            preserveScroll: true,
-                                        })}
-                                        disabled={!link.url}
-                                        className={`px-3 py-2 text-sm rounded-md transition-colors ${
-                                            link.active
-                                                ? 'bg-indigo-600 text-white'
-                                                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-                                        } ${!link.url ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                        dangerouslySetInnerHTML={{ __html: link.label }}
-                                    />
-                                ))
->>>>>>> d6bd258 (fix menu)
                             }
                         </div>
                     )}

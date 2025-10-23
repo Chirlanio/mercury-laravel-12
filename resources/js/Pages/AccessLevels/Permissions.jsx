@@ -4,10 +4,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Button from '@/Components/Button';
 import Modal from '@/Components/Modal';
 import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
-<<<<<<< HEAD
 import { useConfirm } from '@/Hooks/useConfirm';
-=======
->>>>>>> d6bd258 (fix menu)
 
 export default function Permissions({ auth, accessLevel, pages, menus, stats }) {
     const { confirm, ConfirmDialogComponent } = useConfirm();

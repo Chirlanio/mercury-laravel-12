@@ -363,6 +363,11 @@ class MenuService
                 }
             }
         }
+
+        foreach($menuStructure as &$menu) {
+            $menu['direct_items'] = collect($menu['direct_items'])->unique('id')->sortBy('order')->values()->all();
+            $menu['dropdown_items'] = collect($menu['dropdown_items'])->unique('id')->sortBy('order')->values()->all();
+        }
         
         // Now build the hierarchy
         foreach ($menuStructure as $menuId => &$menu) {
