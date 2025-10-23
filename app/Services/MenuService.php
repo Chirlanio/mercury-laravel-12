@@ -325,8 +325,10 @@ class MenuService
         $allMenus = Menu::active()->ordered()->get()->keyBy('id');
         
         $allPageLinks = AccessLevelPage::select('menu_id', 'page_id', 'dropdown', 'order')
-            ->distinct()
-            ->get();
+            ->get()
+            ->unique(function ($item) {
+                return $item['menu_id'] . '-' . $item['page_id'];
+            });
             
         $allPages = Page::active()->whereIn('id', $allPageLinks->pluck('page_id'))->get()->keyBy('id');
         
