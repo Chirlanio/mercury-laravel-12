@@ -14,6 +14,9 @@ class EmploymentContractSeeder extends Seeder
      */
     public function run(): void
     {
+        // Verificar se os funcionários existem antes de inserir contratos
+        $existingEmployeeIds = DB::table('employees')->pluck('id')->toArray();
+
         $contracts = [
             ['id' => 1, 'employee_id' => 197, 'position_id' => 63, 'movement_type_id' => 1, 'start_date' => '2016-10-24', 'end_date' => '2023-09-30', 'store_id' => 'Z999', 'created_at' => '2024-08-23 08:20:23', 'updated_at' => '2024-11-14 09:31:25'],
             ['id' => 2, 'employee_id' => 635, 'position_id' => 63, 'movement_type_id' => 1, 'start_date' => '2022-11-03', 'end_date' => '2023-09-30', 'store_id' => 'Z999', 'created_at' => '2024-08-23 08:24:39', 'updated_at' => '2024-08-23 08:32:55'],
@@ -64,10 +67,16 @@ class EmploymentContractSeeder extends Seeder
         ];
 
         foreach ($contracts as $contract) {
-            DB::table('employment_contracts')->updateOrInsert(
-                ['id' => $contract['id']],
-                $contract
-            );
+            // Verificar se o funcionário existe antes de inserir o contrato
+            if (in_array($contract['employee_id'], $existingEmployeeIds)) {
+                DB::table('employment_contracts')->updateOrInsert(
+                    ['id' => $contract['id']],
+                    $contract
+                );
+            } else {
+                // Log para indicar que o contrato foi ignorado
+                echo "⚠️  Contrato ID {$contract['id']} ignorado - Funcionário ID {$contract['employee_id']} não existe\n";
+            }
         }
     }
 }
