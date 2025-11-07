@@ -9,9 +9,11 @@
 
 Foram identificados **5 seeders com risco de violação de foreign key** devido ao uso de IDs hardcoded que podem não existir no banco de dados.
 
-### ⚠️ STATUS CRÍTICO
-- **EmploymentContractSeeder** - ✅ **CORRIGIDO**
-- **AccessLevelPageSeeder** - ❌ **REQUER CORREÇÃO**
+### ✅ SEEDERS CORRIGIDOS (2/5)
+- **EmploymentContractSeeder** - ✅ **CORRIGIDO EM 07/11/2025**
+- **AccessLevelPageSeeder** - ✅ **CORRIGIDO EM 07/11/2025**
+
+### ❌ SEEDERS PENDENTES (3/5)
 - **PageSeeder** - ❌ **REQUER CORREÇÃO**
 - **StoreSeeder** - ❌ **REQUER CORREÇÃO**
 - **PositionSeeder** - ❌ **REQUER CORREÇÃO**
@@ -49,33 +51,55 @@ foreach ($contracts as $contract) {
 
 ---
 
-## 2. ACCESS LEVEL PAGE SEEDER ❌ REQUER CORREÇÃO
+## 2. ACCESS LEVEL PAGE SEEDER ✅ CORRIGIDO
 
 **Arquivo:** `database/seeders/AccessLevelPageSeeder.php`
-**Status:** ❌ **RISCO ALTO**
+**Status:** ✅ **CORRIGIDO EM 07/11/2025**
 
-### Foreign Keys Utilizadas
-- `menu_id` (valores: 1, 2, 4, 6)
-- `access_level_id` (valores: 1, 2)
-- `page_id` (valores: 1-18)
-
-### Exemplo de Dados
+### Problema Original
 ```php
-['menu_id' => 1, 'access_level_id' => 1, 'page_id' => 1]
-['menu_id' => 2, 'access_level_id' => 1, 'page_id' => 2]
-['menu_id' => 6, 'access_level_id' => 1, 'page_id' => 4]
+// ❌ Inserção sem verificar se menu_id, access_level_id e page_id existem
+DB::table('access_level_pages')->updateOrInsert([...]);
 ```
 
-### Risco
-Se `menus` (ID 1, 2, 4, 6), `access_levels` (ID 1, 2) ou `pages` (ID 1-18) não existirem, o seeder falhará.
+**Risco:** Se `menus` (ID 1, 2, 4, 6), `access_levels` (ID 1, 2) ou `pages` (ID 1-18) não existirem, o seeder falharia com erro de foreign key constraint.
 
-### Dependências (Ordem no DatabaseSeeder)
-1. ✅ MenuSeeder (linha 27) - Roda ANTES
-2. ✅ AdditionalAccessLevelsSeeder (linha 28) - Roda ANTES
-3. ✅ PageSeeder (linha 32) - Roda ANTES
-4. ✅ AccessLevelPageSeeder (linha 33) - Roda DEPOIS
+### Solução Aplicada
+```php
+// Buscar todos os IDs existentes
+$existingMenuIds = DB::table('menus')->pluck('id')->toArray();
+$existingAccessLevelIds = DB::table('access_levels')->pluck('id')->toArray();
+$existingPageIds = DB::table('pages')->pluck('id')->toArray();
 
-**Análise:** Dependências respeitadas, mas IDs podem variar.
+foreach ($accessLevelPages as $accessLevelPage) {
+    // Verificar se todas as foreign keys existem
+    if (!in_array($accessLevelPage['menu_id'], $existingMenuIds)) {
+        echo "⚠️  AccessLevelPage ignorado - menu_id {$accessLevelPage['menu_id']} não existe\n";
+        continue;
+    }
+
+    if (!in_array($accessLevelPage['access_level_id'], $existingAccessLevelIds)) {
+        echo "⚠️  AccessLevelPage ignorado - access_level_id {$accessLevelPage['access_level_id']} não existe\n";
+        continue;
+    }
+
+    if (!in_array($accessLevelPage['page_id'], $existingPageIds)) {
+        echo "⚠️  AccessLevelPage ignorado - page_id {$accessLevelPage['page_id']} não existe\n";
+        continue;
+    }
+
+    // Inserir apenas se todas as foreign keys existirem
+    DB::table('access_level_pages')->updateOrInsert([...]);
+}
+```
+
+### Benefícios da Correção
+- ✅ Previne erros de foreign key constraint
+- ✅ Valida 3 foreign keys antes de inserir
+- ✅ Logs informativos para debug
+- ✅ Seeds executam sem falhas
+
+---
 
 ---
 
@@ -312,8 +336,8 @@ if ($employee) {
 
 ### 🔴 PRIORIDADE CRÍTICA (Fazer Agora)
 1. ✅ **EmploymentContractSeeder** - JÁ CORRIGIDO
-2. ❌ **StoreSeeder** - Verificar manager_id/supervisor_id
-3. ❌ **AccessLevelPageSeeder** - Verificar menu_id, access_level_id, page_id
+2. ✅ **AccessLevelPageSeeder** - JÁ CORRIGIDO
+3. ❌ **StoreSeeder** - Verificar manager_id/supervisor_id
 
 ### 🟠 PRIORIDADE ALTA (Fazer em 1 semana)
 4. ❌ **PageSeeder** - Verificar page_group_id
@@ -345,21 +369,21 @@ Para cada seeder com foreign keys:
 | Seeder | Registros | Risco | Esforço |
 |--------|-----------|-------|---------|
 | EmploymentContractSeeder | 46 | ✅ Corrigido | 0h |
-| AccessLevelPageSeeder | 46 | 🔴 Alto | 2h |
+| AccessLevelPageSeeder | 46 | ✅ Corrigido | 0h |
 | StoreSeeder | 26 | 🔴 Muito Alto | 3h |
 | PageSeeder | 93 | 🟠 Médio | 1h |
 | PositionSeeder | 85 | 🟡 Baixo | 1h |
 | EmployeeSeeder | ? | ⚠️ Verificar | 2h |
 
-**Total Estimado:** ~9 horas de desenvolvimento
+**Total Estimado:** ~7 horas de desenvolvimento
 
 ---
 
 ## CONCLUSÃO
 
-Foram identificados **múltiplos seeders com potencial de violação de foreign key**. A correção do `EmploymentContractSeeder` estabelece um padrão que deve ser replicado em todos os seeders com foreign keys.
+Foram identificados **5 seeders com potencial de violação de foreign key**. Até o momento, **2 seeders foram corrigidos** (`EmploymentContractSeeder` e `AccessLevelPageSeeder`), estabelecendo um padrão de validação que deve ser replicado nos seeders restantes.
 
-**Recomendação:** Aplicar verificação condicional de foreign keys em todos os seeders listados, priorizando `StoreSeeder` e `AccessLevelPageSeeder`.
+**Recomendação:** Aplicar verificação condicional de foreign keys nos 3 seeders pendentes, priorizando `StoreSeeder` (risco muito alto) seguido de `PageSeeder` e `PositionSeeder`.
 
 ---
 
