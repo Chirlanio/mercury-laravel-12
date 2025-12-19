@@ -25,6 +25,7 @@ class MenuService
             'nivel-acesso/listar' => '/access-levels',
             'users-online/list' => '/users-online',
             'employees/list' => '/employees',
+            'employees/index' => '/employees',
 
             // Páginas e Menus
             'pagina/listar' => '/pages',
@@ -164,86 +165,67 @@ class MenuService
             return [];
         }
 
+        // Simplificado para sempre usar a mesma lógica correta para todos os usuários.
         return self::getMenuForAccessLevel($user->accessLevel->id);
     }
 
     /**
-     * Retorna estrutura de menu para um nível de acesso específico
-     * Equivalente ao método itemMenu() do projeto original
+     * Retorna estrutura de menu para um nível de acesso específico, ignorando parent_id
+     * e usando access_level_pages como única fonte de verdade.
      *
      * @param int $accessLevelId
      * @return array
      */
     public static function getMenuForAccessLevel(int $accessLevelId): array
     {
+        // 1. Busca todos os itens de página/menu permitidos, visíveis no menu, para o nível de acesso.
         $menuItems = AccessLevelPage::query()
             ->where('access_level_id', $accessLevelId)
             ->where('permission', true)
-            ->where('lib_menu', true)
-            ->with(['menu' => fn($q) => $q->where('is_active', true), 'page' => fn($q) => $q->where('is_active', true)])
+            ->where('lib_menu', true) // Garante que só itens marcados para menu apareçam
+            ->with(['menu' => fn ($q) => $q->where('is_active', true), 'page' => fn ($q) => $q->where('is_active', true)])
             ->get()
-            ->filter(fn($item) => $item->menu && $item->page);
+            // 2. Filtra itens que não tenham um menu ou página válida associada.
+            ->filter(fn ($item) => $item->menu && $item->page);
 
-        $accessibleMenuIds = $menuItems->pluck('menu.id')->unique()->toArray();
-        $allMenuIds = self::fetchAllParentMenuIds($accessibleMenuIds);
-        $allMenus = Menu::whereIn('id', $allMenuIds)->orderBy('order')->get();
-
+        // 3. Agrupa as páginas encontradas pelo ID do menu pai.
         $menuItemsByMenuId = $menuItems->groupBy('menu_id');
 
         $menuStructure = [];
-        foreach ($allMenus as $menu) {
-            $items = $menuItemsByMenuId->get($menu->id, collect());
-            $mapItemFunc = fn($item) => [
-                'id' => $item->page->id,
-                'name' => $item->page->page_name,
-                'route' => self::convertRoute($item->page->menu_controller . '/' . $item->page->menu_method),
-                'icon' => $item->page->icon,
-                'order' => $item->order,
-            ];
 
-            $menuStructure[$menu->id] = [
-                'id' => $menu->id,
-                'name' => $menu->name,
-                'icon' => $menu->icon,
-                'order' => $menu->order,
-                'parent_id' => $menu->parent_id,
-                'direct_items' => $items->where('dropdown', false)->map($mapItemFunc)->sortBy('order')->values()->all(),
-                'dropdown_items' => $items->where('dropdown', true)->map($mapItemFunc)->sortBy('order')->values()->all(),
-            ];
-        }
+        // 4. Itera sobre os grupos para construir a estrutura final.
+        foreach ($menuItemsByMenuId as $menuId => $items) {
+            $menu = $items->first()->menu;
+            if (!$menu) continue;
 
-        foreach ($menuStructure as $menuId => &$menu) {
-            if ($menu['parent_id'] && isset($menuStructure[$menu['parent_id']])) {
-                $menuStructure[$menu['parent_id']]['dropdown_items'][] = &$menu;
+            // 5. Particiona os itens em 'dropdown' (true) e 'direct' (false).
+            [$dropdownItems, $directItems] = $items->partition(fn ($item) => $item->dropdown);
+
+            $mapItemFunc = function ($item) {
+                return [
+                    'id' => $item->page->id,
+                    'name' => $item->page->page_name,
+                    'route' => self::convertRoute($item->page->menu_controller . '/' . $item->page->menu_method),
+                    'icon' => $item->page->icon,
+                    'order' => $item->order,
+                ];
+            };
+
+            // Adiciona à estrutura somente se houver itens
+            if ($directItems->isNotEmpty() || $dropdownItems->isNotEmpty()) {
+                $menuStructure[] = [
+                    'id' => $menu->id,
+                    'name' => $menu->name,
+                    'icon' => $menu->icon,
+                    'order' => $menu->order,
+                    'direct_items' => $directItems->map($mapItemFunc)->sortBy('order')->values()->all(),
+                    'dropdown_items' => $dropdownItems->map($mapItemFunc)->sortBy('order')->values()->all(),
+                ];
             }
         }
 
-        $topLevelMenus = [];
-        foreach ($menuStructure as $menu) {
-            if (!$menu['parent_id']) {
-                $topLevelMenus[] = $menu;
-            }
-        }
-
-        foreach($topLevelMenus as &$menu) {
-            if(!empty($menu['dropdown_items'])) {
-                $menu['dropdown_items'] = collect($menu['dropdown_items'])->sortBy('order')->values()->all();
-            }
-        }
-
-        return collect($topLevelMenus)->sortBy('order')->values()->toArray();
-    }
-
-    private static function fetchAllParentMenuIds(array $menuIds): array
-    {
-        $allMenuIds = $menuIds;
-        $parentIds = Menu::whereIn('id', $menuIds)->whereNotNull('parent_id')->pluck('parent_id')->unique()->toArray();
-
-        if (count($parentIds) > 0) {
-            $allMenuIds = array_merge($allMenuIds, self::fetchAllParentMenuIds($parentIds));
-        }
-
-        return array_unique($allMenuIds);
+        // 7. Ordena os menus principais e retorna a estrutura final.
+        return collect($menuStructure)->sortBy('order')->values()->toArray();
     }
 
 
@@ -318,78 +300,5 @@ class MenuService
             ->get()
             ->pluck('page')
             ->filter(); // Remove nulls
-    }
-
-    public static function getSuperAdminMenu(): array
-    {
-        $allMenus = Menu::active()->ordered()->get()->keyBy('id');
-        
-        $allPageLinks = AccessLevelPage::select('menu_id', 'page_id', 'dropdown', 'order')
-            ->get()
-            ->unique(function ($item) {
-                return $item['menu_id'] . '-' . $item['page_id'];
-            });
-            
-        $allPages = Page::active()->whereIn('id', $allPageLinks->pluck('page_id'))->get()->keyBy('id');
-        
-        $menuStructure = [];
-        foreach($allMenus as $menu) {
-            $menuStructure[$menu->id] = [
-                'id' => $menu->id,
-                'name' => $menu->name,
-                'icon' => $menu->icon,
-                'order' => $menu->order,
-                'parent_id' => $menu->parent_id,
-                'direct_items' => [],
-                'dropdown_items' => [],
-            ];
-        }
-        
-        foreach($allPageLinks as $link) {
-            if(isset($menuStructure[$link->menu_id]) && isset($allPages[$link->page_id])) {
-                $page = $allPages[$link->page_id];
-                $item = [
-                    'id' => $page->id,
-                    'name' => $page->page_name,
-                    'route' => self::convertRoute($page->menu_controller . '/' . $page->menu_method),
-                    'icon' => $page->icon,
-                    'order' => $link->order,
-                ];
-                
-                if($link->dropdown) {
-                    $menuStructure[$link->menu_id]['dropdown_items'][] = $item;
-                } else {
-                    $menuStructure[$link->menu_id]['direct_items'][] = $item;
-                }
-            }
-        }
-
-        foreach($menuStructure as &$menu) {
-            $menu['direct_items'] = collect($menu['direct_items'])->unique('id')->sortBy('order')->values()->all();
-            $menu['dropdown_items'] = collect($menu['dropdown_items'])->unique('id')->sortBy('order')->values()->all();
-        }
-        
-        // Now build the hierarchy
-        foreach ($menuStructure as $menuId => &$menu) {
-            if ($menu['parent_id'] && isset($menuStructure[$menu['parent_id']])) {
-                $menuStructure[$menu['parent_id']]['dropdown_items'][] = &$menu;
-            }
-        }
-
-        $topLevelMenus = [];
-        foreach ($menuStructure as $menu) {
-            if (!$menu['parent_id']) {
-                $topLevelMenus[] = $menu;
-            }
-        }
-        
-        // Sort dropdown items by order
-        foreach($topLevelMenus as &$menu) {
-            if(!empty($menu['dropdown_items'])) {
-                $menu['dropdown_items'] = collect($menu['dropdown_items'])->sortBy('order')->values()->all();
-            }
-        }
-
-        return collect($topLevelMenus)->sortBy('order')->values()->toArray();
     }
 }

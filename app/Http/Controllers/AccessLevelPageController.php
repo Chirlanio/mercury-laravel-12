@@ -88,25 +88,22 @@ class AccessLevelPageController extends Controller
             'pages.*.lib_menu' => 'boolean',
         ]);
 
-        // Remover todas as permissões existentes para este access level + menu
-        AccessLevelPage::where('access_level_id', $accessLevel->id)
-            ->where('menu_id', $menu->id)
-            ->delete();
-
-        // Inserir novas permissões (somente para páginas com permission = true)
         foreach ($validated['pages'] as $pageData) {
-            // Só criar registro se a permissão estiver ativada
-            if ($pageData['permission'] ?? false) {
-                AccessLevelPage::create([
+            AccessLevelPage::updateOrCreate(
+                [
+                    // Chaves para encontrar o registro
                     'access_level_id' => $accessLevel->id,
                     'menu_id' => $menu->id,
                     'page_id' => $pageData['page_id'],
-                    'permission' => true,
+                ],
+                [
+                    // Valores para atualizar ou criar
+                    'permission' => $pageData['permission'] ?? false,
                     'order' => $pageData['order'],
                     'dropdown' => $pageData['dropdown'] ?? false,
-                    'lib_menu' => $pageData['lib_menu'] ?? true,
-                ]);
-            }
+                    'lib_menu' => $pageData['lib_menu'] ?? false, // Usar false como padrão seguro
+                ]
+            );
         }
 
         return back()->with('success', 'Permissões atualizadas com sucesso!');
