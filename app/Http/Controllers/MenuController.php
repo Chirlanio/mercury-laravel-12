@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Menu;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class MenuController extends Controller
@@ -237,19 +238,9 @@ class MenuController extends Controller
         }
 
         try {
-            if ($user->isSuperAdmin()) {
-                $menuStructure = \App\Services\MenuService::getSuperAdminMenu();
-            } else {
-                if (!$user->access_level_id) {
-                    return response()->json([
-                        'main' => [],
-                        'hr' => [],
-                        'utility' => [],
-                        'system' => [],
-                    ]);
-                }
-                $menuStructure = \App\Services\MenuService::getMenuForAccessLevel($user->access_level_id);
-            }
+            // Lógica unificada: sempre usa getMenuForUser, que contém a lógica correta para todos os níveis de acesso.
+            // A diferenciação de permissões é tratada pelo serviço, não pelo controlador.
+            $menuStructure = \App\Services\MenuService::getMenuForUser($user->id);
 
             $menuGroups = [
                 'main' => [],
@@ -279,7 +270,7 @@ class MenuController extends Controller
 
             return response()->json($menuGroups);
         } catch (\Exception $e) {
-            \Log::error('Erro ao carregar menus dinâmicos: ' . $e->getMessage());
+            Log::error('Erro ao carregar menus dinâmicos: ' . $e->getMessage());
             return response()->json([
                 'main' => [],
                 'hr' => [],

@@ -218,7 +218,7 @@ class AccessLevelController extends Controller
                 'menu_name' => $permission && $permission->menu ? $permission->menu->name : null,
                 'dropdown' => $permission ? $permission->dropdown : false,
                 'lib_menu' => $permission ? $permission->lib_menu : false,
-                'order' => $permission ? $permission->order : 0,
+                'order' => $permission ? $permission->order : 999,
             ];
         }
 
@@ -253,6 +253,10 @@ class AccessLevelController extends Controller
             'permissions' => 'required|array',
             'permissions.*.page_id' => 'required|exists:pages,id',
             'permissions.*.has_permission' => 'required|boolean',
+            'permissions.*.order' => 'required|integer',
+            'permissions.*.dropdown' => 'required|boolean',
+            'permissions.*.lib_menu' => 'required|boolean',
+            'permissions.*.menu_id' => 'nullable|exists:menus,id',
         ]);
 
         DB::beginTransaction();
@@ -266,7 +270,7 @@ class AccessLevelController extends Controller
                     ],
                     [
                         'permission' => $permission['has_permission'],
-                        'order' => $permission['order'] ?? 0,
+                        'order' => $permission['order'] ?? 999,
                         'dropdown' => $permission['dropdown'] ?? false,
                         'lib_menu' => $permission['lib_menu'] ?? false,
                         'menu_id' => $permission['menu_id'] ?? null,

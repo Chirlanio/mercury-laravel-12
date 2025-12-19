@@ -127,11 +127,11 @@ export default function Permissions({ auth, accessLevel, pages, menus, stats }) 
 
         const formattedPermissions = Object.keys(permissions).map(pageId => ({
             page_id: parseInt(pageId),
-            has_permission: permissions[pageId].has_permission,
+            has_permission: permissions[pageId].has_permission || false,
             menu_id: permissions[pageId].menu_id || null,
-            dropdown: permissions[pageId].dropdown,
-            lib_menu: permissions[pageId].lib_menu,
-            order: permissions[pageId].order || 0,
+            dropdown: permissions[pageId].dropdown || false,
+            lib_menu: permissions[pageId].lib_menu || false,
+            order: permissions[pageId].order || 999,
         }));
 
         router.post(route('access-levels.permissions.update', accessLevel.id), {

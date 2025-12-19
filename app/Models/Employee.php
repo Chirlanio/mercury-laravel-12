@@ -52,16 +52,22 @@ class Employee extends Model
     /**
      * Get employee age
      */
-    public function getAgeAttribute(): int
+    public function getAgeAttribute(): ?int
     {
+        if (!$this->birth_date) {
+            return null;
+        }
         return $this->birth_date->age;
     }
 
     /**
      * Get years of service
      */
-    public function getYearsOfServiceAttribute(): int
+    public function getYearsOfServiceAttribute(): ?int
     {
+        if (!$this->admission_date) {
+            return null;
+        }
         $endDate = $this->dismissal_date ?? Carbon::now();
         return $this->admission_date->diffInYears($endDate);
     }
@@ -109,6 +115,9 @@ class Employee extends Model
      */
     public function getInitials(): string
     {
+        if (empty($this->name)) {
+            return '';
+        }
         $words = explode(' ', $this->name);
         $initials = '';
 
