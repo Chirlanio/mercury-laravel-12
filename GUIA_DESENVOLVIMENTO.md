@@ -140,34 +140,36 @@ O **Mercury Laravel** é um sistema de gestão empresarial full-stack desenvolvi
 
 ### 3.2 TABELAS DO LEGADO NÃO MIGRADAS (Por Categoria)
 
-#### 3.2.1 Módulo Financeiro (23 tabelas)
+#### 3.2.1 Área Financeiro (23 tabelas)
 ```
 ❌ adms_accounting_account      - Plano de contas
 ❌ adms_banks                   - Bancos
 ❌ adms_cost_centers            - Centros de custo
 ❌ adms_installments            - Parcelas
 ❌ adms_order_payments          - Pagamentos de pedidos
+❌ adms_sits_order_payments     - Status pagamentos
 ❌ adms_payment_methods         - Formas de pagamento
-❌ adms_coupons                 - Cupons
-❌ adms_daily_sales             - Vendas diárias
-❌ adms_total_sales             - Total de vendas
 ❌ adms_estornos                - Estornos
 ❌ adms_aud_estornos            - Auditoria de estornos
 ❌ adms_motivo_estorno          - Motivos de estorno
 ❌ adms_tps_estornos            - Tipos de estornos
 ❌ adms_sits_estornos           - Status de estornos
-❌ adms_adjustments             - Ajustes
-❌ adms_adjustment_items        - Itens de ajuste
-❌ adms_status_adjustments      - Status de ajustes
 ❌ adms_travel_expenses         - Despesas de viagem
 ❌ adms_travel_expense_reimbursements - Reembolsos
 ❌ adms_sit_travel_expenses     - Status despesas
 ❌ adms_type_expenses           - Tipos de despesas
 ❌ adms_type_key_pixs           - Chaves PIX
 ❌ adms_type_payments           - Tipos de pagamento
+❌ adms_returns                 - Devoluções
+❌ adms_return_items            - Itens devolução
+❌ adms_return_observations     - Observações devolução
+❌ adms_return_reasons          - Razões devolução
+❌ adms_sits_returns            - Status devolução
+❌ adms_budgets_items           - Itens de orçamento
+❌ adms_budgets_uploads         - Uploads de orçamento
 ```
 
-#### 3.2.2 Módulo Comercial/Vendas (18 tabelas)
+#### 3.2.2 Área Comercial/Vendas (18 tabelas)
 ```
 ❌ adms_consignments            - Consignações
 ❌ adms_consignment_products    - Produtos em consignação
@@ -176,20 +178,19 @@ O **Mercury Laravel** é um sistema de gestão empresarial full-stack desenvolvi
 ❌ adms_store_consultants_goals - Metas de consultores
 ❌ adms_store_goals             - Metas de lojas
 ❌ adms_percentage_awards       - Premiações percentuais
-❌ adms_suppliers               - Fornecedores
-❌ adms_brands_suppliers        - Marcas/Fornecedores
-❌ adms_marcas                  - Marcas
-❌ adms_categories              - Categorias
-❌ adms_product_types           - Tipos de produtos
-❌ adms_type_products           - Tipos de produtos (dup?)
-❌ adms_purchase_order_controls - Controle de compras
-❌ adms_purchase_order_control_items - Itens de compras
-❌ adms_budgets_items           - Itens de orçamento
-❌ adms_budgets_uploads         - Uploads de orçamento
 ❌ tb_cad_produtos              - Cadastro de produtos
+❌ adms_daily_sales             - Vendas diárias
+❌ adms_total_sales             - Total de vendas
+❌ adms_checklists              - Checklists
+❌ adms_checklist_answers       - Respostas checklist
+❌ adms_checklist_answer_attachments - Anexos respostas
+❌ adms_checklist_areas         - Áreas checklist
+❌ adms_checklist_questions     - Perguntas checklist
+❌ adms_sit_check_lists         - Status check lists
+❌ adms_sit_check_list_questions - Status perguntas
 ```
 
-#### 3.2.3 Módulo Delivery/Logística (16 tabelas)
+#### 3.2.3 Área Delivery (16 tabelas)
 ```
 ❌ adms_deliveries              - Entregas
 ❌ adms_delivery_routing        - Roteamento de entregas
@@ -204,21 +205,19 @@ O **Mercury Laravel** é um sistema de gestão empresarial full-stack desenvolvi
 ❌ tb_status_delivery           - Status delivery (legado)
 ❌ tb_ponto_saida               - Pontos de saída
 ❌ aud_tb_delivery              - Auditoria delivery
-❌ adms_transfers               - Transferências
-❌ adms_transfer_types          - Tipos de transferência
-❌ adms_status_transfers        - Status de transferências
 ```
 
-#### 3.2.4 Módulo E-commerce (5 tabelas)
+#### 3.2.4 Área E-commerce (5 tabelas)
 ```
 ❌ adms_ecommerce_orders        - Pedidos e-commerce
 ❌ adms_sits_ecommerce          - Status e-commerce
 ❌ adms_sits_orders             - Status de pedidos
 ❌ adms_sits_order_items        - Status itens pedido
-❌ adms_sits_order_payments     - Status pagamentos
+❌ adms_coupons                 - Cupons
+❌ adms_social_media            - Redes sociais
 ```
 
-#### 3.2.5 Módulo RH/Pessoas (25 tabelas)
+#### 3.2.5 Área RH/Pessoas (25 tabelas)
 ```
 ❌ adms_absence_control         - Controle de ausências
 ❌ adms_dismissal_follow_up     - Acompanhamento demissão
@@ -244,30 +243,9 @@ O **Mercury Laravel** é um sistema de gestão empresarial full-stack desenvolvi
 ❌ adms_sits_vacancy            - Status vagas
 ❌ adms_users_treinamentos      - Treinamentos usuários
 ❌ adms_work_schedules          - Escalas de trabalho
-❌ adms_social_media            - Redes sociais
 ```
 
-#### 3.2.6 Módulo Qualidade/Checklists (16 tabelas)
-```
-❌ adms_checklists              - Checklists
-❌ adms_checklist_answers       - Respostas checklist
-❌ adms_checklist_answer_attachments - Anexos respostas
-❌ adms_checklist_areas         - Áreas checklist
-❌ adms_checklist_questions     - Perguntas checklist
-❌ adms_check_lists             - Check lists
-❌ adms_check_list_areas        - Áreas check list
-❌ adms_check_list_questions    - Perguntas check list
-❌ adms_check_list_services     - Serviços check list
-❌ adms_check_list_stores       - Lojas check list
-❌ adms_sits_checklists         - Status checklists
-❌ adms_sit_check_lists         - Status check lists
-❌ adms_sit_check_list_questions - Status perguntas
-❌ adms_service_check_lists     - Check lists serviço
-❌ adms_service_check_list_areas - Áreas serviço
-❌ adms_service_check_list_questions - Perguntas serviço
-```
-
-#### 3.2.7 Módulo Ordem de Serviço (4 tabelas)
+#### 3.2.6 Área Qualidade/Ordem de Serviço (6 tabelas)
 ```
 ❌ adms_defeitos_ordem_servico  - Defeitos OS
 ❌ adms_def_local_ordem_servico - Local defeito OS
@@ -275,6 +253,10 @@ O **Mercury Laravel** é um sistema de gestão empresarial full-stack desenvolvi
 ❌ adms_qualidade_ordem_servico - Qualidade OS
 ❌ adms_tips_ordem_servico      - Tipos OS
 ❌ adms_sits_ordem_servico      - Status OS
+```
+
+#### 3.2.7 Área  (0 tabelas)
+```
 ```
 
 #### 3.2.8 Módulo Ativo Fixo (4 tabelas)
@@ -287,9 +269,6 @@ O **Mercury Laravel** é um sistema de gestão empresarial full-stack desenvolvi
 
 #### 3.2.9 Módulo Biblioteca/Processos (5 tabelas)
 ```
-❌ adms_artigos                 - Artigos
-❌ adms_cats_artigos            - Categorias artigos
-❌ adms_tps_artigos             - Tipos artigos
 ❌ adms_process_librarys        - Biblioteca processos
 ❌ adms_process_library_files   - Arquivos processos
 ❌ adms_cats_process_librarys   - Categorias processos
@@ -303,30 +282,18 @@ O **Mercury Laravel** é um sistema de gestão empresarial full-stack desenvolvi
 ❌ adms_materials               - Materiais
 ```
 
-#### 3.2.11 Módulo Devoluções/Relocações (8 tabelas)
-```
-❌ adms_returns                 - Devoluções
-❌ adms_return_items            - Itens devolução
-❌ adms_return_observations     - Observações devolução
-❌ adms_return_reasons          - Razões devolução
-❌ adms_relocations             - Relocações
-❌ adms_relocation_items        - Itens relocação
-❌ adms_status_relocations      - Status relocação
-❌ adms_sit_relocation_items    - Status itens relocação
-```
-
-#### 3.2.12 Módulo Chat (3 tabelas)
+#### 3.2.11 Módulo Chat (3 tabelas)
 ```
 ❌ adms_chat_conversations      - Conversas
 ❌ adms_chat_messages           - Mensagens
 ❌ adms_chat_typing_status      - Status digitação
 ```
 
-#### 3.2.13 Outros/Auxiliares (28 tabelas)
+#### 3.2.12 Outras Área/Auxiliares (28 tabelas)
 ```
 ❌ adms_areas                   - Áreas
 ❌ adms_bandeiras               - Bandeiras cartão
-❌ adms_boards                  - Quadros
+❌ adms_boards                  - Quadros de diretores
 ❌ adms_cfops                   - CFOPs
 ❌ adms_cors                    - Cores
 ❌ adms_ed_videos               - Vídeos educacionais
@@ -346,12 +313,37 @@ O **Mercury Laravel** é um sistema de gestão empresarial full-stack desenvolvi
 ❌ tb_cargos                    - Cargos (legado)
 ❌ tb_dashboards                - Dashboards (legado)
 ❌ tb_forma_pag                 - Formas pagamento (legado)
-❌ tb_funcionarios              - Funcionários (legado)
 ❌ tb_justificativas            - Justificativas (legado)
 ❌ tb_prateleira_infinita       - Prateleira infinita
 ❌ tb_status                    - Status (legado)
 ❌ tb_tam                       - Tamanhos
-❌ tb_transferencias            - Transferências (legado)
+```
+
+### 3.2.13 Área Planejamento/Logística (23 tabelas)
+```
+❌ adms_adjustments             - Ajustes de estoque
+❌ adms_adjustment_items        - Itens de ajuste
+❌ adms_status_adjustments      - Status de ajustes
+❌ adms_relocations             - Relocações
+❌ adms_relocation_items        - Itens relocação
+❌ adms_status_relocations      - Status relocação
+❌ adms_sit_relocation_items    - Status itens relocação
+❌ adms_suppliers               - Fornecedores
+❌ adms_brands_suppliers        - Marcas/Fornecedores
+❌ adms_marcas                  - Marcas
+❌ adms_categories              - Categorias
+❌ adms_product_types           - Tipos de produtos
+❌ adms_purchase_order_controls - Controle de compras
+❌ adms_purchase_order_control_items - Itens de compras
+❌ adms_transfers               - Transferências
+❌ adms_transfer_types          - Tipos de transferência
+❌ adms_status_transfers        - Status de transferências
+❌ adms_check_list_services     - Serviços check list
+❌ adms_check_list_stores       - Lojas check list
+❌ adms_sits_checklists         - Status checklists
+❌ adms_service_check_lists     - Check lists serviço
+❌ adms_service_check_list_areas - Áreas serviço
+❌ adms_service_check_list_questions - Perguntas serviço
 ```
 
 ### 3.3 Resumo da Migração
