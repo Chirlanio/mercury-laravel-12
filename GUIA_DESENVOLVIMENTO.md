@@ -382,7 +382,7 @@ O **Mercury Laravel** é um sistema de gestão empresarial full-stack desenvolvi
 
 **Dependências:**
 - Employees (já implementado)
-- Stores (já implementado)
+- Stores (pendente)
 
 #### 4.1.2 Módulo Comercial/Vendas
 **Complexidade:** Alta
@@ -397,7 +397,7 @@ O **Mercury Laravel** é um sistema de gestão empresarial full-stack desenvolvi
 - Premiações
 
 **Dependências:**
-- Stores (já implementado)
+- Stores (pendente)
 - Employees (já implementado)
 
 #### 4.1.3 Módulo Delivery/Logística
@@ -412,7 +412,7 @@ O **Mercury Laravel** é um sistema de gestão empresarial full-stack desenvolvi
 - Relatórios de logística
 
 **Dependências:**
-- Stores (já implementado)
+- Stores (pendente)
 - Products (pendente)
 
 ### 4.2 Média Prioridade
@@ -457,7 +457,7 @@ O **Mercury Laravel** é um sistema de gestão empresarial full-stack desenvolvi
 - Relatórios de conformidade
 
 **Dependências:**
-- Stores (já implementado)
+- Stores (pendente)
 - Employees (já implementado)
 
 ### 4.3 Baixa Prioridade

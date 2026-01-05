@@ -95,6 +95,7 @@ class MenuService
             'situacao-transf/listar' => '/transfer-statuses',
             'situacao-troca/listar' => '/exchange-statuses',
             'lojas/listar-lojas' => '/stores',
+            'stores/index' => '/stores',
             'cargo/listar-cargo' => '/positions',
             'bairro/listar' => '/neighborhoods',
             'rota/listar' => '/routes',
@@ -202,10 +203,16 @@ class MenuService
             [$dropdownItems, $directItems] = $items->partition(fn ($item) => $item->dropdown);
 
             $mapItemFunc = function ($item) {
+                // Usa o campo route diretamente se disponível, senão usa fallback para conversão legada
+                $route = $item->page->route;
+                if (empty($route)) {
+                    $route = self::convertRoute($item->page->menu_controller . '/' . $item->page->menu_method);
+                }
+
                 return [
                     'id' => $item->page->id,
                     'name' => $item->page->page_name,
-                    'route' => self::convertRoute($item->page->menu_controller . '/' . $item->page->menu_method),
+                    'route' => $route,
                     'icon' => $item->page->icon,
                     'order' => $item->order,
                 ];

@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\AccessLevel;
 use App\Models\AccessLevelPage;
+use App\Models\ColorTheme;
 use App\Models\Page;
 use App\Models\PageGroup;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class AccessLevelController extends Controller
@@ -72,8 +74,12 @@ class AccessLevelController extends Controller
             ->orderBy('order')
             ->get(['id', 'name', 'icon']);
 
+        // Buscar temas de cores para o formulário de criação
+        $colorThemes = ColorTheme::orderBy('name')->get(['id', 'name', 'color_class']);
+
         return Inertia::render('AccessLevels/Index', [
             'menus' => $menus,
+            'colorThemes' => $colorThemes,
             'accessLevels' => $accessLevels->through(function ($accessLevel) {
                 return [
                     'id' => $accessLevel->id,
@@ -121,8 +127,7 @@ class AccessLevelController extends Controller
     {
         $accessLevel->load('colorTheme', 'pages');
 
-        return Inertia::render('AccessLevels/Show', [
-            'accessLevel' => [
+        $accessLevelData = [
                 'id' => $accessLevel->id,
                 'name' => $accessLevel->name,
                 'order' => $accessLevel->order,
@@ -173,7 +178,16 @@ class AccessLevelController extends Controller
                         'menu_id' => $page->pivot->menu_id,
                     ];
                 }),
-            ],
+        ];
+
+        // Se for uma requisição AJAX, retornar JSON
+        if (request()->ajax() || request()->wantsJson() || request()->header('Accept') === 'application/json') {
+            return response()->json($accessLevelData);
+        }
+
+        // Caso contrário, retornar a view Inertia
+        return Inertia::render('AccessLevels/Show', [
+            'accessLevel' => $accessLevelData,
         ]);
     }
 
@@ -243,7 +257,7 @@ class AccessLevelController extends Controller
      */
     public function updatePermissions(Request $request, AccessLevel $accessLevel)
     {
-        \Log::info('Permissions Update Request', [
+        Log::info('Permissions Update Request', [
             'access_level_id' => $accessLevel->id,
             'headers' => $request->headers->all(),
             'has_csrf' => $request->header('X-CSRF-TOKEN') !== null,
@@ -291,5 +305,64 @@ class AccessLevelController extends Controller
                 ->back()
                 ->with('error', 'Erro ao atualizar permissões: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Store a newly created access level
+     */
+    public function store(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255|unique:access_levels,name',
+            'color_theme_id' => 'nullable|exists:color_themes,id',
+        ]);
+
+        // Obter a próxima ordem disponível
+        $maxOrder = AccessLevel::max('order') ?? 0;
+
+        $accessLevel = AccessLevel::create([
+            'name' => $request->name,
+            'order' => $maxOrder + 1,
+            'color_theme_id' => $request->color_theme_id,
+        ]);
+
+        return back()->with('success', 'Nivel de acesso criado com sucesso!');
+    }
+
+    /**
+     * Update an existing access level
+     */
+    public function update(Request $request, AccessLevel $accessLevel)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255|unique:access_levels,name,' . $accessLevel->id,
+            'color_theme_id' => 'nullable|exists:color_themes,id',
+            'order' => 'nullable|integer|min:1',
+        ]);
+
+        $accessLevel->update([
+            'name' => $request->name,
+            'color_theme_id' => $request->color_theme_id,
+            'order' => $request->order ?? $accessLevel->order,
+        ]);
+
+        return back()->with('success', 'Nivel de acesso atualizado com sucesso!');
+    }
+
+    /**
+     * Delete an access level
+     */
+    public function destroy(AccessLevel $accessLevel)
+    {
+        // Verificar se há usuários vinculados a este nível de acesso
+        // Nota: você pode querer adicionar essa verificação dependendo da estrutura do seu banco
+
+        // Remover todas as permissões associadas
+        $accessLevel->accessLevelPages()->delete();
+
+        // Remover o nível de acesso
+        $accessLevel->delete();
+
+        return back()->with('success', 'Nivel de acesso excluido com sucesso!');
     }
 }
