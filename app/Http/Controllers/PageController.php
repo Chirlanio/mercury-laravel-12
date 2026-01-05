@@ -276,4 +276,14 @@ class PageController extends Controller
 
         return back()->with('success', 'Página atualizada com sucesso!');
     }
+
+    public function destroy(Page $page)
+    {
+        // Remover permissões vinculadas antes de excluir a página
+        $page->accessLevelPages()->delete();
+
+        $page->delete();
+
+        return redirect()->route('pages.index')->with('success', 'Página excluída com sucesso!');
+    }
 }

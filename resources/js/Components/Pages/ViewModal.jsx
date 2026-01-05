@@ -2,7 +2,7 @@ import Modal from '@/Components/Modal';
 
 export default function ViewModal({ show, onClose, selectedPage, getGroupBadge }) {
     return (
-        <Modal show={show} onClose={onClose} title={selectedPage?.page_name}>
+        <Modal show={show} onClose={onClose} title={selectedPage?.page_name} maxWidth="85vw">
             {selectedPage && <div className="space-y-6 p-6">
                 {/* Informações Básicas */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
