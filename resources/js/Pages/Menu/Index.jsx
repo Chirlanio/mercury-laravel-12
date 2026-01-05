@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import DataTable from '@/Components/DataTable';
 import Button from '@/Components/Button';
+import Modal from '@/Components/Modal';
 import GenericDetailModal from '@/Components/GenericDetailModal';
 import GenericFormModal from '@/Components/GenericFormModal';
 import { Head, router } from '@inertiajs/react';
@@ -11,8 +12,10 @@ export default function Index({ auth, menus = { data: [], links: [] }, types = {
     const [showViewModal, setShowViewModal] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [selectedMenuId, setSelectedMenuId] = useState(null);
     const [selectedMenu, setSelectedMenu] = useState(null);
+    const [deleting, setDeleting] = useState(false);
 
     const handleToggleStatus = async (menuId, currentStatus) => {
         const action = currentStatus ? 'desativar' : 'ativar';
@@ -42,6 +45,32 @@ export default function Index({ auth, menus = { data: [], links: [] }, types = {
             onFinish: () => setProcessing(false),
             preserveScroll: true,
         });
+    };
+
+    const handleDeleteClick = (menu) => {
+        setSelectedMenu(menu);
+        setShowDeleteModal(true);
+    };
+
+    const handleConfirmDelete = () => {
+        if (!selectedMenu) return;
+
+        setDeleting(true);
+        router.delete(`/menus/${selectedMenu.id}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowDeleteModal(false);
+                setSelectedMenu(null);
+            },
+            onFinish: () => {
+                setDeleting(false);
+            },
+        });
+    };
+
+    const handleCancelDelete = () => {
+        setShowDeleteModal(false);
+        setSelectedMenu(null);
     };
 
     const getTypeBadge = (menu) => {
@@ -264,6 +293,12 @@ export default function Index({ auth, menus = { data: [], links: [] }, types = {
         'fas fa-clock',
     ];
 
+    // Converter tipos para opções de select
+    const typeOptions = Object.entries(types).map(([value, label]) => ({
+        value,
+        label
+    }));
+
     // Configuração do formulário de criação e edição
     const formSections = [
         {
@@ -284,6 +319,15 @@ export default function Index({ auth, menus = { data: [], links: [] }, types = {
                     required: true,
                     defaultValue: nextOrder,
                     helperText: 'Ordem de exibição no menu',
+                },
+                {
+                    name: 'type',
+                    label: 'Tipo de Menu',
+                    type: 'select',
+                    required: true,
+                    defaultValue: 'main',
+                    options: typeOptions,
+                    helperText: 'Categoria do menu na sidebar',
                 },
             ],
         },
@@ -492,6 +536,22 @@ export default function Index({ auth, menus = { data: [], links: [] }, types = {
                         )}
                         title={menu.is_active ? 'Desativar' : 'Ativar'}
                     />
+                    <Button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClick(menu);
+                        }}
+                        disabled={processing}
+                        variant="danger"
+                        size="sm"
+                        iconOnly={true}
+                        icon={({ className }) => (
+                            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        )}
+                        title="Excluir menu"
+                    />
                 </div>
             )
         }
@@ -662,6 +722,67 @@ export default function Index({ auth, menus = { data: [], links: [] }, types = {
                     )}
                 />
             )}
+
+            {/* Modal de Confirmação de Exclusão */}
+            <Modal
+                show={showDeleteModal}
+                onClose={handleCancelDelete}
+                title="Confirmar Exclusão"
+                maxWidth="md"
+            >
+                <div className="p-6">
+                    <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+                                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div className="ml-4">
+                            <h3 className="text-lg font-medium text-gray-900">
+                                Excluir Item de Menu
+                            </h3>
+                            <div className="mt-2">
+                                <p className="text-sm text-gray-500">
+                                    Tem certeza que deseja excluir o menu <strong>{selectedMenu?.name}</strong>?
+                                    Esta ação não pode ser desfeita.
+                                </p>
+                                {selectedMenu && (
+                                    <div className="mt-3 flex items-center gap-2 p-3 bg-gray-50 rounded">
+                                        {selectedMenu.icon && (
+                                            <i className={`${selectedMenu.icon} text-gray-600`}></i>
+                                        )}
+                                        <span className="text-sm font-medium text-gray-700">{selectedMenu.name}</span>
+                                        <span className={`ml-auto inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${getTypeBadge(selectedMenu).color}`}>
+                                            {getTypeBadge(selectedMenu).label}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 flex justify-end space-x-3">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={handleCancelDelete}
+                            disabled={deleting}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="danger"
+                            onClick={handleConfirmDelete}
+                            disabled={deleting}
+                        >
+                            {deleting ? 'Excluindo...' : 'Excluir'}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </AuthenticatedLayout>
     );
 }

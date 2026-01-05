@@ -68,6 +68,7 @@ class MenuController extends Controller
                     'name' => $menu->name,
                     'icon' => $menu->icon,
                     'order' => $menu->order,
+                    'type' => $menu->type,
                     'is_active' => $menu->is_active,
                     'created_at' => $menu->created_at,
                     'updated_at' => $menu->updated_at,
@@ -98,6 +99,7 @@ class MenuController extends Controller
             'order' => 'required|integer|min:1',
             'parent_id' => 'nullable|exists:menus,id',
             'is_active' => 'boolean',
+            'type' => 'required|in:main,hr,utility,system',
         ]);
 
         // Se não foi especificado is_active, definir como true por padrão
@@ -116,6 +118,7 @@ class MenuController extends Controller
             'order' => 'required|integer|min:1',
             'parent_id' => 'nullable|exists:menus,id',
             'is_active' => 'boolean',
+            'type' => 'required|in:main,hr,utility,system',
         ]);
 
         // Validar que o menu não seja seu próprio pai
@@ -135,6 +138,7 @@ class MenuController extends Controller
             'name' => $menu->name,
             'icon' => $menu->icon,
             'order' => $menu->order,
+            'type' => $menu->type,
             'parent_id' => $menu->parent_id,
             'is_active' => $menu->is_active,
             'created_at' => $menu->created_at,
@@ -202,6 +206,18 @@ class MenuController extends Controller
         Menu::reorderMenus($request->menu_ids);
 
         return back()->with('success', 'Ordem dos menus atualizada com sucesso!');
+    }
+
+    public function destroy(Menu $menu)
+    {
+        // Verificar se o menu tem filhos
+        if ($menu->allChildren()->count() > 0) {
+            return back()->withErrors(['delete' => 'Não é possível excluir um menu que possui submenus. Exclua os submenus primeiro.']);
+        }
+
+        $menu->delete();
+
+        return redirect()->route('menus.index')->with('success', 'Menu excluído com sucesso!');
     }
 
     /**

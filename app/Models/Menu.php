@@ -17,6 +17,7 @@ class Menu extends Model
         'order',
         'is_active',
         'parent_id',
+        'type',
     ];
 
     protected $casts = [
@@ -85,48 +86,41 @@ class Menu extends Model
 
     public function getIsMainMenuAttribute(): bool
     {
-        return in_array($this->name, [
-            'Home', 'Usuário', 'Produto', 'Planejamento', 'Financeiro',
-            'Comercial', 'Delivery', 'E-commerce', 'Configurações'
-        ]);
+        return $this->type === 'main';
     }
 
     public function getIsUtilityMenuAttribute(): bool
     {
-        return in_array($this->name, [
-            'FAQ\'s', 'Movidesk', 'Biblioteca de Processos', 'Escola Digital'
-        ]);
+        return $this->type === 'utility';
     }
 
     public function getIsHrMenuAttribute(): bool
     {
-        return in_array($this->name, [
-            'Pessoas & Cultura', 'Departamento Pessoal'
-        ]);
+        return $this->type === 'hr';
     }
 
     public function getIsSystemMenuAttribute(): bool
     {
-        return in_array($this->name, ['Dashboard\'s', 'Qualidade', 'Sair']);
+        return $this->type === 'system';
     }
 
     public static function getGroupedOptions(): array
     {
         return [
             'Menu Principal' => static::active()
-                ->whereIn('name', ['Home', 'Usuário', 'Produto', 'Planejamento', 'Financeiro', 'Comercial', 'Delivery', 'E-commerce'])
+                ->where('type', 'main')
                 ->orderBy('order')
                 ->pluck('name', 'id')->toArray(),
             'Recursos Humanos' => static::active()
-                ->whereIn('name', ['Pessoas & Cultura', 'Departamento Pessoal'])
+                ->where('type', 'hr')
                 ->orderBy('order')
                 ->pluck('name', 'id')->toArray(),
             'Utilidades' => static::active()
-                ->whereIn('name', ['FAQ\'s', 'Movidesk', 'Biblioteca de Processos', 'Escola Digital'])
+                ->where('type', 'utility')
                 ->orderBy('order')
                 ->pluck('name', 'id')->toArray(),
             'Sistema' => static::active()
-                ->whereIn('name', ['Dashboard\'s', 'Qualidade', 'Configurações', 'Sair'])
+                ->where('type', 'system')
                 ->orderBy('order')
                 ->pluck('name', 'id')->toArray(),
         ];
@@ -134,29 +128,22 @@ class Menu extends Model
 
     public function scopeMainMenu($query)
     {
-        return $query->whereIn('name', [
-            'Home', 'Usuário', 'Produto', 'Planejamento', 'Financeiro',
-            'Comercial', 'Delivery', 'E-commerce'
-        ]);
+        return $query->where('type', 'main');
     }
 
     public function scopeUtilityMenu($query)
     {
-        return $query->whereIn('name', [
-            'FAQ\'s', 'Movidesk', 'Biblioteca de Processos', 'Escola Digital'
-        ]);
+        return $query->where('type', 'utility');
     }
 
     public function scopeHrMenu($query)
     {
-        return $query->whereIn('name', [
-            'Pessoas & Cultura', 'Departamento Pessoal'
-        ]);
+        return $query->where('type', 'hr');
     }
 
     public function scopeSystemMenu($query)
     {
-        return $query->whereIn('name', ['Dashboard\'s', 'Qualidade', 'Configurações', 'Sair']);
+        return $query->where('type', 'system');
     }
 
     public static function getTypes(): array
