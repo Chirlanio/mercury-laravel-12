@@ -12,8 +12,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Alterar a coluna type para incluir 'compensar'
-        DB::statement("ALTER TABLE work_shifts MODIFY COLUMN type ENUM('abertura', 'fechamento', 'integral', 'compensar') NOT NULL");
+        $driver = DB::connection()->getDriverName();
+
+        // SQLite não suporta MODIFY COLUMN nem ENUM, mas aceita qualquer string
+        if ($driver !== 'sqlite') {
+            // MySQL: Alterar a coluna type para incluir 'compensar'
+            DB::statement("ALTER TABLE work_shifts MODIFY COLUMN type ENUM('abertura', 'fechamento', 'integral', 'compensar') NOT NULL");
+        }
     }
 
     /**
@@ -21,7 +26,11 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // Reverter para os valores originais
-        DB::statement("ALTER TABLE work_shifts MODIFY COLUMN type ENUM('abertura', 'fechamento', 'integral') NOT NULL");
+        $driver = DB::connection()->getDriverName();
+
+        if ($driver !== 'sqlite') {
+            // MySQL: Reverter para os valores originais
+            DB::statement("ALTER TABLE work_shifts MODIFY COLUMN type ENUM('abertura', 'fechamento', 'integral') NOT NULL");
+        }
     }
 };

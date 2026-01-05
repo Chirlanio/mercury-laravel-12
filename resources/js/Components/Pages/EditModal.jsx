@@ -124,6 +124,26 @@ export default function EditModal({ show, onClose, onSubmit, onCancel, data, set
                                 <p className="mt-1 text-sm text-red-600">{errors.menu_method}</p>
                             )}
                         </div>
+
+                        <div className="md:col-span-2">
+                            <label htmlFor="edit_route" className="block text-sm font-medium text-gray-700 mb-1">
+                                Rota Laravel *
+                            </label>
+                            <input
+                                id="edit_route"
+                                type="text"
+                                value={data.route}
+                                onChange={(e) => setData('route', e.target.value)}
+                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${errors.route ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'}`}
+                                placeholder="Ex: /users ou /stores"
+                            />
+                            <p className="mt-1 text-xs text-gray-500">
+                                A rota Laravel que sera usada no menu. Exemplo: /users, /stores, /employees
+                            </p>
+                            {errors.route && (
+                                <p className="mt-1 text-sm text-red-600">{errors.route}</p>
+                            )}
+                        </div>
                     </div>
                 </div>
 

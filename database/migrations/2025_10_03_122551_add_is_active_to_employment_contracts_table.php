@@ -17,15 +17,36 @@ return new class extends Migration
         });
 
         // Definir o contrato mais recente de cada funcionário como ativo
-        DB::statement('
-            UPDATE employment_contracts ec1
-            INNER JOIN (
-                SELECT employee_id, MAX(start_date) as max_date
-                FROM employment_contracts
-                GROUP BY employee_id
-            ) ec2 ON ec1.employee_id = ec2.employee_id AND ec1.start_date = ec2.max_date
-            SET ec1.is_active = 1
-        ');
+        // Using subquery approach that works with both MySQL and SQLite
+        $driver = DB::connection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            // SQLite-compatible query
+            DB::statement('
+                UPDATE employment_contracts
+                SET is_active = 1
+                WHERE id IN (
+                    SELECT ec1.id
+                    FROM employment_contracts ec1
+                    INNER JOIN (
+                        SELECT employee_id, MAX(start_date) as max_date
+                        FROM employment_contracts
+                        GROUP BY employee_id
+                    ) ec2 ON ec1.employee_id = ec2.employee_id AND ec1.start_date = ec2.max_date
+                )
+            ');
+        } else {
+            // MySQL-compatible query
+            DB::statement('
+                UPDATE employment_contracts ec1
+                INNER JOIN (
+                    SELECT employee_id, MAX(start_date) as max_date
+                    FROM employment_contracts
+                    GROUP BY employee_id
+                ) ec2 ON ec1.employee_id = ec2.employee_id AND ec1.start_date = ec2.max_date
+                SET ec1.is_active = 1
+            ');
+        }
     }
 
     /**

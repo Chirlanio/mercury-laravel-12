@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Store extends Model
 {
-    use HasFactory;
+    use HasFactory, Auditable;
 
     protected $table = 'stores';
 
@@ -61,6 +62,22 @@ class Store extends Model
     public function supervisor(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'supervisor_id');
+    }
+
+    /**
+     * Get the network for this store
+     */
+    public function network(): BelongsTo
+    {
+        return $this->belongsTo(Network::class);
+    }
+
+    /**
+     * Get the status for this store
+     */
+    public function status(): BelongsTo
+    {
+        return $this->belongsTo(Status::class);
     }
 
     /**

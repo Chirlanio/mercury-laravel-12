@@ -19,6 +19,7 @@ class Page extends Model
         'method',
         'menu_controller',
         'menu_method',
+        'route',
         'page_name',
         'notes',
         'is_public',
@@ -119,11 +120,17 @@ class Page extends Model
         return $query->orderBy('page_name', 'asc');
     }
 
-    public function getRouteAttribute(): string
+    /**
+     * Get the controller@method string (legacy format for display)
+     */
+    public function getControllerMethodAttribute(): string
     {
         return $this->controller . '@' . $this->method;
     }
 
+    /**
+     * Get the menu_controller@menu_method string (legacy format for display)
+     */
     public function getMenuRouteAttribute(): string
     {
         return $this->menu_controller . '@' . $this->menu_method;

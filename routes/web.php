@@ -10,6 +10,7 @@ use App\Http\Controllers\AccessLevelController;
 use App\Http\Controllers\AccessLevelPageController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\WorkShiftController;
+use App\Http\Controllers\StoreController;
 use App\Http\Controllers\Admin\EmailSettingsController;
 use App\Enums\Permission;
 use Illuminate\Foundation\Application;
@@ -192,6 +193,21 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
     // Visualizar nível de acesso específico
     Route::get('/access-levels/{accessLevel}', [AccessLevelController::class, 'show'])->name('access-levels.show');
 
+    // Criar nível de acesso
+    Route::post('/access-levels', [AccessLevelController::class, 'store'])
+        ->middleware('permission:' . Permission::CREATE_USERS->value)
+        ->name('access-levels.store');
+
+    // Atualizar nível de acesso
+    Route::put('/access-levels/{accessLevel}', [AccessLevelController::class, 'update'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('access-levels.update');
+
+    // Excluir nível de acesso
+    Route::delete('/access-levels/{accessLevel}', [AccessLevelController::class, 'destroy'])
+        ->middleware('permission:' . Permission::DELETE_USERS->value)
+        ->name('access-levels.destroy');
+
     // Gerenciar páginas de um menu para um nível de acesso
     Route::get('/access-levels/{accessLevel}/menus/{menu}/pages', [AccessLevelPageController::class, 'manage'])
         ->name('access-levels.menus.pages.manage');
@@ -305,6 +321,51 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
     Route::delete('/work-shifts/{workShift}', [WorkShiftController::class, 'destroy'])
         ->middleware('permission:' . Permission::DELETE_USERS->value)
         ->name('work-shifts.destroy');
+});
+
+// Rotas para lojas
+Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
+    // API para select de lojas
+    Route::get('/api/stores/select', [StoreController::class, 'getForSelect'])->name('stores.select');
+
+    // Listar lojas
+    Route::get('/stores', [StoreController::class, 'index'])->name('stores.index');
+
+    // Reordenar lojas (antes das rotas com parâmetro para evitar conflito)
+    Route::post('/stores/reorder', [StoreController::class, 'reorder'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('stores.reorder');
+
+    // Criar loja
+    Route::post('/stores', [StoreController::class, 'store'])
+        ->middleware('permission:' . Permission::CREATE_USERS->value)
+        ->name('stores.store');
+
+    // Visualizar loja específica
+    Route::get('/stores/{store}', [StoreController::class, 'show'])->name('stores.show');
+
+    // Editar loja
+    Route::get('/stores/{store}/edit', [StoreController::class, 'edit'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('stores.edit');
+
+    Route::match(['put', 'post'], '/stores/{store}', [StoreController::class, 'update'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('stores.update');
+
+    // Deletar loja
+    Route::delete('/stores/{store}', [StoreController::class, 'destroy'])
+        ->middleware('permission:' . Permission::DELETE_USERS->value)
+        ->name('stores.destroy');
+
+    // Ativar/Desativar loja
+    Route::post('/stores/{store}/activate', [StoreController::class, 'activate'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('stores.activate');
+
+    Route::post('/stores/{store}/deactivate', [StoreController::class, 'deactivate'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('stores.deactivate');
 });
 
 // Rotas para páginas básicas ainda não implementadas (placeholder)

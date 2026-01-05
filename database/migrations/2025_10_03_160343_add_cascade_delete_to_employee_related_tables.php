@@ -12,25 +12,38 @@ return new class extends Migration
      */
     public function up(): void
     {
+        $driver = DB::connection()->getDriverName();
+
         // Primeiro, limpar registros órfãos (contratos sem funcionário correspondente)
         DB::statement('
             DELETE FROM employment_contracts
             WHERE employee_id NOT IN (SELECT id FROM employees)
         ');
 
-        // Verificar e remover índice se existir
-        $indexExists = DB::select("
-            SELECT COUNT(*) as count
-            FROM information_schema.statistics
-            WHERE table_schema = DATABASE()
-            AND table_name = 'employment_contracts'
-            AND index_name = 'employment_contracts_employee_id_index'
-        ");
+        if ($driver === 'sqlite') {
+            // SQLite: tentar remover o índice se existir (ignora erro se não existir)
+            try {
+                Schema::table('employment_contracts', function (Blueprint $table) {
+                    $table->dropIndex(['employee_id']);
+                });
+            } catch (\Exception $e) {
+                // Index doesn't exist, continue
+            }
+        } else {
+            // MySQL: Verificar e remover índice se existir
+            $indexExists = DB::select("
+                SELECT COUNT(*) as count
+                FROM information_schema.statistics
+                WHERE table_schema = DATABASE()
+                AND table_name = 'employment_contracts'
+                AND index_name = 'employment_contracts_employee_id_index'
+            ");
 
-        if ($indexExists[0]->count > 0) {
-            Schema::table('employment_contracts', function (Blueprint $table) {
-                $table->dropIndex(['employee_id']);
-            });
+            if ($indexExists[0]->count > 0) {
+                Schema::table('employment_contracts', function (Blueprint $table) {
+                    $table->dropIndex(['employee_id']);
+                });
+            }
         }
 
         // Adicionar foreign key com cascade delete para employment_contracts
