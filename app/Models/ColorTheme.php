@@ -14,6 +14,7 @@ class ColorTheme extends Model
     protected $fillable = [
         'name',
         'color_class',
+        'hex_color',
     ];
 
     protected $casts = [
