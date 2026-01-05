@@ -149,6 +149,9 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
 
         // Reordenar menus
         Route::post('/menus/reorder', [MenuController::class, 'reorder'])->name('menus.reorder');
+
+        // Excluir menu
+        Route::delete('/menus/{menu}', [MenuController::class, 'destroy'])->name('menus.destroy');
     });
 });
 
