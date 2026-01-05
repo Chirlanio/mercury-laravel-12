@@ -11,6 +11,7 @@ use App\Http\Controllers\AccessLevelPageController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\WorkShiftController;
 use App\Http\Controllers\StoreController;
+use App\Http\Controllers\ColorThemeController;
 use App\Http\Controllers\Admin\EmailSettingsController;
 use App\Enums\Permission;
 use Illuminate\Foundation\Application;
@@ -366,6 +367,27 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
     Route::post('/stores/{store}/deactivate', [StoreController::class, 'deactivate'])
         ->middleware('permission:' . Permission::EDIT_USERS->value)
         ->name('stores.deactivate');
+});
+
+// Rotas para gerenciamento de temas de cores
+Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
+    // Listar temas de cores
+    Route::get('/color-themes', [ColorThemeController::class, 'index'])->name('color-themes.index');
+
+    // Criar tema de cor
+    Route::post('/color-themes', [ColorThemeController::class, 'store'])
+        ->middleware('permission:' . Permission::CREATE_USERS->value)
+        ->name('color-themes.store');
+
+    // Atualizar tema de cor
+    Route::put('/color-themes/{colorTheme}', [ColorThemeController::class, 'update'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('color-themes.update');
+
+    // Excluir tema de cor
+    Route::delete('/color-themes/{colorTheme}', [ColorThemeController::class, 'destroy'])
+        ->middleware('permission:' . Permission::DELETE_USERS->value)
+        ->name('color-themes.destroy');
 });
 
 // Rotas para páginas básicas ainda não implementadas (placeholder)

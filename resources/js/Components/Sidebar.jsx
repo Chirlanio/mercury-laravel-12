@@ -7,7 +7,6 @@ export default function Sidebar({ isOpen, onClose }) {
     const { url } = usePage();
     const { hasPermission } = usePermissions();
     const [menuGroups, setMenuGroups] = useState({});
-    const [expandedGroups, setExpandedGroups] = useState({});
     const [expandedSubmenus, setExpandedSubmenus] = useState({});
     const [loading, setLoading] = useState(true);
 
@@ -15,34 +14,16 @@ export default function Sidebar({ isOpen, onClose }) {
         fetchMenus();
     }, []);
 
+    // Expandir automaticamente o submenu que contém a rota ativa
     useEffect(() => {
         if (Object.keys(menuGroups).length > 0) {
-            let activeGroup = null;
-            let activeSubmenu = null;
-
-            for (const [groupKey, menus] of Object.entries(menuGroups)) {
+            for (const menus of Object.values(menuGroups)) {
                 for (const menu of menus) {
-                    const directItems = menu.direct_items || [];
                     const dropdownItems = menu.dropdown_items || [];
-
-                    const allItems = [...directItems, ...dropdownItems];
-
-                    if (allItems.some(item => item.route && url.startsWith(item.route))) {
-                        activeGroup = groupKey;
-                        // Apenas define um submenu ativo se o item ativo estiver no dropdown
-                        if (dropdownItems.some(item => item.route && url.startsWith(item.route))) {
-                            activeSubmenu = menu.id;
-                        }
-                        break;
+                    if (dropdownItems.some(item => item.route && url.startsWith(item.route))) {
+                        setExpandedSubmenus(prev => ({ ...prev, [menu.id]: true }));
+                        return;
                     }
-                }
-                if (activeGroup) break;
-            }
-
-            if (activeGroup) {
-                setExpandedGroups({ [activeGroup]: true });
-                if (activeSubmenu) {
-                    setExpandedSubmenus({ [activeSubmenu]: true });
                 }
             }
         }
@@ -82,38 +63,11 @@ export default function Sidebar({ isOpen, onClose }) {
         }
     };
 
-    const toggleGroup = (groupKey) => {
-        setExpandedGroups((prev) => ({
-            ...prev,
-            [groupKey]: !prev[groupKey],
-        }));
-    };
-
     const toggleSubmenu = (menuId) => {
         setExpandedSubmenus((prev) => ({
             ...prev,
             [menuId]: !prev[menuId],
         }));
-    };
-
-    const getGroupTitle = (groupKey) => {
-        const titles = {
-            main: "Menu Principal",
-            hr: "Recursos Humanos",
-            utility: "Utilidades",
-            system: "Sistema",
-        };
-        return titles[groupKey] || groupKey;
-    };
-
-    const getGroupColor = (groupKey) => {
-        const colors = {
-            main: "text-blue-600",
-            hr: "text-purple-600",
-            utility: "text-green-600",
-            system: "text-gray-600",
-        };
-        return colors[groupKey] || "text-gray-600";
     };
 
     const getMenuRoute = (menuName) => {
@@ -276,103 +230,76 @@ export default function Sidebar({ isOpen, onClose }) {
 
                 {/* Navigation */}
                 <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-                    {/* Menu Groups from API */}
-                    {Object.entries(menuGroups).map(
-                        ([groupKey, menus]) =>
-                            menus.length > 0 && (
-                                <div key={groupKey} className="mb-4">
-                                    {/* Group Header */}
-                                    <button
-                                        onClick={() => toggleGroup(groupKey)}
-                                        className="flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
-                                    >
-                                        <span
-                                            className={getGroupColor(groupKey)}
-                                        >
-                                            {getGroupTitle(groupKey)}
-                                        </span>
-                                        {expandedGroups[groupKey] ? (
-                                            <ChevronDownIcon className="h-4 w-4" />
-                                        ) : (
-                                            <ChevronRightIcon className="h-4 w-4" />
-                                        )}
-                                    </button>
+                    {/* Menu Items - Exibidos diretamente sem agrupamento */}
+                    {Object.values(menuGroups).flat().map((menu) => {
+                        const directItems = menu.direct_items || [];
+                        const dropdownItems = menu.dropdown_items || [];
+                        const hasDropdown = dropdownItems.length > 0;
 
-                                    {/* Group Items */}
-                                                                         {expandedGroups[groupKey] && (
-                                                                            <div className="ml-4 mt-1 space-y-1">
-                                                                                                                            {menus.map((menu) => {
-                                                                                                                                const directItems = menu.direct_items || [];
-                                                                                                                                const dropdownItems = menu.dropdown_items || [];
-                                                                                                                                const hasDropdown = dropdownItems.length > 0;
-                                                                                
-                                                                                                                                // Lógica de Ativação: O menu dropdown está ativo se um de seus filhos estiver ativo
-                                                                                                                                const isDropdownActive = hasDropdown && dropdownItems.some(item => item.route && url.startsWith(item.route));
-                                                                                
-                                                                                                                                return (
-                                                                                                                                    <div key={menu.id}>
-                                                                                                                                        {/* Renderizar Itens Diretos */}
-                                                                                                                                        {directItems.map(item => (
-                                                                                                                                            <button
-                                                                                                                                                key={item.id}
-                                                                                                                                                onClick={() => {
-                                                                                                                                                    if (item.route) {
-                                                                                                                                                        if (item.route === '/logout') handleLogout();
-                                                                                                                                                        else router.get(item.route);
-                                                                                                                                                        if (window.innerWidth < 1024) onClose();
-                                                                                                                                                    }
-                                                                                                                                                }}
-                                                                                                                                                className={`flex items-center w-full px-3 py-2 text-sm rounded-md group text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer ${item.route && url.startsWith(item.route) ? "bg-gray-100 text-gray-900" : ""}`}
-                                                                                                                                            >
-                                                                                                                                                <i className={`${item.icon || menu.icon} mr-3 flex-shrink-0 text-gray-400 group-hover:text-gray-500`}></i>
-                                                                                                                                                <span className="truncate">{item.name}</span>
-                                                                                                                                            </button>
-                                                                                                                                        ))}
-                                                                                
-                                                                                                                                        {/* Renderizar Menu com Dropdown */}
-                                                                                                                                        {hasDropdown && (
-                                                                                                                                            <>
-                                                                                                                                                <button
-                                                                                                                                                    onClick={() => toggleSubmenu(menu.id)}
-                                                                                                                                                    className={`flex items-center w-full px-3 py-2 text-sm rounded-md group text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer ${isDropdownActive ? "bg-gray-100 text-gray-900" : ""}`}
-                                                                                                                                                >
-                                                                                                                                                    <i className={`${menu.icon} mr-3 flex-shrink-0 text-gray-400 group-hover:text-gray-500`}></i>
-                                                                                                                                                    <span className="truncate">{menu.name}</span>
-                                                                                                                                                    {expandedSubmenus[menu.id] ? (
-                                                                                                                                                        <ChevronDownIcon className="ml-auto h-4 w-4" />
-                                                                                                                                                    ) : (
-                                                                                                                                                        <ChevronRightIcon className="ml-auto h-4 w-4" />
-                                                                                                                                                    )}
-                                                                                                                                                </button>
-                                                                                
-                                                                                                                                                {expandedSubmenus[menu.id] && (
-                                                                                                                                                    <div className="ml-6 mt-1 space-y-1">
-                                                                                                                                                        {dropdownItems.map((item) => (
-                                                                                                                                                            <button
-                                                                                                                                                                key={item.id}
-                                                                                                                                                                onClick={() => {
-                                                                                                                                                                    if (item.route) {
-                                                                                                                                                                        if (item.route === '/logout') handleLogout();
-                                                                                                                                                                        else router.get(item.route);
-                                                                                                                                                                        if (window.innerWidth < 1024) onClose();
-                                                                                                                                                                    }
-                                                                                                                                                                }}
-                                                                                                                                                                className={`flex items-center w-full px-3 py-2 text-sm rounded-md group text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer ${item.route && url.startsWith(item.route) ? "bg-gray-100 text-gray-900" : ""}`}
-                                                                                                                                                            >
-                                                                                                                                                                {item.icon && <i className={`${item.icon} mr-3 flex-shrink-0 text-sm text-gray-400 group-hover:text-gray-500`}></i>}
-                                                                                                                                                                <span className="truncate text-sm">{item.name}</span>
-                                                                                                                                                            </button>
-                                                                                                                                                        ))}
-                                                                                                                                                    </div>
-                                                                                                                                                )}
-                                                                                                                                            </>
-                                                                                                                                        )}
-                                                                                                                                    </div>
-                                                                                                                                );
-                                                                                                                            })}                                                                            </div>
-                                                                        )}                                </div>
-                            )
-                    )}
+                        // Lógica de Ativação: O menu dropdown está ativo se um de seus filhos estiver ativo
+                        const isDropdownActive = hasDropdown && dropdownItems.some(item => item.route && url.startsWith(item.route));
+
+                        return (
+                            <div key={menu.id}>
+                                {/* Renderizar Itens Diretos */}
+                                {directItems.map(item => (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => {
+                                            if (item.route) {
+                                                if (item.route === '/logout') handleLogout();
+                                                else router.get(item.route);
+                                                if (window.innerWidth < 1024) onClose();
+                                            }
+                                        }}
+                                        className={`flex items-center w-full px-3 py-2 text-sm rounded-md group text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer ${item.route && url.startsWith(item.route) ? "bg-indigo-50 text-indigo-700 font-medium" : ""}`}
+                                    >
+                                        <i className={`${item.icon || menu.icon} mr-3 flex-shrink-0 ${item.route && url.startsWith(item.route) ? "text-indigo-500" : "text-gray-400 group-hover:text-gray-500"}`}></i>
+                                        <span className="truncate">{item.name}</span>
+                                    </button>
+                                ))}
+
+                                {/* Renderizar Menu com Dropdown */}
+                                {hasDropdown && (
+                                    <>
+                                        <button
+                                            onClick={() => toggleSubmenu(menu.id)}
+                                            className={`flex items-center w-full px-3 py-2 text-sm rounded-md group text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer ${isDropdownActive ? "bg-indigo-50 text-indigo-700 font-medium" : ""}`}
+                                        >
+                                            <i className={`${menu.icon} mr-3 flex-shrink-0 ${isDropdownActive ? "text-indigo-500" : "text-gray-400 group-hover:text-gray-500"}`}></i>
+                                            <span className="truncate">{menu.name}</span>
+                                            {expandedSubmenus[menu.id] ? (
+                                                <ChevronDownIcon className="ml-auto h-4 w-4" />
+                                            ) : (
+                                                <ChevronRightIcon className="ml-auto h-4 w-4" />
+                                            )}
+                                        </button>
+
+                                        {expandedSubmenus[menu.id] && (
+                                            <div className="ml-6 mt-1 space-y-1">
+                                                {dropdownItems.map((item) => (
+                                                    <button
+                                                        key={item.id}
+                                                        onClick={() => {
+                                                            if (item.route) {
+                                                                if (item.route === '/logout') handleLogout();
+                                                                else router.get(item.route);
+                                                                if (window.innerWidth < 1024) onClose();
+                                                            }
+                                                        }}
+                                                        className={`flex items-center w-full px-3 py-2 text-sm rounded-md group text-gray-600 hover:bg-gray-100 hover:text-gray-900 cursor-pointer ${item.route && url.startsWith(item.route) ? "bg-indigo-50 text-indigo-700 font-medium" : ""}`}
+                                                    >
+                                                        {item.icon && <i className={`${item.icon} mr-3 flex-shrink-0 text-sm ${item.route && url.startsWith(item.route) ? "text-indigo-500" : "text-gray-400 group-hover:text-gray-500"}`}></i>}
+                                                        <span className="truncate text-sm">{item.name}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        );
+                    })}
                 </nav>
 
                 {/* Footer */}
