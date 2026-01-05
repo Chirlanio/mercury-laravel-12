@@ -12,6 +12,7 @@ use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\WorkShiftController;
 use App\Http\Controllers\StoreController;
 use App\Http\Controllers\ColorThemeController;
+use App\Http\Controllers\PageGroupController;
 use App\Http\Controllers\Admin\EmailSettingsController;
 use App\Enums\Permission;
 use Illuminate\Foundation\Application;
@@ -178,6 +179,30 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
         // Tornar página pública/privada
         Route::post('/pages/{page}/make-public', [PageController::class, 'makePublic'])->name('pages.makePublic');
         Route::post('/pages/{page}/make-private', [PageController::class, 'makePrivate'])->name('pages.makePrivate');
+
+        // Excluir página
+        Route::delete('/pages/{page}', [PageController::class, 'destroy'])->name('pages.destroy');
+    });
+});
+
+// Rotas para gerenciamento de grupos de páginas
+Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
+    // Listar grupos de páginas
+    Route::get('/page-groups', [PageGroupController::class, 'index'])->name('page-groups.index');
+
+    // Visualizar grupo de páginas
+    Route::get('/page-groups/{pageGroup}', [PageGroupController::class, 'show'])->name('page-groups.show');
+
+    // Ações de gerenciamento (requer permissões administrativas)
+    Route::middleware('permission:' . Permission::MANAGE_SYSTEM_SETTINGS->value)->group(function () {
+        // Criar grupo de páginas
+        Route::post('/page-groups', [PageGroupController::class, 'store'])->name('page-groups.store');
+
+        // Atualizar grupo de páginas
+        Route::put('/page-groups/{pageGroup}', [PageGroupController::class, 'update'])->name('page-groups.update');
+
+        // Excluir grupo de páginas
+        Route::delete('/page-groups/{pageGroup}', [PageGroupController::class, 'destroy'])->name('page-groups.destroy');
     });
 });
 

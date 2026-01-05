@@ -3,7 +3,7 @@ import Button from '@/Components/Button';
 
 export default function EditModal({ show, onClose, onSubmit, onCancel, data, setData, errors, processing, pageGroups, iconSuggestions }) {
     return (
-        <Modal show={show} onClose={onCancel} title="Editar Página">
+        <Modal show={show} onClose={onCancel} title="Editar Página" maxWidth="85vw">
             <form onSubmit={onSubmit} className="space-y-6 p-6">
                 {/* Informações Básicas */}
                 <div className="bg-gray-50 p-4 rounded-lg">
