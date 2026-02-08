@@ -950,6 +950,21 @@ class EmployeeController extends Controller
 
         $event = EmployeeEvent::create($data);
 
+        // Atualizar status do funcionário com base no tipo de evento
+        $eventType = EmployeeEventType::find($request->event_type_id);
+        if ($eventType) {
+            $statusMap = [
+                'Férias' => 4,
+                'Licença' => 5,
+                'Atestado Médico' => 5,
+            ];
+
+            if (isset($statusMap[$eventType->name])) {
+                $employee = Employee::findOrFail($employeeId);
+                $employee->update(['status_id' => $statusMap[$eventType->name]]);
+            }
+        }
+
         return response()->json([
             'message' => 'Evento criado com sucesso',
             'event' => $event->load('eventType', 'creator'),
@@ -970,7 +985,28 @@ class EmployeeController extends Controller
             Storage::disk('public')->delete($event->document_path);
         }
 
+        // Guardar dados do evento antes de excluir
+        $eventType = $event->eventType;
         $event->delete();
+
+        // Reverter status se o evento excluído alterava o status
+        $statusChangingTypes = ['Férias', 'Licença', 'Atestado Médico'];
+        if ($eventType && in_array($eventType->name, $statusChangingTypes)) {
+            // Verificar se há outros eventos ativos que alteram status
+            $hasActiveStatusEvent = EmployeeEvent::where('employee_id', $employeeId)
+                ->whereHas('eventType', function ($q) use ($statusChangingTypes) {
+                    $q->whereIn('name', $statusChangingTypes);
+                })
+                ->where(function ($q) {
+                    $q->where('end_date', '>=', now()->toDateString())
+                      ->orWhereNull('end_date');
+                })
+                ->exists();
+
+            if (!$hasActiveStatusEvent) {
+                $employee->update(['status_id' => 2]); // Ativo
+            }
+        }
 
         return response()->json([
             'message' => 'Evento excluído com sucesso',
