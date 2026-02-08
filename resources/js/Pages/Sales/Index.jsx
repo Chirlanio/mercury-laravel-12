@@ -45,14 +45,28 @@ export default function Index({ auth, sales, stores, filters, cigamAvailable }) 
     const years = Array.from({ length: thisYear - 2019 }, (_, i) => thisYear - i);
 
     const handleFilterChange = (key, value) => {
-        const currentUrl = new URL(window.location);
+        const params = {
+            month: currentMonth,
+            year: currentYear,
+        };
+
+        // Preserve existing filters
+        if (filters.store_id) params.store_id = filters.store_id;
+        if (filters.search) params.search = filters.search;
+        if (filters.sort && filters.sort !== 'date_sales') params.sort = filters.sort;
+        if (filters.direction && filters.direction !== 'desc') params.direction = filters.direction;
+
+        // Apply the new filter
         if (value) {
-            currentUrl.searchParams.set(key, value);
+            params[key] = value;
         } else {
-            currentUrl.searchParams.delete(key);
+            delete params[key];
         }
-        currentUrl.searchParams.delete('page');
-        router.visit(currentUrl.toString(), {
+
+        // Remove page to reset pagination
+        delete params.page;
+
+        router.get('/sales', params, {
             preserveState: true,
             preserveScroll: true,
         });
@@ -119,7 +133,7 @@ export default function Index({ auth, sales, stores, filters, cigamAvailable }) 
     };
 
     const clearFilters = () => {
-        router.visit('/sales', {
+        router.get('/sales', {}, {
             preserveState: true,
             preserveScroll: true,
         });

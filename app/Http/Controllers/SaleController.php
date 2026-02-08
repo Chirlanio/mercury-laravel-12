@@ -30,7 +30,7 @@ class SaleController extends Controller
 
         // Filter by store for non-admin users
         $user = $request->user();
-        if (!in_array($user->role, [Role::ADMIN->value, Role::SUPER_ADMIN->value])) {
+        if (!in_array($user->role, [Role::ADMIN, Role::SUPER_ADMIN])) {
             if ($user->employee && $user->employee->store_id) {
                 $store = Store::where('code', $user->employee->store_id)->first();
                 if ($store) {
@@ -238,7 +238,7 @@ class SaleController extends Controller
         $baseQuery = Sale::query();
 
         $user = $request->user();
-        if (!in_array($user->role, [Role::ADMIN->value, Role::SUPER_ADMIN->value])) {
+        if (!in_array($user->role, [Role::ADMIN, Role::SUPER_ADMIN])) {
             if ($user->employee && $user->employee->store_id) {
                 $store = Store::where('code', $user->employee->store_id)->first();
                 if ($store) {
@@ -313,7 +313,7 @@ class SaleController extends Controller
 
         $result = $service->syncDateRange($start, $end);
 
-        return back()->with('success', "Sincronização concluída: {$result['inserted']} inseridos, {$result['updated']} atualizados, {$result['errors']} erros.");
+        return back()->with($this->buildSyncFlash($result));
     }
 
     public function syncByMonth(Request $request)
@@ -339,7 +339,7 @@ class SaleController extends Controller
 
         $result = $service->syncDateRange($start, $end, $request->store_id);
 
-        return back()->with('success', "Sincronização concluída: {$result['inserted']} inseridos, {$result['updated']} atualizados, {$result['errors']} erros.");
+        return back()->with($this->buildSyncFlash($result));
     }
 
     public function syncByDateRange(Request $request)
@@ -362,7 +362,48 @@ class SaleController extends Controller
             $request->store_id
         );
 
-        return back()->with('success', "Sincronização concluída: {$result['inserted']} inseridos, {$result['updated']} atualizados, {$result['errors']} erros.");
+        return back()->with($this->buildSyncFlash($result));
+    }
+
+    protected function buildSyncFlash(array $result): array
+    {
+        $msg = "Sincronização concluída: {$result['inserted']} inseridos, {$result['updated']} atualizados.";
+
+        $hasSkipped = ($result['skipped_cpfs'] ?? 0) > 0 || ($result['skipped_stores'] ?? 0) > 0;
+        $hasErrors = ($result['errors'] ?? 0) > 0;
+
+        if ($hasSkipped) {
+            $skippedDetails = [];
+            if ($result['skipped_cpfs'] > 0) {
+                $cpfCount = count($result['unmapped_cpfs'] ?? []);
+                $skippedDetails[] = "{$result['skipped_cpfs']} registros de {$cpfCount} funcionários não cadastrados";
+            }
+            if ($result['skipped_stores'] > 0) {
+                $storeCount = count($result['unmapped_stores'] ?? []);
+                $skippedDetails[] = "{$result['skipped_stores']} registros de {$storeCount} lojas não cadastradas";
+            }
+            $msg .= ' Ignorados: ' . implode('; ', $skippedDetails) . '.';
+        }
+
+        if ($hasErrors) {
+            $msg .= " {$result['errors']} erros de processamento.";
+        }
+
+        $totalCigam = $result['total_cigam_records'] ?? 0;
+        if ($totalCigam > 0) {
+            $msg .= " (Total CIGAM: {$totalCigam} registros)";
+        }
+
+        // Use 'success' if any records were synced, 'info' if only skipped, 'error' if all failed
+        if ($result['inserted'] > 0 || $result['updated'] > 0) {
+            $type = ($hasSkipped || $hasErrors) ? 'warning' : 'success';
+        } elseif ($hasSkipped && !$hasErrors) {
+            $type = 'info';
+        } else {
+            $type = 'error';
+        }
+
+        return [$type => $msg];
     }
 
     public function bulkDeletePreview(Request $request)

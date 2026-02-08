@@ -27,6 +27,12 @@ export default function AuthenticatedLayout({ header, children }) {
         if (flash?.error) {
             toast.error(flash.error);
         }
+        if (flash?.warning) {
+            toast.warn(flash.warning);
+        }
+        if (flash?.info) {
+            toast.info(flash.info);
+        }
     }, [flash]);
 
     return (
