@@ -16,6 +16,37 @@ use Inertia\Inertia;
 
 class WorkScheduleController extends Controller
 {
+    public function listJson()
+    {
+        $schedules = WorkSchedule::where('is_active', true)
+            ->with('days')
+            ->orderBy('name')
+            ->get()
+            ->map(function ($schedule) {
+                $workDays = $schedule->days->where('is_work_day', true)->count();
+                $offDays = 7 - $workDays;
+
+                return [
+                    'id' => $schedule->id,
+                    'name' => $schedule->name,
+                    'description' => $schedule->description,
+                    'weekly_hours' => $schedule->formatted_weekly_hours,
+                    'weekly_hours_raw' => (float) $schedule->weekly_hours,
+                    'work_days_label' => "{$workDays}x{$offDays}",
+                    'is_default' => $schedule->is_default,
+                    'days' => $schedule->days->map(fn ($day) => [
+                        'day_of_week' => $day->day_of_week,
+                        'day_short_name' => $day->day_short_name,
+                        'is_work_day' => $day->is_work_day,
+                        'entry_time' => $day->entry_time ? substr($day->entry_time, 0, 5) : null,
+                        'exit_time' => $day->exit_time ? substr($day->exit_time, 0, 5) : null,
+                    ]),
+                ];
+            });
+
+        return response()->json(['schedules' => $schedules]);
+    }
+
     public function index(Request $request)
     {
         $perPage = $request->get('per_page', 15);

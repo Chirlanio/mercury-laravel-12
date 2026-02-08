@@ -32,15 +32,8 @@ export default function WorkScheduleAssignModal({ isOpen, onClose, onSuccess, sc
     const fetchEmployees = async () => {
         setLoading(true);
         try {
-            const response = await fetch('/employees?per_page=1000');
-            const html = await response.text();
-
-            // Parse Inertia page props from the HTML response
-            const match = html.match(/data-page="([^"]+)"/);
-            if (match) {
-                const pageData = JSON.parse(match[1].replace(/&quot;/g, '"'));
-                setEmployees(pageData.props?.employees?.data || []);
-            }
+            const response = await axios.get('/employees/list-json');
+            setEmployees(response.data.employees || []);
         } catch (error) {
             console.error('Erro ao carregar funcionários:', error);
             setEmployees([]);
@@ -61,26 +54,14 @@ export default function WorkScheduleAssignModal({ isOpen, onClose, onSuccess, sc
         setErrors({});
 
         try {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-            const response = await fetch(`/work-schedules/${schedule.id}/employees`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                },
-                body: JSON.stringify(formData),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                if (data.errors) setErrors(data.errors);
-                return;
-            }
-
+            await axios.post(`/work-schedules/${schedule.id}/employees`, formData);
             onSuccess();
         } catch (error) {
-            console.error('Erro ao atribuir funcionário:', error);
+            if (error.response?.status === 422 && error.response?.data?.errors) {
+                setErrors(error.response.data.errors);
+            } else {
+                console.error('Erro ao atribuir funcionário:', error);
+            }
         } finally {
             setProcessing(false);
         }

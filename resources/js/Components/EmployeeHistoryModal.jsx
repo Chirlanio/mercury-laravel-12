@@ -5,6 +5,8 @@ import ContractCreateModal from '@/Components/ContractCreateModal';
 import ContractEditModal from '@/Components/ContractEditModal';
 import DocumentViewerModal from '@/Components/DocumentViewerModal';
 import ExportEventsModal from '@/Components/ExportEventsModal';
+import EmployeeScheduleManageModal from '@/Components/EmployeeScheduleManageModal';
+import WorkScheduleDayOverrideModal from '@/Components/WorkScheduleDayOverrideModal';
 
 export default function EmployeeHistoryModal({ show, onClose, employeeId, positions, stores, onEmployeeUpdated }) {
     const [employee, setEmployee] = useState(null);
@@ -28,6 +30,9 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
     const [isDocumentViewerOpen, setIsDocumentViewerOpen] = useState(false);
     const [selectedDocument, setSelectedDocument] = useState(null);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+    const [isScheduleManageOpen, setIsScheduleManageOpen] = useState(false);
+    const [isScheduleOverrideOpen, setIsScheduleOverrideOpen] = useState(false);
+    const [selectedScheduleAssignment, setSelectedScheduleAssignment] = useState(null);
     const [eventFormData, setEventFormData] = useState({
         event_type_id: '',
         start_date: '',
@@ -54,6 +59,9 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
             setScheduleAssignments([]);
             setActiveTab('contracts');
             setError(null);
+            setIsScheduleManageOpen(false);
+            setIsScheduleOverrideOpen(false);
+            setSelectedScheduleAssignment(null);
         }
     }, [show, employeeId]);
 
@@ -390,6 +398,30 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
         setContractToDelete(null);
     };
 
+    const handleUnassignSchedule = async (assignment) => {
+        if (!confirm('Tem certeza que deseja remover esta escala do funcionário?')) return;
+
+        try {
+            await axios.delete(`/work-schedules/${assignment.schedule_id}/employees/${assignment.id}`);
+            fetchSchedule();
+            if (onEmployeeUpdated) onEmployeeUpdated();
+        } catch (error) {
+            console.error('Erro ao remover escala:', error);
+        }
+    };
+
+    const handleScheduleAssigned = () => {
+        setIsScheduleManageOpen(false);
+        fetchSchedule();
+        if (onEmployeeUpdated) onEmployeeUpdated();
+    };
+
+    const handleScheduleOverrideCreated = () => {
+        setIsScheduleOverrideOpen(false);
+        setSelectedScheduleAssignment(null);
+        fetchSchedule();
+    };
+
     const getEventTypeColor = (eventType) => {
         const colors = {
             promotion: 'bg-green-100 text-green-800 border-green-200',
@@ -584,6 +616,20 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
                                 Novo Evento
                             </Button>
                         </div>
+                    )}
+                    {activeTab === 'schedule' && (
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => setIsScheduleManageOpen(true)}
+                            icon={({ className }) => (
+                                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                </svg>
+                            )}
+                        >
+                            {scheduleAssignments.some(a => a.is_current) ? 'Alterar Escala' : 'Atribuir Escala'}
+                        </Button>
                     )}
                 </div>
                 </div>
@@ -1195,6 +1241,31 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
                                                     {assignment.end_date && ` até ${assignment.end_date}`}
                                                 </div>
                                             </div>
+                                            {assignment.is_current && (
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedScheduleAssignment(assignment);
+                                                            setIsScheduleOverrideOpen(true);
+                                                        }}
+                                                        className="p-1.5 text-yellow-600 hover:bg-yellow-50 rounded-full transition-colors"
+                                                        title="Adicionar exceção"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                        </svg>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleUnassignSchedule(assignment)}
+                                                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                                                        title="Remover escala"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Grid visual de dias */}
@@ -1340,6 +1411,35 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
                 employeeName={employee?.name}
                 eventTypes={eventTypes}
             />
+
+            {/* Schedule Manage Modal */}
+            <EmployeeScheduleManageModal
+                isOpen={isScheduleManageOpen}
+                onClose={() => setIsScheduleManageOpen(false)}
+                onSuccess={handleScheduleAssigned}
+                employeeId={employeeId}
+                employeeName={employee?.name || ''}
+                currentAssignment={scheduleAssignments.find(a => a.is_current) || null}
+            />
+
+            {/* Schedule Day Override Modal */}
+            {selectedScheduleAssignment && (
+                <WorkScheduleDayOverrideModal
+                    isOpen={isScheduleOverrideOpen}
+                    onClose={() => {
+                        setIsScheduleOverrideOpen(false);
+                        setSelectedScheduleAssignment(null);
+                    }}
+                    onSuccess={handleScheduleOverrideCreated}
+                    assignment={{
+                        id: selectedScheduleAssignment.id,
+                        employee_name: employee?.name,
+                        employee_short_name: employee?.name,
+                        overrides: selectedScheduleAssignment.overrides || [],
+                    }}
+                    scheduleDays={selectedScheduleAssignment.days || []}
+                />
+            )}
 
             {/* Delete Event Confirmation Modal */}
             <Modal show={isDeleteEventModalOpen} onClose={handleDeleteEventCancel} title="Confirmar Exclusão" maxWidth="md">
