@@ -39,6 +39,11 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
             cpf: data.cpf ? data.cpf.replace(/\D/g, '') : '', // Remove máscara do CPF
         };
 
+        // Remover profile_image se não houver arquivo selecionado
+        if (!cleanedData.profile_image) {
+            delete cleanedData.profile_image;
+        }
+
         console.log('Create employee data:', cleanedData);
         console.log('CPF limpo:', cleanedData.cpf);
 
@@ -186,9 +191,9 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
                                 onChange={(e) => {
                                     const file = e.target.files[0];
                                     if (file) {
-                                        // Verificar tamanho do arquivo (20MB = 20 * 1024 * 1024 bytes)
-                                        if (file.size > 20 * 1024 * 1024) {
-                                            setError('profile_image', 'O arquivo deve ter no máximo 20MB');
+                                        // Verificar tamanho do arquivo (5MB = 5 * 1024 * 1024 bytes)
+                                        if (file.size > 5 * 1024 * 1024) {
+                                            setError('profile_image', 'O arquivo deve ter no máximo 5MB');
                                             e.target.value = ''; // Limpar o input
                                             return;
                                         }
@@ -212,7 +217,7 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
                         </div>
                         {errors.profile_image && <p className="mt-1 text-sm text-red-600">{errors.profile_image}</p>}
                         <p className="mt-1 text-xs text-gray-500">
-                            Formatos aceitos: JPEG, PNG, JPG, GIF. Tamanho máximo: 20MB
+                            Formatos aceitos: JPEG, PNG, JPG, GIF. Tamanho máximo: 5MB
                         </p>
                     </div>
                 </div>

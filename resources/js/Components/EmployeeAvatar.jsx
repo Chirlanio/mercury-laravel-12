@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 export default function EmployeeAvatar({
     employee = null,
     src = null,
@@ -7,6 +9,8 @@ export default function EmployeeAvatar({
     showTooltip = true,
     onClick = null
 }) {
+    const [imgError, setImgError] = useState(false);
+
     // Tamanhos disponíveis
     const sizes = {
         xs: 'h-6 w-6 text-xs',
@@ -55,8 +59,9 @@ export default function EmployeeAvatar({
     const initials = getInitials(employeeName);
     const bgColor = getBackgroundColor(employeeName);
     const sizeClass = sizes[size] || sizes.md;
+    const showImage = avatarUrl && !imgError;
 
-    const AvatarContent = () => (
+    const content = (
         <div
             className={`
                 relative inline-flex items-center justify-center rounded-full
@@ -67,31 +72,14 @@ export default function EmployeeAvatar({
             onClick={onClick}
             title={showTooltip ? employeeName : undefined}
         >
-            {avatarUrl ? (
-                <>
-                    <img
-                        src={avatarUrl}
-                        alt={employeeName}
-                        className="h-full w-full rounded-full object-cover"
-                        onError={(e) => {
-                            // Se a imagem falhar ao carregar, esconder e mostrar fallback
-                            e.target.style.display = 'none';
-                            e.target.nextSibling.style.display = 'flex';
-                        }}
-                    />
-                    {/* Fallback escondido inicialmente */}
-                    <div
-                        className={`
-                            absolute inset-0 items-center justify-center rounded-full text-white font-medium
-                            ${bgColor}
-                        `}
-                        style={{ display: 'none' }}
-                    >
-                        {initials}
-                    </div>
-                </>
+            {showImage ? (
+                <img
+                    src={avatarUrl}
+                    alt={employeeName}
+                    className="h-full w-full rounded-full object-cover"
+                    onError={() => setImgError(true)}
+                />
             ) : (
-                // Avatar com iniciais
                 <div className={`
                     flex items-center justify-center rounded-full text-white font-medium
                     ${bgColor}
@@ -103,14 +91,9 @@ export default function EmployeeAvatar({
         </div>
     );
 
-    // Se tiver tooltip e não for clicável, envolver em div com title
     if (showTooltip && !onClick) {
-        return (
-            <div title={employeeName}>
-                <AvatarContent />
-            </div>
-        );
+        return <div title={employeeName}>{content}</div>;
     }
 
-    return <AvatarContent />;
+    return content;
 }

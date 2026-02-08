@@ -132,11 +132,11 @@ class Employee extends Model
     }
 
     /**
-     * Get avatar URL (profile image or default)
+     * Get avatar URL (profile image only, null if none)
      */
-    public function getAvatarUrlAttribute(): string
+    public function getAvatarUrlAttribute(): ?string
     {
-        return $this->profile_image_url ?? $this->default_avatar_url;
+        return $this->profile_image_url;
     }
 
     /**

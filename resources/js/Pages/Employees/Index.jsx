@@ -196,28 +196,6 @@ export default function Index({ auth, employees, positions, stores, statuses, fi
             }
         },
         {
-            label: "Características",
-            field: "characteristics",
-            sortable: false,
-            render: (employee) => (
-                <div className="flex flex-wrap gap-1">
-                    {employee.is_pcd && (
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                            PcD
-                        </span>
-                    )}
-                    {employee.is_apprentice && (
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
-                            Aprendiz
-                        </span>
-                    )}
-                    {!employee.is_pcd && !employee.is_apprentice && (
-                        <span className="text-xs text-gray-400">—</span>
-                    )}
-                </div>
-            )
-        },
-        {
             label: "Ações",
             field: "actions",
             sortable: false,
@@ -463,6 +441,7 @@ export default function Index({ auth, employees, positions, stores, statuses, fi
                 employee={selectedEmployee}
                 positions={positions}
                 stores={stores}
+                statuses={statuses}
             />
 
             {/* Delete Confirmation Modal */}
