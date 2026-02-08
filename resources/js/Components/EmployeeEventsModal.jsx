@@ -11,6 +11,7 @@ export default function EmployeeEventsModal({ employee, isOpen, onClose }) {
         event_type_id: '',
         start_date: '',
         end_date: '',
+        days: '',
         document: null,
         notes: '',
     });
@@ -37,17 +38,38 @@ export default function EmployeeEventsModal({ employee, isOpen, onClose }) {
         }
     };
 
+    const isAtestado = (type) => {
+        if (!type || !type.name) return false;
+        return type.name.toLowerCase().includes('atestado');
+    };
+
+    const calculateEndDate = (startDate, days) => {
+        if (!startDate || !days || days < 1) return '';
+        const start = new Date(startDate + 'T00:00:00');
+        const end = new Date(start);
+        end.setDate(end.getDate() + parseInt(days) - 1);
+        return end.toISOString().split('T')[0];
+    };
+
+    const calculateReturnDate = (startDate, days) => {
+        if (!startDate || !days || days < 1) return '';
+        const start = new Date(startDate + 'T00:00:00');
+        const ret = new Date(start);
+        ret.setDate(ret.getDate() + parseInt(days));
+        return ret.toLocaleDateString('pt-BR');
+    };
+
     const handleEventTypeChange = (e) => {
         const typeId = e.target.value;
-        setFormData({ ...formData, event_type_id: typeId });
-
         const type = eventTypes.find(t => t.id === parseInt(typeId));
         setSelectedEventType(type);
 
-        // Limpar campos que não são necessários
-        if (type && !type.requires_date_range) {
-            setFormData(prev => ({ ...prev, end_date: '' }));
-        }
+        setFormData(prev => ({
+            ...prev,
+            event_type_id: typeId,
+            end_date: '',
+            days: '',
+        }));
     };
 
     const handleFileChange = (e) => {
@@ -62,7 +84,14 @@ export default function EmployeeEventsModal({ employee, isOpen, onClose }) {
         formDataToSend.append('event_type_id', formData.event_type_id);
         formDataToSend.append('start_date', formData.start_date);
 
-        if (formData.end_date) {
+        // Para Falta: calcular end_date a partir de days
+        if (isAtestado(selectedEventType) && formData.days) {
+            const computedEnd = calculateEndDate(formData.start_date, formData.days);
+            if (computedEnd) {
+                formDataToSend.append('end_date', computedEnd);
+            }
+            formDataToSend.append('days', formData.days);
+        } else if (formData.end_date) {
             formDataToSend.append('end_date', formData.end_date);
         }
 
@@ -99,6 +128,7 @@ export default function EmployeeEventsModal({ employee, isOpen, onClose }) {
                 event_type_id: '',
                 start_date: '',
                 end_date: '',
+                days: '',
                 document: null,
                 notes: '',
             });
@@ -228,7 +258,7 @@ export default function EmployeeEventsModal({ employee, isOpen, onClose }) {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                {selectedEventType.requires_date_range ? 'Data de Início *' : 'Data *'}
+                                                {selectedEventType.requires_date_range ? 'Data de Inicio *' : 'Data *'}
                                             </label>
                                             <input
                                                 type="date"
@@ -242,7 +272,47 @@ export default function EmployeeEventsModal({ employee, isOpen, onClose }) {
                                             )}
                                         </div>
 
-                                        {selectedEventType.requires_date_range && (
+                                        {isAtestado(selectedEventType) && (
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Quantidade de Dias *
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="365"
+                                                    value={formData.days}
+                                                    onChange={(e) => setFormData({ ...formData, days: e.target.value })}
+                                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                                    placeholder="Ex: 1"
+                                                    required
+                                                />
+                                                {errors.days && (
+                                                    <p className="mt-1 text-sm text-red-600">{errors.days[0]}</p>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {isAtestado(selectedEventType) && formData.start_date && formData.days > 0 && (
+                                            <div className="md:col-span-2 bg-white bg-opacity-60 rounded-lg p-3 border border-indigo-200">
+                                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                                    <div>
+                                                        <span className="font-semibold text-gray-700">Data Final:</span>
+                                                        <p className="text-gray-900">
+                                                            {new Date(calculateEndDate(formData.start_date, formData.days) + 'T00:00:00').toLocaleDateString('pt-BR')}
+                                                        </p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-semibold text-gray-700">Data de Retorno:</span>
+                                                        <p className="text-gray-900 font-medium text-green-700">
+                                                            {calculateReturnDate(formData.start_date, formData.days)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {selectedEventType.requires_date_range && !isAtestado(selectedEventType) && (
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                                     Data de Fim *
@@ -360,17 +430,23 @@ export default function EmployeeEventsModal({ employee, isOpen, onClose }) {
                                             <h4 className="font-bold text-lg text-gray-900">{event.event_type}</h4>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-4 text-sm">
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                                             <div>
-                                                <span className="font-semibold text-gray-700">Período:</span>
+                                                <span className="font-semibold text-gray-700">Periodo:</span>
                                                 <p className="text-gray-900">{event.period}</p>
                                             </div>
                                             <div>
-                                                <span className="font-semibold text-gray-700">Duração:</span>
+                                                <span className="font-semibold text-gray-700">Duracao:</span>
                                                 <p className="text-gray-900">
                                                     {event.duration_in_days} {event.duration_in_days === 1 ? 'dia' : 'dias'}
                                                 </p>
                                             </div>
+                                            {event.return_date && (
+                                                <div>
+                                                    <span className="font-semibold text-gray-700">Retorno:</span>
+                                                    <p className="text-green-700 font-medium">{event.return_date}</p>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {event.has_document && (

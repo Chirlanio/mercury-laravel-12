@@ -14,6 +14,19 @@ use App\Http\Controllers\StoreController;
 use App\Http\Controllers\ColorThemeController;
 use App\Http\Controllers\PageGroupController;
 use App\Http\Controllers\Admin\EmailSettingsController;
+use App\Http\Controllers\Config\PositionController as ConfigPositionController;
+use App\Http\Controllers\Config\PositionLevelController as ConfigPositionLevelController;
+use App\Http\Controllers\Config\SectorController as ConfigSectorController;
+use App\Http\Controllers\Config\GenderController as ConfigGenderController;
+use App\Http\Controllers\Config\EducationLevelController as ConfigEducationLevelController;
+use App\Http\Controllers\Config\EmployeeStatusController as ConfigEmployeeStatusController;
+use App\Http\Controllers\Config\EmployeeEventTypeController as ConfigEmployeeEventTypeController;
+use App\Http\Controllers\Config\TypeMovimentController as ConfigTypeMovimentController;
+use App\Http\Controllers\Config\EmploymentRelationshipController as ConfigEmploymentRelationshipController;
+use App\Http\Controllers\Config\ManagerController as ConfigManagerController;
+use App\Http\Controllers\Config\NetworkController as ConfigNetworkController;
+use App\Http\Controllers\Config\StatusController as ConfigStatusController;
+use App\Http\Controllers\Config\PageStatusController as ConfigPageStatusController;
 use App\Enums\Permission;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -416,6 +429,23 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
     Route::delete('/color-themes/{colorTheme}', [ColorThemeController::class, 'destroy'])
         ->middleware('permission:' . Permission::DELETE_USERS->value)
         ->name('color-themes.destroy');
+});
+
+// Rotas de Configuracao
+Route::middleware(['auth', 'permission:' . Permission::MANAGE_SETTINGS->value])->prefix('config')->name('config.')->group(function () {
+    Route::resource('positions', ConfigPositionController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('position-levels', ConfigPositionLevelController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('sectors', ConfigSectorController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('genders', ConfigGenderController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('education-levels', ConfigEducationLevelController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('employee-statuses', ConfigEmployeeStatusController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('employee-event-types', ConfigEmployeeEventTypeController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('type-moviments', ConfigTypeMovimentController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('employment-relationships', ConfigEmploymentRelationshipController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('managers', ConfigManagerController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('networks', ConfigNetworkController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('statuses', ConfigStatusController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('page-statuses', ConfigPageStatusController::class)->only(['index', 'store', 'update', 'destroy']);
 });
 
 // Rotas para páginas básicas ainda não implementadas (placeholder)

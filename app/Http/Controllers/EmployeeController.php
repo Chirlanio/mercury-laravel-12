@@ -851,12 +851,17 @@ class EmployeeController extends Controller
             ->orderBy('start_date', 'desc')
             ->get()
             ->map(function ($event) {
+                $returnDate = $event->end_date
+                    ? $event->end_date->copy()->addDay()->format('d/m/Y')
+                    : ($event->start_date ? $event->start_date->copy()->addDay()->format('d/m/Y') : null);
+
                 return [
                     'id' => $event->id,
                     'event_type' => $event->eventType->name,
                     'event_type_id' => $event->event_type_id,
                     'start_date' => $event->start_date?->format('d/m/Y'),
                     'end_date' => $event->end_date?->format('d/m/Y'),
+                    'return_date' => $returnDate,
                     'period' => $event->period,
                     'duration_in_days' => $event->duration_in_days,
                     'document_url' => $event->document_url,
@@ -890,11 +895,17 @@ class EmployeeController extends Controller
             'notes' => 'nullable|string|max:1000',
         ];
 
-        if ($eventType->requires_single_date) {
+        // Atestado Medico: requer data inicio + quantidade de dias
+        $isAtestado = strtolower($eventType->name) === 'atestado médico';
+
+        if ($isAtestado) {
+            $rules['start_date'] = 'required|date';
+            $rules['days'] = 'required|integer|min:1|max:365';
+        } elseif ($eventType->requires_single_date) {
             $rules['start_date'] = 'required|date';
         }
 
-        if ($eventType->requires_date_range) {
+        if (!$isAtestado && $eventType->requires_date_range) {
             $rules['start_date'] = 'required|date';
             $rules['end_date'] = 'required|date|after_or_equal:start_date';
         }
@@ -912,11 +923,18 @@ class EmployeeController extends Controller
             ], 422);
         }
 
+        // Calcular end_date para Falta baseado em days
+        $endDate = $request->end_date;
+        if ($isAtestado && $request->days) {
+            $startDate = \Carbon\Carbon::parse($request->start_date);
+            $endDate = $startDate->copy()->addDays((int) $request->days - 1)->toDateString();
+        }
+
         $data = [
             'employee_id' => $employeeId,
             'event_type_id' => $request->event_type_id,
             'start_date' => $request->start_date,
-            'end_date' => $request->end_date,
+            'end_date' => $endDate,
             'notes' => $request->notes,
             'created_by' => auth()->id(),
         ];
