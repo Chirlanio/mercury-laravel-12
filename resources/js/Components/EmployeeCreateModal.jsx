@@ -190,16 +190,34 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
                                 accept="image/jpeg,image/png,image/jpg,image/gif"
                                 onChange={(e) => {
                                     const file = e.target.files[0];
-                                    if (file) {
-                                        // Verificar tamanho do arquivo (5MB = 5 * 1024 * 1024 bytes)
-                                        if (file.size > 5 * 1024 * 1024) {
-                                            setError('profile_image', 'O arquivo deve ter no máximo 5MB');
-                                            e.target.value = ''; // Limpar o input
-                                            return;
-                                        }
-                                        clearErrors('profile_image');
-                                        setData('profile_image', file);
+                                    if (!file) return;
+
+                                    if (file.size > 5 * 1024 * 1024) {
+                                        setError('profile_image', 'O arquivo deve ter no máximo 5MB.');
+                                        e.target.value = '';
+                                        return;
                                     }
+
+                                    const img = new Image();
+                                    img.onload = () => {
+                                        URL.revokeObjectURL(img.src);
+                                        if (img.width < 50 || img.height < 50) {
+                                            setError('profile_image', `Imagem muito pequena (${img.width}x${img.height}). Mínimo: 50x50 pixels.`);
+                                            e.target.value = '';
+                                        } else if (img.width > 2000 || img.height > 2000) {
+                                            setError('profile_image', `Imagem muito grande (${img.width}x${img.height}). Máximo: 2000x2000 pixels.`);
+                                            e.target.value = '';
+                                        } else {
+                                            clearErrors('profile_image');
+                                            setData('profile_image', file);
+                                        }
+                                    };
+                                    img.onerror = () => {
+                                        URL.revokeObjectURL(img.src);
+                                        setError('profile_image', 'Arquivo não é uma imagem válida.');
+                                        e.target.value = '';
+                                    };
+                                    img.src = URL.createObjectURL(file);
                                 }}
                                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
                                     errors.profile_image ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
@@ -217,7 +235,7 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
                         </div>
                         {errors.profile_image && <p className="mt-1 text-sm text-red-600">{errors.profile_image}</p>}
                         <p className="mt-1 text-xs text-gray-500">
-                            Formatos aceitos: JPEG, PNG, JPG, GIF. Tamanho máximo: 5MB
+                            Formatos: JPEG, PNG, GIF. Máx: 5MB, 2000x2000px. Mín: 50x50px.
                         </p>
                     </div>
                 </div>
