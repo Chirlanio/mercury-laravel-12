@@ -10,6 +10,7 @@ use App\Http\Controllers\AccessLevelController;
 use App\Http\Controllers\AccessLevelPageController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\WorkShiftController;
+use App\Http\Controllers\WorkScheduleController;
 use App\Http\Controllers\StoreController;
 use App\Http\Controllers\ColorThemeController;
 use App\Http\Controllers\PageGroupController;
@@ -367,6 +368,57 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
     Route::delete('/work-shifts/{workShift}', [WorkShiftController::class, 'destroy'])
         ->middleware('permission:' . Permission::DELETE_USERS->value)
         ->name('work-shifts.destroy');
+});
+
+// Rotas para escalas de trabalho
+Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
+    Route::get('/work-schedules', [WorkScheduleController::class, 'index'])->name('work-schedules.index');
+
+    Route::get('/work-schedules/{workSchedule}', [WorkScheduleController::class, 'show'])->name('work-schedules.show');
+
+    Route::get('/work-schedules/{workSchedule}/edit', [WorkScheduleController::class, 'edit'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('work-schedules.edit');
+
+    Route::get('/work-schedules/{workSchedule}/employees', [WorkScheduleController::class, 'getEmployees'])
+        ->name('work-schedules.employees');
+
+    Route::post('/work-schedules', [WorkScheduleController::class, 'store'])
+        ->middleware('permission:' . Permission::CREATE_USERS->value)
+        ->name('work-schedules.store');
+
+    Route::post('/work-schedules/{workSchedule}/duplicate', [WorkScheduleController::class, 'duplicate'])
+        ->middleware('permission:' . Permission::CREATE_USERS->value)
+        ->name('work-schedules.duplicate');
+
+    Route::post('/work-schedules/{workSchedule}/employees', [WorkScheduleController::class, 'assignEmployee'])
+        ->middleware('permission:' . Permission::CREATE_USERS->value)
+        ->name('work-schedules.assign-employee');
+
+    Route::match(['put', 'post'], '/work-schedules/{workSchedule}/update', [WorkScheduleController::class, 'update'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('work-schedules.update');
+
+    Route::delete('/work-schedules/{workSchedule}', [WorkScheduleController::class, 'destroy'])
+        ->middleware('permission:' . Permission::DELETE_USERS->value)
+        ->name('work-schedules.destroy');
+
+    Route::delete('/work-schedules/{workSchedule}/employees/{assignment}', [WorkScheduleController::class, 'unassignEmployee'])
+        ->middleware('permission:' . Permission::DELETE_USERS->value)
+        ->name('work-schedules.unassign-employee');
+
+    // Overrides de dia por funcionário
+    Route::post('/employee-schedules/{assignment}/overrides', [WorkScheduleController::class, 'storeOverride'])
+        ->middleware('permission:' . Permission::EDIT_USERS->value)
+        ->name('employee-schedules.overrides.store');
+
+    Route::delete('/employee-schedules/{assignment}/overrides/{override}', [WorkScheduleController::class, 'destroyOverride'])
+        ->middleware('permission:' . Permission::DELETE_USERS->value)
+        ->name('employee-schedules.overrides.destroy');
+
+    // Escala do funcionário (via EmployeeController)
+    Route::get('/employees/{employee}/work-schedule', [EmployeeController::class, 'getWorkSchedule'])
+        ->name('employees.work-schedule');
 });
 
 // Rotas para lojas
