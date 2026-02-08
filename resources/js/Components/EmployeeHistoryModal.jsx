@@ -6,7 +6,7 @@ import ContractEditModal from '@/Components/ContractEditModal';
 import DocumentViewerModal from '@/Components/DocumentViewerModal';
 import ExportEventsModal from '@/Components/ExportEventsModal';
 
-export default function EmployeeHistoryModal({ show, onClose, employeeId, positions, stores }) {
+export default function EmployeeHistoryModal({ show, onClose, employeeId, positions, stores, onEmployeeUpdated }) {
     const [employee, setEmployee] = useState(null);
     const [histories, setHistories] = useState([]);
     const [contracts, setContracts] = useState([]);
@@ -200,6 +200,9 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
 
             // Recarregar eventos
             fetchEvents();
+
+            // Notificar que o funcionário pode ter sido atualizado (status)
+            if (onEmployeeUpdated) onEmployeeUpdated();
         } catch (error) {
             console.error('Erro ao criar evento:', error);
         }
@@ -236,6 +239,9 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
             fetchEvents();
             setIsDeleteEventModalOpen(false);
             setEventToDelete(null);
+
+            // Notificar que o funcionário pode ter sido atualizado (status)
+            if (onEmployeeUpdated) onEmployeeUpdated();
         } catch (error) {
             console.error('Erro ao excluir evento:', error);
         }
@@ -274,6 +280,7 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
         // Recarregar o histórico completo para refletir todas as mudanças
         fetchHistory();
         setIsContractModalOpen(false);
+        if (onEmployeeUpdated) onEmployeeUpdated();
     };
 
     const handleEditContract = (contract) => {
@@ -286,6 +293,7 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
         fetchHistory();
         setIsEditModalOpen(false);
         setSelectedContract(null);
+        if (onEmployeeUpdated) onEmployeeUpdated();
     };
 
     const handleDeleteClick = (contract) => {
@@ -304,11 +312,11 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
                 },
             });
 
-            if (!response.ok) {
-                throw new Error('Erro ao excluir contrato');
-            }
-
             const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Erro ao excluir contrato');
+            }
 
             setIsDeleteModalOpen(false);
             setContractToDelete(null);
@@ -332,9 +340,12 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
                 // Recarregar histórico após exclusão
                 fetchHistory();
             }
+            if (onEmployeeUpdated) onEmployeeUpdated();
         } catch (err) {
             console.error('Erro ao excluir contrato:', err);
-            alert('Erro ao excluir contrato. Tente novamente.');
+            alert(err.message || 'Erro ao excluir contrato. Tente novamente.');
+            setIsDeleteModalOpen(false);
+            setContractToDelete(null);
         }
     };
 
@@ -622,15 +633,17 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                                         </svg>
                                                     </button>
-                                                    <button
-                                                        onClick={() => handleDeleteClick(contract)}
-                                                        className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-colors"
-                                                        title="Excluir contrato"
-                                                    >
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                        </svg>
-                                                    </button>
+                                                    {contract.is_deletable !== false && (
+                                                        <button
+                                                            onClick={() => handleDeleteClick(contract)}
+                                                            className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                                                            title="Excluir contrato"
+                                                        >
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                            </svg>
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
 

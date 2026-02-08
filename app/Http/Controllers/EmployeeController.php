@@ -215,8 +215,8 @@ class EmployeeController extends Controller
                 'birth_date' => $employee->birth_date?->format('d/m/Y'),
                 'position' => $employee->position?->name ?? 'Não informado',
                 'level' => $employee->level,
-                'is_active' => $employee->is_active,
-                'status' => $employee->is_active ? 'Ativo' : 'Inativo',
+                'is_active' => $employee->status_id == 2,
+                'status' => $employee->status_id == 2 ? 'Ativo' : ($employee->status_id == 3 ? 'Inativo' : ($employee->status_id == 1 ? 'Pendente' : ($employee->status_id == 4 ? 'Férias' : 'Licença'))),
                 'age' => $employee->birth_date ? $employee->age : null,
                 'years_of_service' => $employee->years_of_service,
                 'is_pcd' => $employee->is_pcd,
@@ -483,10 +483,11 @@ class EmployeeController extends Controller
             ->orderBy('start_date', 'desc')
             ->get();
 
-        // Determinar qual é o último contrato (mais recente)
+        // Determinar qual é o último contrato (mais recente) e o mais antigo (admissão inicial)
         $latestContractId = $contracts->first()?->id;
+        $oldestContractId = $contracts->last()?->id;
 
-        $contracts = $contracts->map(function ($contract) use ($latestContractId) {
+        $contracts = $contracts->map(function ($contract) use ($latestContractId, $oldestContractId) {
             $isLatest = $contract->id === $latestContractId;
 
             return [
@@ -502,6 +503,7 @@ class EmployeeController extends Controller
                 'status_label' => $contract->is_active && $isLatest ? 'Atual' : (!$contract->is_active && $isLatest ? 'Último contrato' : 'Encerrado'),
                 'duration' => $contract->duration_text,
                 'date_range' => $contract->date_range,
+                'is_deletable' => $contract->id !== $oldestContractId,
                 'created_at' => $contract->created_at->format('d/m/Y H:i'),
             ];
         });
@@ -580,6 +582,21 @@ class EmployeeController extends Controller
                 'end_date' => $request->end_date ?? ($isDismissal ? $request->start_date : null),
                 'is_active' => !$isDismissal, // Se for demissão, já cria como inativo
             ]);
+
+            // Atualizar dados do funcionário com base no novo contrato (exceto demissão)
+            if (!$isDismissal) {
+                $updateData = [
+                    'position_id' => $request->position_id,
+                    'store_id' => $request->store_id,
+                ];
+
+                // Se for admissão, atualizar também a data de admissão
+                if ($isAdmission) {
+                    $updateData['admission_date'] = $request->start_date;
+                }
+
+                $employee->update($updateData);
+            }
 
             // Se for demissão, inativar o funcionário e registrar data de demissão
             if ($isDismissal) {
@@ -728,6 +745,17 @@ class EmployeeController extends Controller
                 ->where('employee_id', $employeeId)
                 ->firstOrFail();
 
+            // Verificar se é o contrato de admissão inicial (mais antigo)
+            $oldestContract = EmploymentContract::where('employee_id', $employeeId)
+                ->orderBy('id', 'asc')
+                ->first();
+
+            if ($contract->id === $oldestContract->id) {
+                return response()->json([
+                    'message' => 'O contrato de admissão inicial não pode ser excluído.'
+                ], 422);
+            }
+
             Log::info('Deleting employment contract', [
                 'contract_id' => $contractId,
                 'employee_id' => $employeeId
@@ -748,6 +776,19 @@ class EmployeeController extends Controller
             }
 
             $contract->delete();
+
+            // Atualizar funcionário com dados do contrato mais recente restante
+            $latestRemainingContract = EmploymentContract::where('employee_id', $employeeId)
+                ->orderBy('start_date', 'desc')
+                ->first();
+
+            if ($latestRemainingContract) {
+                $employee = Employee::find($employeeId);
+                $employee->update([
+                    'position_id' => $latestRemainingContract->position_id,
+                    'store_id' => $latestRemainingContract->store_id,
+                ]);
+            }
 
             $response = [
                 'message' => 'Contrato excluído com sucesso!',
@@ -793,6 +834,13 @@ class EmployeeController extends Controller
             $contract->update([
                 'is_active' => true,
                 'end_date' => null, // Remover data de término ao reativar
+            ]);
+
+            // Atualizar funcionário com dados do contrato reativado
+            $employee = Employee::find($employeeId);
+            $employee->update([
+                'position_id' => $contract->position_id,
+                'store_id' => $contract->store_id,
             ]);
 
             Log::info('Reactivated employment contract', [
@@ -985,28 +1033,28 @@ class EmployeeController extends Controller
             Storage::disk('public')->delete($event->document_path);
         }
 
-        // Guardar dados do evento antes de excluir
-        $eventType = $event->eventType;
         $event->delete();
 
-        // Reverter status se o evento excluído alterava o status
-        $statusChangingTypes = ['Férias', 'Licença', 'Atestado Médico'];
-        if ($eventType && in_array($eventType->name, $statusChangingTypes)) {
-            // Verificar se há outros eventos ativos que alteram status
-            $hasActiveStatusEvent = EmployeeEvent::where('employee_id', $employeeId)
-                ->whereHas('eventType', function ($q) use ($statusChangingTypes) {
-                    $q->whereIn('name', $statusChangingTypes);
-                })
-                ->where(function ($q) {
-                    $q->where('end_date', '>=', now()->toDateString())
-                      ->orWhereNull('end_date');
-                })
-                ->exists();
+        // Recalcular status do funcionário após exclusão
+        $statusMap = ['Férias' => 4, 'Licença' => 5, 'Atestado Médico' => 5];
 
-            if (!$hasActiveStatusEvent) {
-                $employee->update(['status_id' => 2]); // Ativo
-            }
-        }
+        $activeEvent = EmployeeEvent::where('employee_id', $employeeId)
+            ->whereHas('eventType', function ($q) use ($statusMap) {
+                $q->whereIn('name', array_keys($statusMap));
+            })
+            ->where(function ($q) {
+                $q->where('end_date', '>=', now()->toDateString())
+                  ->orWhereNull('end_date');
+            })
+            ->with('eventType')
+            ->orderBy('start_date', 'desc')
+            ->first();
+
+        $newStatusId = $activeEvent
+            ? ($statusMap[$activeEvent->eventType->name] ?? 2)
+            : 2;
+
+        Employee::where('id', $employeeId)->update(['status_id' => $newStatusId]);
 
         return response()->json([
             'message' => 'Evento excluído com sucesso',
