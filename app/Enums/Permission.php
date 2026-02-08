@@ -32,6 +32,12 @@ enum Permission: string
     case EXPORT_ACTIVITY_LOGS = 'activity_logs.export';
     case MANAGE_SYSTEM_SETTINGS = 'system_settings.manage';
 
+    // Gestão comercial
+    case VIEW_SALES = 'sales.view';
+    case CREATE_SALES = 'sales.create';
+    case EDIT_SALES = 'sales.edit';
+    case DELETE_SALES = 'sales.delete';
+
     public function label(): string
     {
         return match($this) {
@@ -57,6 +63,11 @@ enum Permission: string
             self::VIEW_ACTIVITY_LOGS => 'Visualizar logs de atividade',
             self::EXPORT_ACTIVITY_LOGS => 'Exportar logs de atividade',
             self::MANAGE_SYSTEM_SETTINGS => 'Gerenciar configurações do sistema',
+
+            self::VIEW_SALES => 'Visualizar vendas',
+            self::CREATE_SALES => 'Criar vendas',
+            self::EDIT_SALES => 'Editar vendas',
+            self::DELETE_SALES => 'Deletar vendas',
         };
     }
 
@@ -85,6 +96,11 @@ enum Permission: string
             self::VIEW_ACTIVITY_LOGS => 'Permite visualizar histórico de atividades dos usuários',
             self::EXPORT_ACTIVITY_LOGS => 'Permite exportar logs de atividade em diversos formatos',
             self::MANAGE_SYSTEM_SETTINGS => 'Permite gerenciar configurações críticas do sistema',
+
+            self::VIEW_SALES => 'Permite visualizar registros de vendas',
+            self::CREATE_SALES => 'Permite criar novos registros de vendas',
+            self::EDIT_SALES => 'Permite editar registros de vendas existentes',
+            self::DELETE_SALES => 'Permite deletar registros de vendas',
         };
     }
 
