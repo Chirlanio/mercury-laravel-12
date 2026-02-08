@@ -31,6 +31,7 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
         event_type_id: '',
         start_date: '',
         end_date: '',
+        days: '',
         document: null,
         notes: '',
     });
@@ -101,17 +102,38 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
         }
     };
 
+    const isAtestado = (type) => {
+        if (!type || !type.name) return false;
+        return type.name.toLowerCase().includes('atestado');
+    };
+
+    const calculateEndDate = (startDate, days) => {
+        if (!startDate || !days || days < 1) return '';
+        const start = new Date(startDate + 'T00:00:00');
+        const end = new Date(start);
+        end.setDate(end.getDate() + parseInt(days) - 1);
+        return end.toISOString().split('T')[0];
+    };
+
+    const calculateReturnDate = (startDate, days) => {
+        if (!startDate || !days || days < 1) return '';
+        const start = new Date(startDate + 'T00:00:00');
+        const ret = new Date(start);
+        ret.setDate(ret.getDate() + parseInt(days));
+        return ret.toLocaleDateString('pt-BR');
+    };
+
     const handleEventTypeChange = (e) => {
         const typeId = e.target.value;
-        setEventFormData({ ...eventFormData, event_type_id: typeId });
-
         const type = eventTypes.find(t => t.id === parseInt(typeId));
         setSelectedEventType(type);
 
-        // Limpar campos que não são necessários
-        if (type && !type.requires_date_range) {
-            setEventFormData(prev => ({ ...prev, end_date: '' }));
-        }
+        setEventFormData(prev => ({
+            ...prev,
+            event_type_id: typeId,
+            end_date: '',
+            days: '',
+        }));
     };
 
     const handleFileChange = (e) => {
@@ -126,7 +148,13 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
         formDataToSend.append('event_type_id', eventFormData.event_type_id);
         formDataToSend.append('start_date', eventFormData.start_date);
 
-        if (eventFormData.end_date) {
+        if (isAtestado(selectedEventType) && eventFormData.days) {
+            formDataToSend.append('days', eventFormData.days);
+            const computedEnd = calculateEndDate(eventFormData.start_date, eventFormData.days);
+            if (computedEnd) {
+                formDataToSend.append('end_date', computedEnd);
+            }
+        } else if (eventFormData.end_date) {
             formDataToSend.append('end_date', eventFormData.end_date);
         }
 
@@ -163,6 +191,7 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
                 event_type_id: '',
                 start_date: '',
                 end_date: '',
+                days: '',
                 document: null,
                 notes: '',
             });
@@ -820,7 +849,7 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                        {selectedEventType.requires_date_range ? 'Data de Início *' : 'Data *'}
+                                                        {selectedEventType.requires_date_range || isAtestado(selectedEventType) ? 'Data de Início *' : 'Data *'}
                                                     </label>
                                                     <input
                                                         type="date"
@@ -834,7 +863,28 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
                                                     )}
                                                 </div>
 
-                                                {selectedEventType.requires_date_range && (
+                                                {isAtestado(selectedEventType) && (
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                            Quantidade de Dias *
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            min="1"
+                                                            max="365"
+                                                            value={eventFormData.days}
+                                                            onChange={(e) => setEventFormData({ ...eventFormData, days: e.target.value })}
+                                                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                                            placeholder="Ex: 3"
+                                                            required
+                                                        />
+                                                        {eventErrors.days && (
+                                                            <p className="mt-1 text-sm text-red-600">{eventErrors.days[0]}</p>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {selectedEventType.requires_date_range && !isAtestado(selectedEventType) && (
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                                             Data de Fim *
@@ -852,6 +902,25 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
                                                     </div>
                                                 )}
                                             </div>
+
+                                            {isAtestado(selectedEventType) && eventFormData.start_date && eventFormData.days > 0 && (
+                                                <div className="bg-white bg-opacity-60 rounded-lg p-3 border border-indigo-200">
+                                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                                        <div>
+                                                            <span className="font-semibold text-gray-700">Data Final:</span>
+                                                            <p className="text-gray-900">
+                                                                {new Date(calculateEndDate(eventFormData.start_date, eventFormData.days) + 'T00:00:00').toLocaleDateString('pt-BR')}
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <span className="font-semibold text-gray-700">Data de Retorno:</span>
+                                                            <p className="text-gray-900 font-medium text-green-700">
+                                                                {calculateReturnDate(eventFormData.start_date, eventFormData.days)}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
 
                                             {selectedEventType.requires_document && (
                                                 <div>
@@ -905,6 +974,7 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
                                                     event_type_id: '',
                                                     start_date: '',
                                                     end_date: '',
+                                                    days: '',
                                                     document: null,
                                                     notes: '',
                                                 });
