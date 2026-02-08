@@ -33,7 +33,7 @@ export default function DataTable({
         setSortDirection(direction);
 
         // Atualizar URL com parâmetros de ordenação
-        const currentUrl = new URL(window.location);
+        const currentUrl = new URL(window.location.href);
         currentUrl.searchParams.set('sort', field);
         currentUrl.searchParams.set('direction', direction);
 
@@ -46,21 +46,20 @@ export default function DataTable({
     const handlePerPageChange = (newPerPage) => {
         setPerPage(newPerPage);
 
-        const currentUrl = new URL(window.location);
+        const currentUrl = new URL(window.location.href);
         currentUrl.searchParams.set('per_page', newPerPage);
         currentUrl.searchParams.delete('page'); // Reset para primeira página
 
-        router.get(currentUrl.toString(), {
+        router.visit(currentUrl.toString(), {
             preserveState: true,
             preserveScroll: true,
-            only: ['pages'],
         });
     };
 
     const handleSearch = (searchValue) => {
         setSearch(searchValue);
 
-        const currentUrl = new URL(window.location);
+        const currentUrl = new URL(window.location.href);
         if (searchValue) {
             currentUrl.searchParams.set('search', searchValue);
         } else {
@@ -195,12 +194,12 @@ export default function DataTable({
                                     let url = link.url;
                                     if (url) {
                                         const linkUrl = new URL(url);
-                                        const currentUrl = new URL(window.location);
+                                        const currentUrl = new URL(window.location.href);
 
-                                        // Preservar parâmetros importantes da URL atual
-                                        ['per_page', 'search', 'sort', 'direction', 'group_id', 'is_active', 'is_public', 'category'].forEach(param => {
-                                            if (currentUrl.searchParams.has(param) && !linkUrl.searchParams.has(param)) {
-                                                linkUrl.searchParams.set(param, currentUrl.searchParams.get(param));
+                                        // Preservar TODOS os parâmetros da URL atual que não estão no link
+                                        currentUrl.searchParams.forEach((value, param) => {
+                                            if (!linkUrl.searchParams.has(param)) {
+                                                linkUrl.searchParams.set(param, value);
                                             }
                                         });
 
