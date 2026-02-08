@@ -332,6 +332,10 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
     Route::get('/employees/{employee}/events/export', [EmployeeController::class, 'exportEvents'])
         ->name('employees.events.export');
 
+    // Relatório completo do funcionário
+    Route::get('/employees/{employee}/report', [EmployeeController::class, 'generateReport'])
+        ->name('employees.report');
+
     Route::get('/employees/events/export', [EmployeeController::class, 'exportAllEvents'])
         ->name('employees.all-events.export');
 });

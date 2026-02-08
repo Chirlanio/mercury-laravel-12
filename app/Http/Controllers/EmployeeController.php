@@ -8,6 +8,7 @@ use App\Models\EmployeeStatus;
 use App\Models\EmployeeEvent;
 use App\Models\EmployeeEventType;
 use App\Models\EmploymentContract;
+use App\Models\Gender;
 use App\Models\Position;
 use App\Models\Store;
 use App\Exports\EmployeesExport;
@@ -1133,5 +1134,101 @@ class EmployeeController extends Controller
         $pdf = PDF::loadView('pdf.all-employee-events', $data);
 
         return $pdf->download('eventos_todos_funcionarios_' . now()->format('Y-m-d') . '.pdf');
+    }
+
+    /**
+     * Generate full employee report PDF
+     */
+    public function generateReport($id)
+    {
+        $employee = Employee::with(['educationLevel', 'position', 'store', 'employeeStatus'])
+            ->findOrFail($id);
+
+        $gender = $employee->gender_id ? Gender::find($employee->gender_id) : null;
+
+        // Buscar contratos
+        $contracts = EmploymentContract::where('employee_id', $id)
+            ->with(['position', 'movementType', 'store'])
+            ->orderBy('start_date', 'desc')
+            ->get();
+
+        $latestContractId = $contracts->first()?->id;
+
+        $contractsData = $contracts->map(function ($contract) use ($latestContractId) {
+            $isLatest = $contract->id === $latestContractId;
+
+            return [
+                'position' => $contract->position?->name ?? 'Não informado',
+                'movement_type' => $contract->movementType?->name ?? 'Não informado',
+                'store' => $contract->store?->name ?? $contract->store_id,
+                'date_range' => $contract->date_range,
+                'duration' => $contract->duration_text,
+                'status_label' => $contract->is_active && $isLatest ? 'Atual' : (!$contract->is_active && $isLatest ? 'Último contrato' : 'Encerrado'),
+            ];
+        });
+
+        // Buscar eventos
+        $events = EmployeeEvent::where('employee_id', $id)
+            ->with(['eventType', 'creator'])
+            ->orderBy('start_date', 'desc')
+            ->get()
+            ->map(function ($event) {
+                return [
+                    'event_type' => $event->eventType->name,
+                    'period' => $event->period,
+                    'duration_in_days' => $event->duration_in_days,
+                    'notes' => $event->notes,
+                    'created_by' => $event->creator ? $event->creator->name : 'Sistema',
+                    'created_at' => $event->created_at?->format('d/m/Y H:i'),
+                ];
+            });
+
+        // Buscar historico de mudancas
+        $histories = EmployeeHistory::where('employee_id', $id)
+            ->with('createdBy:id,name')
+            ->orderBy('event_date', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function ($history) {
+                return [
+                    'event_type_label' => $history->event_type_label,
+                    'title' => $history->title,
+                    'description' => $history->description,
+                    'old_value' => $history->old_value,
+                    'new_value' => $history->new_value,
+                    'event_date' => $history->event_date->format('d/m/Y'),
+                    'created_by' => $history->createdBy?->name ?? 'Sistema',
+                ];
+            });
+
+        $data = [
+            'employee' => [
+                'name' => $employee->name,
+                'cpf' => $employee->formatted_cpf,
+                'birth_date' => $employee->birth_date?->format('d/m/Y'),
+                'age' => $employee->age,
+                'education_level' => $employee->educationLevel?->description_name ?? 'Não informado',
+                'gender' => $gender?->description_name ?? 'Não informado',
+                'is_pcd' => (bool) $employee->is_pcd,
+                'is_apprentice' => (bool) $employee->is_apprentice,
+                'position' => $employee->position?->name ?? 'Não informado',
+                'level' => $employee->level ?? 'Não informado',
+                'store' => $employee->store?->display_name ?? $employee->store_id ?? 'Não informado',
+                'admission_date' => $employee->admission_date?->format('d/m/Y'),
+                'dismissal_date' => $employee->dismissal_date?->format('d/m/Y'),
+                'years_of_service' => $employee->years_of_service,
+                'is_active' => $employee->is_active,
+                'status' => $employee->employeeStatus?->description_name ?? ($employee->is_active ? 'Ativo' : 'Inativo'),
+                'site_coupon' => $employee->site_coupon,
+            ],
+            'contracts' => $contractsData,
+            'events' => $events,
+            'histories' => $histories,
+            'generated_at' => now()->format('d/m/Y H:i:s'),
+        ];
+
+        $pdf = PDF::loadView('pdf.employee-report', $data);
+
+        return $pdf->download('relatorio_' . str_replace(' ', '_', strtolower($employee->name)) . '_' . now()->format('Y-m-d') . '.pdf');
     }
 }
