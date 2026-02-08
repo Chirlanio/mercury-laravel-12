@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Builder;
 use Carbon\Carbon;
 
 class Employee extends Model
@@ -247,6 +248,24 @@ class Employee extends Model
     public function employeeStatus(): BelongsTo
     {
         return $this->belongsTo(EmployeeStatus::class, 'status_id');
+    }
+
+    /**
+     * Get all work schedule assignments for this employee
+     */
+    public function workScheduleAssignments(): HasMany
+    {
+        return $this->hasMany(EmployeeWorkSchedule::class);
+    }
+
+    /**
+     * Get the current work schedule assignment
+     */
+    public function currentWorkSchedule(): HasOne
+    {
+        return $this->hasOne(EmployeeWorkSchedule::class)
+                    ->whereNull('end_date')
+                    ->orderBy('effective_date', 'desc');
     }
 
     /**

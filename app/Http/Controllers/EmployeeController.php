@@ -7,6 +7,7 @@ use App\Models\EmployeeHistory;
 use App\Models\EmployeeStatus;
 use App\Models\EmployeeEvent;
 use App\Models\EmployeeEventType;
+use App\Models\EmployeeWorkSchedule;
 use App\Models\EmploymentContract;
 use App\Models\Gender;
 use App\Models\Position;
@@ -813,6 +814,63 @@ class EmployeeController extends Controller
                 'message' => 'Erro ao reativar contrato: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Get work schedule assignments for an employee
+     */
+    public function getWorkSchedule($employeeId)
+    {
+        $employee = Employee::findOrFail($employeeId);
+
+        $assignments = EmployeeWorkSchedule::where('employee_id', $employeeId)
+            ->with(['workSchedule.days', 'dayOverrides', 'createdBy:id,name'])
+            ->orderBy('effective_date', 'desc')
+            ->get()
+            ->map(function ($assignment) {
+                return [
+                    'id' => $assignment->id,
+                    'schedule_name' => $assignment->workSchedule->name,
+                    'schedule_id' => $assignment->work_schedule_id,
+                    'weekly_hours' => $assignment->workSchedule->formatted_weekly_hours,
+                    'effective_date' => $assignment->effective_date->format('d/m/Y'),
+                    'end_date' => $assignment->end_date?->format('d/m/Y'),
+                    'is_current' => $assignment->is_current,
+                    'notes' => $assignment->notes,
+                    'created_by' => $assignment->createdBy?->name ?? 'Sistema',
+                    'days' => $assignment->workSchedule->days->map(function ($day) use ($assignment) {
+                        $override = $assignment->dayOverrides->firstWhere('day_of_week', $day->day_of_week);
+                        return [
+                            'day_of_week' => $day->day_of_week,
+                            'day_name' => $day->day_name,
+                            'day_short_name' => $day->day_short_name,
+                            'is_work_day' => $override ? $override->is_work_day : $day->is_work_day,
+                            'entry_time' => $override ? $override->entry_time : $day->entry_time,
+                            'exit_time' => $override ? $override->exit_time : $day->exit_time,
+                            'has_override' => $override !== null,
+                            'override_reason' => $override?->reason,
+                        ];
+                    }),
+                    'overrides' => $assignment->dayOverrides->map(function ($override) {
+                        return [
+                            'id' => $override->id,
+                            'day_of_week' => $override->day_of_week,
+                            'is_work_day' => $override->is_work_day,
+                            'entry_time' => $override->entry_time,
+                            'exit_time' => $override->exit_time,
+                            'reason' => $override->reason,
+                        ];
+                    }),
+                ];
+            });
+
+        return response()->json([
+            'employee' => [
+                'id' => $employee->id,
+                'name' => $employee->name,
+            ],
+            'assignments' => $assignments,
+        ]);
     }
 
     /**

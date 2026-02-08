@@ -8,13 +8,16 @@ export default function EmployeeModal({ show, onClose, employeeId, onEdit, posit
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [currentSchedule, setCurrentSchedule] = useState(null);
 
     useEffect(() => {
         if (show && employeeId) {
             fetchEmployee();
+            fetchCurrentSchedule();
         } else if (!show) {
             // Reset state when modal closes
             setEmployee(null);
+            setCurrentSchedule(null);
             setError(null);
         }
     }, [show, employeeId]);
@@ -35,6 +38,19 @@ export default function EmployeeModal({ show, onClose, employeeId, onEdit, posit
             console.error('Erro ao buscar funcionário:', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchCurrentSchedule = async () => {
+        try {
+            const response = await fetch(`/employees/${employeeId}/work-schedule`);
+            if (response.ok) {
+                const data = await response.json();
+                const current = data.assignments?.find(a => a.is_current);
+                setCurrentSchedule(current || null);
+            }
+        } catch (err) {
+            console.error('Erro ao buscar escala:', err);
         }
     };
 
@@ -228,6 +244,15 @@ export default function EmployeeModal({ show, onClose, employeeId, onEdit, posit
                             <div>
                                 <span className="font-medium text-gray-600">Cupom Site:</span>
                                 <span className="ml-2 text-gray-900">{employee.site_coupon || 'Não informado'}</span>
+                            </div>
+                            <div>
+                                <span className="font-medium text-gray-600">Escala:</span>
+                                <span className="ml-2 text-gray-900">
+                                    {currentSchedule
+                                        ? `${currentSchedule.schedule_name} (${currentSchedule.weekly_hours})`
+                                        : 'Não atribuída'
+                                    }
+                                </span>
                             </div>
                         </div>
                     </div>

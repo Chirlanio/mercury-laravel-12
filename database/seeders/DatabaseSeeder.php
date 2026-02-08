@@ -35,6 +35,7 @@ class DatabaseSeeder extends Seeder
             StoreSeeder::class,
             EmployeeSeeder::class,
             EmploymentContractSeeder::class,
+            WorkScheduleSeeder::class,
         ]);
 
         // Cria um usuário de teste comum

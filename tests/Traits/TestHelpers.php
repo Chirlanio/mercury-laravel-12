@@ -4,6 +4,8 @@ namespace Tests\Traits;
 
 use App\Enums\Role;
 use App\Models\User;
+use App\Models\WorkSchedule;
+use App\Models\WorkScheduleDay;
 use Illuminate\Support\Facades\DB;
 
 trait TestHelpers
@@ -342,6 +344,46 @@ trait TestHelpers
             'created_at' => now(),
             'updated_at' => now(),
         ], $overrides));
+    }
+
+    protected function createTestWorkSchedule(array $overrides = []): WorkSchedule
+    {
+        $schedule = WorkSchedule::create(array_merge([
+            'name' => 'TEST SCHEDULE ' . uniqid(),
+            'description' => 'Test work schedule',
+            'weekly_hours' => 44.00,
+            'is_active' => true,
+            'is_default' => false,
+            'created_by_user_id' => $this->adminUser->id ?? null,
+            'updated_by_user_id' => $this->adminUser->id ?? null,
+        ], $overrides));
+
+        // Create 7 days (Mon-Fri work, Sat-Sun off)
+        $dayConfigs = [
+            ['day' => 0, 'work' => false],
+            ['day' => 1, 'work' => true, 'entry' => '08:00', 'exit' => '17:48', 'bs' => '12:00', 'be' => '13:00', 'bd' => 60, 'dh' => 8.80],
+            ['day' => 2, 'work' => true, 'entry' => '08:00', 'exit' => '17:48', 'bs' => '12:00', 'be' => '13:00', 'bd' => 60, 'dh' => 8.80],
+            ['day' => 3, 'work' => true, 'entry' => '08:00', 'exit' => '17:48', 'bs' => '12:00', 'be' => '13:00', 'bd' => 60, 'dh' => 8.80],
+            ['day' => 4, 'work' => true, 'entry' => '08:00', 'exit' => '17:48', 'bs' => '12:00', 'be' => '13:00', 'bd' => 60, 'dh' => 8.80],
+            ['day' => 5, 'work' => true, 'entry' => '08:00', 'exit' => '17:48', 'bs' => '12:00', 'be' => '13:00', 'bd' => 60, 'dh' => 8.80],
+            ['day' => 6, 'work' => false],
+        ];
+
+        foreach ($dayConfigs as $config) {
+            WorkScheduleDay::create([
+                'work_schedule_id' => $schedule->id,
+                'day_of_week' => $config['day'],
+                'is_work_day' => $config['work'],
+                'entry_time' => $config['work'] ? $config['entry'] : null,
+                'exit_time' => $config['work'] ? $config['exit'] : null,
+                'break_start' => $config['work'] ? $config['bs'] : null,
+                'break_end' => $config['work'] ? $config['be'] : null,
+                'break_duration_minutes' => $config['work'] ? $config['bd'] : null,
+                'daily_hours' => $config['work'] ? $config['dh'] : 0,
+            ]);
+        }
+
+        return $schedule;
     }
 
     protected function createTestStore(string $code, array $overrides = []): int
