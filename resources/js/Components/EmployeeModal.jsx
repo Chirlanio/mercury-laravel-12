@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import Modal from '@/Components/Modal';
 import EmployeeAvatar from '@/Components/EmployeeAvatar';
 import EmployeeHistoryModal from '@/Components/EmployeeHistoryModal';
+import EmployeeScheduleManageModal from '@/Components/EmployeeScheduleManageModal';
+import WorkScheduleDayOverrideModal from '@/Components/WorkScheduleDayOverrideModal';
 
 export default function EmployeeModal({ show, onClose, employeeId, onEdit, positions, stores }) {
     const [employee, setEmployee] = useState(null);
@@ -9,6 +11,8 @@ export default function EmployeeModal({ show, onClose, employeeId, onEdit, posit
     const [error, setError] = useState(null);
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [currentSchedule, setCurrentSchedule] = useState(null);
+    const [isScheduleManageOpen, setIsScheduleManageOpen] = useState(false);
+    const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
 
     useEffect(() => {
         if (show && employeeId) {
@@ -19,6 +23,8 @@ export default function EmployeeModal({ show, onClose, employeeId, onEdit, posit
             setEmployee(null);
             setCurrentSchedule(null);
             setError(null);
+            setIsScheduleManageOpen(false);
+            setIsOverrideModalOpen(false);
         }
     }, [show, employeeId]);
 
@@ -101,9 +107,34 @@ export default function EmployeeModal({ show, onClose, employeeId, onEdit, posit
         setIsHistoryModalOpen(true);
     };
 
+    const handleUnassignSchedule = async () => {
+        if (!currentSchedule) return;
+        if (!confirm('Tem certeza que deseja remover a escala deste funcionário?')) return;
+
+        try {
+            await axios.delete(`/work-schedules/${currentSchedule.schedule_id}/employees/${currentSchedule.id}`);
+            setCurrentSchedule(null);
+            refreshEmployee();
+        } catch (error) {
+            console.error('Erro ao remover escala:', error);
+        }
+    };
+
+    const handleScheduleAssigned = () => {
+        setIsScheduleManageOpen(false);
+        fetchCurrentSchedule();
+        refreshEmployee();
+    };
+
+    const handleOverrideCreated = () => {
+        setIsOverrideModalOpen(false);
+        fetchCurrentSchedule();
+    };
+
     const closeHistoryModal = () => {
         setIsHistoryModalOpen(false);
         refreshEmployee();
+        fetchCurrentSchedule();
     };
 
     if (loading) {
@@ -245,17 +276,128 @@ export default function EmployeeModal({ show, onClose, employeeId, onEdit, posit
                                 <span className="font-medium text-gray-600">Cupom Site:</span>
                                 <span className="ml-2 text-gray-900">{employee.site_coupon || 'Não informado'}</span>
                             </div>
-                            <div>
-                                <span className="font-medium text-gray-600">Escala:</span>
-                                <span className="ml-2 text-gray-900">
-                                    {currentSchedule
-                                        ? `${currentSchedule.schedule_name} (${currentSchedule.weekly_hours})`
-                                        : 'Não atribuída'
-                                    }
-                                </span>
-                            </div>
                         </div>
                     </div>
+                </div>
+
+                {/* Escala de Trabalho */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                            <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Escala de Trabalho
+                        </h4>
+                        <div className="flex gap-2">
+                            {currentSchedule && (
+                                <>
+                                    <button
+                                        onClick={() => setIsOverrideModalOpen(true)}
+                                        className="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md text-yellow-700 bg-yellow-100 hover:bg-yellow-200 transition-colors"
+                                        title="Adicionar exceção de dia"
+                                    >
+                                        <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Exceção
+                                    </button>
+                                    <button
+                                        onClick={handleUnassignSchedule}
+                                        className="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 transition-colors"
+                                        title="Remover escala"
+                                    >
+                                        <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        Remover
+                                    </button>
+                                </>
+                            )}
+                            <button
+                                onClick={() => setIsScheduleManageOpen(true)}
+                                className="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 transition-colors"
+                            >
+                                <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    {currentSchedule ? (
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                    ) : (
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                    )}
+                                </svg>
+                                {currentSchedule ? 'Alterar' : 'Atribuir Escala'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {currentSchedule ? (
+                        <div>
+                            {/* Info da escala */}
+                            <div className="flex items-center gap-3 mb-3">
+                                <span className="text-sm font-semibold text-gray-900">{currentSchedule.schedule_name}</span>
+                                <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">
+                                    {currentSchedule.weekly_hours}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                    Desde {currentSchedule.effective_date}
+                                </span>
+                            </div>
+
+                            {/* Grid visual dos 7 dias */}
+                            {currentSchedule.days && (
+                                <div className="grid grid-cols-7 gap-1">
+                                    {currentSchedule.days.map((day) => (
+                                        <div
+                                            key={day.day_of_week}
+                                            className={`p-2 rounded text-center text-xs ${
+                                                day.is_work_day
+                                                    ? day.has_override
+                                                        ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
+                                                        : 'bg-green-100 text-green-800'
+                                                    : day.has_override
+                                                        ? 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+                                                        : 'bg-gray-100 text-gray-500'
+                                            }`}
+                                        >
+                                            <div className="font-semibold">{day.day_short_name}</div>
+                                            {day.is_work_day ? (
+                                                <div className="text-[10px]">
+                                                    {day.entry_time?.substring(0, 5)}-{day.exit_time?.substring(0, 5)}
+                                                </div>
+                                            ) : (
+                                                <div className="text-[10px]">Folga</div>
+                                            )}
+                                            {day.has_override && (
+                                                <div className="text-[9px] font-medium mt-0.5" title={day.override_reason}>*</div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Overrides existentes */}
+                            {currentSchedule.overrides?.length > 0 && (
+                                <div className="mt-2">
+                                    <p className="text-xs text-gray-500">
+                                        {currentSchedule.overrides.length} exceção(ões) ativa(s)
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="text-center py-4">
+                            <svg className="w-10 h-10 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <p className="text-sm text-gray-500">Nenhuma escala atribuída</p>
+                            <button
+                                onClick={() => setIsScheduleManageOpen(true)}
+                                className="mt-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                            >
+                                Atribuir escala agora
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Ações disponíveis */}
@@ -318,6 +460,32 @@ export default function EmployeeModal({ show, onClose, employeeId, onEdit, posit
                 stores={stores}
                 onEmployeeUpdated={refreshEmployee}
             />
+
+            {/* Schedule Manage Modal */}
+            <EmployeeScheduleManageModal
+                isOpen={isScheduleManageOpen}
+                onClose={() => setIsScheduleManageOpen(false)}
+                onSuccess={handleScheduleAssigned}
+                employeeId={employeeId}
+                employeeName={employee?.name || ''}
+                currentAssignment={currentSchedule}
+            />
+
+            {/* Day Override Modal */}
+            {currentSchedule && (
+                <WorkScheduleDayOverrideModal
+                    isOpen={isOverrideModalOpen}
+                    onClose={() => setIsOverrideModalOpen(false)}
+                    onSuccess={handleOverrideCreated}
+                    assignment={{
+                        id: currentSchedule.id,
+                        employee_name: employee?.name,
+                        employee_short_name: employee?.short_name,
+                        overrides: currentSchedule.overrides || [],
+                    }}
+                    scheduleDays={currentSchedule.days || []}
+                />
+            )}
         </Modal>
     );
 }

@@ -268,6 +268,9 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
     // Exportar funcionários (deve vir antes do show para não conflitar com rotas)
     Route::get('/employees/export', [EmployeeController::class, 'export'])->name('employees.export');
 
+    // Lista JSON de funcionários (para selects/modais)
+    Route::get('/employees/list-json', [EmployeeController::class, 'listJson'])->name('employees.list-json');
+
     // Listar funcionários
     Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
 
@@ -373,6 +376,9 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
 // Rotas para escalas de trabalho
 Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
     Route::get('/work-schedules', [WorkScheduleController::class, 'index'])->name('work-schedules.index');
+
+    // Lista JSON de escalas ativas (para selects/modais) - deve vir antes de {workSchedule}
+    Route::get('/work-schedules/list-json', [WorkScheduleController::class, 'listJson'])->name('work-schedules.list-json');
 
     Route::get('/work-schedules/{workSchedule}', [WorkScheduleController::class, 'show'])->name('work-schedules.show');
 

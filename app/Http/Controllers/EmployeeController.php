@@ -105,6 +105,22 @@ class EmployeeController extends Controller
         ]);
     }
 
+    public function listJson()
+    {
+        $employees = Employee::query()
+            ->select(['id', 'name', 'short_name', 'status_id'])
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($emp) => [
+                'id' => $emp->id,
+                'name' => $emp->name,
+                'short_name' => $emp->short_name,
+                'is_active' => $emp->status_id == 2,
+            ]);
+
+        return response()->json(['employees' => $employees]);
+    }
+
     public function store(Request $request)
     {
         // Limpar CPF removendo máscara

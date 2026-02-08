@@ -38,30 +38,19 @@ export default function WorkScheduleDayOverrideModal({ isOpen, onClose, onSucces
         setErrors({});
 
         try {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-            const response = await fetch(`/employee-schedules/${assignment.id}/overrides`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                },
-                body: JSON.stringify({
-                    ...formData,
-                    day_of_week: parseInt(formData.day_of_week),
-                }),
+            await axios.post(`/employee-schedules/${assignment.id}/overrides`, {
+                ...formData,
+                day_of_week: parseInt(formData.day_of_week),
             });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                if (data.errors) setErrors(data.errors);
-                return;
-            }
 
             setFormData({ day_of_week: '', is_work_day: false, entry_time: '', exit_time: '', break_start: '', break_end: '', reason: '' });
             onSuccess();
         } catch (error) {
-            console.error('Erro ao criar exceção:', error);
+            if (error.response?.status === 422 && error.response?.data?.errors) {
+                setErrors(error.response.data.errors);
+            } else {
+                console.error('Erro ao criar exceção:', error);
+            }
         } finally {
             setProcessing(false);
         }

@@ -13,14 +13,8 @@ export default function WorkScheduleViewModal({ isOpen, onClose, schedule, onEdi
         if (!confirm('Tem certeza que deseja remover este funcionário da escala?')) return;
 
         try {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-            const response = await fetch(`/work-schedules/${schedule.id}/employees/${assignmentId}`, {
-                method: 'DELETE',
-                headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json' },
-            });
-            if (response.ok) {
-                onClose();
-            }
+            await axios.delete(`/work-schedules/${schedule.id}/employees/${assignmentId}`);
+            onClose();
         } catch (error) {
             console.error('Erro ao remover funcionário:', error);
         }
