@@ -38,8 +38,27 @@ export default function EmployeeModal({ show, onClose, employeeId, onEdit, posit
         }
     };
 
-    const getStatusBadgeColor = (isActive) => {
-        return isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+    const refreshEmployee = async () => {
+        try {
+            const response = await fetch(`/employees/${employeeId}?_t=${Date.now()}`);
+            if (response.ok) {
+                const data = await response.json();
+                setEmployee(data.employee);
+            }
+        } catch (err) {
+            console.error('Erro ao atualizar funcionário:', err);
+        }
+    };
+
+    const getStatusBadgeColor = (status) => {
+        const colors = {
+            'Ativo': 'bg-green-100 text-green-800',
+            'Férias': 'bg-blue-100 text-blue-800',
+            'Licença': 'bg-yellow-100 text-yellow-800',
+            'Inativo': 'bg-red-100 text-red-800',
+            'Pendente': 'bg-gray-100 text-gray-800',
+        };
+        return colors[status] || 'bg-red-100 text-red-800';
     };
 
     const getCharacteristicBadges = (employee) => {
@@ -68,6 +87,7 @@ export default function EmployeeModal({ show, onClose, employeeId, onEdit, posit
 
     const closeHistoryModal = () => {
         setIsHistoryModalOpen(false);
+        refreshEmployee();
     };
 
     if (loading) {
@@ -124,7 +144,7 @@ export default function EmployeeModal({ show, onClose, employeeId, onEdit, posit
                         <h3 className="text-xl font-semibold text-gray-900">{employee.name}</h3>
                         <p className="text-gray-600">{employee.short_name}</p>
                         <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${getStatusBadgeColor(employee.is_active)}`}>
+                            <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${getStatusBadgeColor(employee.status)}`}>
                                 {employee.status}
                             </span>
                             {characteristicBadges.map((badge, index) => (
@@ -271,6 +291,7 @@ export default function EmployeeModal({ show, onClose, employeeId, onEdit, posit
                 employeeId={employeeId}
                 positions={positions}
                 stores={stores}
+                onEmployeeUpdated={refreshEmployee}
             />
         </Modal>
     );
