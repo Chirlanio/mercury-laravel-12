@@ -133,7 +133,7 @@ class EmployeeController extends Controller
             'area_id' => 'nullable|integer',
             'is_pcd' => 'boolean',
             'is_apprentice' => 'boolean',
-            'profile_image' => ['nullable', ValidImageRule::avatar()],
+            'profile_image' => $request->hasFile('profile_image') ? ['nullable', ValidImageRule::avatar()] : 'nullable',
         ]);
 
         if ($validator->fails()) {
@@ -141,7 +141,7 @@ class EmployeeController extends Controller
         }
 
         try {
-            $data = $request->all();
+            $data = $request->except(['profile_image', '_token']);
 
             // Processar upload de imagem se existir
             if ($request->hasFile('profile_image')) {
@@ -180,13 +180,6 @@ class EmployeeController extends Controller
                 'start_date' => $employee->admission_date,
                 'end_date' => null,
                 'is_active' => true,
-            ]);
-
-            Log::info('Created employee with admission contract', [
-                'employee_id' => $employee->id,
-                'position_id' => $employee->position_id,
-                'store_id' => $employee->store_id,
-                'admission_date' => $employee->admission_date,
             ]);
 
             return redirect()->route('employees.index')->with('success', 'Funcionário cadastrado com sucesso!');
@@ -249,6 +242,7 @@ class EmployeeController extends Controller
                 'education_level_id' => $employee->education_level_id ? (string)$employee->education_level_id : '',
                 'gender_id' => $employee->gender_id ? (string)$employee->gender_id : '',
                 'area_id' => $employee->area_id ? (string)$employee->area_id : '',
+                'status_id' => $employee->status_id ? (string)$employee->status_id : '',
                 'is_pcd' => (bool)$employee->is_pcd,
                 'is_apprentice' => (bool)$employee->is_apprentice,
                 'avatar_url' => $employee->avatar_url,
@@ -259,17 +253,6 @@ class EmployeeController extends Controller
 
     public function update(Request $request, $id)
     {
-        Log::info('Update employee request', [
-            'id' => $id,
-            'data' => $request->all(),
-            'has_file' => $request->hasFile('profile_image'),
-            'file_info' => $request->hasFile('profile_image') ? [
-                'name' => $request->file('profile_image')->getClientOriginalName(),
-                'size' => $request->file('profile_image')->getSize(),
-                'mime' => $request->file('profile_image')->getMimeType(),
-            ] : null
-        ]);
-
         $employee = Employee::findOrFail($id);
 
         // Limpar CPF removendo máscara
@@ -282,8 +265,6 @@ class EmployeeController extends Controller
             'short_name' => $request->short_name ? strtoupper($request->short_name) : null,
             'site_coupon' => $request->site_coupon ? strtoupper($request->site_coupon) : null,
         ]);
-
-        Log::info('Cleaned CPF', ['original_cpf' => $request->cpf, 'cleaned' => $cleanCpf, 'length' => strlen($cleanCpf)]);
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100',
@@ -301,16 +282,10 @@ class EmployeeController extends Controller
             'area_id' => 'nullable|integer',
             'is_pcd' => 'boolean',
             'is_apprentice' => 'boolean',
-            'profile_image' => ['nullable', ValidImageRule::avatar()],
+            'profile_image' => $request->hasFile('profile_image') ? ['nullable', ValidImageRule::avatar()] : 'nullable',
         ]);
 
         if ($validator->fails()) {
-            Log::error('Update validation failed', [
-                'errors' => $validator->errors()->toArray(),
-                'input' => $request->all(),
-                'cpf_length' => strlen($request->cpf ?? ''),
-                'cpf_value' => $request->cpf
-            ]);
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
@@ -326,48 +301,22 @@ class EmployeeController extends Controller
         }
 
         try {
-            $data = $request->except(['_method', '_token']);
+            $data = $request->except(['_method', '_token', 'profile_image']);
 
             // Processar upload de imagem se existir
             if ($request->hasFile('profile_image')) {
-                Log::info('Processing profile image upload');
-
                 // Remover imagem antiga se existir
                 if ($employee->profile_image) {
                     $oldImagePath = storage_path('app/public/employees/' . $employee->profile_image);
-                    Log::info('Checking old image', ['path' => $oldImagePath, 'exists' => file_exists($oldImagePath)]);
                     if (file_exists($oldImagePath)) {
                         unlink($oldImagePath);
-                        Log::info('Old image deleted');
                     }
                 }
 
                 $image = $request->file('profile_image');
                 $imageName = time() . '.' . $image->getClientOriginalExtension();
-
-                Log::info('Attempting to save image', [
-                    'original_name' => $image->getClientOriginalName(),
-                    'temp_path' => $image->getRealPath(),
-                    'new_name' => $imageName,
-                    'target_dir' => storage_path('app/public/employees')
-                ]);
-
-                // Usar o disk 'public' explicitamente
-                $storedPath = $image->storeAs('employees', $imageName, 'public');
-
-                if ($storedPath === false) {
-                    Log::error('Failed to store image');
-                    throw new \Exception('Falha ao salvar imagem');
-                }
-
+                $image->storeAs('employees', $imageName, 'public');
                 $data['profile_image'] = $imageName;
-
-                Log::info('New image saved', [
-                    'name' => $imageName,
-                    'stored_path' => $storedPath,
-                    'full_path' => storage_path('app/public/employees/' . $imageName),
-                    'file_exists' => file_exists(storage_path('app/public/employees/' . $imageName))
-                ]);
             }
 
             // Definir valores padrão para campos obrigatórios se estiverem vazios
@@ -397,11 +346,7 @@ class EmployeeController extends Controller
             $data['is_pcd'] = isset($data['is_pcd']) && ($data['is_pcd'] === '1' || $data['is_pcd'] === true);
             $data['is_apprentice'] = isset($data['is_apprentice']) && ($data['is_apprentice'] === '1' || $data['is_apprentice'] === true);
 
-            Log::info('Updating employee with data', ['data' => $data]);
-
             $employee->update($data);
-
-            Log::info('Employee updated successfully', ['id' => $employee->id]);
 
             return redirect()->route('employees.index')->with('success', 'Funcionário atualizado com sucesso!');
 

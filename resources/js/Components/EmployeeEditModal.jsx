@@ -3,7 +3,7 @@ import { useForm, router } from '@inertiajs/react';
 import Modal from '@/Components/Modal';
 import Button from '@/Components/Button';
 
-export default function EmployeeEditModal({ show, onClose, onSuccess, employee, positions = [], stores = [] }) {
+export default function EmployeeEditModal({ show, onClose, onSuccess, employee, positions = [], stores = [], statuses = [] }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { data, setData, errors, reset, clearErrors, setError } = useForm({
         name: '',
@@ -19,6 +19,7 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
         education_level_id: '',
         gender_id: '',
         area_id: '',
+        status_id: '',
         is_pcd: false,
         is_apprentice: false,
         profile_image: null,
@@ -50,6 +51,7 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
                 education_level_id: employee.education_level_id ? String(employee.education_level_id) : '',
                 gender_id: employee.gender_id ? String(employee.gender_id) : '',
                 area_id: employee.area_id ? String(employee.area_id) : '',
+                status_id: employee.status_id ? String(employee.status_id) : '',
                 is_pcd: Boolean(employee.is_pcd),
                 is_apprentice: Boolean(employee.is_apprentice),
                 profile_image: null, // Imagem será tratada separadamente
@@ -83,8 +85,8 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
             _method: 'PUT'
         };
 
-        // Se não há um arquivo novo (apenas string com nome do arquivo antigo), remover o campo
-        if (typeof cleanedData.profile_image === 'string') {
+        // Remover profile_image se não houver arquivo novo selecionado
+        if (!cleanedData.profile_image || typeof cleanedData.profile_image === 'string') {
             delete cleanedData.profile_image;
         }
 
@@ -257,9 +259,9 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
                                 onChange={(e) => {
                                     const file = e.target.files[0];
                                     if (file) {
-                                        // Verificar tamanho do arquivo (20MB = 20 * 1024 * 1024 bytes)
-                                        if (file.size > 20 * 1024 * 1024) {
-                                            setError('profile_image', 'O arquivo deve ter no máximo 20MB');
+                                        // Verificar tamanho do arquivo (5MB = 5 * 1024 * 1024 bytes)
+                                        if (file.size > 5 * 1024 * 1024) {
+                                            setError('profile_image', 'O arquivo deve ter no máximo 5MB');
                                             e.target.value = ''; // Limpar o input
                                             return;
                                         }
@@ -294,7 +296,7 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
                         </div>
                         {errors.profile_image && <p className="mt-1 text-sm text-red-600">{errors.profile_image}</p>}
                         <p className="mt-1 text-xs text-gray-500">
-                            Formatos aceitos: JPEG, PNG, JPG, GIF. Tamanho máximo: 20MB
+                            Formatos aceitos: JPEG, PNG, JPG, GIF. Tamanho máximo: 5MB
                         </p>
                     </div>
                 </div>
@@ -405,6 +407,28 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
                                 }`}
                             />
                             {errors.site_coupon && <p className="mt-1 text-sm text-red-600">{errors.site_coupon}</p>}
+                        </div>
+
+                        <div>
+                            <label htmlFor="status_id" className="block text-sm font-medium text-gray-700 mb-1">
+                                Situação
+                            </label>
+                            <select
+                                id="status_id"
+                                value={data.status_id}
+                                onChange={(e) => setData('status_id', e.target.value)}
+                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                                    errors.status_id ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
+                                }`}
+                            >
+                                <option value="">Selecione a situação</option>
+                                {statuses.map((status) => (
+                                    <option key={status.id} value={status.id}>
+                                        {status.name}
+                                    </option>
+                                ))}
+                            </select>
+                            {errors.status_id && <p className="mt-1 text-sm text-red-600">{errors.status_id}</p>}
                         </div>
                     </div>
                 </div>
