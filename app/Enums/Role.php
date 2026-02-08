@@ -54,6 +54,10 @@ enum Role: string
                 Permission::VIEW_ACTIVITY_LOGS->value,
                 Permission::EXPORT_ACTIVITY_LOGS->value,
                 Permission::MANAGE_SYSTEM_SETTINGS->value,
+                Permission::VIEW_SALES->value,
+                Permission::CREATE_SALES->value,
+                Permission::EDIT_SALES->value,
+                Permission::DELETE_SALES->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -73,6 +77,10 @@ enum Role: string
                 Permission::VIEW_LOGS->value,
                 Permission::VIEW_ACTIVITY_LOGS->value,
                 Permission::EXPORT_ACTIVITY_LOGS->value,
+                Permission::VIEW_SALES->value,
+                Permission::CREATE_SALES->value,
+                Permission::EDIT_SALES->value,
+                Permission::DELETE_SALES->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -84,6 +92,7 @@ enum Role: string
                 Permission::ACCESS_SUPPORT_PANEL->value,
                 Permission::VIEW_LOGS->value,
                 Permission::VIEW_ACTIVITY_LOGS->value,
+                Permission::VIEW_SALES->value,
             ],
             self::USER => [
                 // Apenas próprio perfil

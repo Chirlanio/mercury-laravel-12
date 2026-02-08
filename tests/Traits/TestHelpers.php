@@ -386,6 +386,30 @@ trait TestHelpers
         return $schedule;
     }
 
+    protected int $testStoreId = 0;
+    protected int $testEmployeeId = 0;
+
+    protected function createTestSale(array $overrides = []): int
+    {
+        if (!$this->testStoreId) {
+            $this->testStoreId = DB::table('stores')->value('id') ?? $this->createTestStore('S001');
+        }
+        if (!$this->testEmployeeId) {
+            $this->testEmployeeId = DB::table('employees')->value('id') ?? $this->createTestEmployee();
+        }
+
+        return DB::table('sales')->insertGetId(array_merge([
+            'store_id' => $this->testStoreId,
+            'employee_id' => $this->testEmployeeId,
+            'date_sales' => '2026-01-15',
+            'total_sales' => 1500.00,
+            'qtde_total' => 10,
+            'source' => 'manual',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ], $overrides));
+    }
+
     protected function createTestStore(string $code, array $overrides = []): int
     {
         return DB::table('stores')->insertGetId(array_merge([

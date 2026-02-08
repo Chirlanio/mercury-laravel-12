@@ -12,6 +12,7 @@ use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\WorkShiftController;
 use App\Http\Controllers\WorkScheduleController;
 use App\Http\Controllers\StoreController;
+use App\Http\Controllers\SaleController;
 use App\Http\Controllers\ColorThemeController;
 use App\Http\Controllers\PageGroupController;
 use App\Http\Controllers\Admin\EmailSettingsController;
@@ -510,6 +511,46 @@ Route::middleware(['auth', 'permission:' . Permission::MANAGE_SETTINGS->value])-
     Route::resource('page-statuses', ConfigPageStatusController::class)->only(['index', 'store', 'update', 'destroy']);
 });
 
+// Rotas para vendas (Comercial)
+Route::middleware(['auth', 'permission:' . Permission::VIEW_SALES->value])->group(function () {
+    Route::get('/sales/statistics', [SaleController::class, 'statistics'])->name('sales.statistics');
+    Route::get('/sales', [SaleController::class, 'index'])->name('sales.index');
+
+    Route::post('/sales', [SaleController::class, 'store'])
+        ->middleware('permission:' . Permission::CREATE_SALES->value)
+        ->name('sales.store');
+
+    Route::get('/sales/{sale}', [SaleController::class, 'show'])->name('sales.show');
+    Route::get('/sales/{sale}/edit', [SaleController::class, 'edit'])
+        ->middleware('permission:' . Permission::EDIT_SALES->value)
+        ->name('sales.edit');
+    Route::put('/sales/{sale}', [SaleController::class, 'update'])
+        ->middleware('permission:' . Permission::EDIT_SALES->value)
+        ->name('sales.update');
+    Route::delete('/sales/{sale}', [SaleController::class, 'destroy'])
+        ->middleware('permission:' . Permission::DELETE_SALES->value)
+        ->name('sales.destroy');
+
+    // Sincronização CIGAM
+    Route::post('/sales/sync/auto', [SaleController::class, 'syncAuto'])
+        ->middleware('permission:' . Permission::CREATE_SALES->value)
+        ->name('sales.sync.auto');
+    Route::post('/sales/sync/month', [SaleController::class, 'syncByMonth'])
+        ->middleware('permission:' . Permission::CREATE_SALES->value)
+        ->name('sales.sync.month');
+    Route::post('/sales/sync/range', [SaleController::class, 'syncByDateRange'])
+        ->middleware('permission:' . Permission::CREATE_SALES->value)
+        ->name('sales.sync.range');
+
+    // Exclusão em lote
+    Route::post('/sales/bulk-delete/preview', [SaleController::class, 'bulkDeletePreview'])
+        ->middleware('permission:' . Permission::DELETE_SALES->value)
+        ->name('sales.bulk-delete.preview');
+    Route::post('/sales/bulk-delete', [SaleController::class, 'bulkDelete'])
+        ->middleware('permission:' . Permission::DELETE_SALES->value)
+        ->name('sales.bulk-delete');
+});
+
 // Rotas para páginas básicas ainda não implementadas (placeholder)
 Route::middleware(['auth'])->group(function () {
     // Menu Principal
@@ -530,7 +571,7 @@ Route::middleware(['auth'])->group(function () {
     })->name('ativo-fixo');
 
     Route::get('/comercial', function () {
-        return Inertia::render('ComingSoon', ['title' => 'Comercial']);
+        return redirect('/sales');
     })->name('comercial');
 
     Route::get('/delivery', function () {
