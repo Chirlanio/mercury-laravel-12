@@ -178,15 +178,22 @@ export default function Index({ auth, employees, positions, stores, statuses, fi
             label: "Status",
             field: "status",
             sortable: false,
-            render: (employee) => (
-                <span className={`inline-flex px-2 text-xs font-semibold rounded-full ${
-                    employee.is_active
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                }`}>
-                    {employee.status}
-                </span>
-            )
+            render: (employee) => {
+                const statusColors = {
+                    'Ativo': 'bg-green-100 text-green-800',
+                    'Férias': 'bg-blue-100 text-blue-800',
+                    'Licença': 'bg-yellow-100 text-yellow-800',
+                    'Inativo': 'bg-red-100 text-red-800',
+                    'Pendente': 'bg-gray-100 text-gray-800',
+                };
+                return (
+                    <span className={`inline-flex px-2 text-xs font-semibold rounded-full ${
+                        statusColors[employee.status] || 'bg-red-100 text-red-800'
+                    }`}>
+                        {employee.status}
+                    </span>
+                );
+            }
         },
         {
             label: "Características",
