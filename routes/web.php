@@ -14,6 +14,7 @@ use App\Http\Controllers\WorkScheduleController;
 use App\Http\Controllers\StoreController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\ColorThemeController;
+use App\Http\Controllers\ProductController;
 use App\Http\Controllers\PageGroupController;
 use App\Http\Controllers\Admin\EmailSettingsController;
 use App\Http\Controllers\Config\PositionController as ConfigPositionController;
@@ -514,6 +515,7 @@ Route::middleware(['auth', 'permission:' . Permission::MANAGE_SETTINGS->value])-
 // Rotas para vendas (Comercial)
 Route::middleware(['auth', 'permission:' . Permission::VIEW_SALES->value])->group(function () {
     Route::get('/sales/statistics', [SaleController::class, 'statistics'])->name('sales.statistics');
+    Route::get('/sales/employee-daily', [SaleController::class, 'employeeDailySales'])->name('sales.employee-daily');
     Route::get('/sales', [SaleController::class, 'index'])->name('sales.index');
 
     Route::post('/sales', [SaleController::class, 'store'])
@@ -551,11 +553,65 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_SALES->value])->grou
         ->name('sales.bulk-delete');
 });
 
+// Rotas para produtos
+Route::middleware(['auth', 'permission:' . Permission::VIEW_PRODUCTS->value])->group(function () {
+    // Sync routes BEFORE {product} to avoid route-model binding conflict
+    Route::post('/products/sync/init', [ProductController::class, 'syncInit'])
+        ->middleware('permission:' . Permission::SYNC_PRODUCTS->value)
+        ->name('products.sync.init');
+    Route::post('/products/sync/lookups', [ProductController::class, 'syncLookupsEndpoint'])
+        ->middleware('permission:' . Permission::SYNC_PRODUCTS->value)
+        ->name('products.sync.lookups');
+    Route::post('/products/sync/chunk', [ProductController::class, 'syncChunk'])
+        ->middleware('permission:' . Permission::SYNC_PRODUCTS->value)
+        ->name('products.sync.chunk');
+    Route::post('/products/sync/prices', [ProductController::class, 'syncPrices'])
+        ->middleware('permission:' . Permission::SYNC_PRODUCTS->value)
+        ->name('products.sync.prices');
+    Route::post('/products/sync/finalize', [ProductController::class, 'syncFinalize'])
+        ->middleware('permission:' . Permission::SYNC_PRODUCTS->value)
+        ->name('products.sync.finalize');
+    Route::post('/products/sync/cancel', [ProductController::class, 'syncCancel'])
+        ->middleware('permission:' . Permission::SYNC_PRODUCTS->value)
+        ->name('products.sync.cancel');
+    Route::get('/products/sync/status/{log}', [ProductController::class, 'syncStatus'])
+        ->middleware('permission:' . Permission::SYNC_PRODUCTS->value)
+        ->name('products.sync.status');
+    Route::get('/products/sync/logs', [ProductController::class, 'syncLogs'])
+        ->middleware('permission:' . Permission::SYNC_PRODUCTS->value)
+        ->name('products.sync.logs');
+
+    Route::get('/products/filter-options', [ProductController::class, 'filterOptions'])
+        ->name('products.filter-options');
+
+    Route::get('/products', [ProductController::class, 'index'])->name('products.index');
+    Route::get('/products/{product}', [ProductController::class, 'show'])->name('products.show');
+
+    Route::get('/products/{product}/edit', [ProductController::class, 'edit'])
+        ->middleware('permission:' . Permission::EDIT_PRODUCTS->value)
+        ->name('products.edit');
+    Route::put('/products/{product}', [ProductController::class, 'update'])
+        ->middleware('permission:' . Permission::EDIT_PRODUCTS->value)
+        ->name('products.update');
+    Route::post('/products/{product}/unlock-sync', [ProductController::class, 'unlockSync'])
+        ->middleware('permission:' . Permission::EDIT_PRODUCTS->value)
+        ->name('products.unlock-sync');
+    Route::put('/products/{product}/variants/{variant}', [ProductController::class, 'updateVariant'])
+        ->middleware('permission:' . Permission::EDIT_PRODUCTS->value)
+        ->name('products.variants.update');
+    Route::post('/products/{product}/variants', [ProductController::class, 'storeVariant'])
+        ->middleware('permission:' . Permission::EDIT_PRODUCTS->value)
+        ->name('products.variants.store');
+    Route::post('/products/{product}/variants/{variant}/generate-ean', [ProductController::class, 'generateEan'])
+        ->middleware('permission:' . Permission::EDIT_PRODUCTS->value)
+        ->name('products.variants.generate-ean');
+});
+
 // Rotas para páginas básicas ainda não implementadas (placeholder)
 Route::middleware(['auth'])->group(function () {
-    // Menu Principal
+    // Menu Principal - Produto redireciona para /products
     Route::get('/produto', function () {
-        return Inertia::render('ComingSoon', ['title' => 'Produto']);
+        return redirect('/products');
     })->name('produto');
 
     Route::get('/planejamento', function () {

@@ -75,7 +75,7 @@ class CigamSyncService
 
             foreach ($records as $record) {
                 try {
-                    $resolvedStoreId = $this->resolveStoreId($record->store_code, $record->cpf);
+                    $resolvedStoreId = $this->resolveStoreId($record->store_code);
                     $resolvedEmployeeId = $this->resolveEmployeeId($record->cpf);
 
                     if (!$resolvedEmployeeId) {
@@ -153,24 +153,8 @@ class CigamSyncService
         $this->employeeCpfMap = Employee::pluck('id', 'cpf')->toArray();
     }
 
-    protected function resolveStoreId(string $storeCode, string $cpf): ?int
+    protected function resolveStoreId(string $storeCode): ?int
     {
-        // E-commerce Z441: use employee's contract store
-        if ($storeCode === 'Z441') {
-            $employeeId = $this->resolveEmployeeId($cpf);
-            if ($employeeId) {
-                $employee = Employee::with('currentContract')->find($employeeId);
-                if ($employee && $employee->currentContract) {
-                    $contractStoreCode = $employee->currentContract->store_id ?? null;
-                    if ($contractStoreCode && isset($this->storeCodeMap[$contractStoreCode])) {
-                        return $this->storeCodeMap[$contractStoreCode];
-                    }
-                }
-            }
-            // Fallback to Z441 itself
-            return $this->storeCodeMap['Z441'] ?? null;
-        }
-
         return $this->storeCodeMap[$storeCode] ?? null;
     }
 

@@ -110,7 +110,7 @@ export default function Sidebar({ isOpen, onClose }) {
             },
 
             // Páginas básicas
-            Produto: { route: "/produto", permission: null },
+            Produto: { route: "/products", permission: PERMISSIONS.VIEW_PRODUCTS },
             Planejamento: { route: "/planejamento", permission: null },
             Financeiro: { route: "/financeiro", permission: null },
             "Ativo Fixo": { route: "/ativo-fixo", permission: null },

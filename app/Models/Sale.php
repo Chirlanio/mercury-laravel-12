@@ -6,6 +6,8 @@ use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
+use App\Models\Store;
+use App\Models\EmploymentContract;
 
 class Sale extends Model
 {
@@ -54,6 +56,39 @@ class Sale extends Model
     public function scopeForStore(Builder $query, int $storeId): Builder
     {
         return $query->where('store_id', $storeId);
+    }
+
+    public function scopeForStoreWithEcommerce(Builder $query, int $storeId): Builder
+    {
+        $store = Store::find($storeId);
+
+        if (!$store || $store->code === Store::ECOMMERCE_CODE) {
+            return $query->where('store_id', $storeId);
+        }
+
+        $ecommerceStore = Store::where('code', Store::ECOMMERCE_CODE)->first();
+
+        if (!$ecommerceStore) {
+            return $query->where('store_id', $storeId);
+        }
+
+        $employeeIds = EmploymentContract::active()
+            ->where('store_id', $store->code)
+            ->pluck('employee_id')
+            ->unique()
+            ->values()
+            ->toArray();
+
+        return $query->where(function (Builder $q) use ($storeId, $ecommerceStore, $employeeIds) {
+            $q->where('store_id', $storeId);
+
+            if (!empty($employeeIds)) {
+                $q->orWhere(function (Builder $q2) use ($ecommerceStore, $employeeIds) {
+                    $q2->where('store_id', $ecommerceStore->id)
+                       ->whereIn('employee_id', $employeeIds);
+                });
+            }
+        });
     }
 
     public function scopeForEmployee(Builder $query, int $employeeId): Builder

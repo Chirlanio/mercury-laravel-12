@@ -28,6 +28,11 @@ export const PERMISSIONS = {
     VIEW_ACTIVITY_LOGS: 'activity_logs.view',
     EXPORT_ACTIVITY_LOGS: 'activity_logs.export',
     MANAGE_SYSTEM_SETTINGS: 'system_settings.manage',
+
+    // Gestão de produtos
+    VIEW_PRODUCTS: 'products.view',
+    EDIT_PRODUCTS: 'products.edit',
+    SYNC_PRODUCTS: 'products.sync',
 };
 
 export const ROLES = {
@@ -57,6 +62,9 @@ const ROLE_PERMISSIONS = {
         PERMISSIONS.VIEW_ACTIVITY_LOGS,
         PERMISSIONS.EXPORT_ACTIVITY_LOGS,
         PERMISSIONS.MANAGE_SYSTEM_SETTINGS,
+        PERMISSIONS.VIEW_PRODUCTS,
+        PERMISSIONS.EDIT_PRODUCTS,
+        PERMISSIONS.SYNC_PRODUCTS,
     ],
     [ROLES.ADMIN]: [
         PERMISSIONS.VIEW_USERS,
@@ -74,6 +82,9 @@ const ROLE_PERMISSIONS = {
         PERMISSIONS.VIEW_LOGS,
         PERMISSIONS.VIEW_ACTIVITY_LOGS,
         PERMISSIONS.EXPORT_ACTIVITY_LOGS,
+        PERMISSIONS.VIEW_PRODUCTS,
+        PERMISSIONS.EDIT_PRODUCTS,
+        PERMISSIONS.SYNC_PRODUCTS,
     ],
     [ROLES.SUPPORT]: [
         PERMISSIONS.VIEW_USERS,
@@ -84,6 +95,7 @@ const ROLE_PERMISSIONS = {
         PERMISSIONS.ACCESS_SUPPORT_PANEL,
         PERMISSIONS.VIEW_LOGS,
         PERMISSIONS.VIEW_ACTIVITY_LOGS,
+        PERMISSIONS.VIEW_PRODUCTS,
     ],
     [ROLES.USER]: [
         PERMISSIONS.VIEW_OWN_PROFILE,
@@ -214,5 +226,8 @@ export function usePermissions() {
         canEditUsers: () => hasPermission(PERMISSIONS.EDIT_USERS),
         canDeleteUsers: () => hasPermission(PERMISSIONS.DELETE_USERS),
         canManageUserRoles: () => hasPermission(PERMISSIONS.MANAGE_USER_ROLES),
+        canViewProducts: () => hasPermission(PERMISSIONS.VIEW_PRODUCTS),
+        canEditProducts: () => hasPermission(PERMISSIONS.EDIT_PRODUCTS),
+        canSyncProducts: () => hasPermission(PERMISSIONS.SYNC_PRODUCTS),
     };
 }

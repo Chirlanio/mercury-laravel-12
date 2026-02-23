@@ -121,6 +121,8 @@ class MenuService
             'cupons/list' => '/coupons',
             'returns/list' => '/returns',
             'sales/list' => '/sales',
+            'products/list' => '/products',
+            'produto/listar' => '/products',
             'store-goals/list' => '/store-goals',
 
             // Checklist

@@ -12,6 +12,8 @@ class Store extends Model
 {
     use HasFactory, Auditable;
 
+    const ECOMMERCE_CODE = 'Z441';
+
     protected $table = 'stores';
 
     protected $fillable = [

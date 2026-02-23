@@ -38,6 +38,11 @@ enum Permission: string
     case EDIT_SALES = 'sales.edit';
     case DELETE_SALES = 'sales.delete';
 
+    // Gestão de produtos
+    case VIEW_PRODUCTS = 'products.view';
+    case EDIT_PRODUCTS = 'products.edit';
+    case SYNC_PRODUCTS = 'products.sync';
+
     public function label(): string
     {
         return match($this) {
@@ -68,6 +73,10 @@ enum Permission: string
             self::CREATE_SALES => 'Criar vendas',
             self::EDIT_SALES => 'Editar vendas',
             self::DELETE_SALES => 'Deletar vendas',
+
+            self::VIEW_PRODUCTS => 'Visualizar produtos',
+            self::EDIT_PRODUCTS => 'Editar produtos',
+            self::SYNC_PRODUCTS => 'Sincronizar produtos',
         };
     }
 
@@ -101,6 +110,10 @@ enum Permission: string
             self::CREATE_SALES => 'Permite criar novos registros de vendas',
             self::EDIT_SALES => 'Permite editar registros de vendas existentes',
             self::DELETE_SALES => 'Permite deletar registros de vendas',
+
+            self::VIEW_PRODUCTS => 'Permite visualizar catálogo de produtos',
+            self::EDIT_PRODUCTS => 'Permite editar informações de produtos',
+            self::SYNC_PRODUCTS => 'Permite sincronizar produtos com o CIGAM',
         };
     }
 
