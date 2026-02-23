@@ -366,15 +366,15 @@ class ProductControllerTest extends TestCase
 
         $this->mock(ProductSyncService::class, function ($mock) {
             $mock->shouldReceive('isAvailable')->andReturn(true);
-            $mock->shouldReceive('initSync')->andReturn(
-                ProductSyncLog::create([
+            $mock->shouldReceive('initSync')->andReturnUsing(function () {
+                return ProductSyncLog::create([
                     'sync_type' => 'full',
                     'status' => 'running',
                     'total_records' => 100,
                     'started_at' => now(),
                     'started_by_user_id' => $this->adminUser->id,
-                ])
-            );
+                ]);
+            });
         });
 
         $response = $this->actingAs($this->adminUser)->postJson('/products/sync/init', [
