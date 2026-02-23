@@ -58,6 +58,9 @@ enum Role: string
                 Permission::CREATE_SALES->value,
                 Permission::EDIT_SALES->value,
                 Permission::DELETE_SALES->value,
+                Permission::VIEW_PRODUCTS->value,
+                Permission::EDIT_PRODUCTS->value,
+                Permission::SYNC_PRODUCTS->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -81,6 +84,9 @@ enum Role: string
                 Permission::CREATE_SALES->value,
                 Permission::EDIT_SALES->value,
                 Permission::DELETE_SALES->value,
+                Permission::VIEW_PRODUCTS->value,
+                Permission::EDIT_PRODUCTS->value,
+                Permission::SYNC_PRODUCTS->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -93,6 +99,7 @@ enum Role: string
                 Permission::VIEW_LOGS->value,
                 Permission::VIEW_ACTIVITY_LOGS->value,
                 Permission::VIEW_SALES->value,
+                Permission::VIEW_PRODUCTS->value,
             ],
             self::USER => [
                 // Apenas próprio perfil

@@ -4,6 +4,11 @@ namespace Tests\Traits;
 
 use App\Enums\Role;
 use App\Models\User;
+use App\Models\Product;
+use App\Models\ProductBrand;
+use App\Models\ProductVariant;
+use App\Models\ProductSyncLog;
+use App\Models\Supplier;
 use App\Models\WorkSchedule;
 use App\Models\WorkScheduleDay;
 use Illuminate\Support\Facades\DB;
@@ -427,6 +432,59 @@ trait TestHelpers
             'status_id' => 1,
             'created_at' => now(),
             'updated_at' => now(),
+        ], $overrides));
+    }
+
+    protected function createTestProduct(array $overrides = []): Product
+    {
+        return Product::create(array_merge([
+            'reference' => 'REF-' . uniqid(),
+            'description' => 'TEST PRODUCT',
+            'is_active' => true,
+            'sync_locked' => false,
+        ], $overrides));
+    }
+
+    protected function createTestProductVariant(Product $product, array $overrides = []): ProductVariant
+    {
+        return ProductVariant::create(array_merge([
+            'product_id' => $product->id,
+            'barcode' => 'BC-' . uniqid(),
+            'size_cigam_code' => null,
+            'is_active' => true,
+        ], $overrides));
+    }
+
+    protected function createTestProductBrand(array $overrides = []): ProductBrand
+    {
+        return ProductBrand::create(array_merge([
+            'cigam_code' => 'BR-' . uniqid(),
+            'name' => 'TEST BRAND',
+            'is_active' => true,
+        ], $overrides));
+    }
+
+    protected function createTestSupplier(array $overrides = []): Supplier
+    {
+        return Supplier::create(array_merge([
+            'codigo_for' => 'SUP-' . uniqid(),
+            'razao_social' => 'TEST SUPPLIER LTDA',
+            'is_active' => true,
+        ], $overrides));
+    }
+
+    protected function createTestProductSyncLog(array $overrides = []): ProductSyncLog
+    {
+        return ProductSyncLog::create(array_merge([
+            'sync_type' => 'full',
+            'status' => 'completed',
+            'total_records' => 100,
+            'processed_records' => 100,
+            'inserted_records' => 80,
+            'updated_records' => 20,
+            'started_at' => now()->subMinutes(5),
+            'completed_at' => now(),
+            'started_by_user_id' => $this->adminUser->id ?? null,
         ], $overrides));
     }
 }

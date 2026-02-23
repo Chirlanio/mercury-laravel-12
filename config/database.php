@@ -110,6 +110,10 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => 'prefer',
+            'options' => [
+                \PDO::ATTR_TIMEOUT => 5,
+            ],
+            'connect_timeout' => 5,
         ],
 
         'sqlsrv' => [

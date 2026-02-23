@@ -16,10 +16,7 @@ class SaleController extends Controller
 {
     public function index(Request $request)
     {
-        $perPage = $request->get('per_page', 25);
         $search = $request->get('search');
-        $sortField = $request->get('sort', 'date_sales');
-        $sortDirection = $request->get('direction', 'desc');
         $storeId = $request->get('store_id');
         $month = $request->get('month', now()->month);
         $year = $request->get('year', now()->year);
@@ -34,47 +31,50 @@ class SaleController extends Controller
             if ($user->employee && $user->employee->store_id) {
                 $store = Store::where('code', $user->employee->store_id)->first();
                 if ($store) {
-                    $query->forStore($store->id);
+                    $query->forStoreWithEcommerce($store->id);
                 }
             }
         } elseif ($storeId) {
-            $query->forStore((int) $storeId);
+            $query->forStoreWithEcommerce((int) $storeId);
         }
 
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->whereHas('employee', function ($eq) use ($search) {
-                    $eq->where('name', 'like', "%{$search}%")
-                       ->orWhere('short_name', 'like', "%{$search}%");
-                })->orWhereHas('store', function ($sq) use ($search) {
-                    $sq->where('name', 'like', "%{$search}%")
-                       ->orWhere('code', 'like', "%{$search}%");
-                });
+            $query->whereHas('employee', function ($eq) use ($search) {
+                $eq->where('name', 'like', "%{$search}%")
+                   ->orWhere('short_name', 'like', "%{$search}%");
             });
         }
 
-        $allowedSortFields = ['date_sales', 'total_sales', 'qtde_total', 'source'];
-        if (in_array($sortField, $allowedSortFields)) {
-            $query->orderBy($sortField, $sortDirection);
-        } else {
-            $query->orderBy('date_sales', 'desc');
+        $sales = $query->get();
+
+        // Determine the effective store filter (explicit or from non-admin user)
+        $effectiveStoreId = $storeId ? (int) $storeId : null;
+        if (!$effectiveStoreId && !in_array($user->role, [Role::ADMIN, Role::SUPER_ADMIN])) {
+            if ($user->employee && $user->employee->store_id) {
+                $userStore = Store::where('code', $user->employee->store_id)->first();
+                if ($userStore) {
+                    $effectiveStoreId = $userStore->id;
+                }
+            }
         }
 
-        $sales = $query->paginate($perPage)->through(function ($sale) {
-            return [
-                'id' => $sale->id,
-                'date_sales' => $sale->date_sales->format('d/m/Y'),
-                'date_sales_raw' => $sale->date_sales->format('Y-m-d'),
-                'store_name' => $sale->store ? $sale->store->display_name : 'N/A',
-                'store_id' => $sale->store_id,
-                'employee_name' => $sale->employee ? $sale->employee->short_name : 'N/A',
-                'employee_id' => $sale->employee_id,
-                'total_sales' => (float) $sale->total_sales,
-                'formatted_total' => $sale->formatted_total,
-                'qtde_total' => $sale->qtde_total,
-                'source' => $sale->source,
-            ];
-        });
+        if ($effectiveStoreId) {
+            // With store filter: forStoreWithEcommerce already selected the right
+            // sales (physical + e-commerce). Group all under the filtered store so
+            // consultant totals include both physical and e-commerce.
+            $grouped = $this->groupSalesUnderSingleStore($sales, $effectiveStoreId);
+        } else {
+            // No filter (all stores): remap e-commerce sales to the consultant's
+            // physical store so totals include both.
+            $grouped = $this->groupSalesWithEcommerceRemapping($sales);
+        }
+
+        $grandTotals = [
+            'total_sales' => round((float) $sales->sum('total_sales'), 2),
+            'qtde_total' => (int) $sales->sum('qtde_total'),
+            'total_stores' => count($grouped),
+            'total_employees' => $sales->unique('employee_id')->count(),
+        ];
 
         $stores = Store::active()
             ->orderedByNetwork()
@@ -84,17 +84,180 @@ class SaleController extends Controller
         $cigamAvailable = (new CigamSyncService())->isAvailable();
 
         return Inertia::render('Sales/Index', [
-            'sales' => $sales,
+            'salesByStore' => $grouped,
+            'grandTotals' => $grandTotals,
             'stores' => $stores,
             'filters' => [
                 'store_id' => $storeId,
                 'month' => (int) $month,
                 'year' => (int) $year,
                 'search' => $search,
-                'sort' => $sortField,
-                'direction' => $sortDirection,
             ],
             'cigamAvailable' => $cigamAvailable,
+        ]);
+    }
+
+    /**
+     * Group all sales under a single store (used when a store filter is active).
+     */
+    protected function groupSalesUnderSingleStore($sales, int $storeId): array
+    {
+        if ($sales->isEmpty()) {
+            return [];
+        }
+
+        $store = Store::find($storeId);
+        $employees = $sales->groupBy('employee_id')->map(function ($empSales, $employeeId) {
+            $employee = $empSales->first()->employee;
+
+            return [
+                'employee_id' => (int) $employeeId,
+                'employee_name' => $employee ? $employee->short_name : 'N/A',
+                'total_sales' => round((float) $empSales->sum('total_sales'), 2),
+                'qtde_total' => (int) $empSales->sum('qtde_total'),
+            ];
+        })->values()->sortByDesc('total_sales')->values()->all();
+
+        return [[
+            'store_id' => $storeId,
+            'store_name' => $store ? $store->display_name : 'N/A',
+            'total_sales' => round((float) $sales->sum('total_sales'), 2),
+            'qtde_total' => (int) $sales->sum('qtde_total'),
+            'employees' => $employees,
+        ]];
+    }
+
+    /**
+     * Group sales by store, remapping e-commerce sales to the consultant's
+     * physical store based on active employment contracts.
+     */
+    protected function groupSalesWithEcommerceRemapping($sales): array
+    {
+        $ecommerceStore = Store::where('code', Store::ECOMMERCE_CODE)->first();
+        $ecommerceStoreId = $ecommerceStore ? $ecommerceStore->id : null;
+
+        // Build employee → home physical store mapping
+        $employeeHomeStoreId = [];
+        if ($ecommerceStoreId) {
+            $employeeIds = $sales->pluck('employee_id')->unique()->values()->toArray();
+            if (!empty($employeeIds)) {
+                $contracts = \App\Models\EmploymentContract::active()
+                    ->whereIn('employee_id', $employeeIds)
+                    ->get();
+
+                $storeCodes = $contracts->pluck('store_id')->unique()->values()->toArray();
+                $codeToId = Store::whereIn('code', $storeCodes)->pluck('id', 'code');
+
+                foreach ($contracts as $contract) {
+                    $mappedId = $codeToId[$contract->store_id] ?? null;
+                    if ($mappedId && $mappedId !== $ecommerceStoreId) {
+                        $employeeHomeStoreId[$contract->employee_id] = $mappedId;
+                    }
+                }
+            }
+        }
+
+        // Assign display store: e-commerce sales by contracted employees → physical store
+        $salesWithDisplay = $sales->map(function ($sale) use ($ecommerceStoreId, $employeeHomeStoreId) {
+            if ($sale->store_id === $ecommerceStoreId && isset($employeeHomeStoreId[$sale->employee_id])) {
+                $sale->display_store_id = $employeeHomeStoreId[$sale->employee_id];
+            } else {
+                $sale->display_store_id = $sale->store_id;
+            }
+
+            return $sale;
+        });
+
+        $storesById = Store::whereIn('id', $salesWithDisplay->pluck('display_store_id')->unique())->get()->keyBy('id');
+
+        return $salesWithDisplay->groupBy('display_store_id')->map(function ($storeSales, $displayStoreId) use ($storesById) {
+            $store = $storesById[(int) $displayStoreId] ?? null;
+            $employees = $storeSales->groupBy('employee_id')->map(function ($empSales, $employeeId) {
+                $employee = $empSales->first()->employee;
+
+                return [
+                    'employee_id' => (int) $employeeId,
+                    'employee_name' => $employee ? $employee->short_name : 'N/A',
+                    'total_sales' => round((float) $empSales->sum('total_sales'), 2),
+                    'qtde_total' => (int) $empSales->sum('qtde_total'),
+                ];
+            })->values()->sortByDesc('total_sales')->values()->all();
+
+            return [
+                'store_id' => (int) $displayStoreId,
+                'store_name' => $store ? $store->display_name : 'N/A',
+                'total_sales' => round((float) $storeSales->sum('total_sales'), 2),
+                'qtde_total' => (int) $storeSales->sum('qtde_total'),
+                'employees' => $employees,
+            ];
+        })->values()->sortByDesc('total_sales')->values()->all();
+    }
+
+    public function employeeDailySales(Request $request)
+    {
+        $request->validate([
+            'employee_id' => 'required|exists:employees,id',
+            'store_id' => 'required|exists:stores,id',
+            'month' => 'required|integer|between:1,12',
+            'year' => 'required|integer|between:2020,2099',
+        ]);
+
+        $employeeId = (int) $request->employee_id;
+        $storeId = (int) $request->store_id;
+        $month = (int) $request->month;
+        $year = (int) $request->year;
+
+        $employee = \App\Models\Employee::find($employeeId);
+        $store = Store::find($storeId);
+        $ecommerceStore = Store::where('code', Store::ECOMMERCE_CODE)->first();
+
+        // Get ALL sales for this employee in the month (across all stores)
+        $sales = Sale::with('store')
+            ->forEmployee($employeeId)
+            ->forMonth($month, $year)
+            ->orderBy('date_sales')
+            ->get();
+
+        $ecommerceStoreId = $ecommerceStore ? $ecommerceStore->id : null;
+
+        $dailySales = $sales->map(function ($sale) use ($ecommerceStoreId) {
+            $isEcommerce = $sale->store_id === $ecommerceStoreId;
+
+            return [
+                'id' => $sale->id,
+                'date_sales' => $sale->date_sales->format('d/m/Y'),
+                'date_sales_raw' => $sale->date_sales->format('Y-m-d'),
+                'total_sales' => (float) $sale->total_sales,
+                'qtde_total' => (int) $sale->qtde_total,
+                'source' => $sale->source,
+                'store_id' => $sale->store_id,
+                'store_name' => $sale->store ? $sale->store->display_name : 'N/A',
+                'is_ecommerce' => $isEcommerce,
+            ];
+        })->all();
+
+        $storeSales = $sales->filter(fn ($s) => $s->store_id !== $ecommerceStoreId);
+        $ecommerceSales = $sales->filter(fn ($s) => $s->store_id === $ecommerceStoreId);
+
+        return response()->json([
+            'employee' => [
+                'id' => $employee->id,
+                'name' => $employee->name,
+                'short_name' => $employee->short_name,
+            ],
+            'store' => [
+                'id' => $store->id,
+                'name' => $store->display_name,
+            ],
+            'daily_sales' => array_values($dailySales),
+            'totals' => [
+                'store_total' => round((float) $storeSales->sum('total_sales'), 2),
+                'store_qtde' => (int) $storeSales->sum('qtde_total'),
+                'ecommerce_total' => round((float) $ecommerceSales->sum('total_sales'), 2),
+                'ecommerce_qtde' => (int) $ecommerceSales->sum('qtde_total'),
+                'total' => round((float) $sales->sum('total_sales'), 2),
+                'total_qtde' => (int) $sales->sum('qtde_total'),
+            ],
         ]);
     }
 
@@ -242,11 +405,11 @@ class SaleController extends Controller
             if ($user->employee && $user->employee->store_id) {
                 $store = Store::where('code', $user->employee->store_id)->first();
                 if ($store) {
-                    $baseQuery->forStore($store->id);
+                    $baseQuery->forStoreWithEcommerce($store->id);
                 }
             }
         } elseif ($storeId) {
-            $baseQuery->forStore((int) $storeId);
+            $baseQuery->forStoreWithEcommerce((int) $storeId);
         }
 
         // Current month
