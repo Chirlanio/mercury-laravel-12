@@ -1,5 +1,6 @@
 import { Fragment, useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
+import axios from 'axios';
 import {
     XMarkIcon,
     ChevronDownIcon,
@@ -32,17 +33,12 @@ export default function ChecklistEditModal({ show, onClose, checklistId, onSucce
 
     const loadData = () => {
         setLoading(true);
-        fetch(`/checklists/${checklistId}`, {
-            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        })
-            .then((res) => res.json())
-            .then((json) => {
+        axios.get(`/checklists/${checklistId}`)
+            .then(({ data: json }) => {
                 setData(json);
-                // Expand all areas
                 const areas = {};
                 json.answers_by_area?.forEach((_, i) => { areas[i] = true; });
                 setExpandedAreas(areas);
-                // Initialize form state from answers
                 const forms = {};
                 json.answers_by_area?.forEach((group) => {
                     group.answers?.forEach((answer) => {
@@ -62,11 +58,8 @@ export default function ChecklistEditModal({ show, onClose, checklistId, onSucce
     };
 
     const loadEmployees = () => {
-        fetch('/checklists/employees', {
-            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        })
-            .then((res) => res.json())
-            .then((json) => setEmployees(json))
+        axios.get('/checklists/employees')
+            .then(({ data: json }) => setEmployees(json))
             .catch(() => {});
     };
 
@@ -90,32 +83,21 @@ export default function ChecklistEditModal({ show, onClose, checklistId, onSucce
         setSaving((prev) => ({ ...prev, [answerId]: true }));
 
         try {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-            const response = await fetch(`/checklists/${checklistId}/answers/${answerId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN': csrfToken,
-                },
-                body: JSON.stringify(form),
-            });
+            const { data: result } = await axios.put(
+                `/checklists/${checklistId}/answers/${answerId}`,
+                form
+            );
 
-            if (response.ok) {
-                const result = await response.json();
-                setSavedAnswers((prev) => ({ ...prev, [answerId]: true }));
+            setSavedAnswers((prev) => ({ ...prev, [answerId]: true }));
 
-                // Update checklist status in data
-                if (result.checklist) {
-                    setData((prev) => prev ? {
-                        ...prev,
-                        checklist: { ...prev.checklist, ...result.checklist },
-                    } : prev);
-                }
+            if (result.checklist) {
+                setData((prev) => prev ? {
+                    ...prev,
+                    checklist: { ...prev.checklist, ...result.checklist },
+                } : prev);
             }
         } catch (err) {
-            // Error handling silently
+            // Silent error handling
         } finally {
             setSaving((prev) => ({ ...prev, [answerId]: false }));
         }

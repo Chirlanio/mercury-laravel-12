@@ -1,5 +1,6 @@
 import { Fragment, useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
+import axios from 'axios';
 import {
     XMarkIcon,
     ChevronDownIcon,
@@ -38,13 +39,9 @@ export default function ChecklistViewModal({ show, onClose, checklistId }) {
     useEffect(() => {
         if (show && checklistId) {
             setLoading(true);
-            fetch(`/checklists/${checklistId}`, {
-                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-            })
-                .then((res) => res.json())
-                .then((json) => {
+            axios.get(`/checklists/${checklistId}`)
+                .then(({ data: json }) => {
                     setData(json);
-                    // Expand all areas by default
                     const areas = {};
                     json.answers_by_area?.forEach((group, i) => { areas[i] = true; });
                     setExpandedAreas(areas);
