@@ -16,6 +16,10 @@ use App\Http\Controllers\SaleController;
 use App\Http\Controllers\ColorThemeController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\PageGroupController;
+use App\Http\Controllers\UserSessionController;
+use App\Http\Controllers\TransferController;
+use App\Http\Controllers\StockAdjustmentController;
+use App\Http\Controllers\OrderPaymentController;
 use App\Http\Controllers\Admin\EmailSettingsController;
 use App\Http\Controllers\Config\PositionController as ConfigPositionController;
 use App\Http\Controllers\Config\PositionLevelController as ConfigPositionLevelController;
@@ -637,6 +641,81 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/rotas', function () {
         return Inertia::render('ComingSoon', ['title' => 'Rotas']);
     })->name('rotas');
+
+    // ==========================================
+    // Usuários Online
+    // ==========================================
+    Route::middleware('permission:' . Permission::VIEW_USER_SESSIONS->value)->group(function () {
+        Route::get('/user-sessions', [UserSessionController::class, 'index'])->name('user-sessions.index');
+    });
+
+    Route::post('/user-sessions/heartbeat', [UserSessionController::class, 'heartbeat'])->name('user-sessions.heartbeat');
+
+    // ==========================================
+    // Transferências entre Lojas
+    // ==========================================
+    Route::middleware('permission:' . Permission::VIEW_TRANSFERS->value)->group(function () {
+        Route::get('/transfers', [TransferController::class, 'index'])->name('transfers.index');
+        Route::get('/transfers/{transfer}', [TransferController::class, 'show'])->name('transfers.show');
+
+        Route::middleware('permission:' . Permission::CREATE_TRANSFERS->value)->group(function () {
+            Route::post('/transfers', [TransferController::class, 'store'])->name('transfers.store');
+        });
+
+        Route::middleware('permission:' . Permission::EDIT_TRANSFERS->value)->group(function () {
+            Route::put('/transfers/{transfer}', [TransferController::class, 'update'])->name('transfers.update');
+            Route::post('/transfers/{transfer}/confirm-pickup', [TransferController::class, 'confirmPickup'])->name('transfers.confirm-pickup');
+            Route::post('/transfers/{transfer}/confirm-delivery', [TransferController::class, 'confirmDelivery'])->name('transfers.confirm-delivery');
+            Route::post('/transfers/{transfer}/confirm-receipt', [TransferController::class, 'confirmReceipt'])->name('transfers.confirm-receipt');
+            Route::post('/transfers/{transfer}/cancel', [TransferController::class, 'cancel'])->name('transfers.cancel');
+        });
+
+        Route::middleware('permission:' . Permission::DELETE_TRANSFERS->value)->group(function () {
+            Route::delete('/transfers/{transfer}', [TransferController::class, 'destroy'])->name('transfers.destroy');
+        });
+    });
+
+    // ==========================================
+    // Ajustes de Estoque
+    // ==========================================
+    Route::middleware('permission:' . Permission::VIEW_ADJUSTMENTS->value)->group(function () {
+        Route::get('/stock-adjustments', [StockAdjustmentController::class, 'index'])->name('stock-adjustments.index');
+        Route::get('/stock-adjustments/{stockAdjustment}', [StockAdjustmentController::class, 'show'])->name('stock-adjustments.show');
+
+        Route::middleware('permission:' . Permission::CREATE_ADJUSTMENTS->value)->group(function () {
+            Route::post('/stock-adjustments', [StockAdjustmentController::class, 'store'])->name('stock-adjustments.store');
+        });
+
+        Route::middleware('permission:' . Permission::EDIT_ADJUSTMENTS->value)->group(function () {
+            Route::put('/stock-adjustments/{stockAdjustment}', [StockAdjustmentController::class, 'update'])->name('stock-adjustments.update');
+            Route::post('/stock-adjustments/{stockAdjustment}/transition', [StockAdjustmentController::class, 'transition'])->name('stock-adjustments.transition');
+        });
+
+        Route::middleware('permission:' . Permission::DELETE_ADJUSTMENTS->value)->group(function () {
+            Route::delete('/stock-adjustments/{stockAdjustment}', [StockAdjustmentController::class, 'destroy'])->name('stock-adjustments.destroy');
+        });
+    });
+
+    // ==========================================
+    // Ordens de Pagamento
+    // ==========================================
+    Route::middleware('permission:' . Permission::VIEW_ORDER_PAYMENTS->value)->group(function () {
+        Route::get('/order-payments', [OrderPaymentController::class, 'index'])->name('order-payments.index');
+        Route::get('/order-payments/{orderPayment}', [OrderPaymentController::class, 'show'])->name('order-payments.show');
+
+        Route::middleware('permission:' . Permission::CREATE_ORDER_PAYMENTS->value)->group(function () {
+            Route::post('/order-payments', [OrderPaymentController::class, 'store'])->name('order-payments.store');
+        });
+
+        Route::middleware('permission:' . Permission::EDIT_ORDER_PAYMENTS->value)->group(function () {
+            Route::put('/order-payments/{orderPayment}', [OrderPaymentController::class, 'update'])->name('order-payments.update');
+            Route::patch('/order-payments/{orderPayment}/status', [OrderPaymentController::class, 'updateStatus'])->name('order-payments.update-status');
+        });
+
+        Route::middleware('permission:' . Permission::DELETE_ORDER_PAYMENTS->value)->group(function () {
+            Route::delete('/order-payments/{orderPayment}', [OrderPaymentController::class, 'destroy'])->name('order-payments.destroy');
+        });
+    });
 
     Route::get('/ecommerce', function () {
         return Inertia::render('ComingSoon', ['title' => 'E-commerce']);

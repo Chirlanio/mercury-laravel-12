@@ -770,3 +770,50 @@ c069189 fix(tests): correct test failures and update constants
 **Data de Conclusão:** 21/01/2026
 **Responsável:** Claude - Assistente de Desenvolvimento
 **Revisado por:** -
+
+---
+
+## 14. Melhorias Fevereiro/2026 (v2.0)
+
+### 14.1 Contexto
+
+Análise comparativa com módulo APE (9/10) identificou lacunas no Sales (8/10).
+Documento detalhado: `docs/ANALISE_MELHORIAS_SALES.md`
+
+### 14.2 Melhorias Implementadas
+
+| Melhoria | Descrição |
+|----------|-----------|
+| **FinancialPermissionTrait** | Novo trait para centralizar lógica de permissão financeira (substituiu código duplicado em 3 models) |
+| **LoggerService CRUD** | Adicionado em AdmsAddSales, AdmsEditSalesByConsultant, AdmsDeleteSalesByConsultant |
+| **Cache de sessão** | TTL de 5min em AdmsStatisticsSales (reduz ~6 queries/página) |
+| **Filtros extras** | +4 filtros: Loja (admin), Status, Data Início, Data Fim |
+| **Relatórios** | 3 relatórios: por Loja, por Consultor, Comparativo Mensal (com impressão B&W) |
+| **Debounce** | Padronizado para 400ms |
+
+### 14.3 Arquitetura Atualizada
+
+```
+Models/helper/
+├── FinancialPermissionTrait.php  [NOVO] - Permissão financeira
+├── StorePermissionTrait.php             - Permissão de loja (APE)
+└── MoneyConverterTrait.php              - Conversão monetária
+
+Controllers/Sales.php
+├── list()                - Listagem com match expression
+├── statistics()          - Estatísticas JSON (com cache)
+├── report()              [NOVO] - Relatórios JSON (by_store, by_consultant, monthly)
+└── getEmployeesByStore() - Funcionários por loja
+
+Models/AdmsStatisticsSales.php
+├── calculateStatistics()           - Estatísticas (com cache 5min)
+├── calculateSalesByStore()         [NOVO] - Relatório por loja
+├── calculateSalesByConsultant()    [NOVO] - Relatório por consultor
+└── calculateMonthlyComparison()    [NOVO] - Comparativo mensal
+```
+
+### 14.4 Pontuação Atualizada
+
+**Sales: 8/10 → 9/10** (equiparado ao APE)
+
+**Data de Atualização:** 15/02/2026

@@ -43,6 +43,28 @@ enum Permission: string
     case EDIT_PRODUCTS = 'products.edit';
     case SYNC_PRODUCTS = 'products.sync';
 
+    // Usuários online
+    case VIEW_USER_SESSIONS = 'user_sessions.view';
+    case MANAGE_USER_SESSIONS = 'user_sessions.manage';
+
+    // Transferências entre lojas
+    case VIEW_TRANSFERS = 'transfers.view';
+    case CREATE_TRANSFERS = 'transfers.create';
+    case EDIT_TRANSFERS = 'transfers.edit';
+    case DELETE_TRANSFERS = 'transfers.delete';
+
+    // Ajustes de estoque
+    case VIEW_ADJUSTMENTS = 'adjustments.view';
+    case CREATE_ADJUSTMENTS = 'adjustments.create';
+    case EDIT_ADJUSTMENTS = 'adjustments.edit';
+    case DELETE_ADJUSTMENTS = 'adjustments.delete';
+
+    // Ordens de pagamento
+    case VIEW_ORDER_PAYMENTS = 'order_payments.view';
+    case CREATE_ORDER_PAYMENTS = 'order_payments.create';
+    case EDIT_ORDER_PAYMENTS = 'order_payments.edit';
+    case DELETE_ORDER_PAYMENTS = 'order_payments.delete';
+
     public function label(): string
     {
         return match($this) {
@@ -77,6 +99,24 @@ enum Permission: string
             self::VIEW_PRODUCTS => 'Visualizar produtos',
             self::EDIT_PRODUCTS => 'Editar produtos',
             self::SYNC_PRODUCTS => 'Sincronizar produtos',
+
+            self::VIEW_USER_SESSIONS => 'Visualizar usuários online',
+            self::MANAGE_USER_SESSIONS => 'Gerenciar sessões de usuários',
+
+            self::VIEW_TRANSFERS => 'Visualizar transferências',
+            self::CREATE_TRANSFERS => 'Criar transferências',
+            self::EDIT_TRANSFERS => 'Editar transferências',
+            self::DELETE_TRANSFERS => 'Deletar transferências',
+
+            self::VIEW_ADJUSTMENTS => 'Visualizar ajustes de estoque',
+            self::CREATE_ADJUSTMENTS => 'Criar ajustes de estoque',
+            self::EDIT_ADJUSTMENTS => 'Editar ajustes de estoque',
+            self::DELETE_ADJUSTMENTS => 'Deletar ajustes de estoque',
+
+            self::VIEW_ORDER_PAYMENTS => 'Visualizar ordens de pagamento',
+            self::CREATE_ORDER_PAYMENTS => 'Criar ordens de pagamento',
+            self::EDIT_ORDER_PAYMENTS => 'Editar ordens de pagamento',
+            self::DELETE_ORDER_PAYMENTS => 'Deletar ordens de pagamento',
         };
     }
 
@@ -114,6 +154,24 @@ enum Permission: string
             self::VIEW_PRODUCTS => 'Permite visualizar catálogo de produtos',
             self::EDIT_PRODUCTS => 'Permite editar informações de produtos',
             self::SYNC_PRODUCTS => 'Permite sincronizar produtos com o CIGAM',
+
+            self::VIEW_USER_SESSIONS => 'Permite visualizar usuários online no sistema',
+            self::MANAGE_USER_SESSIONS => 'Permite gerenciar sessões e forçar logout de usuários',
+
+            self::VIEW_TRANSFERS => 'Permite visualizar transferências entre lojas',
+            self::CREATE_TRANSFERS => 'Permite criar novas transferências entre lojas',
+            self::EDIT_TRANSFERS => 'Permite editar transferências existentes',
+            self::DELETE_TRANSFERS => 'Permite deletar transferências',
+
+            self::VIEW_ADJUSTMENTS => 'Permite visualizar ajustes de estoque',
+            self::CREATE_ADJUSTMENTS => 'Permite criar novos ajustes de estoque',
+            self::EDIT_ADJUSTMENTS => 'Permite editar ajustes de estoque existentes',
+            self::DELETE_ADJUSTMENTS => 'Permite deletar ajustes de estoque',
+
+            self::VIEW_ORDER_PAYMENTS => 'Permite visualizar ordens de pagamento',
+            self::CREATE_ORDER_PAYMENTS => 'Permite criar novas ordens de pagamento',
+            self::EDIT_ORDER_PAYMENTS => 'Permite editar ordens de pagamento existentes',
+            self::DELETE_ORDER_PAYMENTS => 'Permite deletar ordens de pagamento',
         };
     }
 

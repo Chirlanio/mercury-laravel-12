@@ -75,7 +75,7 @@
 | 29 | **SupplyCheckList** (Checklist de Suprimentos) | 🟡 MÉDIA | 🟨 MÉDIO | ❌ LEGADO | 41h | - | - | - | [ ] TODO |
 | 30 | **InternalTransferSystem** (Sistema de Transferência Interna) | 🟡 MÉDIA | 🟥 COMPLEXO | ❌ LEGADO | 86h | - | - | - | [ ] TODO |
 | 31 | **Consignments** (Consignações) | 🟡 MÉDIA | 🟥 COMPLEXO | ❌ LEGADO | 86h | - | - | - | [ ] TODO |
-| 32 | **OrderPayments** (Pagamentos de Pedidos) | 🟡 MÉDIA | 🟨 MÉDIO | ❌ LEGADO | 41h | - | - | - | [ ] TODO |
+| 32 | **OrderPayments** (Pagamentos de Pedidos) | 🟡 MÉDIA | 🟨 MÉDIO | ✅ MODERNO | 0h | ✅ Claude | - | - | [x] DONE |
 | 33 | **FixedAssets** (Ativos Fixos) | 🟡 MÉDIA | 🟨 MÉDIO | ❌ LEGADO | 41h | - | - | - | [ ] TODO |
 | 34 | **CountFixedAssets** (Contagem de Ativos) | 🟡 MÉDIA | 🟨 MÉDIO | ❌ LEGADO | 41h | - | - | - | [ ] TODO |
 | 35 | **Contracts** (Contratos) | 🟡 MÉDIA | 🟨 MÉDIO | ❌ LEGADO | 41h | - | - | - | [ ] TODO |
@@ -125,7 +125,7 @@
 | 61 | **StatusTransfer** (Status Transferência) | 🟢 BAIXA | 🟦 SIMPLES | ✅ MODERNO | 0h | [x] DONE (AbstractConfigController) |
 | 62 | **StatusReturn** (Status Troca) | 🟢 BAIXA | 🟦 SIMPLES | ✅ MODERNO | 0h | [x] DONE (AbstractConfigController) |
 | 63 | **StatusUser** (Status Usuário) | 🟢 BAIXA | 🟦 SIMPLES | ✅ MODERNO | 0h | [x] DONE (AbstractConfigController) |
-| 64 | **StatusOrderPayment** (Status Pagamento Pedido) | 🟢 BAIXA | 🟦 SIMPLES | ❌ LEGADO | 20h | [ ] TODO |
+| 64 | **StatusOrderPayment** (Status Pagamento Pedido) | 🟢 BAIXA | 🟦 SIMPLES | ✅ MODERNO | 0h | [x] DONE (AbstractConfigController) |
 | 65 | **CouponStatus** (Status Cupom) | 🟢 BAIXA | 🟦 SIMPLES | ❌ LEGADO | 20h | [ ] TODO |
 
 #### Configurações e Administração (SIMPLES/MÉDIO)
@@ -290,18 +290,18 @@
 
 | Status | Quantidade | Percentual |
 |--------|-----------|------------|
-| ✅ **MODERNO** | 17 | 13.6% |
+| ✅ **MODERNO** | 19 | 15.2% |
 | ⚠️ **PARCIAL** | 6 | 4.8% |
-| ❌ **LEGADO** | 102 | 81.6% |
+| ❌ **LEGADO** | 100 | 80.0% |
 | **TOTAL** | **125** | **100%** |
 
 ### Status Real do Projeto (por contagem de módulos)
 
 | Status | Quantidade | Percentual |
 |--------|-----------|------------|
-| ✅ **MODERNO** | ~85 | 77% |
+| ✅ **MODERNO** | ~87 | 79% |
 | ⚠️ **PARCIAL** | ~7 | 6% |
-| ❌ **LEGADO** | ~18 | 17% |
+| ❌ **LEGADO** | ~16 | 15% |
 | **TOTAL** | **110** | **100%** |
 
 ---
@@ -501,8 +501,8 @@ php artisan list:legacy-modules
 
 ---
 
-**Última Atualização**: 2026-02-07
-**Versão**: 1.2
+**Última Atualização**: 2026-03-01
+**Versão**: 1.3
 **Próxima Revisão**: Q2 2026 (final de junho)
 
 ---
@@ -511,6 +511,7 @@ php artisan list:legacy-modules
 
 | Data | Versão | Alterações |
 |------|--------|------------|
+| 2026-03-01 | 1.3 | OrderPayments + StatusOrderPayment marcados como MODERNO (refatoração completa com 5 fases, 151+ testes, WebSocket, reports, Kanban). Contadores atualizados. |
 | 2026-02-07 | 1.2 | 13 módulos config migrados para AbstractConfigController (Cor, Bandeira, Situacao, Cfop, TipoPagamento, TipoPg, SituacaoPg, Rota, SituacaoTransf, SituacaoTroca, SituacaoUser, SituacaoDelivery, ResponsavelAuditoria). ReversalReason (MotivoEstorno) migrado para padrão AJAX/modal. Contadores e métricas atualizados para refletir 77% de modernização real. |
 | 2026-01-21 | 1.1 | Sales marcado como MODERNO (refatoração completa com AJAX, testes, NotificationService, LoggerService) |
 | 2025-01-12 | 1.0 | Versão inicial do checklist |

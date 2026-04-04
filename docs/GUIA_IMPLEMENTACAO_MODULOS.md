@@ -622,16 +622,295 @@ class SalesControllerTest extends TestCase
 
 ---
 
-## 8. Conclusão
+## 8. Padrões Avançados (Referência: OrderPayments)
+
+O módulo **OrderPayments** (Março/2026) estende os padrões do Sales com funcionalidades avançadas. Use-o como referência quando o módulo exigir workflows complexos.
+
+### 8.1. Workflow Kanban com State Machine
+
+Para módulos com fluxo de status definido, crie um **TransitionService**:
+
+```php
+// Services/EntityTransitionService.php
+class EntityTransitionService
+{
+    private const TRANSITIONS = [
+        1 => [2],       // Status 1 → 2
+        2 => [1, 3],    // Status 2 → 1 ou 3
+        3 => [2, 4],    // Status 3 → 2 ou 4
+    ];
+
+    private const REQUIRED_FIELDS = [
+        '1_2' => ['campo_obrigatorio'],
+        '2_3' => ['outro_campo'],
+    ];
+
+    public function validateTransition(int $from, int $to, array $data): array
+    {
+        $allowed = self::TRANSITIONS[$from] ?? [];
+        if (!in_array($to, $allowed)) {
+            return ['valid' => false, 'errors' => ['Transição não permitida']];
+        }
+        // Validar campos obrigatórios...
+        return ['valid' => true, 'errors' => []];
+    }
+
+    public function executeTransition(int $id, int $from, int $to, array $fields, int $userId): bool
+    {
+        // Atualizar status + registrar histórico
+    }
+}
+```
+
+**Referência:** `Services/OrderPaymentTransitionService.php` (227 linhas)
+
+### 8.2. Soft-Delete com Níveis de Permissão
+
+Para módulos que exigem exclusão controlada, crie um **DeleteService**:
+
+```php
+// Services/EntityDeleteService.php
+class EntityDeleteService
+{
+    public function canDelete(array $entity, int $userId, int $userLevel): array
+    {
+        // Nível 1: criador + nunca editado → sem motivo
+        // Nível 2: financeiro → com motivo
+        // Nível 3: super admin → motivo + confirmação dupla
+        return [
+            'allowed' => true,
+            'requireReason' => false,
+            'requireConfirmation' => false,
+            'level' => 1,
+        ];
+    }
+}
+```
+
+**Referência:** `Services/OrderPaymentDeleteService.php` (80 linhas)
+
+### 8.3. Rateio / Alocação de Custos
+
+Para módulos com distribuição de valores entre centros de custo:
+
+```php
+// Services/EntityAllocationService.php
+public function validate(float $totalValue, array $allocations): array
+{
+    // Soma de % = 100% (tolerância ±0.01)
+    // Soma de valores = total (tolerância ±0.01)
+}
+
+public function recalculate(int $entityId, float $newTotal): bool
+{
+    // Mantém % e recalcula valores proporcionalmente
+}
+```
+
+**Referência:** `Services/OrderPaymentAllocationService.php` (216 linhas)
+
+### 8.4. PDO Transactions
+
+Para operações que envolvem múltiplas tabelas:
+
+```php
+$conn = AdmsConn::getConn();
+try {
+    $conn->beginTransaction();
+    // 1. Inserir entidade principal
+    // 2. Inserir parcelas/itens
+    // 3. Inserir alocações
+    // 4. Registrar status inicial
+    // 5. Upload de arquivos
+    $conn->commit();
+} catch (\Exception $e) {
+    $conn->rollBack();
+    LoggerService::error('ENTITY_CREATE_FAILED', $e->getMessage());
+}
+```
+
+**Referência:** `Models/AdmsAddOrderPayment.php` (875 linhas)
+
+### 8.5. Status Constants (Enum-like)
+
+```php
+// Models/constants/EntityStatus.php
+class EntityStatus
+{
+    public const DRAFT = 1;
+    public const ACTIVE = 2;
+    public const DONE = 3;
+
+    public const ALL = [1, 2, 3];
+
+    public static function getName(int $id): string
+    {
+        return match ($id) {
+            self::DRAFT => 'Rascunho',
+            self::ACTIVE => 'Ativo',
+            self::DONE => 'Concluído',
+            default => 'Desconhecido',
+        };
+    }
+}
+```
+
+**Referência:** `Models/constants/OrderPaymentStatus.php` (40 linhas)
+
+### 8.6. Kanban JavaScript com SortableJS
+
+```javascript
+function initKanbanDragDrop() {
+    document.querySelectorAll('.kanban-column-body').forEach(column => {
+        new Sortable(column, {
+            group: 'kanban-entity',
+            animation: 150,
+            onEnd: function(evt) {
+                const from = parseInt(evt.from.dataset.statusId);
+                const to = parseInt(evt.to.dataset.statusId);
+                if (from === to) return;
+                if (Math.abs(to - from) !== 1) {
+                    showFormError('Apenas transições adjacentes');
+                    return;
+                }
+                to > from ? openTransitionModal(id, from, to) : openReturnModal(id, from, to);
+            }
+        });
+    });
+}
+```
+
+**Referência:** `assets/js/order-payments.js` (4.867 linhas)
+
+### 8.7. CSRF Token Refresh (Retry em 403)
+
+```javascript
+async function refreshCsrfToken() {
+    const response = await fetch(window.location.href, { method: 'GET' });
+    const html = await response.text();
+    const match = html.match(/name="_csrf_token"\s+value="([^"]+)"/);
+    if (match) {
+        document.querySelectorAll('input[name="_csrf_token"]').forEach(
+            input => input.value = match[1]
+        );
+        return match[1];
+    }
+    return null;
+}
+
+// Uso em qualquer chamada AJAX:
+if (response.status === 403 && !isRetry) {
+    const newToken = await refreshCsrfToken();
+    if (newToken) return performAction(params, true); // retry
+}
+```
+
+### 8.8. Skeleton Loading Pattern
+
+Para carregamento de conteúdo principal via AJAX, usar skeleton ao invés de spinner:
+
+**CSS:**
+```css
+.skeleton-line {
+    background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-pulse 1.5s ease-in-out infinite;
+    border-radius: 4px;
+    height: 12px;
+}
+.skeleton-card { pointer-events: none; }
+
+@keyframes skeleton-pulse {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .skeleton-line { animation: none; background: #e0e0e0; }
+}
+```
+
+**JavaScript:**
+```javascript
+function getSkeletonHtml() {
+    const card = `
+        <div class="card bg-light m-1 skeleton-card" style="min-height:120px;">
+            <div class="card-header p-2">
+                <div class="skeleton-line" style="width:40%;height:14px;"></div>
+            </div>
+            <div class="card-body p-2">
+                <div class="skeleton-line mb-2" style="width:70%;height:13px;"></div>
+                <div class="skeleton-line mb-1" style="width:90%;height:11px;"></div>
+                <div class="skeleton-line" style="width:50%;height:11px;"></div>
+            </div>
+        </div>`;
+    // Montar layout com a mesma estrutura do conteúdo real
+    return `<div class="row">...</div>`;
+}
+
+// Fluxo: skeleton → fetch → substituir → reinicializar handlers
+contentContainer.innerHTML = getSkeletonHtml();
+const html = await fetchWithTimeout(url).then(r => r.text());
+contentContainer.innerHTML = html;
+initEventHandlers(); // innerHTML destrói listeners
+```
+
+**Quando usar cada indicador:**
+- **Skeleton**: conteúdo principal (listas, Kanban, tabelas)
+- **Spinner centralizado**: modais
+- **Spinner inline no botão**: "carregar mais"
+- **Fade (text-muted)**: atualização de KPIs/valores
+
+**Referência:** `assets/js/order-payments.js`, `assets/css/personalizado.css`
+
+### 8.9. Acessibilidade em Componentes
+
+```php
+<!-- Card com ARIA completo -->
+<div class="card kanban-card"
+     role="listitem"
+     tabindex="0"
+     aria-label="<?= htmlspecialchars("Entidade #{$id}, {$title}, R$ " . number_format($value, 2, ',', '.')) ?>">
+
+<!-- Região para screen readers -->
+<div id="sr-notification" class="visually-hidden" aria-live="assertive"></div>
+```
+
+```javascript
+// Atualizar screen reader após ações
+function updateSrNotification(text) {
+    document.getElementById('sr-notification').textContent = text;
+}
+```
+
+**Referência:** `Views/orderPayment/partials/_kanban_card.php` (143 linhas)
+
+---
+
+## 9. Conclusão
 
 A adoção deste padrão promove um desenvolvimento mais rápido, organizado e de fácil manutenção. Ao criar um novo módulo:
 
+### Módulos Simples (CRUD básico)
 1. **Consulte o módulo Sales** como referência de implementação
 2. **Use match expression** para roteamento no controller principal
 3. **Implemente NotificationService e LoggerService** em todos os controllers
 4. **Crie testes unitários** para Models e Controllers
 5. **Siga a estrutura de partials** para modais
 6. **Use async/await** no JavaScript
+
+### Módulos de Configuração (lookup tables)
+1. **Use AbstractConfigController** como base
+2. Consulte `docs/PADRONIZACAO.md` seção 20
+
+### Módulos Complexos (workflow, financeiro)
+1. **Consulte o módulo OrderPayments** como referência
+2. **Crie Services** para lógica de negócio (transition, delete, allocation)
+3. **Use Constants class** para status (enum-like com match expression)
+4. **Implemente PDO Transactions** para operações multi-tabela
+5. **Crie testes de integração** para workflows completos
+6. **Implemente acessibilidade** (ARIA, screen reader, keyboard)
+7. **Documentação:** `docs/ANALISE_MODULO_ORDERPAYMENTS.md`
 
 A utilização consistente dos Services e das Views parciais é fundamental para a modularidade e reusabilidade do código.
 
@@ -641,5 +920,6 @@ A utilização consistente dos Services e das Views parciais é fundamental para
 
 | Versão | Data | Alterações |
 |--------|------|------------|
+| 3.0 | 04/04/2026 | Adicionado OrderPayments como referência avançada, padrões de workflow, state machine, soft-delete multinível, rateio, Kanban, acessibilidade |
 | 2.0 | 21/01/2026 | Adicionado Sales como referência, padrões modernos |
 | 1.0 | - | Versão inicial baseada em Transfers e Reversals |

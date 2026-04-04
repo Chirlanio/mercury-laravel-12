@@ -1,8 +1,8 @@
 # Analise do Modulo Products (Cadastro de Produtos)
 
-**Data:** 13 de Fevereiro de 2026
-**Versao:** 1.1
-**Status:** Fases 1-4 Completas + Edicao de Produtos
+**Data:** 03 de Marco de 2026
+**Versao:** 1.3
+**Status:** Fases 1-7 Completas
 
 ---
 
@@ -35,9 +35,10 @@ CIGAM (PostgreSQL)                    Mercury (MySQL)
 
 ```
 app/adms/Controllers/
-  ├── Products.php                    # Listagem, busca, estatisticas
+  ├── Products.php                    # Listagem, busca, estatisticas, downloadSyncRejected
   ├── ViewProduct.php                 # Visualizacao detalhada (AJAX modal)
   ├── EditProduct.php                 # Edicao de produto + variantes (AJAX modal)
+  ├── ImportProductPrices.php         # Importacao de precos via CSV (upload, process, download, history)
   └── SynchronizeProducts.php         # Sincronizacao chunked (AJAX 4 fases)
 
 app/adms/Models/
@@ -45,7 +46,8 @@ app/adms/Models/
   ├── AdmsViewProduct.php             # Produto + variantes (JOINs)
   ├── AdmsEditProduct.php             # Edicao + variantes + EAN-13 auto
   ├── AdmsStatisticsProducts.php      # Metricas do catalogo
-  └── AdmsSynchronizeProducts.php     # Engine de sincronizacao (1393 linhas)
+  ├── AdmsImportProductPrices.php     # Engine de importacao de precos via CSV (rejected CSV + DB log)
+  └── AdmsSynchronizeProducts.php     # Engine de sincronizacao (rejected CSV em sync precos)
 
 app/adms/Views/products/
   ├── loadProducts.php                # Pagina principal (load)
@@ -53,7 +55,10 @@ app/adms/Views/products/
   └── partials/
       ├── _view_product_modal.php     # Modal de detalhes
       ├── _edit_product_modal.php     # Modal de edicao (produto + variantes)
-      ├── _sync_products_modal.php    # Modal de sincronizacao
+      ├── _sync_products_modal.php    # Modal de sincronizacao (+ download rejeitados)
+      ├── _import_product_prices_modal.php  # Modal de importacao de precos via CSV
+      ├── _operation_history_modal.php      # Modal de historico de operacoes (import + sync)
+      ├── _label_preset_modal.php     # Modal de impressao de etiquetas
       └── _statistics_dashboard.php   # Cards de estatisticas
 
 app/adms/Services/
@@ -63,8 +68,11 @@ app/cpadms/Models/
   └── CpAdmsSearchProducts.php        # Busca com filtros multiplos
 
 assets/js/
-  ├── products.js                     # Listagem, busca, modal view, modal edit
-  └── products-sync.js                # Orquestracao da sincronizacao
+  ├── products.js                     # Listagem, busca, modais, import precos, historico
+  └── products-sync.js                # Orquestracao da sincronizacao (+ download rejeitados)
+
+database/migrations/
+  └── 2026_03_03_import_product_prices_history.sql  # Migration: tabela import_logs + rejected_file + rotas
 
 tests/Products/                       # 11 arquivos
   ├── ProductsControllerTest.php
@@ -145,9 +153,32 @@ tests/Products/                       # 11 arquivos
 | products_synced | TINYINT | Flag: produtos sincronizados |
 | prices_synced | TINYINT | Flag: precos sincronizados |
 | error_details | TEXT | JSON com detalhes de erros |
+| rejected_file | VARCHAR(500) | Caminho do CSV de referencias rejeitadas (Fase 7) |
 | duration_seconds | INT | Duracao total |
 | created_by_user_id | INT | Usuario que iniciou |
 | started_at / completed_at | DATETIME | Timestamps |
+
+#### `adms_prod_import_logs` (auditoria de importacao de precos — Fase 7)
+
+| Campo | Tipo | Descricao |
+|-------|------|-----------|
+| id | INT PK AUTO_INCREMENT | |
+| import_type | VARCHAR(30) DEFAULT 'price_import' | Tipo de importacao |
+| file_name | VARCHAR(255) | Nome do arquivo CSV importado |
+| status | ENUM | started, processing, completed, error |
+| total_rows | INT | Total de linhas no CSV |
+| processed_rows | INT | Linhas processadas |
+| success_count | INT | Precos atualizados com sucesso |
+| unchanged_count | INT | Precos iguais (sem alteracao) |
+| skipped_count | INT | Linhas ignoradas (formato invalido) |
+| not_found_count | INT | Referencias nao encontradas |
+| error_count | INT | Erros de processamento |
+| rejected_file | VARCHAR(500) | Caminho do CSV de referencias rejeitadas |
+| duration_seconds | INT | Duracao total em segundos |
+| created_by_user_id | INT | Usuario que iniciou |
+| started_at | DATETIME | Inicio da importacao |
+| completed_at | DATETIME | Fim da importacao |
+| created_at | DATETIME | Timestamp de criacao |
 
 ### 2.2 Tabelas de Lookup (8 tabelas)
 
@@ -264,6 +295,38 @@ Frontend (products-sync.js)           Backend (SynchronizeProducts controller)
   - Variantes com `aux_reference` preenchido: preserva valor original
   - Botao de regeneracao para limpar e gerar novo codigo
 
+### 4.5 Importacao de Precos via Arquivo (ImportProductPrices — Fase 6)
+
+- **Upload CSV** com colunas: referencia, preco_venda, preco_custo (delimitador `;`)
+- **Processamento chunked** em background (`session_write_close` + JSON progress file)
+- **Progresso em tempo real** com polling AJAX (barra de progresso + contadores)
+- **Validacao:** formato numerico, referencia existente no banco, preco positivo
+- **Cancelamento** durante processamento via flag no arquivo de progresso
+- **Resultado detalhado:** atualizados, inalterados, ignorados, nao encontrados, erros
+- **CSV de rejeitados:** gera CSV com BOM UTF-8 das referencias com problemas (Fase 7)
+- **Log persistente:** cada importacao registrada em `adms_prod_import_logs` (Fase 7)
+
+### 4.6 CSV de Referencias Rejeitadas + Historico de Operacoes (Fase 7)
+
+- **CSV de rejeitados na importacao:** gera `precos_rejeitados_*.csv` em `uploads/import_errors/`
+  - Colunas: LINHA, REFERENCIA, MOTIVO, PRECO_VENDA, PRECO_CUSTO
+  - BOM UTF-8 para compatibilidade Excel, delimitador `;`
+  - Link de download no resultado da importacao
+- **CSV de rejeitados na sincronizacao:** gera `sync_precos_rejeitados_*.csv`
+  - Colunas: REFERENCIA, MOTIVO
+  - Captura: produtos nao encontrados, produtos bloqueados (sync_locked)
+  - Link de download no resultado da sincronizacao
+- **Log persistente de importacoes:** tabela `adms_prod_import_logs`
+  - Contadores: total, success, unchanged, skipped, not_found, error
+  - Path do CSV rejeitado, duracao, usuario
+- **Modal de historico de operacoes:** unifica importacoes + sincronizacoes
+  - Query UNION ALL entre `adms_prod_import_logs` e `adms_prod_sync_logs`
+  - Badges de status (completed=verde, error=vermelho, partial=amarelo)
+  - Badges de tipo (import=info, sync=warning)
+  - Download de CSVs rejeitados diretamente do historico
+  - Informacoes: data, tipo, subtipo, arquivo, contadores, duracao, usuario
+- **Download seguro:** validacao de path traversal (`str_starts_with('uploads/import_errors/')`)
+
 ### 4.2 Sincronizacao
 
 - **Produtos** — upsert por referencia (INSERT ON DUPLICATE KEY UPDATE)
@@ -301,6 +364,14 @@ Frontend (products-sync.js)           Backend (SynchronizeProducts controller)
 | synchronize-products/cancel | SynchronizeProducts/cancel | AJAX |
 | synchronize-products/get-progress | SynchronizeProducts/getProgress | AJAX |
 | synchronize-products/get-last-sync | SynchronizeProducts/getLastSync | AJAX |
+| import-product-prices/upload | ImportProductPrices/upload | AJAX POST |
+| import-product-prices/process | ImportProductPrices/process | AJAX POST |
+| import-product-prices/progress | ImportProductPrices/progress | AJAX |
+| import-product-prices/dismiss | ImportProductPrices/dismiss | AJAX POST |
+| import-product-prices/cancel | ImportProductPrices/cancel | AJAX POST |
+| import-product-prices/download-rejected | ImportProductPrices/downloadRejected | GET (download) |
+| import-product-prices/operation-history | ImportProductPrices/operationHistory | AJAX POST |
+| products/download-sync-rejected | Products/downloadSyncRejected | GET (download) |
 
 ---
 
@@ -349,6 +420,13 @@ A sincronizacao aplica sanitizacao automatica:
 | Variantes soft delete | Remocao via is_active=0, preserva historico |
 | CSRF refresh por fase | Token expira em 1h, syncs podem ser longos |
 | Lookup batch upsert | INSERT ON DUPLICATE KEY UPDATE para eficiencia |
+| Import precos via CSV | Upload + processamento em background com progress polling |
+| session_write_close() | Libera sessao durante processamento pesado para nao bloquear polling |
+| CSV rejeitados com BOM | BOM UTF-8 (\xEF\xBB\xBF) + delimitador `;` para Excel PT-BR |
+| Log persistente imports | `adms_prod_import_logs` — importacoes nao tinham log antes |
+| UNION ALL historico | Query combinando import_logs + sync_logs com collation explicita |
+| Collation explicita | `utf8mb4_unicode_ci` obrigatorio — MySQL 8 default e `0900_ai_ci` (incompativel em UNION) |
+| Path traversal protection | Validacao `str_starts_with('uploads/import_errors/')` no download |
 
 ---
 
@@ -362,9 +440,11 @@ Ver documento: `docs/PLANO_ACAO_PRODUCTS.md`
 | Fase 2 | Historico de precos | Completa |
 | Fase 3 | Historico de colecoes/estacoes | Completa |
 | Fase 4 | Produtos em promocao | Completa |
-| Extra | Edicao de produto + variantes + EAN-13 | Completa |
+| Fase 5 | Edicao de produto + variantes + EAN-13 | Completa |
+| Fase 6 | Importacao de precos via arquivo CSV | Completa |
+| Fase 7 | CSV de rejeitados + Historico de operacoes | Completa |
 
 ---
 
 **Mantido por:** Equipe Mercury - Grupo Meia Sola
-**Ultima Atualizacao:** 13/02/2026
+**Ultima Atualizacao:** 03/03/2026

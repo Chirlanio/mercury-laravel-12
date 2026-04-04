@@ -1331,6 +1331,192 @@ if (!defined('URLADM')) {
 
 ---
 
+## 12.1. Template: Partial de Estatísticas (Cards)
+
+**Arquivo**: `app/adms/Views/entityName/partials/_statistics_dashboard.php`
+
+Template genérico para cards de estatísticas. Baseado no módulo de referência **Sales**.
+
+### Estrutura do Card
+
+Cada card segue este layout responsivo:
+
+```
+Mobile (xs): 2 cards por linha  → col-6
+Mobile (sm): 3 cards por linha  → col-sm-4
+Tablet (md): 2 cards por linha  → col-md-6
+Desktop (lg): 4 cards por linha → col-lg-3
+```
+
+### Template Completo
+
+```php
+<?php
+/**
+ * Dashboard de Estatísticas de [NomeDoMódulo]
+ *
+ * Partial para exibir cards de estatísticas.
+ * Cards são atualizados dinamicamente via JavaScript quando filtros são aplicados.
+ */
+if (!defined('URLADM')) {
+    header("Location: /");
+    exit();
+}
+
+$stats = $this->Dados['statistics'] ?? [];
+
+// Valores com fallback para garantir exibição
+$totalItems = $stats['total_items'] ?? 0;
+$variation = $stats['variation'] ?? 0;
+$secondaryMetric = $stats['secondary_metric'] ?? 0;
+$tertiaryMetric = $stats['tertiary_metric'] ?? 0;
+
+// Determina cor e ícone da variação
+$variationColor = $variation >= 0 ? 'success' : 'danger';
+$variationIcon = $variation >= 0 ? 'arrow-up' : 'arrow-down';
+?>
+    <div class="row d-print-none" id="statistics_cards">
+        <!-- Card 1: Métrica Principal -->
+        <div class="col-6 col-sm-4 col-md-6 col-lg-3 mb-3">
+            <div class="card border-primary h-100" id="card-total">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-muted mb-1 small">Total do Mês</h6>
+                            <h4 class="mb-0" id="stat-total">R$ <?= number_format($totalItems, 2, ',', '.') ?></h4>
+                            <small class="text-muted d-block text-truncate">Descrição breve</small>
+                        </div>
+                        <div class="text-primary d-none d-sm-block">
+                            <i class="fas fa-dollar-sign fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 2: Variação (cor dinâmica) -->
+        <div class="col-6 col-sm-4 col-md-6 col-lg-3 mb-3">
+            <div class="card border-<?= $variationColor ?> h-100" id="card-variation" data-color="<?= $variationColor ?>">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-muted mb-1 small">Variação</h6>
+                            <h4 class="mb-0" id="stat-variation">
+                                <i class="fas fa-<?= $variationIcon ?> fa-sm" id="icon-variation"></i>
+                                <span id="stat-variation-value"><?= number_format(abs($variation), 1, ',', '.') ?>%</span>
+                            </h4>
+                            <small class="text-muted d-block text-truncate">vs. mês anterior</small>
+                        </div>
+                        <div id="icon-variation-lg" class="text-<?= $variationColor ?> d-none d-sm-block">
+                            <i class="fas fa-chart-line fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 3: Métrica Secundária (cor fixa) -->
+        <div class="col-6 col-sm-4 col-md-6 col-lg-3 mb-3">
+            <div class="card border-info h-100" id="card-secondary">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-muted mb-1 small">Métrica Secundária</h6>
+                            <h4 class="mb-0" id="stat-secondary"><?= number_format($secondaryMetric, 0, ',', '.') ?></h4>
+                            <small class="text-muted d-block text-truncate">Descrição breve</small>
+                        </div>
+                        <div class="text-info d-none d-sm-block">
+                            <i class="fas fa-box fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 4: Métrica Terciária (cor fixa) -->
+        <div class="col-6 col-sm-4 col-md-6 col-lg-3 mb-3">
+            <div class="card border-warning h-100" id="card-tertiary">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-muted mb-1 small">Métrica Terciária</h6>
+                            <h4 class="mb-0" id="stat-tertiary"><?= number_format($tertiaryMetric, 0, ',', '.') ?></h4>
+                            <small class="text-muted d-block text-truncate">Descrição breve</small>
+                        </div>
+                        <div class="text-warning d-none d-sm-block">
+                            <i class="fas fa-users fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+```
+
+### Padrões Importantes
+
+1. **IDs únicos**: Cada card e valor deve ter `id` para atualização via JavaScript (ex: `stat-total`, `card-variation`)
+2. **Atributo `data-color`**: Em cards com cor dinâmica, usar `data-color` para o JS atualizar a borda
+3. **Fallback com `??`**: Sempre usar null coalescing para evitar erros quando `$stats` está vazio
+4. **`d-print-none`**: Cards não aparecem na impressão
+5. **`d-none d-sm-block`**: Ícone grande oculto em telas xs (mobile portrait)
+6. **`text-truncate`**: Evita quebra de linha no subtítulo em telas pequenas
+7. **`h-100`**: Garante altura uniforme entre cards na mesma linha
+
+### Cores Bootstrap para Cards
+
+| Tipo | Classe | Uso recomendado |
+|------|--------|-----------------|
+| `border-primary` | Azul | Métrica principal (total, valor) |
+| `border-success` | Verde | Variação positiva, aprovados |
+| `border-danger` | Vermelho | Variação negativa, rejeitados |
+| `border-warning` | Amarelo | Pendentes, alertas |
+| `border-info` | Ciano | Contadores, quantidade |
+| `border-secondary` | Cinza | Informações complementares |
+
+### Atualização via JavaScript
+
+No arquivo JS do módulo, atualizar os cards após filtros:
+
+```javascript
+function updateStatistics(stats) {
+    // Card com valor monetário
+    const totalEl = document.getElementById('stat-total');
+    if (totalEl) {
+        totalEl.textContent = 'R$ ' + parseFloat(stats.total_items || 0)
+            .toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    }
+
+    // Card com variação (cor dinâmica)
+    const variationCard = document.getElementById('card-variation');
+    const variationIcon = document.getElementById('icon-variation');
+    const variationValue = document.getElementById('stat-variation-value');
+    const variationIconLg = document.getElementById('icon-variation-lg');
+
+    if (variationCard && variationValue) {
+        const variation = parseFloat(stats.variation || 0);
+        const color = variation >= 0 ? 'success' : 'danger';
+        const icon = variation >= 0 ? 'arrow-up' : 'arrow-down';
+
+        variationCard.className = variationCard.className.replace(/border-\w+/, 'border-' + color);
+        variationCard.dataset.color = color;
+        variationIcon.className = 'fas fa-' + icon + ' fa-sm';
+        variationValue.textContent = Math.abs(variation).toFixed(1).replace('.', ',') + '%';
+        if (variationIconLg) {
+            variationIconLg.className = variationIconLg.className.replace(/text-\w+/, 'text-' + color);
+        }
+    }
+
+    // Card com contador simples
+    const secondaryEl = document.getElementById('stat-secondary');
+    if (secondaryEl) {
+        secondaryEl.textContent = parseInt(stats.secondary_metric || 0).toLocaleString('pt-BR');
+    }
+}
+```
+
+---
+
 ## 13. Template: Modal de Cadastro
 
 **Arquivo**: `app/adms/Views/product/partials/_add_product_modal.php`
@@ -2643,7 +2829,107 @@ Referência para CRUD básico com validação e auditoria.
 
 Referência para fluxos de aprovação multinível.
 
+### 21.4. OrderPayments (Ordens de Pagamento) - Módulo Financeiro/Workflow
+
+**Status:** ✅ MODERNO (Implementado em Março/2026)
+
+O módulo OrderPayments é a **referência mais completa** do projeto, combinando workflow Kanban com state machine, soft-delete multinível, rateio de custos, 8 relatórios financeiros, dashboard com gráficos, API REST e acessibilidade completa.
+
+**Características:**
+- Workflow Kanban com drag-and-drop (SortableJS)
+- State machine de transições com validação condicional
+- Sistema de exclusão em 3 níveis (creator → financial → superadmin)
+- Rateio de custos por centro de custo com validação percentual
+- 8 tipos de relatórios financeiros + exportação Excel
+- Dashboard com 4 gráficos Chart.js
+- API REST completa (10 endpoints)
+- Parcelas (installments) com controle de pagamento
+- Soft-delete com restauração (Super Admin)
+- Acessibilidade completa (ARIA, screen reader, keyboard)
+- Notificações WebSocket em tempo real
+- ~90 testes (unitários, integração, acessibilidade)
+
+**Arquivos de Referência:**
+
+| Tipo | Arquivo | Descrição |
+|------|---------|-----------|
+| Controller Principal | `Controllers/OrderPayments.php` | Match router (4 tipos), Kanban, bulk transition, dashboard |
+| Controller Relatórios | `Controllers/ReportOrderPayments.php` | 8 relatórios + Excel export |
+| Controller API | `Api/V1/OrderPaymentsController.php` | 10 endpoints RESTful |
+| Service Transição | `Services/OrderPaymentTransitionService.php` | State machine com validação condicional |
+| Service Exclusão | `Services/OrderPaymentDeleteService.php` | 3 níveis de permissão |
+| Service Rateio | `Services/OrderPaymentAllocationService.php` | CRUD + validação percentual |
+| Constants | `Models/constants/OrderPaymentStatus.php` | Status enum-like |
+| Model Criação | `Models/AdmsAddOrderPayment.php` | PDO transaction, parcelas, PIX validation |
+| View Kanban | `Views/orderPayment/listOrderPayment.php` | 4 colunas, KPI, mobile tabs |
+| Partial Card | `Views/orderPayment/partials/_kanban_card.php` | ARIA completo |
+| JavaScript | `assets/js/order-payments.js` | SortableJS, CSRF refresh, money mask |
+| Testes | `tests/OrderPayments/` | ~90 testes |
+
+**Padrões Demonstrados:**
+
+```php
+// State Machine — Transições com campos condicionais
+private const TRANSITIONS = [1 => [2], 2 => [1, 3], 3 => [2, 4], 4 => [3]];
+
+private const REQUIRED_FIELDS = [
+    '1_2' => ['number_nf', 'launch_number'],
+    '2_3' => ['launch_number'],
+    '3_4' => ['date_paid'],
+];
+
+// Soft-delete multinível
+public function canDelete(array $order, int $userId, int $userLevel): array
+{
+    return ['allowed' => bool, 'requireReason' => bool, 'requireConfirmation' => bool, 'level' => int];
+}
+
+// PDO Transaction
+$conn = AdmsConn::getConn();
+try {
+    $conn->beginTransaction();
+    // inserir ordem → parcelas → alocações → status inicial → upload
+    $conn->commit();
+} catch (\Exception $e) {
+    $conn->rollBack();
+    LoggerService::error('ORDER_PAYMENT_CREATE_TRANSACTION_FAILED', $e->getMessage());
+}
+```
+
+```javascript
+// Kanban drag-and-drop
+new Sortable(column, {
+    group: 'kanban-order-payments',
+    animation: 150,
+    onEnd: function(evt) {
+        const from = parseInt(evt.from.dataset.statusId);
+        const to = parseInt(evt.to.dataset.statusId);
+        if (Math.abs(to - from) === 1) {
+            to > from ? openTransitionModal(id, from, to) : openReturnModal(id, from, to);
+        }
+    }
+});
+
+// CSRF Token Refresh automático
+if (response.status === 403 && !isRetry) {
+    const newToken = await refreshCsrfToken();
+    if (newToken) return performSearchWithPage(page, true);
+}
+```
+
+**Quando usar como referência:**
+- Workflow com status e transições → `OrderPaymentTransitionService`
+- Soft-delete com níveis de permissão → `OrderPaymentDeleteService`
+- Rateio/alocação de custos → `OrderPaymentAllocationService`
+- Kanban UI com drag-and-drop → `order-payments.js`
+- Relatórios financeiros → `ReportOrderPayments.php`
+- Dashboard com gráficos → `_dashboard_modal.php`
+- API REST completa → `Api/V1/OrderPaymentsController.php`
+- Acessibilidade → `_kanban_card.php` + `OrderPaymentAccessibilityTest.php`
+
+**Documentação:** `docs/ANALISE_MODULO_ORDERPAYMENTS.md`
+
 ---
 
-**Última Atualização**: 2026-02-07
+**Última Atualização**: 2026-04-04
 **Mantenedor**: Chirlanio Silva - Grupo Meia Sola
