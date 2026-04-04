@@ -75,6 +75,10 @@ enum Role: string
                 Permission::CREATE_ORDER_PAYMENTS->value,
                 Permission::EDIT_ORDER_PAYMENTS->value,
                 Permission::DELETE_ORDER_PAYMENTS->value,
+                Permission::VIEW_CHECKLISTS->value,
+                Permission::CREATE_CHECKLISTS->value,
+                Permission::EDIT_CHECKLISTS->value,
+                Permission::DELETE_CHECKLISTS->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -114,6 +118,10 @@ enum Role: string
                 Permission::CREATE_ORDER_PAYMENTS->value,
                 Permission::EDIT_ORDER_PAYMENTS->value,
                 Permission::DELETE_ORDER_PAYMENTS->value,
+                Permission::VIEW_CHECKLISTS->value,
+                Permission::CREATE_CHECKLISTS->value,
+                Permission::EDIT_CHECKLISTS->value,
+                Permission::DELETE_CHECKLISTS->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -131,6 +139,7 @@ enum Role: string
                 Permission::VIEW_TRANSFERS->value,
                 Permission::VIEW_ADJUSTMENTS->value,
                 Permission::VIEW_ORDER_PAYMENTS->value,
+                Permission::VIEW_CHECKLISTS->value,
             ],
             self::USER => [
                 // Apenas próprio perfil

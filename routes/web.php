@@ -20,6 +20,7 @@ use App\Http\Controllers\UserSessionController;
 use App\Http\Controllers\TransferController;
 use App\Http\Controllers\StockAdjustmentController;
 use App\Http\Controllers\OrderPaymentController;
+use App\Http\Controllers\ChecklistController;
 use App\Http\Controllers\Admin\EmailSettingsController;
 use App\Http\Controllers\Config\PositionController as ConfigPositionController;
 use App\Http\Controllers\Config\PositionLevelController as ConfigPositionLevelController;
@@ -701,7 +702,9 @@ Route::middleware(['auth'])->group(function () {
     // ==========================================
     Route::middleware('permission:' . Permission::VIEW_ORDER_PAYMENTS->value)->group(function () {
         Route::get('/order-payments', [OrderPaymentController::class, 'index'])->name('order-payments.index');
+        Route::get('/order-payments/statistics', [OrderPaymentController::class, 'statistics'])->name('order-payments.statistics');
         Route::get('/order-payments/{orderPayment}', [OrderPaymentController::class, 'show'])->name('order-payments.show');
+        Route::get('/order-payments/{orderPayment}/delete-check', [OrderPaymentController::class, 'checkDeletePermission'])->name('order-payments.delete-check');
 
         Route::middleware('permission:' . Permission::CREATE_ORDER_PAYMENTS->value)->group(function () {
             Route::post('/order-payments', [OrderPaymentController::class, 'store'])->name('order-payments.store');
@@ -709,7 +712,11 @@ Route::middleware(['auth'])->group(function () {
 
         Route::middleware('permission:' . Permission::EDIT_ORDER_PAYMENTS->value)->group(function () {
             Route::put('/order-payments/{orderPayment}', [OrderPaymentController::class, 'update'])->name('order-payments.update');
-            Route::patch('/order-payments/{orderPayment}/status', [OrderPaymentController::class, 'updateStatus'])->name('order-payments.update-status');
+            Route::post('/order-payments/{orderPayment}/transition', [OrderPaymentController::class, 'transition'])->name('order-payments.transition');
+            Route::post('/order-payments/bulk-transition', [OrderPaymentController::class, 'bulkTransition'])->name('order-payments.bulk-transition');
+            Route::post('/order-payments/{orderPayment}/allocations', [OrderPaymentController::class, 'saveAllocations'])->name('order-payments.allocations');
+            Route::post('/order-payments/{orderPayment}/restore', [OrderPaymentController::class, 'restore'])->name('order-payments.restore');
+            Route::post('/order-payment-installments/{installment}/mark-paid', [OrderPaymentController::class, 'markInstallmentPaid'])->name('order-payments.installment-mark-paid');
         });
 
         Route::middleware('permission:' . Permission::DELETE_ORDER_PAYMENTS->value)->group(function () {
@@ -721,10 +728,27 @@ Route::middleware(['auth'])->group(function () {
         return Inertia::render('ComingSoon', ['title' => 'E-commerce']);
     })->name('ecommerce');
 
-    // Sistema
-    Route::get('/qualidade', function () {
-        return Inertia::render('ComingSoon', ['title' => 'Qualidade']);
-    })->name('qualidade');
+    // ==========================================
+    // Checklists de Qualidade
+    // ==========================================
+    Route::middleware('permission:' . Permission::VIEW_CHECKLISTS->value)->group(function () {
+        Route::get('/checklists', [ChecklistController::class, 'index'])->name('checklists.index');
+        Route::get('/checklists/employees', [ChecklistController::class, 'employees'])->name('checklists.employees');
+        Route::get('/checklists/{checklist}', [ChecklistController::class, 'show'])->name('checklists.show');
+        Route::get('/checklists/{checklist}/statistics', [ChecklistController::class, 'statistics'])->name('checklists.statistics');
+
+        Route::middleware('permission:' . Permission::CREATE_CHECKLISTS->value)->group(function () {
+            Route::post('/checklists', [ChecklistController::class, 'store'])->name('checklists.store');
+        });
+
+        Route::middleware('permission:' . Permission::EDIT_CHECKLISTS->value)->group(function () {
+            Route::put('/checklists/{checklist}/answers/{answer}', [ChecklistController::class, 'updateAnswer'])->name('checklists.update-answer');
+        });
+
+        Route::middleware('permission:' . Permission::DELETE_CHECKLISTS->value)->group(function () {
+            Route::delete('/checklists/{checklist}', [ChecklistController::class, 'destroy'])->name('checklists.destroy');
+        });
+    });
 
     // Recursos Humanos
     Route::get('/pessoas-cultura', function () {
