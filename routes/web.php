@@ -36,6 +36,10 @@ use App\Http\Controllers\Config\ManagerController as ConfigManagerController;
 use App\Http\Controllers\Config\NetworkController as ConfigNetworkController;
 use App\Http\Controllers\Config\StatusController as ConfigStatusController;
 use App\Http\Controllers\Config\PageStatusController as ConfigPageStatusController;
+use App\Http\Controllers\Config\BankController as ConfigBankController;
+use App\Http\Controllers\Config\CostCenterController as ConfigCostCenterController;
+use App\Http\Controllers\Config\PaymentTypeController as ConfigPaymentTypeController;
+use App\Http\Controllers\Config\DriverController as ConfigDriverController;
 use App\Enums\Permission;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -519,6 +523,10 @@ Route::middleware(['auth', 'permission:' . Permission::MANAGE_SETTINGS->value])-
     Route::resource('networks', ConfigNetworkController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('statuses', ConfigStatusController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('page-statuses', ConfigPageStatusController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('banks', ConfigBankController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('cost-centers', ConfigCostCenterController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('payment-types', ConfigPaymentTypeController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('drivers', ConfigDriverController::class)->only(['index', 'store', 'update', 'destroy']);
 });
 
 // Rotas para vendas (Comercial)

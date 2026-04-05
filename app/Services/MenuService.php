@@ -73,10 +73,10 @@ class MenuService
             // Financeiro
             'order-payments/list' => '/order-payments',
             'supplier/list' => '/suppliers',
-            'cost-centers/list' => '/cost-centers',
-            'type-payments/list' => '/payment-types',
-            'banks/list' => '/banks',
-            'tipo-pagamento/listar' => '/payment-types',
+            'cost-centers/list' => '/config/cost-centers',
+            'type-payments/list' => '/config/payment-types',
+            'banks/list' => '/config/banks',
+            'tipo-pagamento/listar' => '/config/payment-types',
             'bandeira/listar' => '/card-brands',
             'motivo-estorno/listar' => '/reversal-reasons',
             'estorno/listar' => '/reversals',
@@ -100,7 +100,7 @@ class MenuService
             'bairro/listar' => '/neighborhoods',
             'rota/listar' => '/routes',
             'marcas/listar' => '/brands',
-            'drivers/list' => '/drivers',
+            'drivers/list' => '/config/drivers',
             'cfop/listar' => '/cfops',
 
             // Qualidade
