@@ -269,6 +269,30 @@ class Employee extends Model
     }
 
     /**
+     * Get all medical certificates for this employee
+     */
+    public function medicalCertificates(): HasMany
+    {
+        return $this->hasMany(MedicalCertificate::class);
+    }
+
+    /**
+     * Get all absences for this employee
+     */
+    public function absences(): HasMany
+    {
+        return $this->hasMany(Absence::class);
+    }
+
+    /**
+     * Get all overtime records for this employee
+     */
+    public function overtimeRecords(): HasMany
+    {
+        return $this->hasMany(OvertimeRecord::class);
+    }
+
+    /**
      * Get all available levels
      */
     public static function getLevels(): array

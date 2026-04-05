@@ -77,6 +77,24 @@ enum Permission: string
     case EDIT_CHECKLISTS = 'checklists.edit';
     case DELETE_CHECKLISTS = 'checklists.delete';
 
+    // Atestados medicos
+    case VIEW_MEDICAL_CERTIFICATES = 'medical_certificates.view';
+    case CREATE_MEDICAL_CERTIFICATES = 'medical_certificates.create';
+    case EDIT_MEDICAL_CERTIFICATES = 'medical_certificates.edit';
+    case DELETE_MEDICAL_CERTIFICATES = 'medical_certificates.delete';
+
+    // Controle de faltas
+    case VIEW_ABSENCES = 'absences.view';
+    case CREATE_ABSENCES = 'absences.create';
+    case EDIT_ABSENCES = 'absences.edit';
+    case DELETE_ABSENCES = 'absences.delete';
+
+    // Controle de horas extras
+    case VIEW_OVERTIME = 'overtime.view';
+    case CREATE_OVERTIME = 'overtime.create';
+    case EDIT_OVERTIME = 'overtime.edit';
+    case DELETE_OVERTIME = 'overtime.delete';
+
     public function label(): string
     {
         return match($this) {
@@ -139,6 +157,21 @@ enum Permission: string
             self::CREATE_CHECKLISTS => 'Criar checklists',
             self::EDIT_CHECKLISTS => 'Editar checklists',
             self::DELETE_CHECKLISTS => 'Deletar checklists',
+
+            self::VIEW_MEDICAL_CERTIFICATES => 'Visualizar atestados medicos',
+            self::CREATE_MEDICAL_CERTIFICATES => 'Criar atestados medicos',
+            self::EDIT_MEDICAL_CERTIFICATES => 'Editar atestados medicos',
+            self::DELETE_MEDICAL_CERTIFICATES => 'Deletar atestados medicos',
+
+            self::VIEW_ABSENCES => 'Visualizar faltas',
+            self::CREATE_ABSENCES => 'Registrar faltas',
+            self::EDIT_ABSENCES => 'Editar faltas',
+            self::DELETE_ABSENCES => 'Deletar faltas',
+
+            self::VIEW_OVERTIME => 'Visualizar horas extras',
+            self::CREATE_OVERTIME => 'Registrar horas extras',
+            self::EDIT_OVERTIME => 'Editar horas extras',
+            self::DELETE_OVERTIME => 'Deletar horas extras',
         };
     }
 
@@ -204,6 +237,21 @@ enum Permission: string
             self::CREATE_CHECKLISTS => 'Permite criar novos checklists de qualidade',
             self::EDIT_CHECKLISTS => 'Permite editar e responder checklists',
             self::DELETE_CHECKLISTS => 'Permite deletar checklists pendentes',
+
+            self::VIEW_MEDICAL_CERTIFICATES => 'Permite visualizar atestados medicos',
+            self::CREATE_MEDICAL_CERTIFICATES => 'Permite cadastrar novos atestados medicos',
+            self::EDIT_MEDICAL_CERTIFICATES => 'Permite editar atestados medicos',
+            self::DELETE_MEDICAL_CERTIFICATES => 'Permite excluir atestados medicos',
+
+            self::VIEW_ABSENCES => 'Permite visualizar registros de faltas',
+            self::CREATE_ABSENCES => 'Permite registrar novas faltas',
+            self::EDIT_ABSENCES => 'Permite editar registros de faltas',
+            self::DELETE_ABSENCES => 'Permite excluir registros de faltas',
+
+            self::VIEW_OVERTIME => 'Permite visualizar registros de horas extras',
+            self::CREATE_OVERTIME => 'Permite registrar novas horas extras',
+            self::EDIT_OVERTIME => 'Permite editar registros de horas extras',
+            self::DELETE_OVERTIME => 'Permite excluir registros de horas extras',
         };
     }
 

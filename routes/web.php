@@ -40,6 +40,13 @@ use App\Http\Controllers\Config\BankController as ConfigBankController;
 use App\Http\Controllers\Config\CostCenterController as ConfigCostCenterController;
 use App\Http\Controllers\Config\PaymentTypeController as ConfigPaymentTypeController;
 use App\Http\Controllers\Config\DriverController as ConfigDriverController;
+use App\Http\Controllers\Config\StockAdjustmentStatusController as ConfigStockAdjustmentStatusController;
+use App\Http\Controllers\MedicalCertificateController;
+use App\Http\Controllers\AbsenceController;
+use App\Http\Controllers\OvertimeRecordController;
+use App\Http\Controllers\Config\TransferStatusController as ConfigTransferStatusController;
+use App\Http\Controllers\Config\OrderPaymentStatusController as ConfigOrderPaymentStatusController;
+use App\Http\Controllers\Config\ManagementReasonController as ConfigManagementReasonController;
 use App\Enums\Permission;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -527,6 +534,10 @@ Route::middleware(['auth', 'permission:' . Permission::MANAGE_SETTINGS->value])-
     Route::resource('cost-centers', ConfigCostCenterController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('payment-types', ConfigPaymentTypeController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('drivers', ConfigDriverController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('stock-adjustment-statuses', ConfigStockAdjustmentStatusController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('transfer-statuses', ConfigTransferStatusController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('order-payment-statuses', ConfigOrderPaymentStatusController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('management-reasons', ConfigManagementReasonController::class)->only(['index', 'store', 'update', 'destroy']);
 });
 
 // Rotas para vendas (Comercial)
@@ -753,6 +764,60 @@ Route::middleware(['auth'])->group(function () {
 
         Route::middleware('permission:' . Permission::DELETE_SUPPLIERS->value)->group(function () {
             Route::delete('/suppliers/{supplier}', [SupplierController::class, 'destroy'])->name('suppliers.destroy');
+        });
+    });
+
+    // ==========================================
+    // Atestados Medicos
+    // ==========================================
+    Route::middleware('permission:' . Permission::VIEW_MEDICAL_CERTIFICATES->value)->group(function () {
+        Route::get('/medical-certificates', [MedicalCertificateController::class, 'index'])->name('medical-certificates.index');
+        Route::get('/medical-certificates/{medical_certificate}', [MedicalCertificateController::class, 'show'])->name('medical-certificates.show');
+
+        Route::middleware('permission:' . Permission::CREATE_MEDICAL_CERTIFICATES->value)->group(function () {
+            Route::post('/medical-certificates', [MedicalCertificateController::class, 'store'])->name('medical-certificates.store');
+        });
+        Route::middleware('permission:' . Permission::EDIT_MEDICAL_CERTIFICATES->value)->group(function () {
+            Route::put('/medical-certificates/{medical_certificate}', [MedicalCertificateController::class, 'update'])->name('medical-certificates.update');
+        });
+        Route::middleware('permission:' . Permission::DELETE_MEDICAL_CERTIFICATES->value)->group(function () {
+            Route::delete('/medical-certificates/{medical_certificate}', [MedicalCertificateController::class, 'destroy'])->name('medical-certificates.destroy');
+        });
+    });
+
+    // ==========================================
+    // Controle de Faltas
+    // ==========================================
+    Route::middleware('permission:' . Permission::VIEW_ABSENCES->value)->group(function () {
+        Route::get('/absences', [AbsenceController::class, 'index'])->name('absences.index');
+        Route::get('/absences/{absence}', [AbsenceController::class, 'show'])->name('absences.show');
+
+        Route::middleware('permission:' . Permission::CREATE_ABSENCES->value)->group(function () {
+            Route::post('/absences', [AbsenceController::class, 'store'])->name('absences.store');
+        });
+        Route::middleware('permission:' . Permission::EDIT_ABSENCES->value)->group(function () {
+            Route::put('/absences/{absence}', [AbsenceController::class, 'update'])->name('absences.update');
+        });
+        Route::middleware('permission:' . Permission::DELETE_ABSENCES->value)->group(function () {
+            Route::delete('/absences/{absence}', [AbsenceController::class, 'destroy'])->name('absences.destroy');
+        });
+    });
+
+    // ==========================================
+    // Controle de Horas Extras
+    // ==========================================
+    Route::middleware('permission:' . Permission::VIEW_OVERTIME->value)->group(function () {
+        Route::get('/overtime-records', [OvertimeRecordController::class, 'index'])->name('overtime-records.index');
+        Route::get('/overtime-records/{overtime_record}', [OvertimeRecordController::class, 'show'])->name('overtime-records.show');
+
+        Route::middleware('permission:' . Permission::CREATE_OVERTIME->value)->group(function () {
+            Route::post('/overtime-records', [OvertimeRecordController::class, 'store'])->name('overtime-records.store');
+        });
+        Route::middleware('permission:' . Permission::EDIT_OVERTIME->value)->group(function () {
+            Route::put('/overtime-records/{overtime_record}', [OvertimeRecordController::class, 'update'])->name('overtime-records.update');
+        });
+        Route::middleware('permission:' . Permission::DELETE_OVERTIME->value)->group(function () {
+            Route::delete('/overtime-records/{overtime_record}', [OvertimeRecordController::class, 'destroy'])->name('overtime-records.destroy');
         });
     });
 

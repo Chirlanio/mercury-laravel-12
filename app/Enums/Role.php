@@ -83,6 +83,18 @@ enum Role: string
                 Permission::CREATE_CHECKLISTS->value,
                 Permission::EDIT_CHECKLISTS->value,
                 Permission::DELETE_CHECKLISTS->value,
+                Permission::VIEW_MEDICAL_CERTIFICATES->value,
+                Permission::CREATE_MEDICAL_CERTIFICATES->value,
+                Permission::EDIT_MEDICAL_CERTIFICATES->value,
+                Permission::DELETE_MEDICAL_CERTIFICATES->value,
+                Permission::VIEW_ABSENCES->value,
+                Permission::CREATE_ABSENCES->value,
+                Permission::EDIT_ABSENCES->value,
+                Permission::DELETE_ABSENCES->value,
+                Permission::VIEW_OVERTIME->value,
+                Permission::CREATE_OVERTIME->value,
+                Permission::EDIT_OVERTIME->value,
+                Permission::DELETE_OVERTIME->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -130,6 +142,18 @@ enum Role: string
                 Permission::CREATE_CHECKLISTS->value,
                 Permission::EDIT_CHECKLISTS->value,
                 Permission::DELETE_CHECKLISTS->value,
+                Permission::VIEW_MEDICAL_CERTIFICATES->value,
+                Permission::CREATE_MEDICAL_CERTIFICATES->value,
+                Permission::EDIT_MEDICAL_CERTIFICATES->value,
+                Permission::DELETE_MEDICAL_CERTIFICATES->value,
+                Permission::VIEW_ABSENCES->value,
+                Permission::CREATE_ABSENCES->value,
+                Permission::EDIT_ABSENCES->value,
+                Permission::DELETE_ABSENCES->value,
+                Permission::VIEW_OVERTIME->value,
+                Permission::CREATE_OVERTIME->value,
+                Permission::EDIT_OVERTIME->value,
+                Permission::DELETE_OVERTIME->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -149,6 +173,9 @@ enum Role: string
                 Permission::VIEW_ORDER_PAYMENTS->value,
                 Permission::VIEW_SUPPLIERS->value,
                 Permission::VIEW_CHECKLISTS->value,
+                Permission::VIEW_MEDICAL_CERTIFICATES->value,
+                Permission::VIEW_ABSENCES->value,
+                Permission::VIEW_OVERTIME->value,
             ],
             self::USER => [
                 // Apenas próprio perfil

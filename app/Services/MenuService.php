@@ -45,7 +45,7 @@ class MenuService
             // Controle de Jornada
             'material-marketing/list' => '/material-marketing',
             'material-request/list' => '/material-request',
-            'overtime-control/list' => '/work-shifts',
+            'work-shifts/list' => '/work-shifts',
 
             // Estoque
             'ajuste/listar-ajuste' => '/stock-adjustments',
@@ -67,7 +67,8 @@ class MenuService
             'personnel-moviments/list' => '/personnel-movements',
             'vacancy-opening/list' => '/vacancy-openings',
             'medical-certificate/list' => '/medical-certificates',
-            'absence-control/list' => '/absence-control',
+            'absence-control/list' => '/absences',
+            'overtime-control/list' => '/overtime-records',
             'internal-transfer-system/list' => '/internal-transfers',
 
             // Financeiro
@@ -81,7 +82,8 @@ class MenuService
             'motivo-estorno/listar' => '/reversal-reasons',
             'estorno/listar' => '/reversals',
             'autorizacao-resp/listar' => '/authorizations',
-            'situacao-order-payment/listar' => '/payment-order-status',
+            'situacao-order-payment/listar' => '/config/order-payment-statuses',
+            'management-reasons/list' => '/config/management-reasons',
             'travel-expenses/list' => '/travel-expenses',
 
             // Configurações
@@ -91,8 +93,8 @@ class MenuService
             'situacao/listar' => '/statuses',
             'situacao-user/listar' => '/user-statuses',
             'situacao-pg/listar' => '/page-statuses',
-            'situacao-ajuste/listar' => '/adjustment-statuses',
-            'situacao-transf/listar' => '/transfer-statuses',
+            'situacao-ajuste/listar' => '/config/stock-adjustment-statuses',
+            'situacao-transf/listar' => '/config/transfer-statuses',
             'situacao-troca/listar' => '/exchange-statuses',
             'lojas/listar-lojas' => '/stores',
             'stores/index' => '/stores',
