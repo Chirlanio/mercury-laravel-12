@@ -220,15 +220,21 @@ class MenuService
                 ];
             };
 
+            // Deduplica itens pela rota (mantém o de menor order, ou seja, o primeiro inserido)
+            $deduplicateByRoute = fn ($items) => $items->unique(fn ($item) => $item['route'])->values()->all();
+
+            $mappedDirect = $directItems->map($mapItemFunc)->sortBy('order')->values();
+            $mappedDropdown = $dropdownItems->map($mapItemFunc)->sortBy('order')->values();
+
             // Adiciona à estrutura somente se houver itens
-            if ($directItems->isNotEmpty() || $dropdownItems->isNotEmpty()) {
+            if ($mappedDirect->isNotEmpty() || $mappedDropdown->isNotEmpty()) {
                 $menuStructure[] = [
                     'id' => $menu->id,
                     'name' => $menu->name,
                     'icon' => $menu->icon,
                     'order' => $menu->order,
-                    'direct_items' => $directItems->map($mapItemFunc)->sortBy('order')->values()->all(),
-                    'dropdown_items' => $dropdownItems->map($mapItemFunc)->sortBy('order')->values()->all(),
+                    'direct_items' => $deduplicateByRoute($mappedDirect),
+                    'dropdown_items' => $deduplicateByRoute($mappedDropdown),
                 ];
             }
         }

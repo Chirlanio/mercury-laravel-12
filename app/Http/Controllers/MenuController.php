@@ -272,14 +272,12 @@ class MenuController extends Controller
                     continue;
                 }
 
-                $group = 'main';
-                if ($menuModel->is_hr_menu) {
-                    $group = 'hr';
-                } elseif ($menuModel->is_utility_menu) {
-                    $group = 'utility';
-                } elseif ($menuModel->is_system_menu) {
-                    $group = 'system';
-                }
+                $group = match ($menuModel->type) {
+                    'hr' => 'hr',
+                    'utility' => 'utility',
+                    'system' => 'system',
+                    default => 'main',
+                };
 
                 $menuGroups[$group][] = $menu;
             }

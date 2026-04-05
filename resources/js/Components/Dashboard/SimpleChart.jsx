@@ -18,7 +18,7 @@ export default function SimpleChart({
 
     const maxValue = Math.max(...data.map(item =>
         typeof item === 'object' ? (item.value || item.users || item.activities || item.count || 0) : item
-    ));
+    )) || 1;
 
     const getBarHeight = (value) => {
         if (maxValue === 0) return 0;

@@ -3,18 +3,43 @@
 namespace App\Http\Controllers;
 
 use App\Models\OrderPayment;
+use App\Models\OrderPaymentInstallment;
 use App\Models\Store;
+use App\Models\Supplier;
+use App\Models\Manager;
+use App\Models\Bank;
+use App\Models\Brand;
+use App\Models\CostCenter;
+use App\Models\ManagementReason;
+use App\Models\PaymentType;
+use App\Models\PixKeyType;
+use App\Models\Sector;
+use App\Services\OrderPaymentTransitionService;
+use App\Services\OrderPaymentDeleteService;
+use App\Services\OrderPaymentAllocationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class OrderPaymentController extends Controller
 {
+    public function __construct(
+        private OrderPaymentTransitionService $transitionService,
+        private OrderPaymentDeleteService $deleteService,
+        private OrderPaymentAllocationService $allocationService,
+    ) {}
+
+    /**
+     * List order payments (Kanban + Table view)
+     */
     public function index(Request $request)
     {
         $query = OrderPayment::with([
             'store:id,code,name',
-            'requestedBy:id,name',
-        ])->latest();
+            'supplier:id,nome_fantasia',
+            'manager:id,name',
+            'createdBy:id,name',
+        ])->active()->latest('date_payment');
 
         if ($request->filled('status')) {
             $query->forStatus($request->status);
@@ -27,118 +52,272 @@ class OrderPaymentController extends Controller
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('supplier_name', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%")
-                    ->orWhere('number_nf', 'like', "%{$search}%");
+                $q->where('description', 'like', "%{$search}%")
+                    ->orWhere('number_nf', 'like', "%{$search}%")
+                    ->orWhere('launch_number', 'like', "%{$search}%")
+                    ->orWhereHas('supplier', fn ($q) => $q->where('nome_fantasia', 'like', "%{$search}%"));
             });
         }
 
-        $payments = $query->paginate(20)->through(fn ($p) => [
-            'id' => $p->id,
-            'store' => $p->store ? ['id' => $p->store->id, 'name' => $p->store->display_name] : null,
-            'supplier_name' => $p->supplier_name,
-            'description' => $p->description,
-            'total_value' => $p->total_value,
-            'formatted_total' => $p->formatted_total,
-            'payment_type' => $p->payment_type,
-            'status' => $p->status,
-            'status_label' => $p->status_label,
-            'number_nf' => $p->number_nf,
-            'due_date' => $p->due_date?->format('d/m/Y'),
-            'date_paid' => $p->date_paid?->format('d/m/Y'),
-            'is_overdue' => $p->due_date && $p->due_date->isPast() && $p->status !== 'done',
-            'requested_by' => $p->requestedBy?->name,
-            'created_at' => $p->created_at->format('d/m/Y H:i'),
-        ]);
+        $payments = $query->paginate(20)->through(fn ($p) => $this->formatPayment($p));
 
-        // Kanban data
+        // Kanban summary — count and total per status
         $kanbanData = [];
         foreach (OrderPayment::STATUS_LABELS as $status => $label) {
+            $statusQuery = OrderPayment::active()->forStatus($status);
             $kanbanData[$status] = [
                 'label' => $label,
-                'count' => OrderPayment::forStatus($status)->count(),
+                'color' => OrderPayment::STATUS_COLORS[$status],
+                'count' => $statusQuery->count(),
+                'total' => round($statusQuery->sum('total_value'), 2),
             ];
         }
 
-        $stores = Store::active()->orderedByStore()->get(['id', 'code', 'name']);
+        // Kanban cards by status (for kanban view)
+        $kanbanCards = [];
+        foreach (OrderPayment::STATUS_LABELS as $status => $label) {
+            $kanbanCards[$status] = OrderPayment::with(['supplier:id,nome_fantasia'])
+                ->active()
+                ->forStatus($status)
+                ->orderBy('date_payment')
+                ->limit(50)
+                ->get()
+                ->map(fn ($p) => $this->formatPayment($p));
+        }
+
+        // All select options (matching legacy v1 listAdd)
+        $selects = [
+            'areas' => Sector::where('is_active', true)->orderBy('id')->get(['id', 'sector_name as name']),
+            'costCenters' => CostCenter::active()->orderBy('name')->get(['id', 'code', 'name', 'area_id']),
+            'brands' => Brand::active()->orderBy('name')->get(['id', 'name']),
+            'suppliers' => Supplier::where('is_active', true)->orderBy('nome_fantasia')->get(['id', 'nome_fantasia', 'cnpj']),
+            'stores' => Store::active()->orderedByStore()->get(['id', 'code', 'name']),
+            'managers' => Manager::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'paymentTypes' => PaymentType::active()->orderBy('id')->get(['id', 'name']),
+            'banks' => Bank::active()->orderBy('bank_name')->get(['id', 'bank_name']),
+            'pixKeyTypes' => PixKeyType::active()->orderBy('id')->get(['id', 'name']),
+            'managementReasons' => ManagementReason::active()->orderBy('name')->get(['id', 'code', 'name']),
+        ];
 
         return Inertia::render('OrderPayments/Index', [
             'payments' => $payments,
-            'stores' => $stores,
+            'selects' => $selects,
             'filters' => $request->only(['search', 'status', 'store_id']),
             'statusOptions' => OrderPayment::STATUS_LABELS,
             'kanbanData' => $kanbanData,
+            'kanbanCards' => $kanbanCards,
         ]);
     }
 
+    /**
+     * Create order payment
+     */
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'store_id' => 'required|exists:stores,id',
-            'supplier_name' => 'required|string|max:255',
-            'description' => 'nullable|string',
+            'store_id' => 'nullable|exists:stores,id',
+            'area_id' => 'nullable|integer',
+            'supplier_id' => 'nullable|exists:suppliers,id',
+            'manager_id' => 'nullable|exists:managers,id',
+            'description' => 'required|string',
             'total_value' => 'required|numeric|min:0.01',
-            'payment_type' => 'nullable|string|max:50',
-            'due_date' => 'nullable|date',
-            'installments' => 'integer|min:1',
+            'date_payment' => 'required|date',
+            'payment_type' => 'nullable|string',
+            'advance' => 'boolean',
+            'advance_amount' => 'nullable|numeric|min:0',
+            'proof' => 'boolean',
+            'number_nf' => 'nullable|string|max:50',
+            'launch_number' => 'nullable|string|max:50',
+            'observations' => 'nullable|string',
+            'bank_name' => 'nullable|string',
+            'agency' => 'nullable|string|max:20',
+            'checking_account' => 'nullable|string|max:25',
+            'type_account' => 'nullable|string',
+            'name_supplier' => 'nullable|string|max:100',
+            'document_number_supplier' => 'nullable|string|max:20',
+            'pix_key_type' => 'nullable|string',
+            'pix_key' => 'nullable|string',
+            'installments' => 'nullable|integer|min:0|max:12',
+            'installment_items' => 'nullable|array',
+            'installment_items.*.value' => 'required_with:installment_items|numeric|min:0.01',
+            'installment_items.*.date' => 'required_with:installment_items|date',
+            'allocations' => 'nullable|array',
         ]);
 
-        $validated['status'] = 'backlog';
-        $validated['requested_by_user_id'] = auth()->id();
+        $order = DB::transaction(function () use ($validated, $request) {
+            $totalValue = $validated['total_value'];
+            $advanceAmount = $validated['advance_amount'] ?? 0;
 
-        OrderPayment::create($validated);
+            $order = OrderPayment::create([
+                ...$validated,
+                'status' => ($validated['advance'] ?? false) ? OrderPayment::STATUS_WAITING : OrderPayment::STATUS_BACKLOG,
+                'diff_payment_advance' => $totalValue - $advanceAmount,
+                'has_allocation' => !empty($validated['allocations']),
+                'created_by_user_id' => auth()->id(),
+            ]);
+
+            // Create installments
+            if (!empty($validated['installment_items'])) {
+                foreach ($validated['installment_items'] as $index => $item) {
+                    $order->installmentItems()->create([
+                        'installment_number' => $index + 1,
+                        'installment_value' => $item['value'],
+                        'date_payment' => $item['date'],
+                    ]);
+                }
+            }
+
+            // Create allocations
+            if (!empty($validated['allocations'])) {
+                $validation = $this->allocationService->validate($totalValue, $validated['allocations']);
+                if ($validation['valid']) {
+                    $this->allocationService->create($order, $validated['allocations']);
+                }
+            }
+
+            // Record initial status
+            $this->transitionService->recordStatusHistory(
+                $order->id, null, $order->status, auth()->id(), 'Criação'
+            );
+
+            return $order;
+        });
 
         return redirect()->route('order-payments.index')
-            ->with('success', 'Ordem de pagamento criada com sucesso.');
+            ->with('success', 'Ordem de pagamento #' . $order->id . ' criada com sucesso.');
     }
 
+    /**
+     * Show order payment details
+     */
     public function show(OrderPayment $orderPayment)
     {
         $orderPayment->load([
             'store:id,code,name',
-            'requestedBy:id,name',
-            'approvedBy:id,name',
+            'supplier:id,nome_fantasia',
+            'manager:id,name',
+            'createdBy:id,name',
+            'updatedBy:id,name',
+            'deletedBy:id,name',
+            'installmentItems',
+            'allocations',
+            'statusHistory.changedBy:id,name',
         ]);
 
-        return response()->json($orderPayment);
+        return response()->json([
+            'order' => $this->formatPaymentDetailed($orderPayment),
+            'installments' => $orderPayment->installmentItems->map(fn ($i) => [
+                'id' => $i->id,
+                'number' => $i->installment_number,
+                'value' => $i->installment_value,
+                'formatted_value' => $i->formatted_value,
+                'date_payment' => $i->date_payment->format('d/m/Y'),
+                'is_paid' => $i->is_paid,
+                'date_paid' => $i->date_paid?->format('d/m/Y'),
+                'is_overdue' => $i->is_overdue,
+            ]),
+            'allocations' => $orderPayment->allocations->map(fn ($a) => [
+                'id' => $a->id,
+                'cost_center_id' => $a->cost_center_id,
+                'store_id' => $a->store_id,
+                'percentage' => $a->allocation_percentage,
+                'value' => $a->allocation_value,
+            ]),
+            'status_history' => $orderPayment->statusHistory->map(fn ($h) => [
+                'id' => $h->id,
+                'old_status' => $h->old_status_label,
+                'new_status' => $h->new_status_label,
+                'changed_by' => $h->changedBy?->name,
+                'notes' => $h->notes,
+                'created_at' => $h->created_at->format('d/m/Y H:i'),
+            ]),
+        ]);
     }
 
+    /**
+     * Update order payment
+     */
     public function update(Request $request, OrderPayment $orderPayment)
     {
         $validated = $request->validate([
-            'supplier_name' => 'required|string|max:255',
-            'description' => 'nullable|string',
+            'description' => 'required|string',
             'total_value' => 'required|numeric|min:0.01',
-            'payment_type' => 'nullable|string|max:50',
-            'due_date' => 'nullable|date',
-            'number_nf' => 'nullable|string|max:255',
-            'launch_number' => 'nullable|string|max:255',
-            'installments' => 'integer|min:1',
-            'bank_name' => 'nullable|string|max:255',
-            'agency' => 'nullable|string|max:50',
-            'checking_account' => 'nullable|string|max:50',
-            'pix_key_type' => 'nullable|string|max:50',
-            'pix_key' => 'nullable|string|max:255',
+            'date_payment' => 'required|date',
+            'payment_type' => 'nullable|string',
+            'store_id' => 'nullable|exists:stores,id',
+            'area_id' => 'nullable|integer',
+            'supplier_id' => 'nullable|exists:suppliers,id',
+            'manager_id' => 'nullable|exists:managers,id',
+            'advance' => 'boolean',
+            'advance_amount' => 'nullable|numeric|min:0',
+            'proof' => 'boolean',
+            'number_nf' => 'nullable|string|max:50',
+            'launch_number' => 'nullable|string|max:50',
+            'observations' => 'nullable|string',
+            'bank_name' => 'nullable|string',
+            'agency' => 'nullable|string|max:20',
+            'checking_account' => 'nullable|string|max:25',
+            'type_account' => 'nullable|string',
+            'name_supplier' => 'nullable|string|max:100',
+            'document_number_supplier' => 'nullable|string|max:20',
+            'pix_key_type' => 'nullable|string',
+            'pix_key' => 'nullable|string',
+            'installment_items' => 'nullable|array',
+            'allocations' => 'nullable|array',
         ]);
 
-        $orderPayment->update($validated);
+        DB::transaction(function () use ($orderPayment, $validated) {
+            $totalValue = $validated['total_value'];
+            $advanceAmount = $validated['advance_amount'] ?? 0;
+
+            $validated['diff_payment_advance'] = $totalValue - $advanceAmount;
+            $validated['has_allocation'] = !empty($validated['allocations']);
+            $validated['updated_by_user_id'] = auth()->id();
+
+            $orderPayment->update($validated);
+
+            // Sync installments
+            if (isset($validated['installment_items'])) {
+                $orderPayment->installmentItems()->delete();
+                foreach ($validated['installment_items'] as $index => $item) {
+                    $orderPayment->installmentItems()->create([
+                        'installment_number' => $index + 1,
+                        'installment_value' => $item['value'],
+                        'date_payment' => $item['date'],
+                    ]);
+                }
+            }
+
+            // Sync allocations
+            if (isset($validated['allocations'])) {
+                if (!empty($validated['allocations'])) {
+                    $validation = $this->allocationService->validate($totalValue, $validated['allocations']);
+                    if ($validation['valid']) {
+                        $this->allocationService->update($orderPayment, $validated['allocations']);
+                    }
+                } else {
+                    $orderPayment->allocations()->delete();
+                }
+            }
+
+            // Recalculate allocations if total changed
+            if ($orderPayment->has_allocation && $orderPayment->wasChanged('total_value')) {
+                $this->allocationService->recalculate($orderPayment, $totalValue);
+            }
+        });
 
         return redirect()->route('order-payments.index')
             ->with('success', 'Ordem de pagamento atualizada com sucesso.');
     }
 
-    public function destroy(OrderPayment $orderPayment)
-    {
-        $orderPayment->delete();
-
-        return redirect()->route('order-payments.index')
-            ->with('success', 'Ordem de pagamento excluída com sucesso.');
-    }
-
-    public function updateStatus(Request $request, OrderPayment $orderPayment)
+    /**
+     * Status transition (Kanban move)
+     */
+    public function transition(Request $request, OrderPayment $orderPayment)
     {
         $validated = $request->validate([
-            'status' => 'required|string|in:backlog,doing,waiting,done',
+            'new_status' => 'required|string|in:backlog,doing,waiting,done',
+            'notes' => 'nullable|string',
             'number_nf' => 'nullable|string',
             'launch_number' => 'nullable|string',
             'date_paid' => 'nullable|date',
@@ -149,54 +328,329 @@ class OrderPaymentController extends Controller
             'pix_key' => 'nullable|string',
         ]);
 
-        $newStatus = $validated['status'];
+        $newStatus = $validated['new_status'];
 
-        if (!$orderPayment->canTransitionTo($newStatus)) {
-            return response()->json(['error' => 'Transição de status inválida.'], 422);
+        // Validate transition
+        $validation = $this->transitionService->validateTransition(
+            $orderPayment, $newStatus, $validated
+        );
+
+        if (!$validation['valid']) {
+            return response()->json([
+                'error' => true,
+                'message' => implode(' ', $validation['errors']),
+            ], 422);
         }
 
-        // Validate required fields per transition
-        $currentStatus = $orderPayment->status;
-        if ($currentStatus === 'backlog' && $newStatus === 'doing') {
-            $request->validate([
-                'number_nf' => 'required|string',
-                'launch_number' => 'required|string',
-            ]);
-        }
+        // Extract additional fields to update on the order
+        $additionalFields = array_filter([
+            'number_nf' => $validated['number_nf'] ?? null,
+            'launch_number' => $validated['launch_number'] ?? null,
+            'date_paid' => $validated['date_paid'] ?? null,
+            'bank_name' => $validated['bank_name'] ?? null,
+            'agency' => $validated['agency'] ?? null,
+            'checking_account' => $validated['checking_account'] ?? null,
+            'pix_key_type' => $validated['pix_key_type'] ?? null,
+            'pix_key' => $validated['pix_key'] ?? null,
+        ], fn ($v) => $v !== null);
 
-        if ($currentStatus === 'doing' && $newStatus === 'waiting') {
-            $request->validate([
-                'launch_number' => 'required|string',
-            ]);
-        }
-
-        if ($newStatus === 'done') {
-            $request->validate([
-                'date_paid' => 'required|date',
-            ]);
-        }
-
-        $updateData = ['status' => $newStatus];
-
-        if (isset($validated['number_nf'])) $updateData['number_nf'] = $validated['number_nf'];
-        if (isset($validated['launch_number'])) $updateData['launch_number'] = $validated['launch_number'];
-        if (isset($validated['date_paid'])) $updateData['date_paid'] = $validated['date_paid'];
-        if (isset($validated['bank_name'])) $updateData['bank_name'] = $validated['bank_name'];
-        if (isset($validated['agency'])) $updateData['agency'] = $validated['agency'];
-        if (isset($validated['checking_account'])) $updateData['checking_account'] = $validated['checking_account'];
-        if (isset($validated['pix_key_type'])) $updateData['pix_key_type'] = $validated['pix_key_type'];
-        if (isset($validated['pix_key'])) $updateData['pix_key'] = $validated['pix_key'];
-
-        if ($newStatus === 'done') {
-            $updateData['approved_by_user_id'] = auth()->id();
-        }
-
-        $orderPayment->update($updateData);
+        $this->transitionService->executeTransition(
+            $orderPayment,
+            $newStatus,
+            $additionalFields,
+            auth()->id(),
+            $validated['notes'] ?? null
+        );
 
         return response()->json([
-            'message' => 'Status atualizado com sucesso.',
+            'error' => false,
+            'message' => 'Status atualizado para: ' . (OrderPayment::STATUS_LABELS[$newStatus] ?? $newStatus),
             'status' => $newStatus,
-            'status_label' => OrderPayment::STATUS_LABELS[$newStatus],
+            'status_label' => OrderPayment::STATUS_LABELS[$newStatus] ?? $newStatus,
+        ]);
+    }
+
+    /**
+     * Bulk status transition
+     */
+    public function bulkTransition(Request $request)
+    {
+        $validated = $request->validate([
+            'order_ids' => 'required|array|max:50',
+            'order_ids.*' => 'integer|exists:order_payments,id',
+            'new_status' => 'required|string|in:backlog,doing,waiting,done',
+            'notes' => 'nullable|string',
+        ]);
+
+        $succeeded = [];
+        $failed = [];
+
+        foreach ($validated['order_ids'] as $orderId) {
+            $order = OrderPayment::find($orderId);
+            if (!$order || $order->is_deleted) {
+                $failed[] = ['id' => $orderId, 'error' => 'Ordem não encontrada ou excluída.'];
+                continue;
+            }
+
+            $validation = $this->transitionService->validateTransition(
+                $order, $validated['new_status'], []
+            );
+
+            if (!$validation['valid']) {
+                $failed[] = ['id' => $orderId, 'error' => implode(' ', $validation['errors'])];
+                continue;
+            }
+
+            $this->transitionService->executeTransition(
+                $order, $validated['new_status'], [], auth()->id(), $validated['notes'] ?? null
+            );
+
+            $succeeded[] = $orderId;
+        }
+
+        return response()->json([
+            'succeeded' => $succeeded,
+            'failed' => $failed,
+            'message' => count($succeeded) . ' ordem(ns) movida(s) com sucesso.',
+        ]);
+    }
+
+    /**
+     * Delete order payment (3-level soft delete)
+     */
+    public function destroy(Request $request, OrderPayment $orderPayment)
+    {
+        $user = $request->user();
+        $permission = $this->deleteService->canDelete($orderPayment, $user);
+
+        if (!$permission['allowed']) {
+            return response()->json(['error' => true, 'message' => $permission['message']], 403);
+        }
+
+        if ($permission['require_reason'] && empty($request->input('reason'))) {
+            return response()->json(['error' => true, 'message' => 'Motivo da exclusão é obrigatório.'], 422);
+        }
+
+        if ($permission['require_confirmation'] && !$request->boolean('confirmed')) {
+            return response()->json([
+                'error' => true,
+                'message' => 'Confirmação necessária para excluir esta ordem.',
+                'require_confirmation' => true,
+            ], 422);
+        }
+
+        $this->deleteService->softDelete($orderPayment, $user, $request->input('reason'));
+
+        return response()->json([
+            'error' => false,
+            'message' => 'Ordem de pagamento excluída com sucesso.',
+        ]);
+    }
+
+    /**
+     * Check delete permission (for frontend modal)
+     */
+    public function checkDeletePermission(OrderPayment $orderPayment)
+    {
+        return response()->json(
+            $this->deleteService->canDelete($orderPayment, auth()->user())
+        );
+    }
+
+    /**
+     * Restore soft-deleted order
+     */
+    public function restore(OrderPayment $orderPayment)
+    {
+        $restored = $this->deleteService->restore($orderPayment, auth()->user());
+
+        if (!$restored) {
+            return response()->json(['error' => true, 'message' => 'Sem permissão para restaurar.'], 403);
+        }
+
+        return response()->json([
+            'error' => false,
+            'message' => 'Ordem de pagamento restaurada com sucesso.',
+        ]);
+    }
+
+    /**
+     * Save allocations for an order
+     */
+    public function saveAllocations(Request $request, OrderPayment $orderPayment)
+    {
+        $validated = $request->validate([
+            'allocations' => 'required|array|min:1',
+            'allocations.*.cost_center_id' => 'required|integer',
+            'allocations.*.store_id' => 'nullable|integer',
+            'allocations.*.percentage' => 'required|numeric|min:0.01|max:100',
+            'allocations.*.value' => 'required|numeric|min:0.01',
+        ]);
+
+        $validation = $this->allocationService->validate(
+            $orderPayment->total_value, $validated['allocations']
+        );
+
+        if (!$validation['valid']) {
+            return response()->json([
+                'error' => true,
+                'errors' => $validation['errors'],
+            ], 422);
+        }
+
+        $this->allocationService->update($orderPayment, $validated['allocations']);
+
+        $orderPayment->update(['has_allocation' => true, 'updated_by_user_id' => auth()->id()]);
+
+        return response()->json([
+            'error' => false,
+            'message' => 'Rateio salvo com sucesso.',
+        ]);
+    }
+
+    /**
+     * Mark installment as paid/unpaid
+     */
+    public function markInstallmentPaid(Request $request, OrderPaymentInstallment $installment)
+    {
+        $validated = $request->validate([
+            'action' => 'required|in:mark,unmark',
+            'date_paid' => 'required_if:action,mark|nullable|date',
+        ]);
+
+        if ($validated['action'] === 'mark') {
+            $installment->update([
+                'is_paid' => true,
+                'date_paid' => $validated['date_paid'],
+                'paid_by_user_id' => auth()->id(),
+            ]);
+        } else {
+            $installment->update([
+                'is_paid' => false,
+                'date_paid' => null,
+                'paid_by_user_id' => null,
+            ]);
+        }
+
+        return response()->json([
+            'error' => false,
+            'message' => $validated['action'] === 'mark' ? 'Parcela marcada como paga.' : 'Marcação removida.',
+        ]);
+    }
+
+    /**
+     * Statistics / KPI dashboard data
+     */
+    public function statistics(Request $request)
+    {
+        // Totals by status
+        $byStatus = [];
+        foreach (OrderPayment::STATUS_LABELS as $status => $label) {
+            $query = OrderPayment::active()->forStatus($status);
+            $byStatus[$status] = [
+                'label' => $label,
+                'count' => $query->count(),
+                'total' => round($query->sum('total_value'), 2),
+            ];
+        }
+
+        // Overdue
+        $overdueCount = OrderPayment::overdue()->count();
+        $overdueTotal = round(OrderPayment::overdue()->sum('total_value'), 2);
+
+        // Monthly totals (last 6 months)
+        $monthlyFlow = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $date = now()->subMonths($i);
+            $monthlyFlow[] = [
+                'month' => $date->format('M/Y'),
+                'created' => round(OrderPayment::active()
+                    ->forMonth($date->month, $date->year)->sum('total_value'), 2),
+                'paid' => round(OrderPayment::active()
+                    ->where('status', 'done')
+                    ->whereMonth('date_paid', $date->month)
+                    ->whereYear('date_paid', $date->year)
+                    ->sum('total_value'), 2),
+            ];
+        }
+
+        // Installment summary
+        $installmentSummary = [
+            'overdue' => OrderPaymentInstallment::where('is_paid', false)
+                ->where('date_payment', '<', today())->count(),
+            'upcoming' => OrderPaymentInstallment::where('is_paid', false)
+                ->whereBetween('date_payment', [today(), today()->addDays(30)])->count(),
+            'paid' => OrderPaymentInstallment::where('is_paid', true)->count(),
+        ];
+
+        return response()->json([
+            'by_status' => $byStatus,
+            'overdue' => ['count' => $overdueCount, 'total' => $overdueTotal],
+            'monthly_flow' => $monthlyFlow,
+            'installments' => $installmentSummary,
+        ]);
+    }
+
+    // ==========================================
+    // Private helpers
+    // ==========================================
+
+    private function formatPayment(OrderPayment $p): array
+    {
+        return [
+            'id' => $p->id,
+            'store' => $p->store ? ['id' => $p->store->id, 'name' => $p->store->display_name] : null,
+            'supplier_name' => $p->supplier?->nome_fantasia ?? '-',
+            'manager_name' => $p->manager?->name ?? '-',
+            'description' => $p->description,
+            'total_value' => $p->total_value,
+            'formatted_total' => $p->formatted_total,
+            'payment_type' => $p->payment_type,
+            'status' => $p->status,
+            'status_label' => $p->status_label,
+            'status_color' => $p->status_color,
+            'number_nf' => $p->number_nf,
+            'launch_number' => $p->launch_number,
+            'date_payment' => $p->date_payment?->format('d/m/Y'),
+            'date_paid' => $p->date_paid?->format('d/m/Y'),
+            'is_overdue' => $p->is_overdue,
+            'is_deleted' => $p->is_deleted,
+            'advance' => $p->advance,
+            'advance_amount' => $p->advance_amount,
+            'proof' => $p->proof,
+            'payment_prepared' => $p->payment_prepared,
+            'has_allocation' => $p->has_allocation,
+            'installments' => $p->installments,
+            'created_by' => $p->createdBy?->name,
+            'created_at' => $p->created_at->format('d/m/Y H:i'),
+        ];
+    }
+
+    private function formatPaymentDetailed(OrderPayment $p): array
+    {
+        return array_merge($this->formatPayment($p), [
+            'area_id' => $p->area_id,
+            'cost_center_id' => $p->cost_center_id,
+            'brand_id' => $p->brand_id,
+            'supplier_id' => $p->supplier_id,
+            'store_id' => $p->store_id,
+            'manager_id' => $p->manager_id,
+            'bank_name' => $p->bank_name,
+            'agency' => $p->agency,
+            'checking_account' => $p->checking_account,
+            'type_account' => $p->type_account,
+            'name_supplier' => $p->name_supplier,
+            'document_number_supplier' => $p->document_number_supplier,
+            'pix_key_type' => $p->pix_key_type,
+            'pix_key' => $p->pix_key,
+            'advance_paid' => $p->advance_paid,
+            'diff_payment_advance' => $p->diff_payment_advance,
+            'observations' => $p->observations,
+            'file_name' => $p->file_name,
+            'updated_by' => $p->updatedBy?->name,
+            'deleted_by' => $p->deletedBy?->name,
+            'deleted_at' => $p->deleted_at?->format('d/m/Y H:i'),
+            'delete_reason' => $p->delete_reason,
         ]);
     }
 }

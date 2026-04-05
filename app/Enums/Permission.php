@@ -65,6 +65,12 @@ enum Permission: string
     case EDIT_ORDER_PAYMENTS = 'order_payments.edit';
     case DELETE_ORDER_PAYMENTS = 'order_payments.delete';
 
+    // Fornecedores
+    case VIEW_SUPPLIERS = 'suppliers.view';
+    case CREATE_SUPPLIERS = 'suppliers.create';
+    case EDIT_SUPPLIERS = 'suppliers.edit';
+    case DELETE_SUPPLIERS = 'suppliers.delete';
+
     // Checklists de qualidade
     case VIEW_CHECKLISTS = 'checklists.view';
     case CREATE_CHECKLISTS = 'checklists.create';
@@ -123,6 +129,11 @@ enum Permission: string
             self::CREATE_ORDER_PAYMENTS => 'Criar ordens de pagamento',
             self::EDIT_ORDER_PAYMENTS => 'Editar ordens de pagamento',
             self::DELETE_ORDER_PAYMENTS => 'Deletar ordens de pagamento',
+
+            self::VIEW_SUPPLIERS => 'Visualizar fornecedores',
+            self::CREATE_SUPPLIERS => 'Criar fornecedores',
+            self::EDIT_SUPPLIERS => 'Editar fornecedores',
+            self::DELETE_SUPPLIERS => 'Deletar fornecedores',
 
             self::VIEW_CHECKLISTS => 'Visualizar checklists',
             self::CREATE_CHECKLISTS => 'Criar checklists',
@@ -183,6 +194,11 @@ enum Permission: string
             self::CREATE_ORDER_PAYMENTS => 'Permite criar novas ordens de pagamento',
             self::EDIT_ORDER_PAYMENTS => 'Permite editar ordens de pagamento existentes',
             self::DELETE_ORDER_PAYMENTS => 'Permite deletar ordens de pagamento',
+
+            self::VIEW_SUPPLIERS => 'Permite visualizar cadastro de fornecedores',
+            self::CREATE_SUPPLIERS => 'Permite cadastrar novos fornecedores',
+            self::EDIT_SUPPLIERS => 'Permite editar dados de fornecedores',
+            self::DELETE_SUPPLIERS => 'Permite excluir fornecedores',
 
             self::VIEW_CHECKLISTS => 'Permite visualizar checklists de qualidade',
             self::CREATE_CHECKLISTS => 'Permite criar novos checklists de qualidade',

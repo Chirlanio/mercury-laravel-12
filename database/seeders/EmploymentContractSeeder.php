@@ -14,6 +14,10 @@ class EmploymentContractSeeder extends Seeder
      */
     public function run(): void
     {
+        // Desabilitar FK checks temporariamente pois os employee_ids
+        // podem não existir ainda (dados vêm do banco de produção)
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+
         $contracts = [
             ['id' => 1, 'employee_id' => 197, 'position_id' => 63, 'movement_type_id' => 1, 'start_date' => '2016-10-24', 'end_date' => '2023-09-30', 'store_id' => 'Z999', 'created_at' => '2024-08-23 08:20:23', 'updated_at' => '2024-11-14 09:31:25'],
             ['id' => 2, 'employee_id' => 635, 'position_id' => 63, 'movement_type_id' => 1, 'start_date' => '2022-11-03', 'end_date' => '2023-09-30', 'store_id' => 'Z999', 'created_at' => '2024-08-23 08:24:39', 'updated_at' => '2024-08-23 08:32:55'],
@@ -69,5 +73,7 @@ class EmploymentContractSeeder extends Seeder
                 $contract
             );
         }
+
+        DB::statement('SET FOREIGN_KEY_CHECKS=1');
     }
 }

@@ -249,14 +249,18 @@ class DashboardService
     {
         $byStatus = [];
         foreach (OrderPayment::STATUS_LABELS as $status => $label) {
-            $byStatus[$status] = OrderPayment::forStatus($status)->count();
+            $query = OrderPayment::active()->forStatus($status);
+            $byStatus[$status] = [
+                'count' => $query->count(),
+                'total' => round($query->sum('total_value'), 2),
+            ];
         }
 
         return [
             'by_status' => $byStatus,
             'overdue_count' => OrderPayment::overdue()->count(),
             'total_pending_amount' => round(
-                OrderPayment::where('status', '!=', 'done')->sum('total_value'),
+                OrderPayment::active()->where('status', '!=', 'done')->sum('total_value'),
                 2
             ),
         ];

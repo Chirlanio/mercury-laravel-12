@@ -141,6 +141,51 @@ export default function Sidebar({ isOpen, onClose }) {
                 route: "/work-shifts",
                 permission: PERMISSIONS.VIEW_USERS,
             },
+            // Novos módulos
+            "Usuários Online": {
+                route: "/user-sessions",
+                permission: PERMISSIONS.VIEW_USER_SESSIONS,
+            },
+            Transferências: {
+                route: "/transfers",
+                permission: PERMISSIONS.VIEW_TRANSFERS,
+            },
+            "Ajustes de Estoque": {
+                route: "/stock-adjustments",
+                permission: PERMISSIONS.VIEW_ADJUSTMENTS,
+            },
+            "Ordens de Pagamento": {
+                route: "/order-payments",
+                permission: PERMISSIONS.VIEW_ORDER_PAYMENTS,
+            },
+            Fornecedores: {
+                route: "/suppliers",
+                permission: PERMISSIONS.VIEW_SUPPLIERS,
+            },
+            "Escalas de Trabalho": {
+                route: "/work-schedules",
+                permission: PERMISSIONS.VIEW_USERS,
+            },
+            Turnos: {
+                route: "/work-shifts",
+                permission: PERMISSIONS.VIEW_USERS,
+            },
+            Lojas: {
+                route: "/stores",
+                permission: PERMISSIONS.MANAGE_SETTINGS,
+            },
+            Vendas: {
+                route: "/sales",
+                permission: PERMISSIONS.VIEW_SALES,
+            },
+            RH: {
+                route: "/employees",
+                permission: PERMISSIONS.VIEW_USERS,
+            },
+            Operações: {
+                route: "/transfers",
+                permission: PERMISSIONS.VIEW_TRANSFERS,
+            },
         };
         return menuRoutes[menuName] || null;
     };

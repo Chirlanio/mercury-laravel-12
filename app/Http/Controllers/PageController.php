@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AccessLevel;
+use App\Models\AccessLevelPage;
 use App\Models\Page;
 use App\Models\PageGroup;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class PageController extends Controller
@@ -215,19 +218,42 @@ class PageController extends Controller
             ])->withInput();
         }
 
-        $page = Page::create([
-            'page_name' => $request->page_name,
-            'controller' => $request->controller,
-            'method' => $request->method,
-            'menu_controller' => $request->menu_controller,
-            'menu_method' => $request->menu_method,
-            'route' => $request->route,
-            'notes' => $request->notes,
-            'icon' => $request->icon,
-            'page_group_id' => $request->page_group_id,
-            'is_public' => $request->boolean('is_public', false),
-            'is_active' => $request->boolean('is_active', true),
-        ]);
+        $page = DB::transaction(function () use ($request) {
+            $page = Page::create([
+                'page_name' => $request->page_name,
+                'controller' => $request->controller,
+                'method' => $request->method,
+                'menu_controller' => $request->menu_controller,
+                'menu_method' => $request->menu_method,
+                'route' => $request->route,
+                'notes' => $request->notes ?? '',
+                'icon' => $request->icon,
+                'page_group_id' => $request->page_group_id,
+                'is_public' => $request->boolean('is_public', false),
+                'is_active' => $request->boolean('is_active', true),
+            ]);
+
+            // Auto-provisioning: criar permissões para TODOS os níveis de acesso
+            $accessLevels = AccessLevel::ordered()->get();
+            $superAdmin = $accessLevels->first(); // Menor ordem = Super Admin
+
+            foreach ($accessLevels as $level) {
+                // Calcular próxima ordem para este nível
+                $maxOrder = AccessLevelPage::where('access_level_id', $level->id)->max('order') ?? 0;
+
+                AccessLevelPage::create([
+                    'access_level_id' => $level->id,
+                    'page_id' => $page->id,
+                    'permission' => $superAdmin && $level->id === $superAdmin->id, // Super Admin = permitido, demais = bloqueado
+                    'order' => $maxOrder + 1,
+                    'dropdown' => false,
+                    'lib_menu' => false,
+                    'menu_id' => null,
+                ]);
+            }
+
+            return $page;
+        });
 
         return back()->with('success', 'Página criada com sucesso!');
     }
@@ -267,7 +293,7 @@ class PageController extends Controller
             'menu_controller' => $request->menu_controller,
             'menu_method' => $request->menu_method,
             'route' => $request->route,
-            'notes' => $request->notes,
+            'notes' => $request->notes ?? '',
             'icon' => $request->icon,
             'page_group_id' => $request->page_group_id,
             'is_public' => $request->boolean('is_public', false),
@@ -279,11 +305,65 @@ class PageController extends Controller
 
     public function destroy(Page $page)
     {
-        // Remover permissões vinculadas antes de excluir a página
-        $page->accessLevelPages()->delete();
+        DB::transaction(function () use ($page) {
+            // Reordenar: para cada nível de acesso, decrementar a ordem dos itens posteriores
+            $permissions = $page->accessLevelPages()->get();
 
-        $page->delete();
+            foreach ($permissions as $permission) {
+                AccessLevelPage::where('access_level_id', $permission->access_level_id)
+                    ->where('order', '>', $permission->order)
+                    ->decrement('order');
+            }
+
+            // Remover permissões vinculadas
+            $page->accessLevelPages()->delete();
+
+            // Excluir a página
+            $page->delete();
+        });
 
         return redirect()->route('pages.index')->with('success', 'Página excluída com sucesso!');
+    }
+
+    /**
+     * Sincroniza permissões: garante que todas as páginas tenham registro
+     * em access_level_pages para todos os níveis de acesso.
+     * Útil após criação manual de páginas ou novos níveis de acesso.
+     */
+    public function syncPermissions()
+    {
+        $stats = DB::transaction(function () {
+            $accessLevels = AccessLevel::ordered()->get();
+            $pages = Page::all();
+            $superAdmin = $accessLevels->first();
+            $created = 0;
+
+            foreach ($pages as $page) {
+                foreach ($accessLevels as $level) {
+                    $exists = AccessLevelPage::where('access_level_id', $level->id)
+                        ->where('page_id', $page->id)
+                        ->exists();
+
+                    if (!$exists) {
+                        $maxOrder = AccessLevelPage::where('access_level_id', $level->id)->max('order') ?? 0;
+
+                        AccessLevelPage::create([
+                            'access_level_id' => $level->id,
+                            'page_id' => $page->id,
+                            'permission' => $superAdmin && $level->id === $superAdmin->id,
+                            'order' => $maxOrder + 1,
+                            'dropdown' => false,
+                            'lib_menu' => false,
+                            'menu_id' => null,
+                        ]);
+                        $created++;
+                    }
+                }
+            }
+
+            return ['created' => $created, 'total_pages' => $pages->count(), 'total_levels' => $accessLevels->count()];
+        });
+
+        return back()->with('success', "Sincronização concluída! {$stats['created']} permissões criadas para {$stats['total_pages']} páginas e {$stats['total_levels']} níveis de acesso.");
     }
 }

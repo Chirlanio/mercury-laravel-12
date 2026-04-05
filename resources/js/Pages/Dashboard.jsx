@@ -255,25 +255,25 @@ export default function Dashboard({
                                         <div className="flex justify-between items-center">
                                             <span className="text-sm text-gray-600">Solicitação</span>
                                             <span className="text-sm font-semibold text-gray-700">
-                                                {paymentsSummary.by_status?.backlog ?? 0}
+                                                {paymentsSummary.by_status?.backlog?.count ?? 0}
                                             </span>
                                         </div>
                                         <div className="flex justify-between items-center">
                                             <span className="text-sm text-gray-600">Reg. Fiscal</span>
                                             <span className="text-sm font-semibold text-blue-600">
-                                                {paymentsSummary.by_status?.doing ?? 0}
+                                                {paymentsSummary.by_status?.doing?.count ?? 0}
                                             </span>
                                         </div>
                                         <div className="flex justify-between items-center">
                                             <span className="text-sm text-gray-600">Lançado</span>
                                             <span className="text-sm font-semibold text-yellow-600">
-                                                {paymentsSummary.by_status?.waiting ?? 0}
+                                                {paymentsSummary.by_status?.waiting?.count ?? 0}
                                             </span>
                                         </div>
                                         <div className="flex justify-between items-center">
                                             <span className="text-sm text-gray-600">Pago</span>
                                             <span className="text-sm font-semibold text-green-600">
-                                                {paymentsSummary.by_status?.done ?? 0}
+                                                {paymentsSummary.by_status?.done?.count ?? 0}
                                             </span>
                                         </div>
                                         {paymentsSummary.overdue_count > 0 && (

@@ -21,6 +21,7 @@ use App\Http\Controllers\TransferController;
 use App\Http\Controllers\StockAdjustmentController;
 use App\Http\Controllers\OrderPaymentController;
 use App\Http\Controllers\ChecklistController;
+use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\Admin\EmailSettingsController;
 use App\Http\Controllers\Config\PositionController as ConfigPositionController;
 use App\Http\Controllers\Config\PositionLevelController as ConfigPositionLevelController;
@@ -203,6 +204,9 @@ Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->grou
 
         // Excluir página
         Route::delete('/pages/{page}', [PageController::class, 'destroy'])->name('pages.destroy');
+
+        // Sincronizar permissões (garantir que todas as páginas tenham registro para todos os níveis)
+        Route::post('/pages/sync-permissions', [PageController::class, 'syncPermissions'])->name('pages.syncPermissions');
     });
 });
 
@@ -721,6 +725,26 @@ Route::middleware(['auth'])->group(function () {
 
         Route::middleware('permission:' . Permission::DELETE_ORDER_PAYMENTS->value)->group(function () {
             Route::delete('/order-payments/{orderPayment}', [OrderPaymentController::class, 'destroy'])->name('order-payments.destroy');
+        });
+    });
+
+    // ==========================================
+    // Fornecedores
+    // ==========================================
+    Route::middleware('permission:' . Permission::VIEW_SUPPLIERS->value)->group(function () {
+        Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
+        Route::get('/suppliers/{supplier}', [SupplierController::class, 'show'])->name('suppliers.show');
+
+        Route::middleware('permission:' . Permission::CREATE_SUPPLIERS->value)->group(function () {
+            Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
+        });
+
+        Route::middleware('permission:' . Permission::EDIT_SUPPLIERS->value)->group(function () {
+            Route::put('/suppliers/{supplier}', [SupplierController::class, 'update'])->name('suppliers.update');
+        });
+
+        Route::middleware('permission:' . Permission::DELETE_SUPPLIERS->value)->group(function () {
+            Route::delete('/suppliers/{supplier}', [SupplierController::class, 'destroy'])->name('suppliers.destroy');
         });
     });
 
