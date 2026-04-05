@@ -14,8 +14,8 @@ return new class extends Migration
         Schema::create('sectors', function (Blueprint $table) {
             $table->id();
             $table->string('sector_name', 120);
-            $table->foreignId('area_manager_id')->constrained('managers')->onDelete('cascade');
-            $table->foreignId('sector_manager_id')->constrained('managers')->onDelete('cascade');
+            $table->foreignId('area_manager_id')->nullable()->constrained('managers')->nullOnDelete();
+            $table->foreignId('sector_manager_id')->nullable()->constrained('managers')->nullOnDelete();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 

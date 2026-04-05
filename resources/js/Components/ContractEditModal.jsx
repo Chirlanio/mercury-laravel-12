@@ -21,20 +21,15 @@ export default function ContractEditModal({ show, onClose, employeeId, contract,
             // Populate form with contract data
             // Convert dates from dd/mm/yyyy to yyyy-mm-dd for input[type=date]
             const convertToInputDate = (dateStr) => {
-                if (!dateStr || dateStr === 'Atual') return '';
+                if (!dateStr || dateStr === 'Atual' || dateStr === '-') return '';
                 const [day, month, year] = dateStr.split('/');
                 return `${year}-${month}-${day}`;
             };
 
-            // Find IDs from names
-            const position = positions?.find(p => p.name === contract.position);
-            const movementType = movementTypes?.find(mt => mt.name === contract.movement_type);
-            const store = stores?.find(s => s.name === contract.store || s.code === contract.store);
-
             setFormData({
-                position_id: position?.id || '',
-                movement_type_id: movementType?.id || '',
-                store_id: store?.code || '',
+                position_id: contract.position_id || '',
+                movement_type_id: contract.movement_type_id || '',
+                store_id: contract.store_id || '',
                 start_date: convertToInputDate(contract.start_date),
                 end_date: convertToInputDate(contract.end_date),
             });
@@ -63,7 +58,10 @@ export default function ContractEditModal({ show, onClose, employeeId, contract,
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                 },
-                body: JSON.stringify(formData),
+                body: JSON.stringify({
+                    ...formData,
+                    end_date: formData.end_date || null,
+                }),
             });
 
             const data = await response.json();

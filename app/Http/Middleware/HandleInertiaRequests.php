@@ -4,37 +4,62 @@ namespace App\Http\Middleware;
 
 use App\Helpers\PermissionHelper;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
 {
-    /**
-     * The root template that is loaded on the first page visit.
-     *
-     * @var string
-     */
     protected $rootView = 'app';
 
-    /**
-     * Determine the current asset version.
-     */
     public function version(Request $request): ?string
     {
         return parent::version($request);
     }
 
-    /**
-     * Define the props that are shared by default.
-     *
-     * @return array<string, mixed>
-     */
     public function share(Request $request): array
+    {
+        $currentTenant = tenant();
+        $isCentral = ! $currentTenant;
+
+        // Central context: use central guard
+        if ($isCentral) {
+            return $this->shareCentralProps($request);
+        }
+
+        // Tenant context: use web guard (tenant users)
+        return $this->shareTenantProps($request, $currentTenant);
+    }
+
+    protected function shareCentralProps(Request $request): array
+    {
+        $user = Auth::guard('central')->user();
+
+        return [
+            ...parent::share($request),
+            'csrf_token' => csrf_token(),
+            'isCentral' => true,
+            'auth' => [
+                'user' => $user ? [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                ] : null,
+                'permissions' => [],
+            ],
+            'tenant' => null,
+            'flash' => $this->flashProps($request),
+        ];
+    }
+
+    protected function shareTenantProps(Request $request, $currentTenant): array
     {
         $user = $request->user();
 
         return [
             ...parent::share($request),
             'csrf_token' => csrf_token(),
+            'isCentral' => false,
             'auth' => [
                 'user' => $user ? [
                     'id' => $user->id,
@@ -47,12 +72,28 @@ class HandleInertiaRequests extends Middleware
                 ] : null,
                 'permissions' => $user ? PermissionHelper::getUserPermissions($user) : [],
             ],
-            'flash' => [
-                'success' => fn () => $request->session()->get('success'),
-                'error' => fn () => $request->session()->get('error'),
-                'warning' => fn () => $request->session()->get('warning'),
-                'info' => fn () => $request->session()->get('info'),
+            'tenant' => [
+                'id' => $currentTenant->id,
+                'name' => $currentTenant->name,
+                'slug' => $currentTenant->slug,
+                'plan' => $currentTenant->plan ? [
+                    'name' => $currentTenant->plan->name,
+                    'slug' => $currentTenant->plan->slug,
+                ] : null,
+                'modules' => $currentTenant->activeModules()->pluck('module_slug'),
+                'settings' => $currentTenant->settings ?? [],
             ],
+            'flash' => $this->flashProps($request),
+        ];
+    }
+
+    protected function flashProps(Request $request): array
+    {
+        return [
+            'success' => fn () => $request->session()->get('success'),
+            'error' => fn () => $request->session()->get('error'),
+            'warning' => fn () => $request->session()->get('warning'),
+            'info' => fn () => $request->session()->get('info'),
         ];
     }
 }

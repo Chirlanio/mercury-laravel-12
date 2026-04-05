@@ -78,6 +78,9 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
             setEmployee(data.employee);
             setHistories(data.histories || []);
             setContracts(data.contracts || []);
+            if (data.movement_types) {
+                setMovementTypes(data.movement_types);
+            }
         } catch (err) {
             setError('Erro ao carregar histórico do funcionário');
             console.error('Erro ao buscar histórico:', err);
@@ -87,19 +90,8 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
     };
 
     const fetchMovementTypes = async () => {
-        try {
-            // Por enquanto, vamos criar os tipos manualmente
-            // Se precisar buscar do backend, adicione uma rota
-            setMovementTypes([
-                { id: 1, name: 'Admissão' },
-                { id: 2, name: 'Promoção' },
-                { id: 3, name: 'Mudança de Cargo' },
-                { id: 4, name: 'Transferência' },
-                { id: 5, name: 'Demissão' },
-            ]);
-        } catch (err) {
-            console.error('Erro ao buscar tipos de movimentação:', err);
-        }
+        // Movement types are now loaded from the history endpoint.
+        // This function is kept as a no-op fallback since history fetch already sets them.
     };
 
     const fetchEvents = async () => {

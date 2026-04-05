@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -54,7 +55,7 @@ class ActivityLog extends Model
         ?Model $model = null,
         ?array $oldValues = null,
         ?array $newValues = null,
-        ?User $user = null
+        ?Authenticatable $user = null
     ): self {
         $request = request();
 

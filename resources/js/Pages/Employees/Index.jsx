@@ -10,7 +10,7 @@ import EmployeeAvatar from "@/Components/EmployeeAvatar";
 import Button from "@/Components/Button";
 import ExportAllEventsModal from "@/Components/ExportAllEventsModal";
 
-export default function Index({ auth, employees, positions, stores, statuses, filters }) {
+export default function Index({ auth, employees, positions, stores, statuses, educationLevels, filters }) {
     const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -431,6 +431,7 @@ export default function Index({ auth, employees, positions, stores, statuses, fi
                 onSuccess={handleEmployeeCreated}
                 positions={positions}
                 stores={stores}
+                educationLevels={educationLevels}
             />
 
             {/* Employee Edit Modal */}
@@ -442,6 +443,7 @@ export default function Index({ auth, employees, positions, stores, statuses, fi
                 positions={positions}
                 stores={stores}
                 statuses={statuses}
+                educationLevels={educationLevels}
             />
 
             {/* Delete Confirmation Modal */}

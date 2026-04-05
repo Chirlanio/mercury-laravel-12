@@ -3,7 +3,7 @@ import { useForm, router } from '@inertiajs/react';
 import Modal from '@/Components/Modal';
 import Button from '@/Components/Button';
 
-export default function EmployeeCreateModal({ show, onClose, onSuccess, positions = [], stores = [] }) {
+export default function EmployeeCreateModal({ show, onClose, onSuccess, positions = [], stores = [], educationLevels = [] }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { data, setData, errors, reset, clearErrors, setError } = useForm({
         name: '',
@@ -388,16 +388,11 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
                                 }`}
                             >
                                 <option value="">Selecione a escolaridade</option>
-                                <option value="1">Ensino Fundamental Incompleto</option>
-                                <option value="2">Ensino Fundamental Completo</option>
-                                <option value="3">Ensino Médio Incompleto</option>
-                                <option value="4">Ensino Médio Completo</option>
-                                <option value="5">Ensino Superior Incompleto</option>
-                                <option value="6">Ensino Superior Completo</option>
-                                <option value="7">Pós-graduação</option>
-                                <option value="8">Mestrado</option>
-                                <option value="9">Doutorado</option>
-                                <option value="10">Técnico</option>
+                                {educationLevels.map((level) => (
+                                    <option key={level.id} value={level.id}>
+                                        {level.name}
+                                    </option>
+                                ))}
                             </select>
                             {errors.education_level_id && <p className="mt-1 text-sm text-red-600">{errors.education_level_id}</p>}
                         </div>

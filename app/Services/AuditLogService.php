@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\ActivityLog;
-use App\Models\User;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -21,7 +21,7 @@ class AuditLogService
         ?Model $model = null,
         ?array $oldValues = null,
         ?array $newValues = null,
-        ?User $user = null
+        ?Authenticatable $user = null,
     ): ?ActivityLog {
         try {
             return ActivityLog::log(
@@ -46,7 +46,7 @@ class AuditLogService
     /**
      * Registra login de usuário
      */
-    public function logLogin(User $user): ?ActivityLog
+    public function logLogin(Authenticatable $user): ?ActivityLog
     {
         return $this->log(
             action: 'login',
@@ -58,7 +58,7 @@ class AuditLogService
     /**
      * Registra logout de usuário
      */
-    public function logLogout(?User $user = null): ?ActivityLog
+    public function logLogout(?Authenticatable $user = null): ?ActivityLog
     {
         $user = $user ?? Auth::user();
 
@@ -76,7 +76,7 @@ class AuditLogService
     /**
      * Registra criação de modelo
      */
-    public function logModelCreated(Model $model, ?User $user = null): ?ActivityLog
+    public function logModelCreated(Model $model, ?Authenticatable $user = null): ?ActivityLog
     {
         $modelName = class_basename($model);
         $description = "Criou um novo {$modelName}";
@@ -101,7 +101,7 @@ class AuditLogService
     /**
      * Registra atualização de modelo
      */
-    public function logModelUpdated(Model $model, array $oldValues, ?User $user = null): ?ActivityLog
+    public function logModelUpdated(Model $model, array $oldValues, ?Authenticatable $user = null): ?ActivityLog
     {
         $modelName = class_basename($model);
         $description = "Atualizou {$modelName}";
@@ -127,7 +127,7 @@ class AuditLogService
     /**
      * Registra deleção de modelo
      */
-    public function logModelDeleted(Model $model, ?User $user = null): ?ActivityLog
+    public function logModelDeleted(Model $model, ?Authenticatable $user = null): ?ActivityLog
     {
         $modelName = class_basename($model);
         $description = "Deletou {$modelName}";
@@ -152,7 +152,7 @@ class AuditLogService
     /**
      * Registra acesso a recurso
      */
-    public function logResourceAccess(string $resource, ?Model $model = null, ?User $user = null): ?ActivityLog
+    public function logResourceAccess(string $resource, ?Model $model = null, ?Authenticatable $user = null): ?ActivityLog
     {
         $description = "Acessou {$resource}";
 
@@ -172,7 +172,7 @@ class AuditLogService
     /**
      * Registra tentativa de acesso negado
      */
-    public function logAccessDenied(string $resource, string $reason = '', ?User $user = null): ?ActivityLog
+    public function logAccessDenied(string $resource, string $reason = '', ?Authenticatable $user = null): ?ActivityLog
     {
         $description = "Tentativa de acesso negado a {$resource}";
 
@@ -195,7 +195,7 @@ class AuditLogService
         string $description,
         ?Model $model = null,
         ?array $metadata = null,
-        ?User $user = null
+        ?Authenticatable $user = null,
     ): ?ActivityLog {
         return $this->log(
             action: $action,
@@ -290,7 +290,7 @@ class AuditLogService
     /**
      * Verifica se um usuário tem atividade suspeita
      */
-    public function detectSuspiciousActivity(User $user, int $timeWindowMinutes = 5): array
+    public function detectSuspiciousActivity(Authenticatable $user, int $timeWindowMinutes = 5): array
     {
         $startTime = Carbon::now()->subMinutes($timeWindowMinutes);
 

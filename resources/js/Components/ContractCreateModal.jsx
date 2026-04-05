@@ -42,7 +42,10 @@ export default function ContractCreateModal({ show, onClose, employeeId, positio
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                 },
-                body: JSON.stringify(formData),
+                body: JSON.stringify({
+                    ...formData,
+                    end_date: formData.end_date || null,
+                }),
             });
 
             const data = await response.json();

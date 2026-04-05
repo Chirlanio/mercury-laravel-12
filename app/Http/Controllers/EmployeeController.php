@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Models\EmployeeHistory;
+use App\Models\EducationLevel;
 use App\Models\EmployeeStatus;
 use App\Models\EmployeeEvent;
 use App\Models\EmployeeEventType;
@@ -72,6 +73,7 @@ class EmployeeController extends Controller
         $positions = Position::active()->orderBy('name')->get(['id', 'name', 'level']);
         $stores = Store::active()->orderBy('name')->get(['id', 'code', 'name']);
         $statuses = EmployeeStatus::orderBy('description_name')->get(['id', 'description_name as name']);
+        $educationLevels = EducationLevel::where('is_active', true)->orderBy('id')->get(['id', 'description_name as name']);
 
         return Inertia::render('Employees/Index', [
             'employees' => $employees->through(function ($employee) {
@@ -94,6 +96,7 @@ class EmployeeController extends Controller
             'positions' => $positions,
             'stores' => $stores,
             'statuses' => $statuses,
+            'educationLevels' => $educationLevels,
             'filters' => [
                 'search' => $search,
                 'sort' => $sortField,
@@ -454,8 +457,11 @@ class EmployeeController extends Controller
 
             return [
                 'id' => $contract->id,
+                'position_id' => $contract->position_id,
                 'position' => $contract->position?->name ?? 'Não informado',
+                'movement_type_id' => $contract->movement_type_id,
                 'movement_type' => $contract->movementType?->name ?? 'Não informado',
+                'store_id' => $contract->store_id,
                 'store' => $contract->store?->name ?? $contract->store_id,
                 'start_date' => $contract->start_date->format('d/m/Y'),
                 'end_date' => $contract->is_active ? 'Atual' : ($contract->end_date ? $contract->end_date->format('d/m/Y') : '-'),
@@ -470,6 +476,11 @@ class EmployeeController extends Controller
             ];
         });
 
+        // Buscar tipos de movimentação do banco
+        $movementTypes = \App\Models\TypeMoviment::where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return response()->json([
             'employee' => [
                 'id' => $employee->id,
@@ -477,6 +488,7 @@ class EmployeeController extends Controller
             ],
             'histories' => $histories,
             'contracts' => $contracts,
+            'movement_types' => $movementTypes,
         ]);
     }
 
@@ -586,8 +598,11 @@ class EmployeeController extends Controller
                 'message' => 'Contrato criado com sucesso!',
                 'contract' => [
                     'id' => $contract->id,
+                    'position_id' => $contract->position_id,
                     'position' => $contract->position?->name ?? 'Não informado',
+                    'movement_type_id' => $contract->movement_type_id,
                     'movement_type' => $contract->movementType?->name ?? 'Não informado',
+                    'store_id' => $contract->store_id,
                     'store' => $contract->store?->name ?? $contract->store_id,
                     'start_date' => $contract->start_date->format('d/m/Y'),
                     'end_date' => $contract->is_active ? 'Atual' : ($contract->end_date ? $contract->end_date->format('d/m/Y') : '-'),
@@ -666,12 +681,56 @@ class EmployeeController extends Controller
                 ->first();
             $isLatest = $contract->id === $latestContract->id;
 
+            // Sincronizar dados do contrato com o funcionário
+            $isAdmission = (int) $request->movement_type_id === 1;
+            $isDismissal = (int) $request->movement_type_id === 5;
+
+            if ($isLatest) {
+                if ($isDismissal) {
+                    $employee->update([
+                        'dismissal_date' => $request->start_date,
+                        'status_id' => 3,
+                    ]);
+                } else {
+                    $updateData = [
+                        'position_id' => $request->position_id,
+                        'store_id' => $request->store_id,
+                    ];
+
+                    if ($isAdmission) {
+                        $updateData['admission_date'] = $request->start_date;
+                    }
+
+                    $employee->update($updateData);
+
+                    // Se mudou de demissão para outro tipo, reativar funcionário
+                    if ($employee->status_id == 3) {
+                        $employee->update([
+                            'status_id' => 2,
+                            'dismissal_date' => null,
+                        ]);
+                    }
+                }
+            } else {
+                // Mesmo não sendo o último, se for o contrato de admissão (mais antigo), atualizar admission_date
+                $oldestContract = EmploymentContract::where('employee_id', $employeeId)
+                    ->orderBy('start_date', 'asc')
+                    ->first();
+
+                if ($isAdmission && $contract->id === $oldestContract->id) {
+                    $employee->update(['admission_date' => $request->start_date]);
+                }
+            }
+
             return response()->json([
                 'message' => 'Contrato atualizado com sucesso!',
                 'contract' => [
                     'id' => $contract->id,
+                    'position_id' => $contract->position_id,
                     'position' => $contract->position?->name ?? 'Não informado',
+                    'movement_type_id' => $contract->movement_type_id,
                     'movement_type' => $contract->movementType?->name ?? 'Não informado',
+                    'store_id' => $contract->store_id,
                     'store' => $contract->store?->name ?? $contract->store_id,
                     'start_date' => $contract->start_date->format('d/m/Y'),
                     'end_date' => $contract->is_active ? 'Atual' : ($contract->end_date ? $contract->end_date->format('d/m/Y') : '-'),
@@ -740,16 +799,41 @@ class EmployeeController extends Controller
             $contract->delete();
 
             // Atualizar funcionário com dados do contrato mais recente restante
+            $employee = Employee::find($employeeId);
             $latestRemainingContract = EmploymentContract::where('employee_id', $employeeId)
                 ->orderBy('start_date', 'desc')
                 ->first();
 
             if ($latestRemainingContract) {
-                $employee = Employee::find($employeeId);
-                $employee->update([
+                $updateData = [
                     'position_id' => $latestRemainingContract->position_id,
                     'store_id' => $latestRemainingContract->store_id,
-                ]);
+                ];
+
+                $isDismissal = (int) $latestRemainingContract->movement_type_id === 5;
+
+                if ($isDismissal) {
+                    $updateData['dismissal_date'] = $latestRemainingContract->start_date;
+                    $updateData['status_id'] = 3;
+                } else {
+                    // Se o contrato excluído era de demissão, reativar o funcionário
+                    if ((int) $contract->movement_type_id === 5) {
+                        $updateData['dismissal_date'] = null;
+                        $updateData['status_id'] = 2;
+                    }
+                }
+
+                $employee->update($updateData);
+            }
+
+            // Atualizar admission_date com o contrato de admissão mais antigo
+            $oldestAdmissionContract = EmploymentContract::where('employee_id', $employeeId)
+                ->where('movement_type_id', 1)
+                ->orderBy('start_date', 'asc')
+                ->first();
+
+            if ($oldestAdmissionContract) {
+                $employee->update(['admission_date' => $oldestAdmissionContract->start_date]);
             }
 
             $response = [
