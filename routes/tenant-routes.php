@@ -449,6 +449,10 @@ use Inertia\Inertia;
             ->middleware('permission:' . Permission::DELETE_STORE_GOALS->value)->name('store-goals.destroy');
         Route::post('/store-goals/{storeGoal}/redistribute', [StoreGoalController::class, 'redistribute'])
             ->middleware('permission:' . Permission::EDIT_STORE_GOALS->value)->name('store-goals.redistribute');
+        Route::get('/store-goals/{storeGoal}/confirm-data', [StoreGoalController::class, 'loadConfirmData'])
+            ->middleware('permission:' . Permission::EDIT_STORE_GOALS->value)->name('store-goals.confirm-data');
+        Route::post('/store-goals/{storeGoal}/confirm-sales', [StoreGoalController::class, 'confirmSales'])
+            ->middleware('permission:' . Permission::EDIT_STORE_GOALS->value)->name('store-goals.confirm-sales');
     });
 
     // ==========================================

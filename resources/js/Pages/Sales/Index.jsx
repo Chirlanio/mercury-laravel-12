@@ -1,6 +1,5 @@
 import { Head, router } from "@inertiajs/react";
 import { useState } from "react";
-import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import Modal from "@/Components/Modal";
 import Button from "@/Components/Button";
 import SaleStatisticsCards from "@/Components/SaleStatisticsCards";
@@ -10,6 +9,7 @@ import SaleSyncModal from "@/Components/SaleSyncModal";
 import SaleBulkDeleteModal from "@/Components/SaleBulkDeleteModal";
 import SalesHierarchyTable from "@/Components/SalesHierarchyTable";
 import EmployeeDailySalesModal from "@/Components/EmployeeDailySalesModal";
+import { formatDate } from '@/Utils/dateHelpers';
 
 export default function Index({ auth, salesByStore, grandTotals, stores, filters, cigamAvailable, cigamUnavailableReason }) {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -114,7 +114,7 @@ export default function Index({ auth, salesByStore, grandTotals, stores, filters
     };
 
     return (
-        <AuthenticatedLayout user={auth.user}>
+        <>
             <Head title="Vendas" />
 
             <div className="py-12">
@@ -298,7 +298,7 @@ export default function Index({ auth, salesByStore, grandTotals, stores, filters
                         Confirmar Exclusão
                     </h2>
                     <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        Tem certeza que deseja excluir esta venda de <strong>{saleToDelete?.employee_name || saleToDelete?.store_name}</strong> em <strong>{saleToDelete?.date_sales}</strong>? Esta ação não pode ser desfeita.
+                        Tem certeza que deseja excluir esta venda de <strong>{saleToDelete?.employee_name || saleToDelete?.store_name}</strong> em <strong>{formatDate(saleToDelete?.date_sales)}</strong>? Esta ação não pode ser desfeita.
                     </p>
                     {deleteError && (
                         <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
@@ -323,6 +323,6 @@ export default function Index({ auth, salesByStore, grandTotals, stores, filters
                     </div>
                 </div>
             </Modal>
-        </AuthenticatedLayout>
+        </>
     );
 }

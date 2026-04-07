@@ -1,8 +1,9 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import PageHeader from '@/Components/PageHeader';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ArrowsRightLeftIcon, PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
+import { formatDateTime } from '@/Utils/dateHelpers';
 
 const STATUS_COLORS = {
     pending: 'bg-yellow-100 text-yellow-800',
@@ -48,8 +49,9 @@ export default function Index({ transfers, stores = [], filters = {}, statusOpti
     };
 
     return (
-        <AuthenticatedLayout
-            header={
+        <>
+            <Head title="Transferências" />
+            <PageHeader>
                 <div className="flex justify-between items-center">
                     <h2 className="text-xl font-semibold leading-tight text-gray-800">
                         Transferências
@@ -64,9 +66,7 @@ export default function Index({ transfers, stores = [], filters = {}, statusOpti
                         </button>
                     )}
                 </div>
-            }
-        >
-            <Head title="Transferências" />
+            </PageHeader>
 
             <div className="py-6">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -158,7 +158,7 @@ export default function Index({ transfers, stores = [], filters = {}, statusOpti
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {transfer.created_at}
+                                                {formatDateTime(transfer.created_at)}
                                             </td>
                                         </tr>
                                     ))
@@ -311,6 +311,6 @@ export default function Index({ transfers, stores = [], filters = {}, statusOpti
                     )}
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }

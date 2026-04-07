@@ -5,6 +5,7 @@ import { createInertiaApp } from '@inertiajs/react';
 import { router } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
@@ -76,7 +77,14 @@ createInertiaApp({
         resolvePageComponent(
             `./Pages/${name}.jsx`,
             import.meta.glob('./Pages/**/*.jsx'),
-        ),
+        ).then((module) => {
+            const page = module.default;
+            // Apply persistent layout for tenant pages (skip Auth and Central pages)
+            if (!page.layout && !name.startsWith('Auth/') && !name.startsWith('Central/')) {
+                page.layout = (page) => <AuthenticatedLayout>{page}</AuthenticatedLayout>;
+            }
+            return module;
+        }),
     setup({ el, App, props }) {
         const root = createRoot(el);
 

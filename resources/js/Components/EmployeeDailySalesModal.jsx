@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { router } from '@inertiajs/react';
 import Modal from '@/Components/Modal';
 import Button from '@/Components/Button';
+import { formatDate } from '@/Utils/dateHelpers';
 
 const formatCurrency = (value) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -126,7 +127,7 @@ export default function EmployeeDailySalesModal({
                                     ) : (
                                         data.daily_sales.map((sale) => (
                                             <tr key={sale.id} className="hover:bg-gray-50">
-                                                <td className="px-4 py-2 text-sm text-gray-900">{sale.date_sales}</td>
+                                                <td className="px-4 py-2 text-sm text-gray-900">{formatDate(sale.date_sales)}</td>
                                                 <td className="px-4 py-2 text-sm">
                                                     {sale.is_ecommerce ? (
                                                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">

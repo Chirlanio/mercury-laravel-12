@@ -1,8 +1,9 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import PageHeader from '@/Components/PageHeader';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ClipboardDocumentCheckIcon, PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
+import { formatDateTime } from '@/Utils/dateHelpers';
 
 const STATUS_COLORS = {
     pending: 'bg-yellow-100 text-yellow-800',
@@ -64,8 +65,9 @@ export default function Index({ adjustments, stores = [], filters = {}, statusOp
     };
 
     return (
-        <AuthenticatedLayout
-            header={
+        <>
+            <Head title="Ajustes de Estoque" />
+            <PageHeader>
                 <div className="flex justify-between items-center">
                     <h2 className="text-xl font-semibold leading-tight text-gray-800">
                         Ajustes de Estoque
@@ -80,9 +82,7 @@ export default function Index({ adjustments, stores = [], filters = {}, statusOp
                         </button>
                     )}
                 </div>
-            }
-        >
-            <Head title="Ajustes de Estoque" />
+            </PageHeader>
 
             <div className="py-6">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -170,7 +170,7 @@ export default function Index({ adjustments, stores = [], filters = {}, statusOp
                                                 {adj.created_by || '-'}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {adj.created_at}
+                                                {formatDateTime(adj.created_at)}
                                             </td>
                                         </tr>
                                     ))
@@ -306,6 +306,6 @@ export default function Index({ adjustments, stores = [], filters = {}, statusOp
                     )}
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }

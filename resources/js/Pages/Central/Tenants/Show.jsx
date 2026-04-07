@@ -1,6 +1,7 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import CentralLayout from '@/Layouts/CentralLayout';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { formatDateTime } from '@/Utils/dateHelpers';
 
 export default function Show({ tenant, usage, plans, recentInvoices }) {
     const planLimits = tenant.plan ? plans.find(p => p.id === tenant.plan?.id) : null;
@@ -64,7 +65,7 @@ export default function Show({ tenant, usage, plans, recentInvoices }) {
                             </div>
                             <div>
                                 <dt className="font-medium text-gray-500">Criado em</dt>
-                                <dd className="mt-1 text-gray-900">{tenant.created_at}</dd>
+                                <dd className="mt-1 text-gray-900">{formatDateTime(tenant.created_at)}</dd>
                             </div>
                         </dl>
                     </div>

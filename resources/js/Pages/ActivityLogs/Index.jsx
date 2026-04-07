@@ -1,4 +1,3 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import DataTable from '@/Components/DataTable';
 import Button from '@/Components/Button';
 import { Head, router } from '@inertiajs/react';
@@ -160,7 +159,7 @@ export default function Index({ auth, logs = { data: [], links: [] }, filters = 
     };
 
     return (
-        <AuthenticatedLayout user={auth.user}>
+        <>
             <Head title="Logs de Atividade" />
 
             <div className="py-12">
@@ -292,6 +291,6 @@ export default function Index({ auth, logs = { data: [], links: [] }, filters = 
                     />
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }

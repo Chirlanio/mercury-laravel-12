@@ -1,6 +1,7 @@
 import { Fragment, useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import axios from 'axios';
+import { formatDateTime } from '@/Utils/dateHelpers';
 import {
     XMarkIcon,
     ChevronDownIcon,
@@ -114,9 +115,9 @@ export default function ChecklistViewModal({ show, onClose, checklistId }) {
                                                 <InfoField label="Loja" value={checklist?.store?.name} />
                                                 <InfoField label="Aplicador" value={checklist?.applicator?.name || '-'} />
                                                 <InfoField label="Status" value={STATUS_LABELS[checklist?.status] || checklist?.status} />
-                                                <InfoField label="Criado em" value={checklist?.created_at} />
-                                                {checklist?.started_at && <InfoField label="Iniciado em" value={checklist.started_at} />}
-                                                {checklist?.completed_at && <InfoField label="Concluído em" value={checklist.completed_at} />}
+                                                <InfoField label="Criado em" value={formatDateTime(checklist?.created_at)} />
+                                                {checklist?.started_at && <InfoField label="Iniciado em" value={formatDateTime(checklist.started_at)} />}
+                                                {checklist?.completed_at && <InfoField label="Concluído em" value={formatDateTime(checklist.completed_at)} />}
                                             </div>
 
                                             {/* Score Overview */}

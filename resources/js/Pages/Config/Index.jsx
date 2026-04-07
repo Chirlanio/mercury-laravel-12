@@ -1,4 +1,3 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import DataTable from '@/Components/DataTable';
 import Button from '@/Components/Button';
 import GenericFormModal from '@/Components/GenericFormModal';
@@ -204,7 +203,7 @@ export default function Index({
     };
 
     return (
-        <AuthenticatedLayout user={auth.user}>
+        <>
             <Head title={config.title || 'Configuração'} />
 
             <div className="py-12">
@@ -359,6 +358,6 @@ export default function Index({
                 cancelText="Cancelar"
                 type="danger"
             />
-        </AuthenticatedLayout>
+        </>
     );
 }

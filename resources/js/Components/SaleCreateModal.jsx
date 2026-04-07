@@ -3,6 +3,7 @@ import { router } from '@inertiajs/react';
 import Modal from '@/Components/Modal';
 import Button from '@/Components/Button';
 import axios from 'axios';
+import { maskMoney, parseMoney } from '@/Hooks/useMasks';
 
 export default function SaleCreateModal({ isOpen, onClose, onSuccess, stores = [] }) {
     const [form, setForm] = useState({
@@ -43,7 +44,7 @@ export default function SaleCreateModal({ isOpen, onClose, onSuccess, stores = [
         if (!form.store_id) newErrors.store_id = 'Selecione uma loja.';
         if (!form.employee_id) newErrors.employee_id = 'Selecione um funcionário.';
         if (!form.date_sales) newErrors.date_sales = 'Informe a data.';
-        if (!form.total_sales || parseFloat(form.total_sales) <= 0) newErrors.total_sales = 'Informe um valor válido.';
+        if (!form.total_sales || parseMoney(form.total_sales) <= 0) newErrors.total_sales = 'Informe um valor válido.';
         if (!form.qtde_total || parseInt(form.qtde_total) < 1) newErrors.qtde_total = 'Informe a quantidade.';
 
         if (Object.keys(newErrors).length > 0) {
@@ -56,7 +57,7 @@ export default function SaleCreateModal({ isOpen, onClose, onSuccess, stores = [
             store_id: parseInt(form.store_id),
             employee_id: parseInt(form.employee_id),
             date_sales: form.date_sales,
-            total_sales: parseFloat(form.total_sales),
+            total_sales: parseMoney(form.total_sales),
             qtde_total: parseInt(form.qtde_total),
         }, {
             preserveScroll: true,
@@ -119,11 +120,10 @@ export default function SaleCreateModal({ isOpen, onClose, onSuccess, stores = [
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Valor (R$)</label>
                     <input
-                        type="number"
-                        step="0.01"
-                        min="0.01"
+                        type="text"
+                        inputMode="numeric"
                         value={form.total_sales}
-                        onChange={(e) => handleChange('total_sales', e.target.value)}
+                        onChange={(e) => handleChange('total_sales', maskMoney(e.target.value))}
                         placeholder="0,00"
                         className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     />

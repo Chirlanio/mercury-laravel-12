@@ -85,35 +85,32 @@ export default function StatCard({
     const colors = colorClasses[color] || colorClasses.blue;
 
     return (
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
+        <div className="bg-white overflow-hidden shadow rounded-lg flex flex-col">
+            <div className="p-5 flex-1">
                 <div className="flex items-center">
                     <div className="flex-shrink-0">
                         <div className={`w-8 h-8 ${colors.light} rounded-md flex items-center justify-center`}>
                             {Icon && <Icon className={`h-5 w-5 ${colors.icon}`} />}
                         </div>
                     </div>
-                    <div className="ml-5 w-0 flex-1">
+                    <div className="ml-5 min-w-0 flex-1">
                         <dl>
                             <dt className="text-sm font-medium text-gray-500 truncate">
                                 {title}
                             </dt>
-                            <dd className="flex items-baseline">
-                                <div className={`text-2xl font-semibold ${colors.text} ${loading ? 'animate-pulse' : ''}`}>
+                            <dd>
+                                <div className={`text-2xl font-semibold ${colors.text} ${loading ? 'animate-pulse' : ''} truncate`}>
                                     {formatValue(value)}
                                 </div>
                                 {trend && (
-                                    <div className={`ml-2 flex items-baseline text-sm font-semibold ${
+                                    <div className={`mt-1 flex items-center text-sm font-semibold ${
                                         trend.isPositive ? 'text-green-600' : 'text-red-600'
                                     }`}>
                                         {trend.isPositive ? (
-                                            <ArrowUpIcon className="self-center flex-shrink-0 h-4 w-4 text-green-500" />
+                                            <ArrowUpIcon className="flex-shrink-0 h-4 w-4 text-green-500 mr-0.5" />
                                         ) : (
-                                            <ArrowDownIcon className="self-center flex-shrink-0 h-4 w-4 text-red-500" />
+                                            <ArrowDownIcon className="flex-shrink-0 h-4 w-4 text-red-500 mr-0.5" />
                                         )}
-                                        <span className="sr-only">
-                                            {trend.isPositive ? 'Aumentou' : 'Diminuiu'} em
-                                        </span>
                                         {trend.percentage}%
                                     </div>
                                 )}
@@ -122,19 +119,21 @@ export default function StatCard({
                     </div>
                 </div>
             </div>
-            {trend && (
-                <div className="bg-gray-50 px-5 py-3">
-                    <div className="text-sm">
-                        <span className="text-gray-500">
+            <div className="bg-gray-50 px-5 py-3">
+                <div className="text-sm text-gray-500">
+                    {trend ? (
+                        <>
                             {trend.isPositive ? 'Aumento' : 'Diminuição'} de{' '}
-                        </span>
-                        <span className={`font-medium ${trend.isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                            {formatValue(trend.value)}
-                        </span>
-                        <span className="text-gray-500"> em relação ao período anterior</span>
-                    </div>
+                            <span className={`font-medium ${trend.isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                                {formatValue(trend.value)}
+                            </span>
+                            {' '}vs mês anterior
+                        </>
+                    ) : (
+                        <span className="text-gray-400">Sem comparativo</span>
+                    )}
                 </div>
-            )}
+            </div>
         </div>
     );
 }

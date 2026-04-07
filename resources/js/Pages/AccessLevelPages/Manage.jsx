@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Head, useForm, usePage } from '@inertiajs/react';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Button from '@/Components/Button';
 
 export default function Manage({ accessLevel, menu, pages = [] }) {
@@ -70,7 +69,7 @@ export default function Manage({ accessLevel, menu, pages = [] }) {
 
     if (!accessLevel || !menu) {
         return (
-            <AuthenticatedLayout>
+            <>
                 <Head title="Erro" />
                 <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg dark:bg-gray-800">
@@ -79,12 +78,12 @@ export default function Manage({ accessLevel, menu, pages = [] }) {
                         </div>
                     </div>
                 </div>
-            </AuthenticatedLayout>
+            </>
         );
     }
 
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title={`Gerenciar Páginas - ${menu.name} - ${accessLevel.name}`} />
 
             <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -330,6 +329,6 @@ export default function Manage({ accessLevel, menu, pages = [] }) {
                     </div>
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }

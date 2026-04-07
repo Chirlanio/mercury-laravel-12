@@ -1,6 +1,5 @@
 import { Head, router } from "@inertiajs/react";
 import { useState, useEffect } from "react";
-import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import Modal from "@/Components/Modal";
 import EmployeeModal from "@/Components/EmployeeModal";
 import EmployeeCreateModal from "@/Components/EmployeeCreateModal";
@@ -253,7 +252,7 @@ export default function Index({ auth, employees, positions, stores, statuses, ed
     ];
 
     return (
-        <AuthenticatedLayout user={auth.user}>
+        <>
             <Head title="Funcionários" />
 
             <div className="py-12">
@@ -502,6 +501,6 @@ export default function Index({ auth, employees, positions, stores, statuses, ed
                 eventTypes={eventTypes}
                 stores={stores}
             />
-        </AuthenticatedLayout>
+        </>
     );
 }

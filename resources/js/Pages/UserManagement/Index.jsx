@@ -1,4 +1,3 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import UserCreateModal from '@/Components/UserCreateModal';
 import UserEditModal from '@/Components/UserEditModal';
 import UserViewModal from '@/Components/UserViewModal';
@@ -202,7 +201,7 @@ export default function Index({ auth, users = { data: [], links: [] }, roles = {
     ];
 
     return (
-        <AuthenticatedLayout user={auth.user}>
+        <>
             <Head title="Gerenciamento de Usuarios" />
 
             <div className="py-12">
@@ -343,6 +342,6 @@ export default function Index({ auth, users = { data: [], links: [] }, roles = {
                 canEdit={selectedUser && canEditUser(selectedUser)}
                 canDelete={selectedUser && canDeleteUser(selectedUser) && hasPermission(PERMISSIONS.DELETE_USERS)}
             />
-        </AuthenticatedLayout>
+        </>
     );
 }

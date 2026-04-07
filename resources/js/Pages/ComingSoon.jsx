@@ -1,9 +1,8 @@
 import { Head } from "@inertiajs/react";
-import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 
 export default function ComingSoon({ auth, title = "Em Desenvolvimento" }) {
     return (
-        <AuthenticatedLayout user={auth.user}>
+        <>
             <Head title={title} />
 
             <div className="py-12">
@@ -58,6 +57,6 @@ export default function ComingSoon({ auth, title = "Em Desenvolvimento" }) {
                     </div>
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }

@@ -1,4 +1,3 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router } from '@inertiajs/react';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 
@@ -26,7 +25,7 @@ export default function Show({ auth, log }) {
     const formattedDate = formatDate(log.created_at);
 
     return (
-        <AuthenticatedLayout user={auth.user}>
+        <>
             <Head title={`Log de Atividade #${log.id}`} />
 
             <div className="py-12">
@@ -261,6 +260,6 @@ export default function Show({ auth, log }) {
                     </div>
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }

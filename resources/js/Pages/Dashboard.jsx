@@ -1,4 +1,4 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import PageHeader from '@/Components/PageHeader';
 import StatCard from '@/Components/Dashboard/StatCard';
 import SimpleChart from '@/Components/Dashboard/SimpleChart';
 import RecentActivities from '@/Components/Dashboard/RecentActivities';
@@ -45,8 +45,9 @@ export default function Dashboard({
     };
 
     return (
-        <AuthenticatedLayout
-            header={
+        <>
+            <Head title="Dashboard" />
+            <PageHeader>
                 <div className="flex justify-between items-center">
                     <div>
                         <h2 className="text-xl font-semibold leading-tight text-gray-800">
@@ -61,9 +62,7 @@ export default function Dashboard({
                         <span>Atualizado agora</span>
                     </div>
                 </div>
-            }
-        >
-            <Head title="Dashboard" />
+            </PageHeader>
 
             <div className="py-6">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -149,6 +148,7 @@ export default function Dashboard({
                                 title="Vendas (Últimos 7 dias)"
                                 type="bar"
                                 color="green"
+                                format="currency"
                             />
                         ) : (
                             <SimpleChart
@@ -401,6 +401,6 @@ export default function Dashboard({
                     </div>
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }

@@ -1,4 +1,4 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import PageHeader from '@/Components/PageHeader';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
@@ -59,9 +59,9 @@ export default function Edit({ auth, user = {}, roles = {} }) {
     };
 
     return (
-        <AuthenticatedLayout
-            user={auth.user}
-            header={
+        <>
+            <Head title={`Editar Usuário: ${user.name || 'Carregando...'}`} />
+            <PageHeader>
                 <div className="flex justify-between items-center">
                     <h2 className="font-semibold text-xl text-gray-800 leading-tight">
                         Editar Usuário: {user.name || 'Carregando...'}
@@ -73,9 +73,7 @@ export default function Edit({ auth, user = {}, roles = {} }) {
                         Voltar
                     </Link>
                 </div>
-            }
-        >
-            <Head title={`Editar Usuário: ${user.name || 'Carregando...'}`} />
+            </PageHeader>
 
             <div className="py-12">
                 <div className="max-w-2xl mx-auto sm:px-6 lg:px-8">
@@ -223,6 +221,6 @@ export default function Edit({ auth, user = {}, roles = {} }) {
                     </div>
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }

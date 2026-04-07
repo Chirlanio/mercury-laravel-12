@@ -1,4 +1,3 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head } from '@inertiajs/react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 
@@ -7,7 +6,7 @@ export default function EmailSettings({ auth, settings }) {
 
     if (!hasPermission(PERMISSIONS.MANAGE_SETTINGS)) {
         return (
-            <AuthenticatedLayout user={auth.user}>
+            <>
                 <Head title="Configurações de E-mail" />
                 <div className="py-12">
                     <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
@@ -18,7 +17,7 @@ export default function EmailSettings({ auth, settings }) {
                         </div>
                     </div>
                 </div>
-            </AuthenticatedLayout>
+            </>
         );
     }
 
@@ -46,7 +45,7 @@ export default function EmailSettings({ auth, settings }) {
     };
 
     return (
-        <AuthenticatedLayout user={auth.user}>
+        <>
             <Head title="Configurações de E-mail" />
 
             <div className="py-12">
@@ -288,6 +287,6 @@ export default function EmailSettings({ auth, settings }) {
                     </div>
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Modal from '@/Components/Modal';
 import Button from '@/Components/Button';
 import WorkScheduleDayOverrideModal from '@/Components/WorkScheduleDayOverrideModal';
+import { formatDateTime } from '@/Utils/dateHelpers';
 
 const DAY_NAMES = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
@@ -69,7 +70,7 @@ export default function WorkScheduleViewModal({ isOpen, onClose, schedule, onEdi
                             </div>
                             <div>
                                 <span className="font-medium text-gray-600">Criado em:</span>
-                                <span className="ml-2 text-gray-900">{schedule.created_at}</span>
+                                <span className="ml-2 text-gray-900">{formatDateTime(schedule.created_at)}</span>
                             </div>
                         </div>
                     </div>

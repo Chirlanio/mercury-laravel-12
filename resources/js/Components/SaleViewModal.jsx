@@ -1,5 +1,6 @@
 import Modal from '@/Components/Modal';
 import Button from '@/Components/Button';
+import { formatDate, formatDateTime } from '@/Utils/dateHelpers';
 
 const formatCurrency = (value) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -25,7 +26,7 @@ export default function SaleViewModal({ isOpen, onClose, sale, onEdit }) {
                     </div>
                     <div>
                         <label className="block text-xs font-medium text-gray-500 uppercase">Data</label>
-                        <p className="mt-1 text-sm text-gray-900">{sale.date_sales}</p>
+                        <p className="mt-1 text-sm text-gray-900">{formatDate(sale.date_sales)}</p>
                     </div>
                     <div>
                         <label className="block text-xs font-medium text-gray-500 uppercase">Valor</label>
@@ -56,7 +57,7 @@ export default function SaleViewModal({ isOpen, onClose, sale, onEdit }) {
                     {sale.created_at && (
                         <div>
                             <label className="block text-xs font-medium text-gray-500 uppercase">Data de Criação</label>
-                            <p className="mt-1 text-sm text-gray-900">{sale.created_at}</p>
+                            <p className="mt-1 text-sm text-gray-900">{formatDateTime(sale.created_at)}</p>
                         </div>
                     )}
                 </div>

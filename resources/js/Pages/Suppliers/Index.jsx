@@ -1,9 +1,9 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import { maskCpfCnpj, maskPhone } from '@/Hooks/useMasks';
 import Button from '@/Components/Button';
+import { formatDateTime } from '@/Utils/dateHelpers';
 
 export default function Index({ auth, suppliers, filters = {} }) {
     const { hasPermission } = usePermissions();
@@ -44,7 +44,7 @@ export default function Index({ auth, suppliers, filters = {} }) {
     };
 
     return (
-        <AuthenticatedLayout user={auth?.user}>
+        <>
             <Head title="Fornecedores" />
 
             <div className="py-12">
@@ -220,7 +220,7 @@ export default function Index({ auth, suppliers, filters = {} }) {
                     )}
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }
 
@@ -390,8 +390,8 @@ function ViewModal({ supplier, onClose }) {
                         </h4>
                         <div className="bg-gray-50 rounded-lg p-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <Detail label="Cadastrado em" value={supplier.created_at} />
-                                <Detail label="Última atualização" value={supplier.updated_at} />
+                                <Detail label="Cadastrado em" value={formatDateTime(supplier.created_at)} />
+                                <Detail label="Última atualização" value={formatDateTime(supplier.updated_at)} />
                             </div>
                         </div>
                     </div>

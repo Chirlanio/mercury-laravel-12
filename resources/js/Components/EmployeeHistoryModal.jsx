@@ -7,6 +7,7 @@ import DocumentViewerModal from '@/Components/DocumentViewerModal';
 import ExportEventsModal from '@/Components/ExportEventsModal';
 import EmployeeScheduleManageModal from '@/Components/EmployeeScheduleManageModal';
 import WorkScheduleDayOverrideModal from '@/Components/WorkScheduleDayOverrideModal';
+import { formatDateTime } from '@/Utils/dateHelpers';
 
 export default function EmployeeHistoryModal({ show, onClose, employeeId, positions, stores, onEmployeeUpdated }) {
     const [employee, setEmployee] = useState(null);
@@ -778,7 +779,7 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
                                                 <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                 </svg>
-                                                <span>Registrado em {contract.created_at}</span>
+                                                <span>Registrado em {formatDateTime(contract.created_at)}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -884,7 +885,7 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                 </svg>
-                                                <span>{history.created_at}</span>
+                                                <span>{formatDateTime(history.created_at)}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1184,7 +1185,7 @@ export default function EmployeeHistoryModal({ show, onClose, employeeId, positi
                                                     <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                     </svg>
-                                                    <span>Registrado por {event.created_by} em {event.created_at}</span>
+                                                    <span>Registrado por {event.created_by} em {formatDateTime(event.created_at)}</span>
                                                 </div>
                                             </div>
                                         </div>

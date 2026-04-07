@@ -3,6 +3,7 @@ import Modal from '@/Components/Modal';
 import EmployeeAvatar from '@/Components/EmployeeAvatar';
 import EmployeeHistoryModal from '@/Components/EmployeeHistoryModal';
 import EmployeeScheduleManageModal from '@/Components/EmployeeScheduleManageModal';
+import { formatDate } from '@/Utils/dateHelpers';
 import WorkScheduleDayOverrideModal from '@/Components/WorkScheduleDayOverrideModal';
 
 export default function EmployeeModal({ show, onClose, employeeId, onEdit, positions, stores }) {
@@ -265,7 +266,7 @@ export default function EmployeeModal({ show, onClose, employeeId, onEdit, posit
                             {employee.dismissal_date && (
                                 <div>
                                     <span className="font-medium text-gray-600">Data de Demissão:</span>
-                                    <span className="ml-2 text-gray-900">{employee.dismissal_date}</span>
+                                    <span className="ml-2 text-gray-900">{formatDate(employee.dismissal_date)}</span>
                                 </div>
                             )}
                             <div>

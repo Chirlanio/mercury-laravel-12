@@ -74,7 +74,7 @@ export default function Welcome() {
                                 </p>
                                 <div className="space-y-2">
                                     <a
-                                        href="http://meia-sola.localhost:8000"
+                                        href="http://meia-sola.localhost"
                                         className="flex items-center justify-between px-4 py-3 bg-white rounded-lg border border-gray-200 hover:border-emerald-300 hover:shadow-sm transition-all group"
                                     >
                                         <div className="flex items-center gap-3">
@@ -83,7 +83,7 @@ export default function Welcome() {
                                             </div>
                                             <div>
                                                 <span className="text-sm font-medium text-gray-900">Meia Sola</span>
-                                                <p className="text-xs text-gray-400">meia-sola.localhost:8000</p>
+                                                <p className="text-xs text-gray-400">meia-sola.localhost</p>
                                             </div>
                                         </div>
                                         <svg className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
@@ -91,7 +91,7 @@ export default function Welcome() {
                                         </svg>
                                     </a>
                                     <a
-                                        href="http://inmystock.localhost:8000"
+                                        href="http://inmystock.localhost"
                                         className="flex items-center justify-between px-4 py-3 bg-white rounded-lg border border-gray-200 hover:border-emerald-300 hover:shadow-sm transition-all group"
                                     >
                                         <div className="flex items-center gap-3">
@@ -100,7 +100,7 @@ export default function Welcome() {
                                             </div>
                                             <div>
                                                 <span className="text-sm font-medium text-gray-900">InMyStock</span>
-                                                <p className="text-xs text-gray-400">inmystock.localhost:8000</p>
+                                                <p className="text-xs text-gray-400">inmystock.localhost</p>
                                             </div>
                                         </div>
                                         <svg className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 transition-colors" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">

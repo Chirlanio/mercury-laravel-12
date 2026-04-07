@@ -1,9 +1,8 @@
 import { Head } from '@inertiajs/react';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 
 export default function Privacy({ tenant }) {
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="Política de Privacidade" />
 
             <div className="py-6">
@@ -78,6 +77,6 @@ export default function Privacy({ tenant }) {
                     </div>
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }

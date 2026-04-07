@@ -1,4 +1,3 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import DataTable from '@/Components/DataTable';
 import Button from '@/Components/Button';
 import Modal from '@/Components/Modal';
@@ -160,7 +159,7 @@ export default function Index({ auth, colorThemes = { data: [], links: [] }, col
     ];
 
     return (
-        <AuthenticatedLayout user={auth.user}>
+        <>
             <Head title="Gerenciamento de Cores" />
 
             <div className="py-12">
@@ -344,6 +343,6 @@ export default function Index({ auth, colorThemes = { data: [], links: [] }, col
                     </div>
                 </div>
             </Modal>
-        </AuthenticatedLayout>
+        </>
     );
 }

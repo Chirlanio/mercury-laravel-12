@@ -1,5 +1,6 @@
 import { Head } from '@inertiajs/react';
 import CentralLayout from '@/Layouts/CentralLayout';
+import { formatDateTime } from '@/Utils/dateHelpers';
 import {
     BuildingOffice2Icon,
     UserGroupIcon,
@@ -64,7 +65,7 @@ export default function Dashboard({ stats, recentTenants, planDistribution }) {
                                         }`}>
                                             {tenant.is_active ? 'Ativo' : 'Inativo'}
                                         </span>
-                                        <span className="text-xs text-gray-400">{tenant.created_at}</span>
+                                        <span className="text-xs text-gray-400">{formatDateTime(tenant.created_at)}</span>
                                     </div>
                                 </div>
                             ))

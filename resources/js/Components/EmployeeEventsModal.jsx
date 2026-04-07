@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Modal from './Modal';
 import Button from './Button';
+import { formatDateTime } from '@/Utils/dateHelpers';
 
 export default function EmployeeEventsModal({ employee, isOpen, onClose }) {
     const [events, setEvents] = useState([]);
@@ -473,7 +474,7 @@ export default function EmployeeEventsModal({ employee, isOpen, onClose }) {
                                         )}
 
                                         <div className="mt-2 text-xs text-gray-600">
-                                            Registrado por {event.created_by} em {event.created_at}
+                                            Registrado por {event.created_by} em {formatDateTime(event.created_at)}
                                         </div>
                                     </div>
 

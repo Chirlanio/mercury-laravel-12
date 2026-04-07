@@ -10,7 +10,7 @@ import { useState, useEffect } from "react";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-export default function AuthenticatedLayout({ header, children }) {
+export default function AuthenticatedLayout({ children }) {
     const { props } = usePage();
     const user = props.auth.user;
     const flash = props.flash;
@@ -228,14 +228,6 @@ export default function AuthenticatedLayout({ header, children }) {
                         </div>
                     </div>
                 </nav>
-
-                {header && (
-                    <header className="bg-white shadow">
-                        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-                            {header}
-                        </div>
-                    </header>
-                )}
 
                 <main>{children}</main>
 

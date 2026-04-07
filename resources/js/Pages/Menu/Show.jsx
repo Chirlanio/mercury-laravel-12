@@ -1,4 +1,3 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -46,7 +45,7 @@ export default function Show({ auth, menu }) {
     const menuType = getMenuType();
 
     return (
-        <AuthenticatedLayout user={auth.user}>
+        <>
             <Head title={`Menu: ${menu.name}`} />
 
             <div className="py-12">
@@ -252,6 +251,6 @@ export default function Show({ auth, menu }) {
                     </div>
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }

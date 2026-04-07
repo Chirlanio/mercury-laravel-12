@@ -1,5 +1,6 @@
 import Modal from "@/Components/Modal";
 import Button from "@/Components/Button";
+import { formatDateTime } from '@/Utils/dateHelpers';
 
 export default function StoreViewModal({ isOpen, onClose, store, onEdit }) {
     if (!store) return null;
@@ -165,8 +166,8 @@ export default function StoreViewModal({ isOpen, onClose, store, onEdit }) {
                 {/* Timestamps */}
                 <div className="mt-6 pt-4 border-t border-gray-200">
                     <div className="flex justify-between text-xs text-gray-500">
-                        <span>Criado em: {store.created_at}</span>
-                        <span>Atualizado em: {store.updated_at}</span>
+                        <span>Criado em: {formatDateTime(store.created_at)}</span>
+                        <span>Atualizado em: {formatDateTime(store.updated_at)}</span>
                     </div>
                 </div>
 

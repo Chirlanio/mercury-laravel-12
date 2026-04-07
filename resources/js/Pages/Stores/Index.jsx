@@ -1,6 +1,5 @@
 import { Head, router } from "@inertiajs/react";
 import { useState } from "react";
-import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import Modal from "@/Components/Modal";
 import DataTable from "@/Components/DataTable";
 import Button from "@/Components/Button";
@@ -248,7 +247,7 @@ export default function Index({ auth, stores, networks, statuses, managers, filt
     ];
 
     return (
-        <AuthenticatedLayout user={auth.user}>
+        <>
             <Head title="Lojas" />
 
             <div className="py-12">
@@ -460,6 +459,6 @@ export default function Index({ auth, stores, networks, statuses, managers, filt
                     </div>
                 </div>
             </Modal>
-        </AuthenticatedLayout>
+        </>
     );
 }

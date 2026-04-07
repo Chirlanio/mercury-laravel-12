@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Head, router, usePage } from '@inertiajs/react';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import DataTable from '@/Components/DataTable';
 import Button from '@/Components/Button';
 import AccessLevelCreateModal from '@/Components/AccessLevelCreateModal';
@@ -227,7 +226,7 @@ export default function Index({ auth, accessLevels, categories, groupedAccessLev
     };
 
     return (
-        <AuthenticatedLayout user={auth?.user}>
+        <>
             <Head title="Niveis de Acesso" />
 
             <div className="py-12">
@@ -712,6 +711,6 @@ export default function Index({ auth, accessLevels, categories, groupedAccessLev
                     </div>
                 </div>
             )}
-        </AuthenticatedLayout>
+        </>
     );
 }

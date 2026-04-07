@@ -1,5 +1,4 @@
 import { Head, router } from '@inertiajs/react';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { PlusIcon, ArrowPathIcon, CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 
@@ -19,7 +18,7 @@ const driverLabels = {
 
 export default function Index({ integrations, providers, drivers }) {
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="Integrações" />
 
             <div className="py-6">
@@ -81,6 +80,6 @@ export default function Index({ integrations, providers, drivers }) {
                     )}
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }

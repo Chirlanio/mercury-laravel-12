@@ -1,8 +1,8 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import Button from '@/Components/Button';
+import { formatDateTime } from '@/Utils/dateHelpers';
 
 export default function Index({ auth, absences, employees = [], filters = {}, typeOptions = [] }) {
     const { hasPermission } = usePermissions();
@@ -50,7 +50,7 @@ export default function Index({ auth, absences, employees = [], filters = {}, ty
         : <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Injustificada</span>;
 
     return (
-        <AuthenticatedLayout user={auth?.user}>
+        <>
             <Head title="Controle de Faltas" />
             <div className="py-12">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
@@ -155,7 +155,7 @@ export default function Index({ auth, absences, employees = [], filters = {}, ty
                     {deleting && <DeleteConfirm label={`falta de ${deleting.employee_name} em ${deleting.absence_date}`} onConfirm={handleDelete} onCancel={() => setDeleting(null)} />}
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }
 
@@ -262,7 +262,7 @@ function ViewModal({ absence, onClose }) {
                     {absence.notes && <div className="bg-gray-50 rounded-lg p-4"><Detail label="Observacoes" value={absence.notes} /></div>}
                     <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-2 gap-4">
                         <Detail label="Registrado por" value={absence.created_by} />
-                        <Detail label="Registrado em" value={absence.created_at} />
+                        <Detail label="Registrado em" value={formatDateTime(absence.created_at)} />
                     </div>
                     <div className="flex justify-end pt-4 border-t">
                         <Button variant="outline" onClick={onClose}>Fechar</Button>

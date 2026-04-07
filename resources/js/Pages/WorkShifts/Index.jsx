@@ -1,6 +1,5 @@
 import { Head, router } from "@inertiajs/react";
 import { useState } from "react";
-import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import Modal from "@/Components/Modal";
 import DataTable from "@/Components/DataTable";
 import Button from "@/Components/Button";
@@ -207,7 +206,7 @@ export default function Index({ auth, workShifts, employees, stores, types, filt
 
 
     return (
-        <AuthenticatedLayout user={auth.user}>
+        <>
             <Head title="Controle de Jornada" />
 
             <div className="py-12">
@@ -415,6 +414,6 @@ export default function Index({ auth, workShifts, employees, stores, types, filt
                 types={types}
                 currentFilters={filters}
             />
-        </AuthenticatedLayout>
+        </>
     );
 }

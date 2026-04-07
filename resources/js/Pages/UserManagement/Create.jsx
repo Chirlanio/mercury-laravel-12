@@ -1,4 +1,4 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import PageHeader from '@/Components/PageHeader';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
@@ -35,9 +35,9 @@ export default function Create({ auth, roles = {} }) {
     };
 
     return (
-        <AuthenticatedLayout
-            user={auth.user}
-            header={
+        <>
+            <Head title="Criar Novo Usuário" />
+            <PageHeader>
                 <div className="flex justify-between items-center">
                     <h2 className="font-semibold text-xl text-gray-800 leading-tight">
                         Criar Novo Usuário
@@ -49,9 +49,7 @@ export default function Create({ auth, roles = {} }) {
                         Voltar
                     </Link>
                 </div>
-            }
-        >
-            <Head title="Criar Novo Usuário" />
+            </PageHeader>
 
             <div className="py-12">
                 <div className="max-w-2xl mx-auto sm:px-6 lg:px-8">
@@ -234,6 +232,6 @@ export default function Create({ auth, roles = {} }) {
                     </div>
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }

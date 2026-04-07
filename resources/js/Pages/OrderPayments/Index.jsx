@@ -1,4 +1,4 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import PageHeader from '@/Components/PageHeader';
 import { Head, router, useForm } from '@inertiajs/react';
 import {
     PlusIcon, MagnifyingGlassIcon, Squares2X2Icon, TableCellsIcon,
@@ -55,8 +55,9 @@ export default function Index({
 
     // ======== RENDER ========
     return (
-        <AuthenticatedLayout
-            header={
+        <>
+            <Head title="Ordens de Pagamento" />
+            <PageHeader>
                 <div className="flex justify-between items-center">
                     <h2 className="text-xl font-semibold leading-tight text-gray-800">Ordens de Pagamento</h2>
                     <div className="flex items-center space-x-3">
@@ -69,9 +70,7 @@ export default function Index({
                         )}
                     </div>
                 </div>
-            }
-        >
-            <Head title="Ordens de Pagamento" />
+            </PageHeader>
             <div className="py-6">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     {/* KPI */}
@@ -107,7 +106,7 @@ export default function Index({
                     )}
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }
 

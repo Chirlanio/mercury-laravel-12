@@ -30,15 +30,17 @@ Tests use in-memory SQLite (`DB_CONNECTION=sqlite`, `DB_DATABASE=:memory:`). The
 
 ### PHP Environment Note
 
-Two PHP installations exist on this machine:
-- **Herd Lite** (`C:\Users\MSDEV\.config\herd-lite\bin\php.exe`): PHP 8.4, lacks `pdo_pgsql`/`pdo_sqlite`
-- **Full PHP 8.4** (`C:\Users\MSDEV\php84\php.exe`): Has `pdo_pgsql`, `pdo_sqlite` — required for CIGAM sync and tests
+Three PHP installations exist on this machine:
+- **Herd Lite** (`C:\Users\MSDEV\.config\herd-lite\bin\php.exe`): PHP 8.4, lacks `pdo_pgsql`/`pdo_sqlite` — **do NOT use for dev server**
+- **Full PHP 8.4** (`C:\Users\MSDEV\php84\php.exe`): Has `pdo_pgsql`, `pdo_sqlite` — for tests
+- **WampServer PHP 8.4** (`C:\wamp64\bin\php\php8.4.0\php.exe`): Has `pdo_pgsql`, `pdo_sqlite`, `pdo_mysql` — **recommended for dev server** (`composer dev` uses this)
 
-For tests or CIGAM features, prefix with the full PHP path:
+For tests, use:
 ```bash
 C:\Users\MSDEV\php84\php.exe artisan test
-C:\Users\MSDEV\php84\php.exe artisan serve
 ```
+
+The `composer dev` command automatically uses WampServer PHP with all required extensions.
 
 ### Linting
 

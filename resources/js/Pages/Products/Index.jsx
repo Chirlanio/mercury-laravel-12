@@ -1,6 +1,5 @@
 import { Head, router } from "@inertiajs/react";
 import { useState } from "react";
-import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import ProductFilterBar from "@/Components/ProductFilterBar";
 import ProductDetailModal from "@/Components/ProductDetailModal";
 import ProductEditModal from "@/Components/ProductEditModal";
@@ -58,7 +57,7 @@ export default function Index({ auth, products, filters, stats, cigamAvailable, 
     };
 
     return (
-        <AuthenticatedLayout user={auth.user}>
+        <>
             <Head title="Produtos" />
 
             <div className="py-6 px-4 sm:px-6 lg:px-8">
@@ -251,7 +250,7 @@ export default function Index({ auth, products, filters, stats, cigamAvailable, 
                 show={isSyncLogsOpen}
                 onClose={() => setIsSyncLogsOpen(false)}
             />
-        </AuthenticatedLayout>
+        </>
     );
 }
 

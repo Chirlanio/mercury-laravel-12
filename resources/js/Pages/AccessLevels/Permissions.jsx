@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Head, router } from '@inertiajs/react';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Button from '@/Components/Button';
 import Modal from '@/Components/Modal';
 import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
@@ -433,7 +432,7 @@ export default function Permissions({ auth, accessLevel, pages, menus, stats }) 
     ];
 
     return (
-        <AuthenticatedLayout user={auth.user}>
+        <>
             <Head title={`Permissões - ${accessLevel.name}`} />
 
             <div className="py-12">
@@ -792,6 +791,6 @@ export default function Permissions({ auth, accessLevel, pages, menus, stats }) 
 
             {/* Dialog de Confirmação */}
             <ConfirmDialogComponent />
-        </AuthenticatedLayout>
+        </>
     );
 }

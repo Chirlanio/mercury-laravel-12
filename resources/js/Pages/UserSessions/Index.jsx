@@ -1,4 +1,4 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import PageHeader from '@/Components/PageHeader';
 import { Head, router } from '@inertiajs/react';
 import { WifiIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
@@ -19,8 +19,9 @@ export default function Index({ sessions, stores = [], filters = {}, onlineCount
     };
 
     return (
-        <AuthenticatedLayout
-            header={
+        <>
+            <Head title="Usuários Online" />
+            <PageHeader>
                 <div className="flex justify-between items-center">
                     <h2 className="text-xl font-semibold leading-tight text-gray-800">
                         Usuários Online
@@ -30,9 +31,7 @@ export default function Index({ sessions, stores = [], filters = {}, onlineCount
                         <span>{onlineCount} online</span>
                     </div>
                 </div>
-            }
-        >
-            <Head title="Usuários Online" />
+            </PageHeader>
 
             <div className="py-6">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -137,6 +136,6 @@ export default function Index({ sessions, stores = [], filters = {}, onlineCount
                     </div>
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }

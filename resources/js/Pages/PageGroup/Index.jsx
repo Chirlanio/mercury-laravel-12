@@ -1,4 +1,3 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import DataTable from '@/Components/DataTable';
 import Button from '@/Components/Button';
 import Modal from '@/Components/Modal';
@@ -210,7 +209,7 @@ export default function Index({ auth, pageGroups = { data: [], links: [] }, stat
     ];
 
     return (
-        <AuthenticatedLayout user={auth.user}>
+        <>
             <Head title="Grupos de Paginas" />
 
             <div className="py-12">
@@ -466,6 +465,6 @@ export default function Index({ auth, pageGroups = { data: [], links: [] }, stat
                     </div>
                 </div>
             </Modal>
-        </AuthenticatedLayout>
+        </>
     );
 }

@@ -1,6 +1,7 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import CentralLayout from '@/Layouts/CentralLayout';
 import { useState } from 'react';
+import { formatDateTime } from '@/Utils/dateHelpers';
 import {
     PlusIcon,
     MagnifyingGlassIcon,
@@ -100,7 +101,7 @@ export default function Index({ tenants, plans, filters }) {
                                         {tenant.is_active ? 'Ativo' : 'Suspenso'}
                                     </span>
                                 </td>
-                                <td className="px-6 py-4 text-sm text-gray-500">{tenant.created_at}</td>
+                                <td className="px-6 py-4 text-sm text-gray-500">{formatDateTime(tenant.created_at)}</td>
                                 <td className="px-6 py-4 text-right">
                                     <div className="flex justify-end gap-2">
                                         <button

@@ -1,4 +1,4 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import PageHeader from '@/Components/PageHeader';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
@@ -209,8 +209,9 @@ export default function Index({ checklists, stats, stores = [], filters = {} }) 
     ];
 
     return (
-        <AuthenticatedLayout
-            header={
+        <>
+            <Head title="Checklists" />
+            <PageHeader>
                 <div className="flex justify-between items-center">
                     <h2 className="text-xl font-semibold leading-tight text-gray-800 flex items-center gap-2">
                         <ClipboardDocumentCheckIcon className="h-6 w-6" />
@@ -226,9 +227,7 @@ export default function Index({ checklists, stats, stores = [], filters = {} }) 
                         </button>
                     )}
                 </div>
-            }
-        >
-            <Head title="Checklists" />
+            </PageHeader>
 
             <div className="py-6">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -366,7 +365,7 @@ export default function Index({ checklists, stats, stores = [], filters = {} }) 
                 confirmText="Excluir"
                 type="danger"
             />
-        </AuthenticatedLayout>
+        </>
     );
 }
 

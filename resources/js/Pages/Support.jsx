@@ -1,4 +1,3 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head } from '@inertiajs/react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 
@@ -6,7 +5,7 @@ export default function Support({ auth }) {
     const { hasPermission } = usePermissions();
 
     return (
-        <AuthenticatedLayout user={auth.user}>
+        <>
             <Head title="Painel de Suporte" />
 
             <div className="py-12">
@@ -218,6 +217,6 @@ export default function Support({ auth }) {
                     </div>
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }

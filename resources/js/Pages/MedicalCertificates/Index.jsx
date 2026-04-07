@@ -1,8 +1,8 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import Button from '@/Components/Button';
+import { formatDateTime } from '@/Utils/dateHelpers';
 
 export default function Index({ auth, certificates, employees = [], filters = {} }) {
     const { hasPermission } = usePermissions();
@@ -46,7 +46,7 @@ export default function Index({ auth, certificates, employees = [], filters = {}
     };
 
     return (
-        <AuthenticatedLayout user={auth?.user}>
+        <>
             <Head title="Atestados Medicos" />
             <div className="py-12">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
@@ -150,7 +150,7 @@ export default function Index({ auth, certificates, employees = [], filters = {}
                     {deleting && <DeleteConfirm item={deleting} label={`atestado de ${deleting.employee_name}`} onConfirm={handleDelete} onCancel={() => setDeleting(null)} />}
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }
 
@@ -280,7 +280,7 @@ function ViewModal({ certificate, onClose }) {
                     )}
                     <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-2 gap-4">
                         <Detail label="Cadastrado por" value={certificate.created_by} />
-                        <Detail label="Cadastrado em" value={certificate.created_at} />
+                        <Detail label="Cadastrado em" value={formatDateTime(certificate.created_at)} />
                     </div>
                     <div className="flex justify-end pt-4 border-t">
                         <Button variant="outline" onClick={onClose}>Fechar</Button>

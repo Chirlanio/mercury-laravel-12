@@ -22,6 +22,7 @@ class SuperAdminSeeder extends Seeder
                 'email' => 'superadmin@mercury.com',
                 'password' => Hash::make('password'),
                 'role' => Role::SUPER_ADMIN,
+                'access_level_id' => 1,
                 'email_verified_at' => now(),
             ]
         );
@@ -33,6 +34,7 @@ class SuperAdminSeeder extends Seeder
                 'email' => 'admin@mercury.com',
                 'password' => Hash::make('password'),
                 'role' => Role::ADMIN,
+                'access_level_id' => 2,
                 'email_verified_at' => now(),
             ]
         );
@@ -44,6 +46,7 @@ class SuperAdminSeeder extends Seeder
                 'email' => 'support@mercury.com',
                 'password' => Hash::make('password'),
                 'role' => Role::SUPPORT,
+                'access_level_id' => 3,
                 'email_verified_at' => now(),
             ]
         );
@@ -55,6 +58,7 @@ class SuperAdminSeeder extends Seeder
                 'email' => 'user@mercury.com',
                 'password' => Hash::make('password'),
                 'role' => Role::USER,
+                'access_level_id' => 18,
                 'email_verified_at' => now(),
             ]
         );

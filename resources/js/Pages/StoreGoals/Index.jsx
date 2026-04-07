@@ -1,6 +1,5 @@
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Button from '@/Components/Button';
 import Modal from '@/Components/Modal';
 import StatisticsCards from '@/Components/StoreGoals/StatisticsCards';
@@ -9,6 +8,7 @@ import EditModal from '@/Components/StoreGoals/EditModal';
 import ViewModal from '@/Components/StoreGoals/ViewModal';
 import ImportModal from '@/Components/StoreGoals/ImportModal';
 import ConsultantRankingModal from '@/Components/StoreGoals/ConsultantRankingModal';
+import ConfirmSalesModal from '@/Components/StoreGoals/ConfirmSalesModal';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import { useConfirm } from '@/Hooks/useConfirm';
 
@@ -21,6 +21,8 @@ export default function Index({ auth, goals, stores, filters }) {
     const [isViewModalOpen, setIsViewModalOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isRankingModalOpen, setIsRankingModalOpen] = useState(false);
+    const [isConfirmSalesOpen, setIsConfirmSalesOpen] = useState(false);
+    const [confirmGoalId, setConfirmGoalId] = useState(null);
     const [selectedGoal, setSelectedGoal] = useState(null);
     const [viewGoalId, setViewGoalId] = useState(null);
 
@@ -101,7 +103,7 @@ export default function Index({ auth, goals, stores, filters }) {
     };
 
     return (
-        <AuthenticatedLayout user={auth.user}>
+        <>
             <Head title="Metas de Loja" />
 
             <div className="py-12">
@@ -272,7 +274,16 @@ export default function Index({ auth, goals, stores, filters }) {
                                     {goals.length > 0 ? goals.map((goal) => (
                                         <tr key={goal.id} className="hover:bg-gray-50">
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className="text-sm font-medium text-gray-900">{goal.store_name}</span>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-sm font-medium text-gray-900">{goal.store_name}</span>
+                                                    {goal.has_confirmed_sales && (
+                                                        <span className="inline-flex items-center" title="Vendas confirmadas">
+                                                            <svg className="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+                                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                            </svg>
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <span className="text-sm text-gray-600">{goal.period_label}</span>
@@ -303,6 +314,17 @@ export default function Index({ auth, goals, stores, filters }) {
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                         </svg>
                                                     </button>
+                                                    {hasPermission(PERMISSIONS.EDIT_STORE_GOALS) && (
+                                                        <button
+                                                            onClick={() => { setConfirmGoalId(goal.id); setIsConfirmSalesOpen(true); }}
+                                                            className={`${goal.has_confirmed_sales ? 'text-emerald-600 hover:text-emerald-900' : 'text-gray-400 hover:text-gray-600'}`}
+                                                            title="Confirmar Vendas"
+                                                        >
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                        </button>
+                                                    )}
                                                     {hasPermission(PERMISSIONS.EDIT_STORE_GOALS) && (
                                                         <button
                                                             onClick={() => handleEdit(goal)}
@@ -387,7 +409,18 @@ export default function Index({ auth, goals, stores, filters }) {
                 storeId={filters.store_id}
             />
 
+            <ConfirmSalesModal
+                isOpen={isConfirmSalesOpen}
+                onClose={() => { setIsConfirmSalesOpen(false); setConfirmGoalId(null); }}
+                onSuccess={(msg) => {
+                    setIsConfirmSalesOpen(false);
+                    setConfirmGoalId(null);
+                    router.reload({ only: ['goals'] });
+                }}
+                storeGoalId={confirmGoalId}
+            />
+
             <ConfirmDialogComponent />
-        </AuthenticatedLayout>
+        </>
     );
 }

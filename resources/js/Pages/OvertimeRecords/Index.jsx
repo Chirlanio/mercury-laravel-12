@@ -1,8 +1,8 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import Button from '@/Components/Button';
+import { formatDateTime } from '@/Utils/dateHelpers';
 
 const STATUS_COLORS = {
     pending: 'bg-yellow-100 text-yellow-800',
@@ -53,7 +53,7 @@ export default function Index({ auth, records, employees = [], filters = {}, typ
     };
 
     return (
-        <AuthenticatedLayout user={auth?.user}>
+        <>
             <Head title="Controle de Horas Extras" />
             <div className="py-12">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
@@ -162,7 +162,7 @@ export default function Index({ auth, records, employees = [], filters = {}, typ
                     {deleting && <DeleteConfirm label={`hora extra de ${deleting.employee_name} em ${deleting.date}`} onConfirm={handleDelete} onCancel={() => setDeleting(null)} />}
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }
 
@@ -312,7 +312,7 @@ function ViewModal({ record, onClose }) {
                     {record.notes && <div className="bg-gray-50 rounded-lg p-4"><Detail label="Observacoes" value={record.notes} /></div>}
                     <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-2 gap-4">
                         <Detail label="Registrado por" value={record.created_by} />
-                        <Detail label="Registrado em" value={record.created_at} />
+                        <Detail label="Registrado em" value={formatDateTime(record.created_at)} />
                     </div>
                     <div className="flex justify-end pt-4 border-t">
                         <Button variant="outline" onClick={onClose}>Fechar</Button>

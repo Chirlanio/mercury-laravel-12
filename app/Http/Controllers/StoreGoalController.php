@@ -4,13 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Enums\Role;
 use App\Imports\StoreGoalsImport;
+use App\Models\ConfirmedSale;
 use App\Models\ConsultantGoal;
+use App\Models\EmploymentContract;
 use App\Models\PercentageAward;
 use App\Models\Sale;
 use App\Models\Store;
 use App\Models\StoreGoal;
 use App\Services\GoalRedistributionService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
@@ -41,7 +44,17 @@ class StoreGoalController extends Controller
             $query->forStore((int) $storeId);
         }
 
-        $goals = $query->orderBy('store_id')->get()->map(fn ($goal) => [
+        $goals = $query->orderBy('store_id')->get();
+
+        // Check confirmation status per store
+        $confirmedCounts = ConfirmedSale::whereIn('store_id', $goals->pluck('store_id'))
+            ->where('reference_month', (int) $month)
+            ->where('reference_year', (int) $year)
+            ->selectRaw('store_id, COUNT(*) as count')
+            ->groupBy('store_id')
+            ->pluck('count', 'store_id');
+
+        $goals = $goals->map(fn ($goal) => [
             'id' => $goal->id,
             'store_id' => $goal->store_id,
             'store_name' => $goal->store->display_name ?? $goal->store->name,
@@ -53,6 +66,7 @@ class StoreGoalController extends Controller
             'business_days' => $goal->business_days,
             'non_working_days' => $goal->non_working_days,
             'consultant_goals_count' => $goal->consultant_goals_count,
+            'has_confirmed_sales' => ($confirmedCounts->get($goal->store_id, 0) > 0),
             'created_by' => $goal->createdBy?->name,
             'created_at' => $goal->created_at?->format('d/m/Y H:i'),
         ]);
@@ -124,22 +138,41 @@ class StoreGoalController extends Controller
 
     public function show(StoreGoal $storeGoal)
     {
-        $storeGoal->load(['store', 'consultantGoals.employee', 'createdBy', 'updatedBy']);
+        $storeGoal->load(['store.manager', 'consultantGoals.employee', 'createdBy', 'updatedBy']);
 
-        // Get sales data for achievement calculation
+        $awards = PercentageAward::all()->keyBy('level');
+
+        // Get system sales data
         $salesByEmployee = Sale::forMonth($storeGoal->reference_month, $storeGoal->reference_year)
             ->forStoreWithEcommerce($storeGoal->store_id)
             ->get()
             ->groupBy('employee_id')
             ->map(fn ($sales) => round((float) $sales->sum('total_sales'), 2));
 
-        $totalSales = $salesByEmployee->sum();
+        // Get confirmed sales
+        $confirmedByEmployee = ConfirmedSale::forStore($storeGoal->store_id)
+            ->forMonth($storeGoal->reference_month, $storeGoal->reference_year)
+            ->pluck('sale_value', 'employee_id');
 
-        $consultants = $storeGoal->consultantGoals->map(function ($cg) use ($salesByEmployee) {
-            $actualSales = $salesByEmployee->get($cg->employee_id, 0);
+        $hasConfirmedSales = $confirmedByEmployee->isNotEmpty();
+        $totalSales = 0;
+        $totalAwards = 0;
+
+        $consultants = $storeGoal->consultantGoals->map(function ($cg) use ($salesByEmployee, $confirmedByEmployee, $awards, &$totalSales, &$totalAwards) {
+            $systemSales = $salesByEmployee->get($cg->employee_id, 0);
+            $confirmedValue = $confirmedByEmployee->get($cg->employee_id);
+            $effectiveSales = $confirmedValue !== null ? round((float) $confirmedValue, 2) : $systemSales;
+            $totalSales += $effectiveSales;
+
             $achievementPct = $cg->individual_goal > 0
-                ? round(($actualSales / $cg->individual_goal) * 100, 1)
+                ? round(($effectiveSales / $cg->individual_goal) * 100, 1)
                 : 0;
+
+            $tier = $cg->getAchievementTier($effectiveSales);
+            $award = $awards->get($cg->level_snapshot);
+            $awardPct = $award ? $award->getPercentageForTier($tier) : 0;
+            $awardAmount = round($effectiveSales * ($awardPct / 100), 2);
+            $totalAwards += $awardAmount;
 
             return [
                 'id' => $cg->id,
@@ -152,30 +185,59 @@ class StoreGoalController extends Controller
                 'individual_goal' => (float) $cg->individual_goal,
                 'super_goal' => (float) $cg->super_goal,
                 'hiper_goal' => (float) $cg->hiper_goal,
-                'actual_sales' => $actualSales,
+                'system_sales' => $systemSales,
+                'confirmed_sales' => $confirmedValue !== null ? round((float) $confirmedValue, 2) : null,
+                'actual_sales' => $effectiveSales,
                 'achievement_pct' => $achievementPct,
-                'tier' => $cg->getAchievementTier($actualSales),
+                'tier' => $tier,
+                'award_pct' => $awardPct,
+                'award_amount' => $awardAmount,
             ];
         })->sortByDesc('actual_sales')->values();
 
-        $goalAchievementPct = $storeGoal->goal_amount > 0
-            ? round(($totalSales / $storeGoal->goal_amount) * 100, 1)
+        $goalAmount = (float) $storeGoal->goal_amount;
+        $superGoal = (float) $storeGoal->super_goal;
+        $hiperGoal = round($superGoal * StoreGoal::SUPER_MULTIPLIER, 2);
+
+        $goalAchievementPct = $goalAmount > 0
+            ? round(($totalSales / $goalAmount) * 100, 1)
             : 0;
+
+        $missingForGoal = max(0, $goalAmount - $totalSales);
+
+        // Percentage awards config
+        $awardsConfig = $awards->map(fn ($a) => [
+            'level' => $a->level,
+            'no_goal_pct' => (float) $a->no_goal_pct,
+            'goal_pct' => (float) $a->goal_pct,
+            'super_goal_pct' => (float) $a->super_goal_pct,
+            'hiper_goal_pct' => (float) $a->hiper_goal_pct,
+        ])->values();
+
+        // Days in month
+        $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $storeGoal->reference_month, $storeGoal->reference_year);
 
         return response()->json([
             'id' => $storeGoal->id,
             'store_name' => $storeGoal->store->display_name ?? $storeGoal->store->name,
             'store_id' => $storeGoal->store_id,
+            'manager_name' => $storeGoal->store->manager?->name ?? null,
             'reference_month' => $storeGoal->reference_month,
             'reference_year' => $storeGoal->reference_year,
             'period_label' => $storeGoal->period_label,
-            'goal_amount' => (float) $storeGoal->goal_amount,
-            'super_goal' => (float) $storeGoal->super_goal,
+            'goal_amount' => $goalAmount,
+            'super_goal' => $superGoal,
+            'hiper_goal' => $hiperGoal,
             'business_days' => $storeGoal->business_days,
             'non_working_days' => $storeGoal->non_working_days,
-            'total_sales' => $totalSales,
+            'days_in_month' => $daysInMonth,
+            'total_sales' => round($totalSales, 2),
+            'total_awards' => round($totalAwards, 2),
+            'missing_for_goal' => round($missingForGoal, 2),
             'achievement_pct' => $goalAchievementPct,
+            'has_confirmed_sales' => $hasConfirmedSales,
             'consultants' => $consultants,
+            'awards_config' => $awardsConfig,
             'created_by' => $storeGoal->createdBy?->name,
             'updated_by' => $storeGoal->updatedBy?->name,
             'created_at' => $storeGoal->created_at?->format('d/m/Y H:i'),
@@ -257,16 +319,49 @@ class StoreGoalController extends Controller
             : null;
 
         // Sales and achievement per store
-        $totalSales = 0;
+        // Use raw total to avoid double-counting e-commerce sales
+        // (forStoreWithEcommerce attributes Z441 sales to physical stores,
+        //  so summing across stores would count them twice)
+        $totalSales = (float) Sale::forMonth($month, $year)->sum('total_sales');
+
         $storesAboveGoal = 0;
         $storesAboveSuper = 0;
         $storeRanking = [];
 
+        // Collect employee IDs attributed to physical stores (to exclude from Z441 count)
+        $ecommerceStore = Store::where('code', Store::ECOMMERCE_CODE)->first();
+        $attributedEmployeeIds = [];
+        if ($ecommerceStore) {
+            foreach ($goals as $goal) {
+                if ($goal->store_id === $ecommerceStore->id) {
+                    continue;
+                }
+                $store = $goal->store;
+                if ($store) {
+                    $empIds = EmploymentContract::active()
+                        ->where('store_id', $store->code)
+                        ->pluck('employee_id')
+                        ->unique()
+                        ->toArray();
+                    $attributedEmployeeIds = array_merge($attributedEmployeeIds, $empIds);
+                }
+            }
+            $attributedEmployeeIds = array_unique($attributedEmployeeIds);
+        }
+
         foreach ($goals as $goal) {
-            $storeSales = (float) Sale::forMonth($month, $year)
-                ->forStoreWithEcommerce($goal->store_id)
-                ->sum('total_sales');
-            $totalSales += $storeSales;
+            // For e-commerce store: only count sales NOT attributed to physical stores
+            if ($ecommerceStore && $goal->store_id === $ecommerceStore->id) {
+                $query = Sale::forMonth($month, $year)->where('store_id', $ecommerceStore->id);
+                if (! empty($attributedEmployeeIds)) {
+                    $query->whereNotIn('employee_id', $attributedEmployeeIds);
+                }
+                $storeSales = (float) $query->sum('total_sales');
+            } else {
+                $storeSales = (float) Sale::forMonth($month, $year)
+                    ->forStoreWithEcommerce($goal->store_id)
+                    ->sum('total_sales');
+            }
 
             $pct = $goal->goal_amount > 0 ? round(($storeSales / $goal->goal_amount) * 100, 1) : 0;
 
@@ -460,6 +555,90 @@ class StoreGoalController extends Controller
         $filename = "metas_consultores_{$months[$month]}_{$year}.csv";
 
         return $this->csvResponse($rows, $filename);
+    }
+
+    public function loadConfirmData(StoreGoal $storeGoal)
+    {
+        $storeGoal->load(['store', 'consultantGoals.employee.employeeStatus']);
+
+        $salesByEmployee = Sale::forMonth($storeGoal->reference_month, $storeGoal->reference_year)
+            ->forStoreWithEcommerce($storeGoal->store_id)
+            ->get()
+            ->groupBy('employee_id')
+            ->map(fn ($sales) => round((float) $sales->sum('total_sales'), 2));
+
+        $confirmedByEmployee = ConfirmedSale::forStore($storeGoal->store_id)
+            ->forMonth($storeGoal->reference_month, $storeGoal->reference_year)
+            ->pluck('sale_value', 'employee_id');
+
+        $consultants = $storeGoal->consultantGoals->map(fn ($cg) => [
+            'employee_id' => $cg->employee_id,
+            'employee_name' => $cg->employee?->name ?? 'N/A',
+            'level' => $cg->level_snapshot,
+            'status_id' => $cg->employee?->status_id,
+            'status_name' => $cg->employee?->employeeStatus?->description_name ?? 'N/A',
+            'is_active' => $cg->employee?->status_id === 2,
+            'system_sales' => $salesByEmployee->get($cg->employee_id, 0),
+            'confirmed_sales' => $confirmedByEmployee->has($cg->employee_id)
+                ? round((float) $confirmedByEmployee->get($cg->employee_id), 2)
+                : null,
+        ])->sortBy('employee_name')->values();
+
+        return response()->json([
+            'store_name' => $storeGoal->store->display_name ?? $storeGoal->store->name,
+            'period_label' => $storeGoal->period_label,
+            'consultants' => $consultants,
+        ]);
+    }
+
+    public function confirmSales(Request $request, StoreGoal $storeGoal)
+    {
+        $request->validate([
+            'sales' => 'required|array|min:1',
+            'sales.*.employee_id' => 'required|integer|exists:employees,id',
+            'sales.*.sale_value' => 'nullable|numeric|min:0',
+        ]);
+
+        $confirmed = 0;
+        $removed = 0;
+
+        DB::transaction(function () use ($request, $storeGoal, &$confirmed, &$removed) {
+            foreach ($request->sales as $item) {
+                $employeeId = $item['employee_id'];
+                $saleValue = $item['sale_value'];
+
+                if ($saleValue === null || $saleValue === '' || (float) $saleValue <= 0) {
+                    $deleted = ConfirmedSale::where('employee_id', $employeeId)
+                        ->where('store_id', $storeGoal->store_id)
+                        ->where('reference_month', $storeGoal->reference_month)
+                        ->where('reference_year', $storeGoal->reference_year)
+                        ->delete();
+                    if ($deleted) {
+                        $removed++;
+                    }
+                } else {
+                    ConfirmedSale::updateOrCreate(
+                        [
+                            'employee_id' => $employeeId,
+                            'store_id' => $storeGoal->store_id,
+                            'reference_month' => $storeGoal->reference_month,
+                            'reference_year' => $storeGoal->reference_year,
+                        ],
+                        [
+                            'sale_value' => (float) $saleValue,
+                            'confirmed_by_user_id' => auth()->id(),
+                        ]
+                    );
+                    $confirmed++;
+                }
+            }
+        });
+
+        return response()->json([
+            'message' => "Vendas confirmadas: {$confirmed}, removidas: {$removed}.",
+            'confirmed' => $confirmed,
+            'removed' => $removed,
+        ]);
     }
 
     protected function csvResponse(array $rows, string $filename)

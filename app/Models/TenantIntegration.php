@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Crypt;
 
 class TenantIntegration extends Model
 {
+    protected $connection = 'mysql';
+
     protected $fillable = [
         'tenant_id',
         'name',

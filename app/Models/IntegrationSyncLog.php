@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class IntegrationSyncLog extends Model
 {
+    protected $connection = 'mysql';
+
     protected $fillable = [
         'integration_id',
         'tenant_id',

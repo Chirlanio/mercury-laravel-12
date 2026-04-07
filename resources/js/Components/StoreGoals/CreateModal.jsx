@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { router } from '@inertiajs/react';
 import Modal from '@/Components/Modal';
 import Button from '@/Components/Button';
+import { maskMoney, parseMoney } from '@/Hooks/useMasks';
 
 export default function CreateModal({ isOpen, onClose, onSuccess, stores = [] }) {
     const [form, setForm] = useState({
@@ -34,7 +35,8 @@ export default function CreateModal({ isOpen, onClose, onSuccess, stores = [] })
         setErrors(prev => ({ ...prev, [field]: null }));
     };
 
-    const superGoal = form.goal_amount ? (parseFloat(form.goal_amount) * 1.15).toFixed(2) : '';
+    const goalValue = parseMoney(form.goal_amount);
+    const superGoal = goalValue > 0 ? goalValue * 1.15 : 0;
 
     const formatCurrency = (value) => {
         if (!value) return '';
@@ -58,7 +60,7 @@ export default function CreateModal({ isOpen, onClose, onSuccess, stores = [] })
 
         const newErrors = {};
         if (!form.store_id) newErrors.store_id = 'Selecione uma loja.';
-        if (!form.goal_amount || parseFloat(form.goal_amount) <= 0) newErrors.goal_amount = 'Informe um valor válido.';
+        if (!form.goal_amount || parseMoney(form.goal_amount) <= 0) newErrors.goal_amount = 'Informe um valor válido.';
         if (!form.business_days || form.business_days < 1) newErrors.business_days = 'Informe os dias úteis.';
 
         if (Object.keys(newErrors).length > 0) {
@@ -71,7 +73,7 @@ export default function CreateModal({ isOpen, onClose, onSuccess, stores = [] })
             store_id: parseInt(form.store_id),
             reference_month: parseInt(form.reference_month),
             reference_year: parseInt(form.reference_year),
-            goal_amount: parseFloat(form.goal_amount),
+            goal_amount: parseMoney(form.goal_amount),
             business_days: parseInt(form.business_days),
             non_working_days: parseInt(form.non_working_days) || 0,
         }, {
@@ -138,13 +140,12 @@ export default function CreateModal({ isOpen, onClose, onSuccess, stores = [] })
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Meta (R$)</label>
                         <input
-                            type="number"
-                            step="0.01"
-                            min="0"
+                            type="text"
+                            inputMode="numeric"
                             value={form.goal_amount}
-                            onChange={(e) => handleChange('goal_amount', e.target.value)}
+                            onChange={(e) => handleChange('goal_amount', maskMoney(e.target.value))}
                             className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            placeholder="Ex: 150000.00"
+                            placeholder="0,00"
                         />
                         {errors.goal_amount && <p className="mt-1 text-sm text-red-600">{errors.goal_amount}</p>}
                         {superGoal && (
