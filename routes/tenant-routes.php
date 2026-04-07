@@ -4,6 +4,8 @@
 // Included by both tenant.php (with tenancy middleware) and tenant-test.php (without).
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\StoreGoalController;
+use App\Http\Controllers\Config\PercentageAwardController as ConfigPercentageAwardController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\DashboardController;
@@ -390,6 +392,7 @@ use Inertia\Inertia;
         Route::resource('transfer-statuses', ConfigTransferStatusController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::resource('order-payment-statuses', ConfigOrderPaymentStatusController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::resource('management-reasons', ConfigManagementReasonController::class)->only(['index', 'store', 'update', 'destroy']);
+        Route::resource('percentage-awards', ConfigPercentageAwardController::class)->only(['index', 'store', 'update', 'destroy']);
     });
 
     // ==========================================
@@ -418,6 +421,34 @@ use Inertia\Inertia;
             ->middleware('permission:' . Permission::DELETE_SALES->value)->name('sales.bulk-delete.preview');
         Route::post('/sales/bulk-delete', [SaleController::class, 'bulkDelete'])
             ->middleware('permission:' . Permission::DELETE_SALES->value)->name('sales.bulk-delete');
+    });
+
+    // ==========================================
+    // Store Goals (Metas de Loja)
+    // ==========================================
+    Route::middleware(['auth', 'permission:' . Permission::VIEW_STORE_GOALS->value])->group(function () {
+        // Fixed routes (must come before {storeGoal} wildcard)
+        Route::get('/store-goals/statistics', [StoreGoalController::class, 'statistics'])->name('store-goals.statistics');
+        Route::get('/store-goals/achievement/consultants', [StoreGoalController::class, 'achievementByConsultant'])
+            ->name('store-goals.achievement.consultants');
+        Route::get('/store-goals/export/stores', [StoreGoalController::class, 'exportByStore'])
+            ->name('store-goals.export.stores');
+        Route::get('/store-goals/export/consultants', [StoreGoalController::class, 'exportByConsultant'])
+            ->name('store-goals.export.consultants');
+        Route::post('/store-goals/import', [StoreGoalController::class, 'import'])
+            ->middleware('permission:' . Permission::CREATE_STORE_GOALS->value)->name('store-goals.import');
+
+        // Resource routes
+        Route::get('/store-goals', [StoreGoalController::class, 'index'])->name('store-goals.index');
+        Route::post('/store-goals', [StoreGoalController::class, 'store'])
+            ->middleware('permission:' . Permission::CREATE_STORE_GOALS->value)->name('store-goals.store');
+        Route::get('/store-goals/{storeGoal}', [StoreGoalController::class, 'show'])->name('store-goals.show');
+        Route::put('/store-goals/{storeGoal}', [StoreGoalController::class, 'update'])
+            ->middleware('permission:' . Permission::EDIT_STORE_GOALS->value)->name('store-goals.update');
+        Route::delete('/store-goals/{storeGoal}', [StoreGoalController::class, 'destroy'])
+            ->middleware('permission:' . Permission::DELETE_STORE_GOALS->value)->name('store-goals.destroy');
+        Route::post('/store-goals/{storeGoal}/redistribute', [StoreGoalController::class, 'redistribute'])
+            ->middleware('permission:' . Permission::EDIT_STORE_GOALS->value)->name('store-goals.redistribute');
     });
 
     // ==========================================

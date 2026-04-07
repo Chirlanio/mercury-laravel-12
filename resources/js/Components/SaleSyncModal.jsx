@@ -3,7 +3,7 @@ import { router } from '@inertiajs/react';
 import Modal from '@/Components/Modal';
 import Button from '@/Components/Button';
 
-export default function SaleSyncModal({ isOpen, onClose, stores = [], cigamAvailable = false }) {
+export default function SaleSyncModal({ isOpen, onClose, stores = [], cigamAvailable = false, cigamUnavailableReason = null }) {
     const [mode, setMode] = useState('auto');
     const [month, setMonth] = useState(new Date().getMonth() + 1);
     const [year, setYear] = useState(new Date().getFullYear());
@@ -76,8 +76,7 @@ export default function SaleSyncModal({ isOpen, onClose, stores = [], cigamAvail
                             <div>
                                 <h3 className="text-sm font-medium text-yellow-800">Conexão CIGAM não disponível</h3>
                                 <p className="mt-1 text-sm text-yellow-700">
-                                    A conexão com o banco de dados CIGAM (PostgreSQL) não está configurada ou não está acessível.
-                                    Verifique as variáveis de ambiente CIGAM_DB_* no arquivo .env.
+                                    {cigamUnavailableReason || 'A conexão com o banco de dados CIGAM (PostgreSQL) não está configurada ou não está acessível. Verifique as variáveis de ambiente CIGAM_DB_* no arquivo .env.'}
                                 </p>
                             </div>
                         </div>

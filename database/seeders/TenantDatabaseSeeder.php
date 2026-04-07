@@ -35,6 +35,9 @@ class TenantDatabaseSeeder extends Seeder
 
             // Laravel route-based pages and menu permissions
             LaravelPagesSeeder::class,
+
+            // Store goals commission config
+            PercentageAwardSeeder::class,
         ]);
 
         // Seed generic sectors without manager FK references

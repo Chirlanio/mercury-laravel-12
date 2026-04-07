@@ -257,49 +257,46 @@ class AccessLevelController extends Controller
      */
     public function updatePermissions(Request $request, AccessLevel $accessLevel)
     {
-        Log::info('Permissions Update Request', [
-            'access_level_id' => $accessLevel->id,
-            'headers' => $request->headers->all(),
-            'has_csrf' => $request->header('X-CSRF-TOKEN') !== null,
-        ]);
-
         $request->validate([
             'permissions' => 'required|array',
-            'permissions.*.page_id' => 'required|exists:pages,id',
+            'permissions.*.page_id' => 'required|integer',
             'permissions.*.has_permission' => 'required|boolean',
             'permissions.*.order' => 'required|integer',
             'permissions.*.dropdown' => 'required|boolean',
             'permissions.*.lib_menu' => 'required|boolean',
-            'permissions.*.menu_id' => 'nullable|exists:menus,id',
+            'permissions.*.menu_id' => 'nullable|integer',
         ]);
 
-        DB::beginTransaction();
+        $now = now();
+        $rows = collect($request->permissions)->map(fn($p) => [
+            'access_level_id' => $accessLevel->id,
+            'page_id' => $p['page_id'],
+            'permission' => $p['has_permission'],
+            'order' => $p['order'] ?? 999,
+            'dropdown' => $p['dropdown'] ?? false,
+            'lib_menu' => $p['lib_menu'] ?? false,
+            'menu_id' => $p['menu_id'] ?: null,
+            'updated_at' => $now,
+            'created_at' => $now,
+        ])->all();
 
         try {
-            foreach ($request->permissions as $permission) {
-                AccessLevelPage::updateOrCreate(
-                    [
-                        'access_level_id' => $accessLevel->id,
-                        'page_id' => $permission['page_id'],
-                    ],
-                    [
-                        'permission' => $permission['has_permission'],
-                        'order' => $permission['order'] ?? 999,
-                        'dropdown' => $permission['dropdown'] ?? false,
-                        'lib_menu' => $permission['lib_menu'] ?? false,
-                        'menu_id' => $permission['menu_id'] ?? null,
-                    ]
-                );
-            }
-
-            DB::commit();
+            // Single query upsert instead of N updateOrCreate calls
+            AccessLevelPage::upsert(
+                $rows,
+                ['access_level_id', 'page_id'],
+                ['permission', 'order', 'dropdown', 'lib_menu', 'menu_id', 'updated_at']
+            );
 
             return redirect()
                 ->route('access-levels.permissions', $accessLevel)
                 ->with('success', 'Permissões atualizadas com sucesso!');
 
         } catch (\Exception $e) {
-            DB::rollBack();
+            Log::error('Failed to update permissions', [
+                'access_level_id' => $accessLevel->id,
+                'error' => $e->getMessage(),
+            ]);
 
             return redirect()
                 ->back()

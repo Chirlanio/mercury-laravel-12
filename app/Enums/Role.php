@@ -95,6 +95,10 @@ enum Role: string
                 Permission::CREATE_OVERTIME->value,
                 Permission::EDIT_OVERTIME->value,
                 Permission::DELETE_OVERTIME->value,
+                Permission::VIEW_STORE_GOALS->value,
+                Permission::CREATE_STORE_GOALS->value,
+                Permission::EDIT_STORE_GOALS->value,
+                Permission::DELETE_STORE_GOALS->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -154,6 +158,10 @@ enum Role: string
                 Permission::CREATE_OVERTIME->value,
                 Permission::EDIT_OVERTIME->value,
                 Permission::DELETE_OVERTIME->value,
+                Permission::VIEW_STORE_GOALS->value,
+                Permission::CREATE_STORE_GOALS->value,
+                Permission::EDIT_STORE_GOALS->value,
+                Permission::DELETE_STORE_GOALS->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -176,6 +184,7 @@ enum Role: string
                 Permission::VIEW_MEDICAL_CERTIFICATES->value,
                 Permission::VIEW_ABSENCES->value,
                 Permission::VIEW_OVERTIME->value,
+                Permission::VIEW_STORE_GOALS->value,
             ],
             self::USER => [
                 // Apenas próprio perfil

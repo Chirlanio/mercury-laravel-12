@@ -1,203 +1,202 @@
 # Mercury Laravel
 
-Mercury Laravel is a web application built with the Laravel framework and a React frontend using Inertia.js. It provides a starting point for applications requiring user authentication, user management, activity logging, and more.
+Sistema de gestão empresarial multi-tenant (SaaS) desenvolvido com **Laravel 12 + React 18 + Inertia.js 2**. Reescrita completa do sistema legado Mercury v1 para o Grupo Meia Sola.
 
-## Key Features
+## Stack
 
-*   **User Authentication**: Secure login, registration, and password reset functionality.
-*   **User Management**: Easily create, read, update, and delete users.
-*   **Profile Management**: Users can update their profile information and upload an avatar.
-*   **Activity Logging**: Track user actions within the application.
-*   **Dashboard**: A central hub displaying application statistics and recent activities.
-*   **Role-Based Access Control (RBAC)**: Control user access to features based on roles and permissions.
-*   **Modern Tech Stack**: Built with the latest versions of Laravel, React, and Vite.
+| Camada | Tecnologia |
+|--------|------------|
+| Backend | Laravel 12, PHP 8.2+ |
+| Frontend | React 18, Tailwind CSS 3, Heroicons |
+| Bridge | Inertia.js 2 |
+| Build | Vite 7 |
+| Multi-tenancy | stancl/tenancy (subdomínios) |
+| Database | MySQL/MariaDB + PostgreSQL (CIGAM, opcional) |
+| PDF | barryvdh/laravel-dompdf |
+| Excel | maatwebsite/excel |
 
-## Technologies Used
-
-### Backend
-
-*   [Laravel](https://laravel.com/)
-*   [Inertia.js (Server-side)](https://inertiajs.com/)
-*   [Intervention Image](https://image.intervention.io/)
-*   [Laravel Sanctum](https://laravel.com/docs/sanctum)
-*   [Ziggy](https://github.com/tightenco/ziggy)
-
-### Frontend
-
-*   [React](https://reactjs.org/)
-*   [Inertia.js (Client-side)](https://inertiajs.com/)
-*   [Tailwind CSS](https://tailwindcss.com/)
-*   [Vite](https://vitejs.dev/)
-*   [Axios](https://axios-http.com/)
-*   [React Toastify](https://fkhadra.github.io/react-toastify/introduction)
-*   [Heroicons](https://heroicons.com/)
-
-## Getting Started
-
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
-
-### Prerequisites
-
-*   PHP >= 8.2
-*   Node.js and npm
-*   Composer
-*   A database (e.g., MySQL, PostgreSQL, SQLite)
-
-### Installation
-
-1.  **Clone the repository**
-
-    ```bash
-    git clone https://github.com/your-username/mercury-laravel.git
-    cd mercury-laravel
-    ```
-
-2.  **Install backend dependencies**
-
-    ```bash
-    composer install
-    ```
-
-3.  **Install frontend dependencies**
-
-    ```bash
-    npm install
-    ```
-
-4.  **Set up your environment**
-
-    *   Copy the `.env.example` file to `.env`:
-
-        ```bash
-        cp .env.example .env
-        ```
-
-    *   Generate an application key:
-
-        ```bash
-        php artisan key:generate
-        ```
-
-    *   Configure your database connection in the `.env` file.
-
-5.  **Run database migrations and seeders**
-
-    ```bash
-    php artisan migrate --seed
-    ```
-
-6.  **Build frontend assets**
-
-    ```bash
-    npm run build
-    ```
-
-## Usage
-
-To start the development server, you can use the following command:
+## Instalacao
 
 ```bash
-composer run dev
+# 1. Clonar e instalar dependencias
+git clone https://github.com/your-username/mercury-laravel.git
+cd mercury-laravel
+composer install
+npm install
+
+# 2. Configurar ambiente
+cp .env.example .env
+php artisan key:generate
+# Configurar DB_* no .env
+
+# 3. Banco de dados (central)
+php artisan migrate --seed
+
+# 4. Build frontend
+npm run build
 ```
 
-This will concurrently start the PHP development server, the Vite development server, and the queue listener.
-
-You can then access the application in your browser at the address provided by the `php artisan serve` command (usually `http://127.0.0.1:8000`).
-
-### Running Tests
-
-To run the application's test suite, use the following command:
+## Desenvolvimento
 
 ```bash
-composer run test
+composer dev          # Inicia server + queue + logs + vite
+php artisan serve     # Apenas servidor Laravel
+npm run dev           # Apenas Vite dev server
+npm run build         # Build de producao
+vendor/bin/pint       # Linting (code style)
 ```
 
-## Contributing
+### Testes
 
-Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+Testes usam SQLite in-memory. Na maquina de dev, usar o PHP com pdo_sqlite:
 
-If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement".
+```bash
+C:\Users\MSDEV\php84\php.exe artisan test
+C:\Users\MSDEV\php84\php.exe artisan test --filter=SaleControllerTest
+```
 
-1.  Fork the Project
-2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4.  Push to the Branch (`git push origin feature/AmazingFeature`)
-5.  Open a Pull Request
+## Acessando o Sistema
 
-## License
+O Mercury opera em dois contextos: **Central** (admin SaaS) e **Tenant** (aplicacao por empresa).
+
+### Painel Central (Admin SaaS)
+
+Gerenciamento de tenants, planos e billing.
+
+| Item | Valor |
+|------|-------|
+| URL | `http://127.0.0.1:8000` |
+| Login | `http://127.0.0.1:8000/login` |
+| Dashboard | `http://127.0.0.1:8000/admin` |
+
+**Credenciais (seed):**
+
+| Email | Senha | Role |
+|-------|-------|------|
+| `admin@mercury.com.br` | `password` | super_admin |
+
+### Tenants (Aplicacao por Empresa)
+
+Cada tenant e acessado via subdominio. Os tenants sao criados pelo painel central.
+
+**Tenant Meia Sola:**
+
+| Item | Valor |
+|------|-------|
+| URL | `http://meia-sola.localhost:8000` |
+| Login | `http://meia-sola.localhost:8000/login` |
+
+| Email | Senha | Role |
+|-------|-------|------|
+| `superadmin@mercury.com` | `password` | super_admin |
+| `admin@mercury.com` | `password` | admin |
+| `support@mercury.com` | `password` | support |
+| `user@mercury.com` | `password` | user |
+
+**Tenant InMyStock:**
+
+| Item | Valor |
+|------|-------|
+| URL | `http://inmystock.localhost:8000` |
+| Login | `http://inmystock.localhost:8000/login` |
+
+### Criando um Novo Tenant
+
+1. Acesse o painel central (`http://127.0.0.1:8000/admin`)
+2. Va em **Tenants** e clique em **Criar Tenant**
+3. Defina o slug (ex: `minha-empresa`) — o subdominio sera `minha-empresa.localhost:8000`
+4. O banco de dados do tenant e criado automaticamente com dados de referencia (seeders)
+5. Crie o primeiro usuario do tenant pelo painel central
+
+### Importante: Central vs Tenant
+
+O sistema usa **guards de autenticacao separados**:
+
+- **Central** (`/login` em `127.0.0.1`): tabela `central_users`, guard `central`
+- **Tenant** (`/login` em `*.localhost`): tabela `users` (por tenant), guard `web`
+
+Os usuarios sao completamente independentes. Um usuario do tenant nao consegue acessar o painel central e vice-versa.
+
+## Arquitetura
+
+```
+app/
+├── Http/Controllers/
+│   ├── Central/         # Admin SaaS (tenants, plans)
+│   ├── Config/          # 21 config modules (extend ConfigController)
+│   ├── Admin/           # Email settings
+│   ├── Api/             # Integration API + Webhooks
+│   └── *.php            # Module controllers
+├── Models/              # 81 Eloquent models
+├── Services/            # 18 service classes
+├── Enums/               # Role.php, Permission.php (60+ permissions)
+└── Http/Middleware/      # 12 middlewares
+
+resources/js/
+├── Pages/               # 54 React pages
+│   ├── Central/         # Admin SaaS pages
+│   ├── Config/Index.jsx # Generic page for 21 config modules
+│   └── ...              # Module pages
+├── Components/          # 73 reusable components
+├── Layouts/             # 3 layouts (Authenticated, Guest, Central)
+└── Hooks/               # 4 hooks (usePermissions, useConfirm, etc.)
+
+routes/
+├── web.php              # Central routes (tenant management)
+├── tenant-routes.php    # Tenant routes (full application)
+├── tenant.php           # Tenant middleware + resolution
+├── api.php              # API routes
+└── auth.php             # Auth routes
+```
+
+## RBAC
+
+4 roles hierarquicos com 60+ permissions:
+
+| Role | Level | Descricao |
+|------|-------|-----------|
+| SUPER_ADMIN | 4 | Acesso total |
+| ADMIN | 3 | Gerenciamento sem controle total |
+| SUPPORT | 2 | Suporte com visualizacao ampla |
+| USER | 1 | Apenas proprio perfil |
+
+## Documentacao
+
+| Documento | Descricao |
+|-----------|-----------|
+| `CLAUDE.md` | Instrucoes para Claude Code |
+| `GUIA_DESENVOLVIMENTO.md` | Guia completo de desenvolvimento |
+| `docs/BLUEPRINT_LARAVEL_V2.md` | Blueprint de migracao v1 → v2 |
+| `docs/ARCHITECTURE.md` | Arquitetura do sistema |
+| `docs/GUIA_IMPLEMENTACAO_MODULOS.md` | Passo-a-passo para novos modulos |
+| `docs/PADRONIZACAO.md` | Padroes de codigo |
+| `docs/TESTING_STRATEGY.md` | Estrategia de testes |
+| `docs/DEPLOYMENT.md` | Guia de deploy |
+| `docs/CONTRIBUTING.md` | Guia de contribuicao |
+
+## Deploy (VPS)
+
+```bash
+# Instalar dependencias
+composer install --no-dev --optimize-autoloader
+npm install && npm run build
+
+# Configurar ambiente
+cp .env.example .env
+php artisan key:generate
+# Editar .env com credenciais de producao
+
+# Banco de dados
+php artisan migrate --seed
+
+# Permissoes
+sudo chown -R www-data:www-data storage bootstrap/cache
+sudo chmod -R 775 storage bootstrap/cache
+
+# Scheduler (cron)
+* * * * * cd /path-to-project && php artisan schedule:run >> /dev/null 2>&1
+```
+
+## Licenca
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
-
-## Deploy on Hostinger VPS
-
-These instructions will guide you through deploying the project on a Hostinger VPS.
-
-### Prerequisites
-
-*   A Hostinger VPS with root access.
-*   Git, Composer, and Node.js installed on the VPS.
-*   A database (e.g., MySQL, PostgreSQL) set up on the VPS.
-
-### Deployment Steps
-
-1.  **Clone the repository**
-
-    ```bash
-    git clone https://github.com/your-username/mercury-laravel.git
-    cd mercury-laravel
-    ```
-
-2.  **Install backend dependencies**
-
-    ```bash
-    composer install --no-dev --optimize-autoloader
-    ```
-
-3.  **Install frontend dependencies**
-
-    ```bash
-    npm install && npm run build
-    ```
-
-4.  **Set up your environment**
-
-    *   Copy the `.env.example` file to `.env`:
-
-        ```bash
-        cp .env.example .env
-        ```
-
-    *   Generate an application key:
-
-        ```bash
-        php artisan key:generate
-        ```
-
-    *   Configure your database connection and other settings in the `.env` file.
-
-5.  **Run database migrations and seeders**
-
-    ```bash
-    php artisan migrate --seed
-    ```
-
-6.  **Configure the web server**
-
-    You will need to configure your web server (e.g., Apache, Nginx) to point to the `public` directory of your application.
-
-7.  **Set file permissions**
-
-    Ensure that the `storage` and `bootstrap/cache` directories are writable by the web server.
-
-    ```bash
-    sudo chown -R www-data:www-data storage bootstrap/cache
-    sudo chmod -R 775 storage bootstrap/cache
-    ```
-
-8.  **Set up the scheduler**
-
-    Add the following cron job to your server to run the Laravel scheduler every minute:
-
-    ```bash
-    * * * * * cd /path-to-your-project && php artisan schedule:run >> /dev/null 2>&1
-    ```

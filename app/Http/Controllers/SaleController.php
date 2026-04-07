@@ -81,7 +81,9 @@ class SaleController extends Controller
             ->get()
             ->map(fn ($s) => ['id' => $s->id, 'name' => $s->display_name]);
 
-        $cigamAvailable = (new CigamSyncService())->isAvailable();
+        $cigamService = new CigamSyncService();
+        $cigamAvailable = $cigamService->isAvailable();
+        $cigamUnavailableReason = $cigamService->getUnavailableReason();
 
         return Inertia::render('Sales/Index', [
             'salesByStore' => $grouped,
@@ -94,6 +96,7 @@ class SaleController extends Controller
                 'search' => $search,
             ],
             'cigamAvailable' => $cigamAvailable,
+            'cigamUnavailableReason' => $cigamUnavailableReason,
         ]);
     }
 

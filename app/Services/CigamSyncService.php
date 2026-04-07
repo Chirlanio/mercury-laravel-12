@@ -14,14 +14,39 @@ class CigamSyncService
     protected array $storeCodeMap = [];
     protected array $employeeCpfMap = [];
 
+    protected ?string $unavailableReason = null;
+
     public function isAvailable(): bool
     {
+        // Check if pdo_pgsql extension is loaded
+        if (!extension_loaded('pdo_pgsql')) {
+            $this->unavailableReason = 'A extensão pdo_pgsql não está disponível no PHP atual. '
+                . 'Use o PHP completo (C:\Users\MSDEV\php84\php.exe artisan serve) para habilitar a conexão CIGAM.';
+            Log::warning('CIGAM: pdo_pgsql extension not loaded. Current PHP: ' . PHP_BINARY);
+            return false;
+        }
+
+        // Check if CIGAM env vars are configured
+        if (empty(config('database.connections.cigam.host')) || config('database.connections.cigam.host') === '127.0.0.1') {
+            if (empty(env('CIGAM_DB_HOST'))) {
+                $this->unavailableReason = 'Variáveis CIGAM_DB_* não configuradas no .env.';
+                return false;
+            }
+        }
+
         try {
             DB::connection('cigam')->getPdo();
             return true;
         } catch (\Exception $e) {
+            $this->unavailableReason = 'Não foi possível conectar ao CIGAM: ' . $e->getMessage();
+            Log::warning('CIGAM connection failed: ' . $e->getMessage());
             return false;
         }
+    }
+
+    public function getUnavailableReason(): ?string
+    {
+        return $this->unavailableReason;
     }
 
     public function syncDateRange(Carbon $start, Carbon $end, ?int $storeId = null): array

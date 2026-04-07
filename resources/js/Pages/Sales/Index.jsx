@@ -11,7 +11,7 @@ import SaleBulkDeleteModal from "@/Components/SaleBulkDeleteModal";
 import SalesHierarchyTable from "@/Components/SalesHierarchyTable";
 import EmployeeDailySalesModal from "@/Components/EmployeeDailySalesModal";
 
-export default function Index({ auth, salesByStore, grandTotals, stores, filters, cigamAvailable }) {
+export default function Index({ auth, salesByStore, grandTotals, stores, filters, cigamAvailable, cigamUnavailableReason }) {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -280,6 +280,7 @@ export default function Index({ auth, salesByStore, grandTotals, stores, filters
                 onClose={() => setIsSyncModalOpen(false)}
                 stores={stores}
                 cigamAvailable={cigamAvailable}
+                cigamUnavailableReason={cigamUnavailableReason}
             />
 
             {/* Modal de Exclusão em Lote */}

@@ -95,6 +95,12 @@ enum Permission: string
     case EDIT_OVERTIME = 'overtime.edit';
     case DELETE_OVERTIME = 'overtime.delete';
 
+    // Metas de loja
+    case VIEW_STORE_GOALS = 'store_goals.view';
+    case CREATE_STORE_GOALS = 'store_goals.create';
+    case EDIT_STORE_GOALS = 'store_goals.edit';
+    case DELETE_STORE_GOALS = 'store_goals.delete';
+
     public function label(): string
     {
         return match($this) {
@@ -172,6 +178,11 @@ enum Permission: string
             self::CREATE_OVERTIME => 'Registrar horas extras',
             self::EDIT_OVERTIME => 'Editar horas extras',
             self::DELETE_OVERTIME => 'Deletar horas extras',
+
+            self::VIEW_STORE_GOALS => 'Visualizar metas de loja',
+            self::CREATE_STORE_GOALS => 'Criar metas de loja',
+            self::EDIT_STORE_GOALS => 'Editar metas de loja',
+            self::DELETE_STORE_GOALS => 'Deletar metas de loja',
         };
     }
 
@@ -252,6 +263,11 @@ enum Permission: string
             self::CREATE_OVERTIME => 'Permite registrar novas horas extras',
             self::EDIT_OVERTIME => 'Permite editar registros de horas extras',
             self::DELETE_OVERTIME => 'Permite excluir registros de horas extras',
+
+            self::VIEW_STORE_GOALS => 'Permite visualizar metas de loja',
+            self::CREATE_STORE_GOALS => 'Permite criar metas de loja',
+            self::EDIT_STORE_GOALS => 'Permite editar metas de loja',
+            self::DELETE_STORE_GOALS => 'Permite excluir metas de loja',
         };
     }
 
