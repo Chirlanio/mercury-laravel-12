@@ -34,6 +34,9 @@ class User extends Authenticatable
         'status_id',
         'email_confirmation_key',
         'unsubscribe_key',
+        'terms_accepted_at',
+        'terms_version',
+        'terms_ip',
     ];
 
     /**
@@ -62,6 +65,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'terms_accepted_at' => 'datetime',
             'password' => 'hashed',
             'role' => Role::class,
         ];

@@ -19,7 +19,7 @@ class TypeMovimentController extends ConfigController
 
     protected function viewDescription(): string
     {
-        return 'Gerencie os tipos de movimentacao de funcionarios';
+        return 'Gerencie os tipos de movimentacao de funcionários';
     }
 
     protected function routeName(): string
@@ -51,7 +51,7 @@ class TypeMovimentController extends ConfigController
     {
         return [
             ['name' => 'name', 'label' => 'Nome', 'type' => 'text', 'required' => true, 'placeholder' => 'Ex: Admissao'],
-            ['name' => 'description', 'label' => 'Descricao', 'type' => 'textarea', 'required' => false, 'placeholder' => 'Descricao do tipo de movimentacao'],
+            ['name' => 'description', 'label' => 'Descricao', 'type' => 'textarea', 'required' => false, 'placeholder' => 'Descricao do tipo de movimentação'],
             ['name' => 'is_active', 'label' => 'Ativo', 'type' => 'checkbox', 'defaultValue' => true],
         ];
     }
@@ -78,7 +78,7 @@ class TypeMovimentController extends ConfigController
     {
         $count = $model->employmentContracts()->count();
         if ($count > 0) {
-            return "Este tipo de movimentacao esta sendo usado por {$count} contrato(s) e nao pode ser excluido.";
+            return "Este tipo de movimentação está sendo usado por {$count} contrato(s) e não pode ser excluído.";
         }
         return true;
     }

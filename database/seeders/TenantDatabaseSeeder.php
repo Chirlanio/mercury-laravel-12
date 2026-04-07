@@ -32,6 +32,9 @@ class TenantDatabaseSeeder extends Seeder
             PageGroupSeeder::class,
             PageSeeder::class,
             AccessLevelPageSeeder::class,
+
+            // Laravel route-based pages and menu permissions
+            LaravelPagesSeeder::class,
         ]);
 
         // Seed generic sectors without manager FK references
@@ -46,7 +49,7 @@ class TenantDatabaseSeeder extends Seeder
     {
         $now = now();
         $sectors = [
-            'Administrativo', 'Comercial', 'Financeiro', 'Logistica',
+            'Administrativo', 'Comercial', 'Financeiro', 'Logística',
             'Marketing', 'Operacional', 'Recursos Humanos', 'Tecnologia',
         ];
 

@@ -77,7 +77,7 @@ export default function Index({ plans, allModules, moduleLabels }) {
 
                         <div className="px-6 py-4 space-y-3">
                             <div className="flex justify-between text-sm">
-                                <span className="text-gray-500">Preco Mensal</span>
+                                <span className="text-gray-500">Preço Mensal</span>
                                 <span className="font-medium">
                                     {Number(plan.price_monthly) > 0
                                         ? `R$ ${numberToDisplay(plan.price_monthly)}`
@@ -85,11 +85,11 @@ export default function Index({ plans, allModules, moduleLabels }) {
                                 </span>
                             </div>
                             <div className="flex justify-between text-sm">
-                                <span className="text-gray-500">Max Usuarios</span>
+                                <span className="text-gray-500">Máx Usuários</span>
                                 <span className="font-medium">{plan.max_users || 'Ilimitado'}</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                                <span className="text-gray-500">Max Lojas</span>
+                                <span className="text-gray-500">Máx Lojas</span>
                                 <span className="font-medium">{plan.max_stores || 'Ilimitado'}</span>
                             </div>
                             <div className="flex justify-between text-sm">
@@ -104,7 +104,7 @@ export default function Index({ plans, allModules, moduleLabels }) {
 
                         <div className="px-6 py-4 bg-gray-50 border-t">
                             <p className="text-xs font-medium text-gray-500 mb-2">
-                                Modulos ({plan.enabled_modules?.length || 0}/{allModules.length})
+                                Módulos ({plan.enabled_modules?.length || 0}/{allModules.length})
                             </p>
                             <div className="flex flex-wrap gap-1">
                                 {plan.enabled_modules?.slice(0, 8).map((mod) => (
@@ -215,22 +215,22 @@ function PlanFormModal({ plan, allModules, moduleLabels, onClose }) {
                                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" required disabled={isEditing} />
                         </div>
                         <div className="col-span-2">
-                            <label className="block text-sm font-medium text-gray-700">Descricao</label>
+                            <label className="block text-sm font-medium text-gray-700">Descrição</label>
                             <textarea value={data.description} onChange={(e) => setData('description', e.target.value)}
                                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" rows="2" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Max Usuarios (0=ilimitado)</label>
+                            <label className="block text-sm font-medium text-gray-700">Máx Usuários (0=ilimitado)</label>
                             <input type="number" value={data.max_users} onChange={(e) => setData('max_users', parseInt(e.target.value))}
                                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" min="0" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Max Lojas (0=ilimitado)</label>
+                            <label className="block text-sm font-medium text-gray-700">Máx Lojas (0=ilimitado)</label>
                             <input type="number" value={data.max_stores} onChange={(e) => setData('max_stores', parseInt(e.target.value))}
                                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" min="0" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Preco Mensal</label>
+                            <label className="block text-sm font-medium text-gray-700">Preço Mensal</label>
                             <div className="mt-1 relative">
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">R$</span>
                                 <input type="text" value={centsToDisplay(monthlyCents)}
@@ -241,7 +241,7 @@ function PlanFormModal({ plan, allModules, moduleLabels, onClose }) {
                             </div>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Preco Anual</label>
+                            <label className="block text-sm font-medium text-gray-700">Preço Anual</label>
                             <div className="mt-1 relative">
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">R$</span>
                                 <input type="text" value={centsToDisplay(yearlyCents)}
@@ -256,7 +256,7 @@ function PlanFormModal({ plan, allModules, moduleLabels, onClose }) {
                     {/* Modules */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Modulos ({data.modules.length}/{allModules.length})
+                            Módulos ({data.modules.length}/{allModules.length})
                         </label>
                         <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto border rounded-md p-3">
                             {allModules.map((mod) => (

@@ -92,7 +92,7 @@ class PlanLimitService
         }
 
         return match ($resource) {
-            'users' => "Limite de {$plan->max_users} usuarios atingido no plano {$plan->name}.",
+            'users' => "Limite de {$plan->max_users} usuários atingido no plano {$plan->name}.",
             'stores' => "Limite de {$plan->max_stores} lojas atingido no plano {$plan->name}.",
             default => "Limite atingido no plano {$plan->name}.",
         };

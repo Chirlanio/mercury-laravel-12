@@ -54,7 +54,8 @@
       "Bash(cd /c/xampp/htdocs/mercury-laravel && C:/Users/MSDEV/php84/php.exe artisan route:list --name=products 2>&1)",
       "Bash(C:\\\\Users\\\\MSDEV\\\\php84\\\\php.exe C:\\\\xampp\\\\htdocs\\\\mercury-laravel\\\\artisan:*)",
       "Bash(/c/Users/MSDEV/php84/php.exe:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(C:/Users/MSDEV/php84/php.exe artisan:*)"
     ],
     "deny": [],
     "ask": []

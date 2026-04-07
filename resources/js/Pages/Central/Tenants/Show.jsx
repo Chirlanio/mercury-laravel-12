@@ -43,7 +43,7 @@ export default function Show({ tenant, usage, plans, recentInvoices }) {
                                 <dd className="mt-1 text-gray-900">{tenant.slug}</dd>
                             </div>
                             <div>
-                                <dt className="font-medium text-gray-500">Dominio</dt>
+                                <dt className="font-medium text-gray-500">Domínio</dt>
                                 <dd className="mt-1 text-gray-900">{tenant.domain || '-'}</dd>
                             </div>
                             <div>
@@ -55,7 +55,7 @@ export default function Show({ tenant, usage, plans, recentInvoices }) {
                                 <dd className="mt-1 text-gray-900">{tenant.plan?.name || 'Nenhum'}</dd>
                             </div>
                             <div>
-                                <dt className="font-medium text-gray-500">Responsavel</dt>
+                                <dt className="font-medium text-gray-500">Responsável</dt>
                                 <dd className="mt-1 text-gray-900">{tenant.owner_name}</dd>
                             </div>
                             <div>
@@ -71,7 +71,7 @@ export default function Show({ tenant, usage, plans, recentInvoices }) {
 
                     {/* Modules */}
                     <div className="bg-white shadow rounded-lg p-6">
-                        <h3 className="text-base font-semibold text-gray-900 mb-3">Modulos Habilitados</h3>
+                        <h3 className="text-base font-semibold text-gray-900 mb-3">Módulos Habilitados</h3>
                         <div className="flex flex-wrap gap-2">
                             {tenant.modules?.map((mod) => (
                                 <span key={mod} className="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
@@ -79,14 +79,14 @@ export default function Show({ tenant, usage, plans, recentInvoices }) {
                                 </span>
                             ))}
                             {tenant.modules?.length === 0 && (
-                                <p className="text-sm text-gray-500">Nenhum modulo habilitado.</p>
+                                <p className="text-sm text-gray-500">Nenhum módulo habilitado.</p>
                             )}
                         </div>
                     </div>
 
                     {/* Actions */}
                     <div className="bg-white shadow rounded-lg p-6">
-                        <h3 className="text-base font-semibold text-gray-900 mb-4">Acoes</h3>
+                        <h3 className="text-base font-semibold text-gray-900 mb-4">Ações</h3>
                         <div className="flex flex-wrap gap-3">
                             {tenant.is_active ? (
                                 <button
@@ -109,7 +109,7 @@ export default function Show({ tenant, usage, plans, recentInvoices }) {
                             )}
                             <button
                                 onClick={() => {
-                                    if (confirm(`EXCLUIR ${tenant.name} e TODOS os dados? Esta acao nao pode ser desfeita!`)) {
+                                    if (confirm(`EXCLUIR ${tenant.name} e TODOS os dados? Esta ação não pode ser desfeita!`)) {
                                         router.delete(`/admin/tenants/${tenant.id}`);
                                     }
                                 }}
@@ -126,9 +126,9 @@ export default function Show({ tenant, usage, plans, recentInvoices }) {
                     <div className="bg-white shadow rounded-lg p-6">
                         <h3 className="text-base font-semibold text-gray-900 mb-4">Uso</h3>
                         <dl className="space-y-3">
-                            <UsageItem label="Usuarios" value={usage.users} max={planLimits?.max_users} />
+                            <UsageItem label="Usuários" value={usage.users} max={planLimits?.max_users} />
                             <UsageItem label="Lojas" value={usage.stores} max={planLimits?.max_stores} />
-                            <UsageItem label="Funcionarios" value={usage.employees} />
+                            <UsageItem label="Funcionários" value={usage.employees} />
                         </dl>
                     </div>
 

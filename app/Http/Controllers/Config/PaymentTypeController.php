@@ -19,7 +19,7 @@ class PaymentTypeController extends ConfigController
 
     protected function viewDescription(): string
     {
-        return 'Gerencie os tipos de pagamento disponiveis no sistema';
+        return 'Gerencie os tipos de pagamento disponíveis no sistema';
     }
 
     protected function routeName(): string

@@ -19,7 +19,7 @@ class PageStatusController extends ConfigController
 
     protected function viewDescription(): string
     {
-        return 'Gerencie os status disponiveis para paginas do sistema';
+        return 'Gerencie os status disponíveis para páginas do sistema';
     }
 
     protected function routeName(): string
@@ -80,7 +80,7 @@ class PageStatusController extends ConfigController
     {
         $count = $model->pages()->count();
         if ($count > 0) {
-            return "Este status esta sendo usado por {$count} pagina(s) e nao pode ser excluido.";
+            return "Este status está sendo usado por {$count} página(s) e não pode ser excluído.";
         }
         return true;
     }

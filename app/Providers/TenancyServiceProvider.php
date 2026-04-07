@@ -116,6 +116,20 @@ class TenancyServiceProvider extends ServiceProvider
 
     protected function mapRoutes()
     {
+        if ($this->app->environment('testing')) {
+            // In testing, load tenant routes without tenancy middleware
+            // so feature tests can access routes without subdomain setup
+            $this->app->booted(function () {
+                if (file_exists(base_path('routes/tenant-test.php'))) {
+                    Route::middleware('web')
+                        ->namespace(static::$controllerNamespace)
+                        ->group(base_path('routes/tenant-test.php'));
+                }
+            });
+
+            return;
+        }
+
         $this->app->booted(function () {
             if (file_exists(base_path('routes/tenant.php'))) {
                 Route::namespace(static::$controllerNamespace)

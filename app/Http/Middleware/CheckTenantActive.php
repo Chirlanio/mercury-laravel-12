@@ -21,7 +21,7 @@ class CheckTenantActive
             auth()->logout();
             $request->session()->invalidate();
 
-            abort(403, 'Esta conta esta suspensa. Entre em contato com o suporte.');
+            abort(403, 'Esta conta está suspensa. Entre em contato com o suporte.');
         }
 
         // Check if trial has expired without a plan
@@ -29,7 +29,7 @@ class CheckTenantActive
             auth()->logout();
             $request->session()->invalidate();
 
-            abort(403, 'Seu periodo de avaliacao expirou. Contrate um plano para continuar.');
+            abort(403, 'Seu período de avaliação expirou. Contrate um plano para continuar.');
         }
 
         return $next($request);

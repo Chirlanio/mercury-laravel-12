@@ -21,7 +21,7 @@ class PositionController extends ConfigController
 
     protected function viewDescription(): string
     {
-        return 'Gerencie os cargos disponiveis para funcionarios';
+        return 'Gerencie os cargos disponíveis para funcionários';
     }
 
     protected function routeName(): string
@@ -43,7 +43,7 @@ class PositionController extends ConfigController
     {
         return [
             ['key' => 'name', 'label' => 'Nome', 'sortable' => true],
-            ['key' => 'level', 'label' => 'Nivel', 'sortable' => true],
+            ['key' => 'level', 'label' => 'Nível', 'sortable' => true],
             ['key' => 'level_category_name', 'label' => 'Categoria', 'sortable' => false],
             ['key' => 'status_name', 'label' => 'Status', 'sortable' => false],
             ['key' => 'created_at', 'label' => 'Criado em', 'sortable' => true],
@@ -54,7 +54,7 @@ class PositionController extends ConfigController
     {
         return [
             ['name' => 'name', 'label' => 'Nome do Cargo', 'type' => 'text', 'required' => true, 'placeholder' => 'Ex: Gerente de Loja'],
-            ['name' => 'level', 'label' => 'Nivel', 'type' => 'text', 'required' => false, 'placeholder' => 'Ex: Senior'],
+            ['name' => 'level', 'label' => 'Nível', 'type' => 'text', 'required' => false, 'placeholder' => 'Ex: Sênior'],
             ['name' => 'level_category_id', 'label' => 'Categoria', 'type' => 'select', 'required' => false, 'optionsKey' => 'positionLevels'],
             ['name' => 'status_id', 'label' => 'Status', 'type' => 'select', 'required' => false, 'optionsKey' => 'statuses'],
         ];
@@ -107,7 +107,7 @@ class PositionController extends ConfigController
     {
         $count = $model->employees()->count();
         if ($count > 0) {
-            return "Este cargo esta sendo usado por {$count} funcionario(s) e nao pode ser excluido.";
+            return "Este cargo está sendo usado por {$count} funcionário(s) e não pode ser excluído.";
         }
         return true;
     }

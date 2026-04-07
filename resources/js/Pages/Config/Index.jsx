@@ -104,7 +104,7 @@ export default function Index({
         // Coluna de acoes
         if (canEdit || canDelete) {
             cols.push({
-                label: 'Acoes',
+                label: 'Ações',
                 field: 'actions',
                 sortable: false,
                 render: (item) => (
@@ -151,7 +151,7 @@ export default function Index({
         return cols;
     };
 
-    // Construir secoes do formulario a partir da config
+    // Construir seções do formulário a partir da config
     const buildFormSections = () => {
         const fields = (config.formFields || []).map((field) => {
             const baseField = {
@@ -163,7 +163,7 @@ export default function Index({
                 defaultValue: field.defaultValue ?? (field.type === 'checkbox' ? false : ''),
             };
 
-            // Adicionar opcoes para selects
+            // Adicionar opções para selects
             if (field.type === 'select' && field.optionsKey) {
                 baseField.options = (additionalData[field.optionsKey] || []).map((opt) => ({
                     value: opt.id ?? opt.value,
@@ -178,7 +178,19 @@ export default function Index({
             return baseField;
         });
 
-        return [{ fields }];
+        // Adaptar colunas ao número de campos
+        const fieldCount = fields.length;
+        const columns = fieldCount <= 2 ? 'md:grid-cols-1' : fieldCount <= 4 ? 'md:grid-cols-2' : 'md:grid-cols-2 lg:grid-cols-3';
+
+        return [{ fields, columns }];
+    };
+
+    // Adaptar largura do modal ao número de campos
+    const getModalMaxWidth = () => {
+        const fieldCount = (config.formFields || []).length;
+        if (fieldCount <= 2) return 'lg';
+        if (fieldCount <= 4) return 'xl';
+        return '2xl';
     };
 
     // Identificar o campo "nome" principal para exibir no dialog de delete
@@ -193,7 +205,7 @@ export default function Index({
 
     return (
         <AuthenticatedLayout user={auth.user}>
-            <Head title={config.title || 'Configuracao'} />
+            <Head title={config.title || 'Configuração'} />
 
             <div className="py-12">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
@@ -202,7 +214,7 @@ export default function Index({
                         <div className="flex justify-between items-center">
                             <div>
                                 <h1 className="text-3xl font-bold text-gray-900">
-                                    {config.title || 'Configuracao'}
+                                    {config.title || 'Configuração'}
                                 </h1>
                                 <p className="mt-1 text-sm text-gray-600">
                                     {config.description || ''}
@@ -302,7 +314,7 @@ export default function Index({
                 </div>
             </div>
 
-            {/* Modal de Criacao */}
+            {/* Modal de Criação */}
             <GenericFormModal
                 show={showCreateModal}
                 onClose={closeModals}
@@ -313,11 +325,11 @@ export default function Index({
                 submitUrl={route(config.routeName + '.store')}
                 submitMethod="post"
                 submitButtonText="Criar"
-                maxWidth="2xl"
+                maxWidth={getModalMaxWidth()}
                 preserveScroll={true}
             />
 
-            {/* Modal de Edicao */}
+            {/* Modal de Edição */}
             <GenericFormModal
                 show={showEditModal}
                 onClose={closeModals}
@@ -329,11 +341,11 @@ export default function Index({
                 submitUrl={selectedItem ? route(config.routeName + '.update', selectedItem.id) : ''}
                 submitMethod="put"
                 submitButtonText="Salvar"
-                maxWidth="2xl"
+                maxWidth={getModalMaxWidth()}
                 preserveScroll={true}
             />
 
-            {/* Dialog de Confirmacao de Exclusao */}
+            {/* Dialog de Confirmação de Exclusão */}
             <ConfirmDialog
                 show={showDeleteDialog}
                 onClose={() => {
@@ -341,8 +353,8 @@ export default function Index({
                     setSelectedItem(null);
                 }}
                 onConfirm={handleConfirmDelete}
-                title="Confirmar Exclusao"
-                message={`Tem certeza que deseja excluir "${getItemDisplayName(selectedItem)}"? Esta acao nao pode ser desfeita.`}
+                title="Confirmar Exclusão"
+                message={`Tem certeza que deseja excluir "${getItemDisplayName(selectedItem)}"? Esta ação não pode ser desfeita.`}
                 confirmText={deleting ? 'Excluindo...' : 'Excluir'}
                 cancelText="Cancelar"
                 type="danger"

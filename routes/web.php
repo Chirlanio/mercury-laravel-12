@@ -19,6 +19,11 @@ use Inertia\Inertia;
 
 // Register central routes for each configured central domain
 // This prevents tenant routes from overriding them
+// Skip domain-scoped central routes in testing (tests access routes directly without subdomain)
+if (app()->environment('testing')) {
+    return;
+}
+
 $centralDomains = config('tenancy.central_domains', ['localhost', '127.0.0.1']);
 
 foreach ($centralDomains as $domain) {

@@ -73,12 +73,18 @@ class TenantProvisioningService
     {
         $userModel = config('auth.providers.users.model');
 
+        // Find the highest-privilege access level (Super Administrador = ID 1)
+        $accessLevelId = \App\Models\AccessLevel::where('name', 'like', '%Super Admin%')
+            ->orWhere('name', 'like', '%Super Administrador%')
+            ->value('id') ?? 1;
+
         $userModel::create([
             'name' => $data['owner_name'],
             'email' => $data['owner_email'],
             'username' => Str::slug($data['owner_name'], '.'),
             'password' => bcrypt($data['admin_password'] ?? Str::random(16)),
             'role' => 'super_admin',
+            'access_level_id' => $accessLevelId,
         ]);
     }
 

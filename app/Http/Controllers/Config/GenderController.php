@@ -19,7 +19,7 @@ class GenderController extends ConfigController
 
     protected function viewDescription(): string
     {
-        return 'Gerencie os generos disponiveis para cadastro de funcionarios';
+        return 'Gerencie os gêneros disponíveis para cadastro de funcionários';
     }
 
     protected function routeName(): string
@@ -80,7 +80,7 @@ class GenderController extends ConfigController
     {
         $count = $model->employees()->count();
         if ($count > 0) {
-            return "Este genero esta sendo usado por {$count} funcionario(s) e nao pode ser excluido.";
+            return "Este gênero está sendo usado por {$count} funcionário(s) e não pode ser excluído.";
         }
         return true;
     }

@@ -32,6 +32,11 @@ class AppServiceProvider extends ServiceProvider
 
         Vite::prefetch(concurrency: 3);
 
+        // In testing, register tenant migrations so RefreshDatabase runs them
+        if (app()->environment('testing')) {
+            $this->loadMigrationsFrom(database_path('migrations/tenant'));
+        }
+
         // Configure where authenticated users are redirected when hitting 'guest' middleware.
         RedirectIfAuthenticated::redirectUsing(function ($request) {
             if (Auth::guard('central')->check()) {

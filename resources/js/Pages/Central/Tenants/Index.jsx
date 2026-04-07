@@ -66,11 +66,11 @@ export default function Index({ tenants, plans, filters }) {
                     <thead className="bg-gray-50">
                         <tr>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Empresa</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dominio</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Domínio</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Plano</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Criado em</th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acoes</th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -232,12 +232,12 @@ function CreateTenantModal({ plans, onClose }) {
                                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Nome do Responsavel *</label>
+                            <label className="block text-sm font-medium text-gray-700">Nome do Responsável *</label>
                             <input type="text" value={data.owner_name} onChange={(e) => setData('owner_name', e.target.value)}
                                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" required />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">E-mail do Responsavel *</label>
+                            <label className="block text-sm font-medium text-gray-700">E-mail do Responsável *</label>
                             <input type="email" value={data.owner_email} onChange={(e) => setData('owner_email', e.target.value)}
                                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" required />
                         </div>

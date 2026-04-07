@@ -77,13 +77,13 @@ class ManagerController extends ConfigController
 
     protected function canDelete($model): bool|string
     {
-        // Verificar se o gestor esta vinculado a algum setor
+        // Verificar se o gestor está vinculado a algum setor
         $areaCount = Sector::where('area_manager_id', $model->id)->count();
         $sectorCount = Sector::where('sector_manager_id', $model->id)->count();
         $total = $areaCount + $sectorCount;
 
         if ($total > 0) {
-            return "Este gestor esta vinculado a {$total} setor(es) e nao pode ser excluido.";
+            return "Este gestor está vinculado a {$total} setor(es) e não pode ser excluído.";
         }
         return true;
     }

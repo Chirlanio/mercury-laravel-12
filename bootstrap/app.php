@@ -27,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant.active' => \App\Http\Middleware\CheckTenantActive::class,
             'tenant.module' => \App\Http\Middleware\CheckTenantModule::class,
             'plan.limit' => \App\Http\Middleware\CheckPlanLimit::class,
+            'terms.accepted' => \App\Http\Middleware\EnsureTermsAccepted::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

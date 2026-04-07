@@ -75,7 +75,7 @@ export default function Dashboard({ stats, recentTenants, planDistribution }) {
                 {/* Plan Distribution */}
                 <div className="bg-white shadow rounded-lg">
                     <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-                        <h3 className="text-base font-semibold text-gray-900">Distribuicao por Plano</h3>
+                        <h3 className="text-base font-semibold text-gray-900">Distribuição por Plano</h3>
                     </div>
                     <div className="p-6">
                         {planDistribution?.length === 0 ? (
@@ -107,7 +107,7 @@ export default function Dashboard({ stats, recentTenants, planDistribution }) {
             {/* Revenue */}
             {stats.monthly_revenue > 0 && (
                 <div className="mt-6 bg-white shadow rounded-lg p-6">
-                    <h3 className="text-base font-semibold text-gray-900 mb-2">Receita do Mes</h3>
+                    <h3 className="text-base font-semibold text-gray-900 mb-2">Receita do Mês</h3>
                     <p className="text-3xl font-bold text-green-600">
                         R$ {Number(stats.monthly_revenue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>

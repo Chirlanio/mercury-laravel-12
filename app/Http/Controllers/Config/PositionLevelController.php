@@ -53,7 +53,7 @@ class PositionLevelController extends ConfigController
     {
         $count = $model->employees()->count();
         if ($count > 0) {
-            return "Este nivel de cargo esta sendo usado por {$count} funcionario(s) e nao pode ser excluido.";
+            return "Este nível de cargo está sendo usado por {$count} funcionário(s) e não pode ser excluído.";
         }
         return true;
     }

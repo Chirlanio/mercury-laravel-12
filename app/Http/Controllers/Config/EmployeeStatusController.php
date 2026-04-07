@@ -20,7 +20,7 @@ class EmployeeStatusController extends ConfigController
 
     protected function viewDescription(): string
     {
-        return 'Gerencie os status disponiveis para funcionarios (Ativo, Inativo, Ferias, etc.)';
+        return 'Gerencie os status disponíveis para funcionários (Ativo, Inativo, Férias, etc.)';
     }
 
     protected function routeName(): string
@@ -98,7 +98,7 @@ class EmployeeStatusController extends ConfigController
     {
         $count = $model->employees()->count();
         if ($count > 0) {
-            return "Este status esta sendo usado por {$count} funcionario(s) e nao pode ser excluido.";
+            return "Este status está sendo usado por {$count} funcionário(s) e não pode ser excluído.";
         }
         return true;
     }

@@ -19,7 +19,7 @@ class EducationLevelController extends ConfigController
 
     protected function viewDescription(): string
     {
-        return 'Gerencie os niveis de escolaridade disponiveis para cadastro';
+        return 'Gerencie os níveis de escolaridade disponíveis para cadastro';
     }
 
     protected function routeName(): string
@@ -80,7 +80,7 @@ class EducationLevelController extends ConfigController
     {
         $count = $model->employees()->count();
         if ($count > 0) {
-            return "Este nivel de escolaridade esta sendo usado por {$count} funcionario(s) e nao pode ser excluido.";
+            return "Este nível de escolaridade está sendo usado por {$count} funcionário(s) e não pode ser excluído.";
         }
         return true;
     }

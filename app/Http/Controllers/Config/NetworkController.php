@@ -93,7 +93,7 @@ class NetworkController extends ConfigController
     {
         $count = $model->users()->count();
         if ($count > 0) {
-            return "Esta rede esta sendo usada por {$count} usuario(s) e nao pode ser excluida.";
+            return "Esta rede está sendo usada por {$count} usuário(s) e não pode ser excluída.";
         }
         return true;
     }

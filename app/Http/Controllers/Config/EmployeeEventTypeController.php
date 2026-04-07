@@ -19,7 +19,7 @@ class EmployeeEventTypeController extends ConfigController
 
     protected function viewDescription(): string
     {
-        return 'Gerencie os tipos de eventos que podem ser registrados para funcionarios';
+        return 'Gerencie os tipos de eventos que podem ser registrados para funcionários';
     }
 
     protected function routeName(): string
@@ -85,7 +85,7 @@ class EmployeeEventTypeController extends ConfigController
     {
         $count = $model->events()->count();
         if ($count > 0) {
-            return "Este tipo de evento esta sendo usado por {$count} evento(s) e nao pode ser excluido.";
+            return "Este tipo de evento está sendo usado por {$count} evento(s) e não pode ser excluído.";
         }
         return true;
     }
