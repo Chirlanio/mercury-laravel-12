@@ -412,12 +412,8 @@ use Inertia\Inertia;
             ->middleware('permission:' . Permission::EDIT_SALES->value)->name('sales.update');
         Route::delete('/sales/{sale}', [SaleController::class, 'destroy'])
             ->middleware('permission:' . Permission::DELETE_SALES->value)->name('sales.destroy');
-        Route::post('/sales/sync/auto', [SaleController::class, 'syncAuto'])
-            ->middleware('permission:' . Permission::CREATE_SALES->value)->name('sales.sync.auto');
-        Route::post('/sales/sync/month', [SaleController::class, 'syncByMonth'])
-            ->middleware('permission:' . Permission::CREATE_SALES->value)->name('sales.sync.month');
-        Route::post('/sales/sync/range', [SaleController::class, 'syncByDateRange'])
-            ->middleware('permission:' . Permission::CREATE_SALES->value)->name('sales.sync.range');
+        Route::post('/sales/refresh-from-movements', [SaleController::class, 'refreshFromMovements'])
+            ->middleware('permission:' . Permission::CREATE_SALES->value)->name('sales.refresh-from-movements');
         Route::post('/sales/bulk-delete/preview', [SaleController::class, 'bulkDeletePreview'])
             ->middleware('permission:' . Permission::DELETE_SALES->value)->name('sales.bulk-delete.preview');
         Route::post('/sales/bulk-delete', [SaleController::class, 'bulkDelete'])
@@ -429,6 +425,7 @@ use Inertia\Inertia;
     // ==========================================
     Route::middleware(['auth', 'permission:' . Permission::VIEW_MOVEMENTS->value])->group(function () {
         Route::get('/movements/statistics', [MovementController::class, 'statistics'])->name('movements.statistics');
+        Route::get('/movements/sync-logs', [MovementController::class, 'syncLogs'])->name('movements.sync-logs');
         Route::get('/movements', [MovementController::class, 'index'])->name('movements.index');
 
         Route::middleware('permission:' . Permission::SYNC_MOVEMENTS->value)->group(function () {

@@ -265,6 +265,62 @@ class MovementController extends Controller
         ];
     }
 
+    public function syncLogs()
+    {
+        $logs = MovementSyncLog::with('startedBy')
+            ->orderByDesc('started_at')
+            ->limit(50)
+            ->get()
+            ->map(fn ($log) => [
+                'id' => $log->id,
+                'sync_type' => $log->sync_type,
+                'status' => $log->status,
+                'total_records' => $log->total_records ?? 0,
+                'processed_records' => $log->processed_records ?? 0,
+                'inserted_records' => $log->inserted_records ?? 0,
+                'deleted_records' => $log->deleted_records ?? 0,
+                'skipped_records' => $log->skipped_records ?? 0,
+                'error_count' => $log->error_count ?? 0,
+                'error_message' => $log->error_details['message'] ?? null,
+                'date_range_start' => $log->date_range_start?->format('d/m/Y'),
+                'date_range_end' => $log->date_range_end?->format('d/m/Y'),
+                'started_at' => $log->started_at?->format('d/m/Y H:i:s'),
+                'completed_at' => $log->completed_at?->format('d/m/Y H:i:s'),
+                'elapsed_seconds' => $log->started_at && $log->completed_at
+                    ? $log->started_at->diffInSeconds($log->completed_at)
+                    : null,
+                'started_by' => $log->startedBy?->name ?? 'Sistema',
+            ]);
+
+        // Summary info
+        $lastCompleted = MovementSyncLog::where('status', 'completed')
+            ->orderByDesc('completed_at')
+            ->first();
+
+        $lastMovementDate = \App\Models\Movement::max('movement_date');
+        $totalMovements = \App\Models\Movement::count();
+        $totalSyncs = MovementSyncLog::count();
+        $failedSyncs = MovementSyncLog::where('status', 'failed')->count();
+
+        return response()->json([
+            'logs' => $logs,
+            'summary' => [
+                'last_sync_at' => $lastCompleted?->completed_at?->format('d/m/Y H:i:s'),
+                'last_sync_type' => $lastCompleted?->sync_type,
+                'last_sync_records' => $lastCompleted?->inserted_records ?? 0,
+                'last_sync_elapsed' => $lastCompleted?->started_at && $lastCompleted?->completed_at
+                    ? $lastCompleted->started_at->diffInSeconds($lastCompleted->completed_at)
+                    : null,
+                'last_movement_date' => $lastMovementDate
+                    ? Carbon::parse($lastMovementDate)->format('d/m/Y')
+                    : null,
+                'total_movements' => $totalMovements,
+                'total_syncs' => $totalSyncs,
+                'failed_syncs' => $failedSyncs,
+            ],
+        ]);
+    }
+
     public function refreshSalesOnly(Request $request)
     {
         $request->validate([

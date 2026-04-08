@@ -5,18 +5,17 @@ import Button from "@/Components/Button";
 import SaleStatisticsCards from "@/Components/SaleStatisticsCards";
 import SaleCreateModal from "@/Components/SaleCreateModal";
 import SaleEditModal from "@/Components/SaleEditModal";
-import SaleSyncModal from "@/Components/SaleSyncModal";
 import SaleBulkDeleteModal from "@/Components/SaleBulkDeleteModal";
 import SalesHierarchyTable from "@/Components/SalesHierarchyTable";
 import EmployeeDailySalesModal from "@/Components/EmployeeDailySalesModal";
 import { formatDate } from '@/Utils/dateHelpers';
 
-export default function Index({ auth, salesByStore, grandTotals, stores, filters, cigamAvailable, cigamUnavailableReason }) {
+export default function Index({ auth, salesByStore, grandTotals, stores, filters, lastMovementDate, lastSalesRefresh }) {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
     const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [selectedSale, setSelectedSale] = useState(null);
     const [saleToDelete, setSaleToDelete] = useState(null);
     const [deleteError, setDeleteError] = useState(null);
@@ -106,6 +105,17 @@ export default function Index({ auth, salesByStore, grandTotals, stores, filters
         });
     };
 
+    const handleRefreshFromMovements = () => {
+        setIsRefreshing(true);
+        router.post('/sales/refresh-from-movements', {
+            month: currentMonth,
+            year: currentYear,
+        }, {
+            preserveScroll: true,
+            onFinish: () => setIsRefreshing(false),
+        });
+    };
+
     const clearFilters = () => {
         router.get('/sales', {}, {
             preserveState: true,
@@ -128,19 +138,25 @@ export default function Index({ auth, salesByStore, grandTotals, stores, filters
                                 </h1>
                                 <p className="mt-1 text-sm text-gray-600">
                                     Gerencie registros de vendas por loja e funcionário
+                                    {lastMovementDate && (
+                                        <span className="ml-2 text-xs text-gray-400">
+                                            (Movimentações até {lastMovementDate})
+                                        </span>
+                                    )}
                                 </p>
                             </div>
                             <div className="flex gap-2">
                                 <Button
                                     variant="info"
-                                    onClick={() => setIsSyncModalOpen(true)}
+                                    onClick={handleRefreshFromMovements}
+                                    disabled={isRefreshing}
                                     icon={({ className }) => (
-                                        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className={`${className} ${isRefreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                         </svg>
                                     )}
                                 >
-                                    Sincronizar
+                                    {isRefreshing ? 'Atualizando...' : 'Atualizar Vendas'}
                                 </Button>
                                 <Button
                                     variant="danger"
@@ -272,15 +288,6 @@ export default function Index({ auth, salesByStore, grandTotals, stores, filters
                 onSuccess={handleUpdated}
                 sale={selectedSale}
                 stores={stores}
-            />
-
-            {/* Modal de Sincronização */}
-            <SaleSyncModal
-                isOpen={isSyncModalOpen}
-                onClose={() => setIsSyncModalOpen(false)}
-                stores={stores}
-                cigamAvailable={cigamAvailable}
-                cigamUnavailableReason={cigamUnavailableReason}
             />
 
             {/* Modal de Exclusão em Lote */}

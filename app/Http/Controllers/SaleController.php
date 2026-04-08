@@ -5,7 +5,8 @@ namespace App\Http\Controllers;
 use App\Enums\Role;
 use App\Models\Sale;
 use App\Models\Store;
-use App\Services\CigamSyncService;
+use App\Models\Movement;
+use App\Services\MovementSyncService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -81,9 +82,9 @@ class SaleController extends Controller
             ->get()
             ->map(fn ($s) => ['id' => $s->id, 'name' => $s->display_name]);
 
-        $cigamService = new CigamSyncService();
-        $cigamAvailable = $cigamService->isAvailable();
-        $cigamUnavailableReason = $cigamService->getUnavailableReason();
+        // Check if movements data exists (source of truth)
+        $lastMovementDate = Movement::max('movement_date');
+        $lastSalesRefresh = Sale::fromCigam()->max('updated_at');
 
         return Inertia::render('Sales/Index', [
             'salesByStore' => $grouped,
@@ -95,8 +96,8 @@ class SaleController extends Controller
                 'year' => (int) $year,
                 'search' => $search,
             ],
-            'cigamAvailable' => $cigamAvailable,
-            'cigamUnavailableReason' => $cigamUnavailableReason,
+            'lastMovementDate' => $lastMovementDate ? Carbon::parse($lastMovementDate)->format('d/m/Y') : null,
+            'lastSalesRefresh' => $lastSalesRefresh,
         ]);
     }
 
@@ -461,115 +462,39 @@ class SaleController extends Controller
         ]);
     }
 
-    public function syncAuto()
-    {
-        $service = new CigamSyncService();
-
-        if (!$service->isAvailable()) {
-            return back()->with('error', 'Conexão CIGAM não disponível. Verifique as configurações.');
-        }
-
-        $lastDate = Sale::fromCigam()->max('date_sales');
-        $start = $lastDate ? Carbon::parse($lastDate)->addDay() : Carbon::now()->subMonth()->startOfMonth();
-        $end = Carbon::yesterday();
-
-        if ($start->gt($end)) {
-            return back()->with('info', 'Dados já estão atualizados até ontem.');
-        }
-
-        $result = $service->syncDateRange($start, $end);
-
-        return back()->with($this->buildSyncFlash($result));
-    }
-
-    public function syncByMonth(Request $request)
+    /**
+     * Refresh sales summary from movements table (source of truth).
+     * Replaces the old direct CIGAM sync — now movements are synced first,
+     * then sales are aggregated from movements.
+     */
+    public function refreshFromMovements(Request $request)
     {
         $request->validate([
             'month' => 'required|integer|between:1,12',
             'year' => 'required|integer|between:2020,2099',
-            'store_id' => 'nullable|exists:stores,id',
         ]);
 
-        $service = new CigamSyncService();
-
-        if (!$service->isAvailable()) {
-            return back()->with('error', 'Conexão CIGAM não disponível.');
-        }
+        set_time_limit(0);
 
         $start = Carbon::create($request->year, $request->month, 1)->startOfMonth();
         $end = (clone $start)->endOfMonth();
 
-        if ($end->isFuture()) {
-            $end = Carbon::yesterday();
+        // Check if movements exist for this period
+        $movementCount = Movement::forDateRange($start->toDateString(), $end->toDateString())->count();
+
+        if ($movementCount === 0) {
+            return back()->with('warning', 'Nenhuma movimentação encontrada para este período. Sincronize as movimentações primeiro.');
         }
 
-        $result = $service->syncDateRange($start, $end, $request->store_id);
+        $service = app(MovementSyncService::class);
+        $result = $service->refreshSalesSummary($start, $end);
 
-        return back()->with($this->buildSyncFlash($result));
-    }
-
-    public function syncByDateRange(Request $request)
-    {
-        $request->validate([
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
-            'store_id' => 'nullable|exists:stores,id',
-        ]);
-
-        $service = new CigamSyncService();
-
-        if (!$service->isAvailable()) {
-            return back()->with('error', 'Conexão CIGAM não disponível.');
+        $msg = "Vendas atualizadas: {$result['inserted']} inseridas, {$result['updated']} atualizadas.";
+        if ($result['skipped'] > 0) {
+            $msg .= " {$result['skipped']} ignoradas (lojas não cadastradas).";
         }
 
-        $result = $service->syncDateRange(
-            Carbon::parse($request->start_date),
-            Carbon::parse($request->end_date),
-            $request->store_id
-        );
-
-        return back()->with($this->buildSyncFlash($result));
-    }
-
-    protected function buildSyncFlash(array $result): array
-    {
-        $msg = "Sincronização concluída: {$result['inserted']} inseridos, {$result['updated']} atualizados.";
-
-        $hasSkipped = ($result['skipped_cpfs'] ?? 0) > 0 || ($result['skipped_stores'] ?? 0) > 0;
-        $hasErrors = ($result['errors'] ?? 0) > 0;
-
-        if ($hasSkipped) {
-            $skippedDetails = [];
-            if ($result['skipped_cpfs'] > 0) {
-                $cpfCount = count($result['unmapped_cpfs'] ?? []);
-                $skippedDetails[] = "{$result['skipped_cpfs']} registros de {$cpfCount} funcionários não cadastrados";
-            }
-            if ($result['skipped_stores'] > 0) {
-                $storeCount = count($result['unmapped_stores'] ?? []);
-                $skippedDetails[] = "{$result['skipped_stores']} registros de {$storeCount} lojas não cadastradas";
-            }
-            $msg .= ' Ignorados: ' . implode('; ', $skippedDetails) . '.';
-        }
-
-        if ($hasErrors) {
-            $msg .= " {$result['errors']} erros de processamento.";
-        }
-
-        $totalCigam = $result['total_cigam_records'] ?? 0;
-        if ($totalCigam > 0) {
-            $msg .= " (Total CIGAM: {$totalCigam} registros)";
-        }
-
-        // Use 'success' if any records were synced, 'info' if only skipped, 'error' if all failed
-        if ($result['inserted'] > 0 || $result['updated'] > 0) {
-            $type = ($hasSkipped || $hasErrors) ? 'warning' : 'success';
-        } elseif ($hasSkipped && !$hasErrors) {
-            $type = 'info';
-        } else {
-            $type = 'error';
-        }
-
-        return [$type => $msg];
+        return back()->with('success', $msg);
     }
 
     public function bulkDeletePreview(Request $request)

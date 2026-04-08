@@ -4,10 +4,10 @@ import Modal from '@/Components/Modal';
 import Button from '@/Components/Button';
 
 const TABS = [
-    { key: 'auto', label: 'Automatico' },
+    { key: 'auto', label: 'Automático' },
     { key: 'today', label: 'Hoje' },
-    { key: 'month', label: 'Por Mes' },
-    { key: 'range', label: 'Por Periodo' },
+    { key: 'month', label: 'Por Mês' },
+    { key: 'range', label: 'Por Período' },
     { key: 'types', label: 'Tipos' },
 ];
 
@@ -25,7 +25,7 @@ export default function SyncModal({ isOpen, onClose, cigamAvailable, cigamUnavai
 
     const months = [
         { value: 1, label: 'Janeiro' }, { value: 2, label: 'Fevereiro' },
-        { value: 3, label: 'Marco' }, { value: 4, label: 'Abril' },
+        { value: 3, label: 'Março' }, { value: 4, label: 'Abril' },
         { value: 5, label: 'Maio' }, { value: 6, label: 'Junho' },
         { value: 7, label: 'Julho' }, { value: 8, label: 'Agosto' },
         { value: 9, label: 'Setembro' }, { value: 10, label: 'Outubro' },
@@ -69,7 +69,7 @@ export default function SyncModal({ isOpen, onClose, cigamAvailable, cigamUnavai
             setSyncState('error');
             const msg = err.response?.data?.error_details?.message
                 || err.response?.data?.message
-                || 'Erro ao executar sincronizacao.';
+                || 'Erro ao executar sincronização.';
             setResult({ status: 'failed', error_details: { message: msg } });
         }
     };
@@ -105,11 +105,11 @@ export default function SyncModal({ isOpen, onClose, cigamAvailable, cigamUnavai
     return (
         <Modal show={isOpen} onClose={handleClose} maxWidth="lg">
             <div className="p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Sincronizar Movimentacoes</h2>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Sincronizar Movimentações</h2>
 
                 {!cigamAvailable && syncState === 'idle' && (
                     <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                        <p className="text-sm text-red-700">{cigamUnavailableReason || 'CIGAM indisponivel'}</p>
+                        <p className="text-sm text-red-700">{cigamUnavailableReason || 'CIGAM indisponível'}</p>
                     </div>
                 )}
 
@@ -137,7 +137,7 @@ export default function SyncModal({ isOpen, onClose, cigamAvailable, cigamUnavai
                                     syncState === 'done' ? 'text-emerald-600' : 'text-red-600'
                                 }`}>
                                     {isSyncing ? 'Sincronizando...' :
-                                     syncState === 'done' ? 'Concluido' : 'Falha'}
+                                     syncState === 'done' ? 'Concluído' : 'Falha'}
                                 </span>
                             </div>
                             <span className="text-xs text-gray-500">
@@ -168,7 +168,7 @@ export default function SyncModal({ isOpen, onClose, cigamAvailable, cigamUnavai
                         {/* Date Range */}
                         {result?.date_range_start && (
                             <p className="text-xs text-gray-500">
-                                Periodo: {result.date_range_start} a {result.date_range_end}
+                                Período: {result.date_range_start} a {result.date_range_end}
                             </p>
                         )}
 
@@ -206,7 +206,7 @@ export default function SyncModal({ isOpen, onClose, cigamAvailable, cigamUnavai
                         <div className="flex justify-end gap-2 pt-2">
                             {isFinished && (
                                 <Button variant="primary" size="sm" onClick={handleNewSync}>
-                                    Nova Sincronizacao
+                                    Nova Sincronização
                                 </Button>
                             )}
                             <Button
@@ -244,7 +244,7 @@ export default function SyncModal({ isOpen, onClose, cigamAvailable, cigamUnavai
                             {activeTab === 'auto' && (
                                 <div>
                                     <p className="text-sm text-gray-600 mb-4">
-                                        Sincroniza automaticamente desde a ultima data registrada ate ontem. Registros existentes sao substituidos.
+                                        Sincroniza automaticamente desde a última data registrada até ontem. Registros existentes são substituídos.
                                     </p>
                                     <Button variant="primary" onClick={() => handleSync('/movements/sync/auto')} disabled={!cigamAvailable}>
                                         Sincronizar
@@ -255,7 +255,7 @@ export default function SyncModal({ isOpen, onClose, cigamAvailable, cigamUnavai
                             {activeTab === 'today' && (
                                 <div>
                                     <p className="text-sm text-gray-600 mb-4">
-                                        Busca apenas novos registros de hoje (incremental). Nao remove dados existentes.
+                                        Busca apenas novos registros de hoje (incremental). Não remove dados existentes.
                                     </p>
                                     <Button variant="primary" onClick={() => handleSync('/movements/sync/today')} disabled={!cigamAvailable}>
                                         Sincronizar Hoje
@@ -266,7 +266,7 @@ export default function SyncModal({ isOpen, onClose, cigamAvailable, cigamUnavai
                             {activeTab === 'month' && (
                                 <div>
                                     <p className="text-sm text-gray-600 mb-4">
-                                        Re-sincroniza todos os registros do mes selecionado.
+                                        Re-sincroniza todos os registros do mês selecionado.
                                     </p>
                                     <div className="flex gap-3 mb-4">
                                         <select value={month} onChange={(e) => setMonth(parseInt(e.target.value))}
@@ -279,7 +279,7 @@ export default function SyncModal({ isOpen, onClose, cigamAvailable, cigamUnavai
                                         </select>
                                     </div>
                                     <Button variant="primary" onClick={() => handleSync('/movements/sync/month', { month, year })} disabled={!cigamAvailable}>
-                                        Sincronizar Mes
+                                        Sincronizar Mês
                                     </Button>
                                 </div>
                             )}
@@ -287,11 +287,11 @@ export default function SyncModal({ isOpen, onClose, cigamAvailable, cigamUnavai
                             {activeTab === 'range' && (
                                 <div>
                                     <p className="text-sm text-gray-600 mb-4">
-                                        Re-sincroniza um periodo especifico (maximo 180 dias).
+                                        Re-sincroniza um período específico (máximo 180 dias).
                                     </p>
                                     <div className="flex gap-3 mb-4">
                                         <div>
-                                            <label className="block text-xs text-gray-500 mb-1">Data Inicio</label>
+                                            <label className="block text-xs text-gray-500 mb-1">Data Início</label>
                                             <input type="date" value={dateStart} onChange={(e) => setDateStart(e.target.value)}
                                                 className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                                         </div>
@@ -304,7 +304,7 @@ export default function SyncModal({ isOpen, onClose, cigamAvailable, cigamUnavai
                                     <Button variant="primary"
                                         onClick={() => handleSync('/movements/sync/range', { date_start: dateStart, date_end: dateEnd })}
                                         disabled={!cigamAvailable || !dateStart || !dateEnd}>
-                                        Sincronizar Periodo
+                                        Sincronizar Período
                                     </Button>
                                 </div>
                             )}
@@ -312,7 +312,7 @@ export default function SyncModal({ isOpen, onClose, cigamAvailable, cigamUnavai
                             {activeTab === 'types' && (
                                 <div>
                                     <p className="text-sm text-gray-600 mb-4">
-                                        Atualiza a tabela de tipos de movimentacao a partir do CIGAM.
+                                        Atualiza a tabela de tipos de movimentação a partir do CIGAM.
                                     </p>
                                     <Button variant="primary" onClick={() => handleSync('/movements/sync/types')} disabled={!cigamAvailable}>
                                         Sincronizar Tipos

@@ -4,6 +4,7 @@ import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import Button from '@/Components/Button';
 import StatisticsCards from '@/Components/Movements/StatisticsCards';
 import SyncModal from '@/Components/Movements/SyncModal';
+import SyncLogsModal from '@/Components/Movements/SyncLogsModal';
 import ViewModal from '@/Components/Movements/ViewModal';
 
 export default function Index({ auth, movements, stores, movementTypes, filters, cigamAvailable, cigamUnavailableReason }) {
@@ -11,6 +12,7 @@ export default function Index({ auth, movements, stores, movementTypes, filters,
     const canSync = hasPermission(PERMISSIONS.SYNC_MOVEMENTS);
 
     const [isSyncOpen, setIsSyncOpen] = useState(false);
+    const [isSyncLogsOpen, setIsSyncLogsOpen] = useState(false);
     const [selectedMovement, setSelectedMovement] = useState(null);
 
     const [localFilters, setLocalFilters] = useState({
@@ -49,11 +51,18 @@ export default function Index({ auth, movements, stores, movementTypes, filters,
                             <h1 className="text-2xl font-bold text-gray-900">Movimentações Diárias</h1>
                             <p className="mt-1 text-sm text-gray-600">Dados granulares do CIGAM - fonte de verdade para vendas e estoque</p>
                         </div>
-                        {canSync && (
-                            <Button variant="primary" onClick={() => setIsSyncOpen(true)}>
-                                Sincronizar
-                            </Button>
-                        )}
+                        <div className="flex gap-2">
+                            {canSync && (
+                                <Button variant="outline" onClick={() => setIsSyncLogsOpen(true)}>
+                                    Histórico
+                                </Button>
+                            )}
+                            {canSync && (
+                                <Button variant="primary" onClick={() => setIsSyncOpen(true)}>
+                                    Sincronizar
+                                </Button>
+                            )}
+                        </div>
                     </div>
 
                     {/* Statistics */}
@@ -198,6 +207,11 @@ export default function Index({ auth, movements, stores, movementTypes, filters,
                 }}
                 cigamAvailable={cigamAvailable}
                 cigamUnavailableReason={cigamUnavailableReason}
+            />
+
+            <SyncLogsModal
+                isOpen={isSyncLogsOpen}
+                onClose={() => setIsSyncLogsOpen(false)}
             />
 
             <ViewModal
