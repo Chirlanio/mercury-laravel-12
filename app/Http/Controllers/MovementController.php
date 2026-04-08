@@ -1,0 +1,283 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Jobs\SyncMovementsJob;
+use App\Models\Movement;
+use App\Models\MovementSyncLog;
+use App\Models\MovementType;
+use App\Models\Store;
+use App\Services\CigamSyncService;
+use App\Services\MovementSyncService;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+
+class MovementController extends Controller
+{
+    public function index(Request $request)
+    {
+        $dateStart = $request->get('date_start', now()->toDateString());
+        $dateEnd = $request->get('date_end', now()->toDateString());
+        $storeCode = $request->get('store_code');
+        $movementCode = $request->get('movement_code');
+        $search = $request->get('search');
+
+        $query = Movement::query()
+            ->with('movementType')
+            ->forDateRange($dateStart, $dateEnd)
+            ->orderByDesc('movement_date')
+            ->orderByDesc('movement_time');
+
+        if ($storeCode) {
+            $query->forStore($storeCode);
+        }
+
+        if ($movementCode) {
+            $query->forMovementCode((int) $movementCode);
+        }
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('barcode', 'like', "%{$search}%")
+                  ->orWhere('ref_size', 'like', "%{$search}%")
+                  ->orWhere('invoice_number', 'like', "%{$search}%")
+                  ->orWhere('cpf_consultant', 'like', "%{$search}%")
+                  ->orWhere('cpf_customer', 'like', "%{$search}%");
+            });
+        }
+
+        $movements = $query->paginate(50)->through(fn ($m) => [
+            'id' => $m->id,
+            'movement_date' => $m->movement_date->format('d/m/Y'),
+            'movement_time' => $m->movement_time ? substr($m->movement_time, 0, 8) : '-',
+            'store_code' => $m->store_code,
+            'invoice_number' => $m->invoice_number,
+            'movement_code' => $m->movement_code,
+            'movement_type' => $m->movementType?->description ?? $m->movement_code,
+            'cpf_consultant' => $m->cpf_consultant,
+            'ref_size' => $m->ref_size,
+            'barcode' => $m->barcode,
+            'quantity' => (float) $m->quantity,
+            'realized_value' => (float) $m->realized_value,
+            'net_value' => (float) $m->net_value,
+            'entry_exit' => $m->entry_exit,
+            'cpf_customer' => $m->cpf_customer,
+            'sale_price' => (float) $m->sale_price,
+            'cost_price' => (float) $m->cost_price,
+            'discount_value' => (float) $m->discount_value,
+            'net_quantity' => (float) $m->net_quantity,
+            'synced_at' => $m->synced_at,
+        ]);
+
+        $stores = Store::active()->orderedByNetwork()->get()
+            ->map(fn ($s) => ['code' => $s->code, 'name' => $s->display_name]);
+
+        $movementTypes = MovementType::orderBy('code')->get()
+            ->map(fn ($t) => ['code' => $t->code, 'description' => $t->description]);
+
+        $cigamService = app(CigamSyncService::class);
+        $cigamAvailable = $cigamService->isAvailable();
+
+        return Inertia::render('Movements/Index', [
+            'movements' => $movements,
+            'stores' => $stores,
+            'movementTypes' => $movementTypes,
+            'filters' => [
+                'date_start' => $dateStart,
+                'date_end' => $dateEnd,
+                'store_code' => $storeCode,
+                'movement_code' => $movementCode,
+                'search' => $search,
+            ],
+            'cigamAvailable' => $cigamAvailable,
+            'cigamUnavailableReason' => $cigamAvailable ? null : $cigamService->getUnavailableReason(),
+        ]);
+    }
+
+    public function statistics(Request $request)
+    {
+        $refDate = $request->get('date', now()->toDateString());
+        $ref = Carbon::parse($refDate);
+        $yesterday = $ref->copy()->subDay();
+        $lastWeek = $ref->copy()->subWeek();
+
+        $todaySales = (float) Movement::forDate($ref->toDateString())->sales()->sum('realized_value');
+        $todayReturns = (float) Movement::forDate($ref->toDateString())->returns()->sum('realized_value');
+        $todayNet = $todaySales - $todayReturns;
+
+        $yesterdaySales = (float) Movement::forDate($yesterday->toDateString())->sales()->sum('realized_value');
+        $yesterdayReturns = (float) Movement::forDate($yesterday->toDateString())->returns()->sum('realized_value');
+        $yesterdayNet = $yesterdaySales - $yesterdayReturns;
+
+        $lastWeekSales = (float) Movement::forDate($lastWeek->toDateString())->sales()->sum('realized_value');
+        $lastWeekReturns = (float) Movement::forDate($lastWeek->toDateString())->returns()->sum('realized_value');
+        $lastWeekNet = $lastWeekSales - $lastWeekReturns;
+
+        $variationYesterday = $yesterdayNet > 0
+            ? round((($todayNet - $yesterdayNet) / $yesterdayNet) * 100, 1)
+            : null;
+        $variationWeek = $lastWeekNet > 0
+            ? round((($todayNet - $lastWeekNet) / $lastWeekNet) * 100, 1)
+            : null;
+
+        $itemsSold = (int) Movement::forDate($ref->toDateString())->sales()->sum('quantity');
+        $activeStores = Movement::forDate($ref->toDateString())->distinct('store_code')->count('store_code');
+        $totalMovements = Movement::forDate($ref->toDateString())->count();
+        $lastSync = Movement::max('synced_at');
+
+        return response()->json([
+            'today_net' => round($todayNet, 2),
+            'yesterday_net' => round($yesterdayNet, 2),
+            'variation_yesterday' => $variationYesterday,
+            'last_week_net' => round($lastWeekNet, 2),
+            'variation_week' => $variationWeek,
+            'items_sold' => $itemsSold,
+            'active_stores' => $activeStores,
+            'total_movements' => $totalMovements,
+            'last_sync' => $lastSync,
+        ]);
+    }
+
+    // =============================================
+    // SYNC ENDPOINTS (synchronous, no timeout)
+    // =============================================
+
+    public function syncAuto()
+    {
+        set_time_limit(0);
+
+        $log = MovementSyncLog::start('auto', auth()->id());
+        $service = app(MovementSyncService::class);
+        $service->syncAutomatic(auth()->id(), $log);
+
+        return response()->json($this->formatProgress($log->fresh()));
+    }
+
+    public function syncToday()
+    {
+        set_time_limit(0);
+
+        $log = MovementSyncLog::start('today', auth()->id());
+        $service = app(MovementSyncService::class);
+        $service->syncToday(auth()->id(), $log);
+
+        return response()->json($this->formatProgress($log->fresh()));
+    }
+
+    public function syncByMonth(Request $request)
+    {
+        $request->validate([
+            'month' => 'required|integer|min:1|max:12',
+            'year' => 'required|integer|min:2020|max:2099',
+        ]);
+
+        set_time_limit(0);
+
+        $log = MovementSyncLog::start('range', auth()->id());
+        $service = app(MovementSyncService::class);
+        $service->syncByMonth((int) $request->month, (int) $request->year, auth()->id(), $log);
+
+        return response()->json($this->formatProgress($log->fresh()));
+    }
+
+    public function syncByDateRange(Request $request)
+    {
+        $request->validate([
+            'date_start' => 'required|date',
+            'date_end' => 'required|date|after_or_equal:date_start',
+        ]);
+
+        set_time_limit(0);
+
+        $log = MovementSyncLog::start('range', auth()->id());
+        $service = app(MovementSyncService::class);
+        $service->syncByDateRange(
+            Carbon::parse($request->date_start),
+            Carbon::parse($request->date_end),
+            auth()->id(),
+            $log,
+        );
+
+        return response()->json($this->formatProgress($log->fresh()));
+    }
+
+    public function syncMovementTypes()
+    {
+        $service = app(MovementSyncService::class);
+
+        if (! $service->isAvailable()) {
+            return response()->json([
+                'status' => 'failed',
+                'error_details' => ['message' => $service->getUnavailableReason() ?? 'CIGAM indisponivel'],
+            ], 422);
+        }
+
+        $log = MovementSyncLog::start('types', auth()->id());
+
+        try {
+            $count = $service->syncMovementTypes();
+            $log->update([
+                'total_records' => $count,
+                'processed_records' => $count,
+                'inserted_records' => $count,
+            ]);
+            $log->markCompleted();
+        } catch (\Exception $e) {
+            $log->markFailed($e->getMessage());
+        }
+
+        return response()->json($this->formatProgress($log->fresh()));
+    }
+
+    // =============================================
+    // PROGRESS
+    // =============================================
+
+    public function syncProgress(MovementSyncLog $log)
+    {
+        return response()->json($this->formatProgress($log));
+    }
+
+    protected function formatProgress(MovementSyncLog $log): array
+    {
+        return [
+            'id' => $log->id,
+            'sync_type' => $log->sync_type,
+            'status' => $log->status,
+            'total_records' => $log->total_records ?? 0,
+            'processed_records' => $log->processed_records ?? 0,
+            'inserted_records' => $log->inserted_records ?? 0,
+            'deleted_records' => $log->deleted_records ?? 0,
+            'skipped_records' => $log->skipped_records ?? 0,
+            'error_count' => $log->error_count ?? 0,
+            'error_details' => $log->error_details,
+            'date_range_start' => $log->date_range_start?->format('d/m/Y'),
+            'date_range_end' => $log->date_range_end?->format('d/m/Y'),
+            'started_at' => $log->started_at?->format('d/m/Y H:i:s'),
+            'completed_at' => $log->completed_at?->format('d/m/Y H:i:s'),
+            'elapsed_seconds' => $log->started_at
+                ? $log->started_at->diffInSeconds($log->completed_at ?? now())
+                : 0,
+            'percentage' => $log->total_records > 0
+                ? min(100, round(($log->processed_records / $log->total_records) * 100))
+                : ($log->status === 'completed' ? 100 : 0),
+        ];
+    }
+
+    public function refreshSalesOnly(Request $request)
+    {
+        $request->validate([
+            'date_start' => 'required|date',
+            'date_end' => 'required|date|after_or_equal:date_start',
+        ]);
+
+        $service = app(MovementSyncService::class);
+        $result = $service->refreshSalesSummary(
+            Carbon::parse($request->date_start),
+            Carbon::parse($request->date_end)
+        );
+
+        return back()->with('success', "Vendas atualizadas: {$result['inserted']} inseridas, {$result['updated']} atualizadas.");
+    }
+}

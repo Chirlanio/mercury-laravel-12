@@ -101,6 +101,10 @@ enum Permission: string
     case EDIT_STORE_GOALS = 'store_goals.edit';
     case DELETE_STORE_GOALS = 'store_goals.delete';
 
+    // Movimentações Diárias
+    case VIEW_MOVEMENTS = 'movements.view';
+    case SYNC_MOVEMENTS = 'movements.sync';
+
     public function label(): string
     {
         return match($this) {
@@ -183,6 +187,9 @@ enum Permission: string
             self::CREATE_STORE_GOALS => 'Criar metas de loja',
             self::EDIT_STORE_GOALS => 'Editar metas de loja',
             self::DELETE_STORE_GOALS => 'Deletar metas de loja',
+
+            self::VIEW_MOVEMENTS => 'Visualizar movimentações',
+            self::SYNC_MOVEMENTS => 'Sincronizar movimentações',
         };
     }
 
@@ -268,6 +275,9 @@ enum Permission: string
             self::CREATE_STORE_GOALS => 'Permite criar metas de loja',
             self::EDIT_STORE_GOALS => 'Permite editar metas de loja',
             self::DELETE_STORE_GOALS => 'Permite excluir metas de loja',
+
+            self::VIEW_MOVEMENTS => 'Permite visualizar movimentações diárias',
+            self::SYNC_MOVEMENTS => 'Permite sincronizar movimentações do CIGAM',
         };
     }
 

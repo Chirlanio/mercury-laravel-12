@@ -123,4 +123,16 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | PHP Binary Path
+    |--------------------------------------------------------------------------
+    |
+    | Path to the PHP binary with required extensions (pdo_pgsql, pdo_sqlite).
+    | Used to spawn background processes for CIGAM sync.
+    |
+    */
+
+    'php_binary' => env('PHP_BINARY', PHP_BINARY),
+
 ];

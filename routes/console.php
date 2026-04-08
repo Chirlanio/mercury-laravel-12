@@ -8,6 +8,17 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+// Movements sync: incremental every 5 minutes, full daily at 06:00
+Schedule::command('movements:sync today')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/movements-sync.log'));
+
+Schedule::command('movements:sync auto')
+    ->dailyAt('06:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/movements-sync.log'));
+
 // Store Goals mid-month alert: runs on the 15th of each month at 9:00 AM
 Schedule::command('store-goals:midmonth-alert')
     ->monthlyOn(15, '09:00')

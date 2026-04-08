@@ -10,6 +10,8 @@ import { useState, useEffect } from "react";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+const SIDEBAR_COLLAPSED_KEY = "sidebar_collapsed";
+
 export default function AuthenticatedLayout({ children }) {
     const { props } = usePage();
     const user = props.auth.user;
@@ -19,6 +21,23 @@ export default function AuthenticatedLayout({ children }) {
     const [showingNavigationDropdown, setShowingNavigationDropdown] =
         useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+        try {
+            return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+        } catch {
+            return false;
+        }
+    });
+
+    const handleToggleCollapse = () => {
+        setSidebarCollapsed((prev) => {
+            const next = !prev;
+            try {
+                localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
+            } catch {}
+            return next;
+        });
+    };
 
     useEffect(() => {
         if (flash?.success) {
@@ -41,10 +60,16 @@ export default function AuthenticatedLayout({ children }) {
             <Sidebar
                 isOpen={sidebarOpen}
                 onClose={() => setSidebarOpen(false)}
+                collapsed={sidebarCollapsed}
+                onToggleCollapse={handleToggleCollapse}
             />
 
-            {/* Main Content */}
-            <div className="flex-1 flex flex-col lg:ml-0">
+            {/* Main Content - margem ajustada ao estado da sidebar */}
+            <div
+                className={`flex-1 flex flex-col transition-all duration-300 ${
+                    sidebarCollapsed ? "lg:ml-16" : "lg:ml-64"
+                }`}
+            >
                 <nav className="border-b border-gray-100 bg-white">
                     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                         <div className="flex h-16 justify-between">

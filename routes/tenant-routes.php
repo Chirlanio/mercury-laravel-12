@@ -54,6 +54,7 @@ use App\Http\Controllers\Config\TransferStatusController as ConfigTransferStatus
 use App\Http\Controllers\Config\OrderPaymentStatusController as ConfigOrderPaymentStatusController;
 use App\Http\Controllers\Config\ManagementReasonController as ConfigManagementReasonController;
 use App\Http\Controllers\LgpdController;
+use App\Http\Controllers\MovementController;
 use App\Enums\Permission;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -421,6 +422,24 @@ use Inertia\Inertia;
             ->middleware('permission:' . Permission::DELETE_SALES->value)->name('sales.bulk-delete.preview');
         Route::post('/sales/bulk-delete', [SaleController::class, 'bulkDelete'])
             ->middleware('permission:' . Permission::DELETE_SALES->value)->name('sales.bulk-delete');
+    });
+
+    // ==========================================
+    // Movements (Movimentações Diárias)
+    // ==========================================
+    Route::middleware(['auth', 'permission:' . Permission::VIEW_MOVEMENTS->value])->group(function () {
+        Route::get('/movements/statistics', [MovementController::class, 'statistics'])->name('movements.statistics');
+        Route::get('/movements', [MovementController::class, 'index'])->name('movements.index');
+
+        Route::middleware('permission:' . Permission::SYNC_MOVEMENTS->value)->group(function () {
+            Route::post('/movements/sync/auto', [MovementController::class, 'syncAuto'])->name('movements.sync.auto');
+            Route::post('/movements/sync/today', [MovementController::class, 'syncToday'])->name('movements.sync.today');
+            Route::post('/movements/sync/month', [MovementController::class, 'syncByMonth'])->name('movements.sync.month');
+            Route::post('/movements/sync/range', [MovementController::class, 'syncByDateRange'])->name('movements.sync.range');
+            Route::post('/movements/sync/types', [MovementController::class, 'syncMovementTypes'])->name('movements.sync.types');
+            Route::get('/movements/sync/{log}/progress', [MovementController::class, 'syncProgress'])->name('movements.sync.progress');
+            Route::post('/movements/refresh-sales', [MovementController::class, 'refreshSalesOnly'])->name('movements.refresh-sales');
+        });
     });
 
     // ==========================================

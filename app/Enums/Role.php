@@ -99,6 +99,8 @@ enum Role: string
                 Permission::CREATE_STORE_GOALS->value,
                 Permission::EDIT_STORE_GOALS->value,
                 Permission::DELETE_STORE_GOALS->value,
+                Permission::VIEW_MOVEMENTS->value,
+                Permission::SYNC_MOVEMENTS->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -162,6 +164,8 @@ enum Role: string
                 Permission::CREATE_STORE_GOALS->value,
                 Permission::EDIT_STORE_GOALS->value,
                 Permission::DELETE_STORE_GOALS->value,
+                Permission::VIEW_MOVEMENTS->value,
+                Permission::SYNC_MOVEMENTS->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -185,6 +189,7 @@ enum Role: string
                 Permission::VIEW_ABSENCES->value,
                 Permission::VIEW_OVERTIME->value,
                 Permission::VIEW_STORE_GOALS->value,
+                Permission::VIEW_MOVEMENTS->value,
             ],
             self::USER => [
                 // Apenas próprio perfil
