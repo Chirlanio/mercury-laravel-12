@@ -243,7 +243,15 @@
     <span class="toc-item level2">9.8. Cancelar Fatura</span>
     <span class="toc-item level2">9.9. Configuração do Asaas</span>
     <span class="toc-item">10. Regras de Negócio</span>
-    <span class="toc-item">11. Glossário</span>
+    <span class="toc-item">11. Decisões Técnicas e Justificativas</span>
+    <span class="toc-item level2">11.1. Gateway de Pagamento (Asaas)</span>
+    <span class="toc-item level2">11.2. Multi-Tenancy (stancl/tenancy)</span>
+    <span class="toc-item level2">11.3. Frontend (React + Inertia.js)</span>
+    <span class="toc-item level2">11.4. Permissões (DB + Enum Fallback)</span>
+    <span class="toc-item level2">11.5. Módulos em Banco de Dados</span>
+    <span class="toc-item level2">11.6. Navegação Centralizada</span>
+    <span class="toc-item level2">11.7. Roles por Tenant</span>
+    <span class="toc-item">12. Glossário</span>
 </div>
 
 {{-- =================== 1. INTRODUÇÃO =================== --}}
@@ -1291,7 +1299,181 @@
 </ul>
 
 {{-- =================== 10. GLOSSÁRIO =================== --}}
-<h1>11. Glossário</h1>
+{{-- =================== 11. DECISÕES TÉCNICAS =================== --}}
+<h1>11. Decisões Técnicas e Justificativas</h1>
+
+<p>Este capítulo documenta os motivos por trás das escolhas técnicas feitas na construção da plataforma. Serve como referência para decisões futuras e para entender o raciocínio por trás de cada componente.</p>
+
+<h2>11.1. Gateway de Pagamento — Asaas</h2>
+
+<p><strong>Escolhido:</strong> Asaas &nbsp; | &nbsp; <strong>Alternativas avaliadas:</strong> Stripe, iugu, Vindi, Efí (Gerencianet), PagSeguro</p>
+
+<table>
+    <tr>
+        <th>Critério</th>
+        <th>Asaas</th>
+        <th>Stripe</th>
+        <th>iugu</th>
+    </tr>
+    <tr>
+        <td>PIX nativo</td>
+        <td><strong>Sim</strong> — QR Code + copia e cola via API</td>
+        <td>Sim (limitado no BR)</td>
+        <td>Sim</td>
+    </tr>
+    <tr>
+        <td>Boleto</td>
+        <td><strong>Sim</strong> — geração automática</td>
+        <td>Não</td>
+        <td>Sim</td>
+    </tr>
+    <tr>
+        <td>Cartão recorrente</td>
+        <td><strong>Sim</strong> — assinaturas nativas</td>
+        <td>Sim</td>
+        <td>Sim</td>
+    </tr>
+    <tr>
+        <td>NFSe integrada</td>
+        <td><strong>Sim</strong> — emissão automática</td>
+        <td>Não</td>
+        <td>Sim</td>
+    </tr>
+    <tr>
+        <td>Webhook</td>
+        <td><strong>Sim</strong> — completo com auth token</td>
+        <td>Sim</td>
+        <td>Sim</td>
+    </tr>
+    <tr>
+        <td>Sandbox</td>
+        <td><strong>Sim</strong> — ambiente completo de testes</td>
+        <td>Sim</td>
+        <td>Sim</td>
+    </tr>
+    <tr>
+        <td>API em português</td>
+        <td><strong>Sim</strong></td>
+        <td>Não</td>
+        <td>Sim</td>
+    </tr>
+    <tr>
+        <td>Foco no mercado BR</td>
+        <td><strong>Sim</strong> — especialista em SaaS brasileiro</td>
+        <td>Internacional</td>
+        <td>Sim</td>
+    </tr>
+</table>
+
+<p><strong>Motivos da escolha:</strong></p>
+<ul>
+    <li><strong>Cobertura completa de meios de pagamento brasileiros</strong> — PIX, Boleto e Cartão em uma única integração. Não é necessário integrar múltiplos gateways.</li>
+    <li><strong>NFSe embutida</strong> — obrigação fiscal para SaaS no Brasil. O Asaas emite automaticamente, eliminando a necessidade de integrar com prefeituras individualmente.</li>
+    <li><strong>API REST simples</strong> — não requer SDK proprietário. Integração via HTTP puro com o <code>Http</code> facade do Laravel, sem dependências externas.</li>
+    <li><strong>Cobrança recorrente nativa</strong> — suporta assinaturas com ciclos mensal, trimestral, semestral e anual, eliminando a necessidade de schedulers próprios para gerar cobranças.</li>
+    <li><strong>Dunning automático</strong> — retentativas de cobrança em cartão e envio de lembretes de pagamento são gerenciados pelo próprio Asaas.</li>
+    <li><strong>Custo competitivo</strong> — taxas adequadas para o modelo SaaS B2B brasileiro.</li>
+</ul>
+
+<div class="info-box">
+    <div class="box-title">Decisão de integração direta (sem SDK)</div>
+    Optamos por usar o <code>Http</code> facade do Laravel em vez de SDKs de terceiros (<code>codephix/asaas-sdk</code>, etc.) por três motivos: (1) controle total sobre as chamadas, (2) sem dependência de manutenção de pacotes externos, (3) a API REST do Asaas é simples o suficiente para um wrapper de ~150 linhas.
+</div>
+
+<h2>11.2. Multi-Tenancy — stancl/tenancy</h2>
+
+<p><strong>Escolhido:</strong> stancl/tenancy v3 (database-per-tenant) &nbsp; | &nbsp; <strong>Alternativas:</strong> tenancy nativa com scopes, spatie/laravel-multitenancy, single-database com tenant_id</p>
+
+<p><strong>Motivos da escolha:</strong></p>
+<ul>
+    <li><strong>Isolamento total de dados</strong> — cada tenant tem seu próprio banco de dados MySQL. Impossível um tenant acessar dados de outro acidentalmente. Fundamental para compliance (LGPD) e confiança dos clientes.</li>
+    <li><strong>Simplicidade de backup/restore</strong> — backup por tenant é um simples <code>mysqldump</code>. Restaurar um tenant específico não afeta os demais.</li>
+    <li><strong>Performance</strong> — sem necessidade de filtrar por <code>tenant_id</code> em todas as queries. Cada banco é otimizado para o volume do tenant.</li>
+    <li><strong>Migração facilitada</strong> — o sistema Mercury original já operava com um banco por empresa. O modelo database-per-tenant preservou essa arquitetura.</li>
+    <li><strong>Pacote maduro</strong> — stancl/tenancy é o pacote mais popular para multi-tenancy em Laravel, com documentação extensa e comunidade ativa.</li>
+    <li><strong>Identificação por subdomínio</strong> — cada tenant acessa via <code>empresa.mercury.com.br</code>, separando naturalmente o tráfego central do de tenants.</li>
+</ul>
+
+<div class="warning-box">
+    <div class="box-title">Trade-off</div>
+    Database-per-tenant consome mais recursos (uma conexão MySQL por tenant ativo). Para centenas de tenants, é necessário monitorar o número de conexões do MySQL e considerar connection pooling.
+</div>
+
+<h2>11.3. Frontend — React + Inertia.js</h2>
+
+<p><strong>Escolhido:</strong> React 18 + Inertia.js 2 &nbsp; | &nbsp; <strong>Alternativas:</strong> Blade + Livewire, Vue.js + Inertia, API REST + SPA separada</p>
+
+<p><strong>Motivos da escolha:</strong></p>
+<ul>
+    <li><strong>Sem API separada</strong> — Inertia.js permite que controllers Laravel renderizem diretamente para componentes React, eliminando a necessidade de construir e manter uma API REST. Reduz drasticamente o código de infraestrutura.</li>
+    <li><strong>Experiência SPA</strong> — navegação sem reload de página, transições suaves, estados mantidos entre páginas. A experiência do usuário é de um aplicativo moderno.</li>
+    <li><strong>Ecossistema React</strong> — maior biblioteca de componentes, maior mercado de desenvolvedores, Heroicons, Tailwind CSS com excelente suporte.</li>
+    <li><strong>RBAC no frontend</strong> — o hook <code>usePermissions()</code> espelha a lógica de permissões do backend, permitindo esconder/mostrar elementos da UI de forma consistente.</li>
+    <li><strong>Formulários via useForm</strong> — Inertia.js gerencia estado de formulários, validação, CSRF e erros do servidor automaticamente.</li>
+</ul>
+
+<h2>11.4. Permissões — DB com Fallback para Enum</h2>
+
+<p><strong>Escolhido:</strong> CentralRoleResolver (DB + cache + fallback) &nbsp; | &nbsp; <strong>Alternativas:</strong> enums PHP puros, spatie/laravel-permission, políticas do Laravel Gate</p>
+
+<p><strong>Motivos da escolha:</strong></p>
+<ul>
+    <li><strong>Flexibilidade sem deploy</strong> — o admin SaaS pode criar roles customizadas e alterar permissões via painel, sem alterar código ou fazer deploy.</li>
+    <li><strong>Backward compatible</strong> — se as tabelas centrais estiverem vazias, o sistema usa os enums PHP como fallback. Zero risco na migração.</li>
+    <li><strong>Performance via cache</strong> — permissões são cacheadas por 5 minutos (cache store file). Sem consulta ao banco central a cada requisição.</li>
+    <li><strong>Sem dependência externa</strong> — não usamos spatie/laravel-permission porque o modelo de hierarquia (nível numérico) e a relação com multi-tenancy exigiam customização que seria difícil com o pacote genérico.</li>
+    <li><strong>Hierarquia numérica</strong> — roles têm um <code>hierarchy_level</code> que determina quem pode gerenciar quem. Mais simples e intuitivo que árvores de permissão complexas.</li>
+</ul>
+
+<h2>11.5. Módulos em Banco de Dados</h2>
+
+<p><strong>Escolhido:</strong> Tabela <code>central_modules</code> &nbsp; | &nbsp; <strong>Alternativa anterior:</strong> <code>config/modules.php</code> (arquivo estático)</p>
+
+<p><strong>Motivos da mudança:</strong></p>
+<ul>
+    <li><strong>CRUD sem deploy</strong> — novos módulos podem ser criados, editados e ativados/desativados pelo admin SaaS sem alterar código.</li>
+    <li><strong>Vinculação com planos</strong> — a tabela <code>tenant_modules</code> referencia módulos por slug. Com a tabela central, módulos novos aparecem automaticamente na tela de planos.</li>
+    <li><strong>Metadados ricos</strong> — cada módulo armazena rotas, dependências, ícone e descrição no banco, acessíveis por qualquer parte do sistema.</li>
+    <li><strong>Desativação global</strong> — um módulo desativado na central desaparece de todos os planos imediatamente, sem precisar editar cada plano individualmente.</li>
+</ul>
+
+<h2>11.6. Navegação Centralizada</h2>
+
+<p><strong>Escolhido:</strong> Tabelas centrais (<code>central_menus</code>, <code>central_pages</code>) &nbsp; | &nbsp; <strong>Alternativa anterior:</strong> Seeders estáticos por tenant</p>
+
+<p><strong>Motivos da mudança:</strong></p>
+<ul>
+    <li><strong>Estrutura da plataforma, não do tenant</strong> — menus e páginas são definidos pelo mantenedor do SaaS, não pelo admin do tenant. A navegação é parte do produto, não configuração do cliente.</li>
+    <li><strong>Consistência entre tenants</strong> — todos os novos tenants recebem a mesma estrutura de navegação, filtrada pelos módulos do plano.</li>
+    <li><strong>Atualizações centralizadas</strong> — quando um novo módulo é criado, as páginas correspondentes são adicionadas na central e novos tenants já recebem a navegação atualizada.</li>
+    <li><strong>Permissões padrão por role</strong> — a tabela <code>central_menu_page_defaults</code> define quais páginas cada role acessa por padrão, garantindo que novos tenants já têm permissões corretas.</li>
+</ul>
+
+<div class="info-box">
+    <div class="box-title">Tenants existentes</div>
+    Alterações na navegação central afetam apenas novos tenants. Tenants existentes mantêm sua estrutura atual. Isso é intencional — evita quebras em clientes que já personalizaram suas configurações.
+</div>
+
+<h2>11.7. Roles por Tenant (allowed_roles)</h2>
+
+<p><strong>Escolhido:</strong> Campo <code>settings.allowed_roles</code> no JSON do tenant &nbsp; | &nbsp; <strong>Alternativa:</strong> allowed_roles por plano</p>
+
+<p><strong>Motivos da escolha:</strong></p>
+<ul>
+    <li><strong>Granularidade por tenant</strong> — permite restringir roles individualmente. Um tenant enterprise pode ter todas as roles; um starter pode ter apenas "admin" e "user".</li>
+    <li><strong>Sem migration adicional</strong> — utiliza o campo <code>settings</code> JSON que já existia na tabela <code>tenants</code>. Zero impacto no schema.</li>
+    <li><strong>Validação em dois níveis</strong> — o backend valida a role tanto no dropdown (frontend filtra) quanto na criação do usuário (backend rejeita roles não permitidas). Mesmo que o frontend seja burlado, a API protege.</li>
+    <li><strong>Backward compatible</strong> — tenants sem <code>allowed_roles</code> definido veem todas as roles disponíveis. Nenhum tenant existente é afetado.</li>
+    <li><strong>Flexibilidade comercial</strong> — permite usar roles como alavanca de upsell. "Quer perfil Suporte? Upgrade para o plano Professional."</li>
+</ul>
+
+<div class="example">
+    <div class="example-title">Por que não por plano?</div>
+    <p>A alternativa de vincular <code>allowed_roles</code> ao plano (e não ao tenant) foi considerada. Seria mais fácil de gerenciar para muitos tenants, mas menos flexível: se dois tenants no mesmo plano precisam de roles diferentes, seria necessário criar planos duplicados. A abordagem por tenant permite exceções sem duplicação.</p>
+</div>
+
+{{-- =================== 12. GLOSSÁRIO =================== --}}
+<h1>12. Glossário</h1>
 
 <table>
     <tr><th>Termo</th><th>Definição</th></tr>
@@ -1315,7 +1497,7 @@
 </table>
 
 <div class="footer">
-    <p>Mercury SaaS — Manual de Administração v1.1 — {{ now()->format('d/m/Y') }}</p>
+    <p>Mercury SaaS — Manual de Administração v1.2 — {{ now()->format('d/m/Y') }}</p>
     <p>Documento gerado automaticamente. Grupo Meia Sola.</p>
 </div>
 
