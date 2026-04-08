@@ -18,6 +18,8 @@ class ProductSyncLog extends Model
         'skipped_records',
         'error_count',
         'error_details',
+        'date_range_start',
+        'date_range_end',
         'started_at',
         'completed_at',
         'started_by_user_id',
@@ -25,6 +27,8 @@ class ProductSyncLog extends Model
 
     protected $casts = [
         'error_details' => 'array',
+        'date_range_start' => 'date',
+        'date_range_end' => 'date',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
         'total_records' => 'integer',
@@ -56,7 +60,7 @@ class ProductSyncLog extends Model
         ]);
     }
 
-    public function markFailed(string $error = null): void
+    public function markFailed(?string $error = null): void
     {
         $errors = $this->error_details ?? [];
         if ($error) {

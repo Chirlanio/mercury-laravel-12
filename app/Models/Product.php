@@ -23,6 +23,7 @@ class Product extends Model
         'material_cigam_code',
         'article_complement_cigam_code',
         'supplier_codigo_for',
+        'image',
         'sale_price',
         'cost_price',
         'is_active',

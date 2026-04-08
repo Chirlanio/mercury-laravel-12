@@ -15,11 +15,16 @@ use App\Models\ProductSubcollection;
 use App\Models\ProductSyncLog;
 use App\Models\ProductVariant;
 use App\Models\Supplier;
+use App\Exports\RejectedPriceRowsExport;
+use App\Imports\ProductPricesImport;
 use App\Services\EanGeneratorService;
+use App\Services\ImageUploadService;
+use App\Services\LabelPrintService;
 use App\Services\ProductSyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ProductController extends Controller
 {
@@ -103,7 +108,13 @@ class ProductController extends Controller
             'variants.size', 'createdBy', 'updatedBy',
         ]);
 
-        return response()->json($product);
+        $data = $product->toArray();
+        $data['image_url'] = $product->image ? asset('storage/' . $product->image) : null;
+        $data['markup'] = ($product->cost_price && $product->cost_price > 0)
+            ? round((($product->sale_price - $product->cost_price) / $product->cost_price) * 100, 1)
+            : null;
+
+        return response()->json($data);
     }
 
     public function edit(Product $product): JsonResponse
@@ -191,6 +202,8 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'type' => 'required|string|in:full,incremental,lookups_only,prices_only,by_period',
+            'date_start' => 'required_if:type,by_period|nullable|date',
+            'date_end' => 'required_if:type,by_period|nullable|date|after_or_equal:date_start',
         ]);
 
         $syncService = app(ProductSyncService::class);
@@ -224,10 +237,14 @@ class ProductController extends Controller
             return response()->json(['log' => $log->fresh(), 'lookups' => $results]);
         }
 
-        // For other types: create log + count total, then dispatch job
-        $log = $syncService->initSync($validated['type'], $request->user()->id);
+        // Spawn background process with the PHP that has pdo_pgsql
+        $dateStart = $validated['date_start'] ?? null;
+        $dateEnd = $validated['date_end'] ?? null;
+        $type = $validated['type'];
 
-        ProductSyncJob::dispatch($log->id, $validated['type']);
+        $log = $syncService->initSync($type, $request->user()->id, $dateStart, $dateEnd);
+
+        $this->spawnSyncProcess($log->id, $type, $request->user()->id, $dateStart, $dateEnd);
 
         return response()->json(['log' => $log]);
     }
@@ -339,6 +356,178 @@ class ProductController extends Controller
             'materials' => ProductMaterial::active()->orderBy('name')->get(['cigam_code', 'name']),
             'suppliers' => Supplier::active()->orderBy('razao_social')->get(['codigo_for', 'razao_social', 'nome_fantasia']),
         ]);
+    }
+
+    // =============================================
+    // PRODUCT IMAGE
+    // =============================================
+
+    public function uploadImage(Request $request, Product $product): JsonResponse
+    {
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,jpg,png,webp|max:2048',
+        ]);
+
+        $imageService = app(ImageUploadService::class);
+
+        $path = $imageService->uploadImage(
+            $request->file('image'),
+            'products',
+            $product->image
+        );
+
+        $product->update([
+            'image' => $path,
+            'updated_by_user_id' => auth()->id(),
+        ]);
+
+        return response()->json([
+            'message' => 'Imagem atualizada.',
+            'image' => $path,
+            'image_url' => asset('storage/' . $path),
+        ]);
+    }
+
+    public function deleteImage(Product $product): JsonResponse
+    {
+        if ($product->image) {
+            $imageService = app(ImageUploadService::class);
+            $imageService->deleteFile($product->image);
+
+            $product->update([
+                'image' => null,
+                'updated_by_user_id' => auth()->id(),
+            ]);
+        }
+
+        return response()->json(['message' => 'Imagem removida.']);
+    }
+
+    /**
+     * Spawn products:sync as a background process using the PHP binary with pdo_pgsql.
+     */
+    protected function spawnSyncProcess(int $logId, string $type, int $userId, ?string $dateStart = null, ?string $dateEnd = null): void
+    {
+        $php = config('app.php_binary', 'C:\\Users\\MSDEV\\php84\\php.exe');
+        $artisan = base_path('artisan');
+        $tenantId = tenant('id');
+
+        $args = [
+            $php, $artisan, 'products:sync', $type,
+            '--tenant=' . $tenantId,
+            '--log-id=' . $logId,
+            '--user-id=' . $userId,
+        ];
+
+        if ($dateStart) {
+            $args[] = '--date-start=' . $dateStart;
+        }
+        if ($dateEnd) {
+            $args[] = '--date-end=' . $dateEnd;
+        }
+
+        $cmd = implode(' ', array_map('escapeshellarg', $args));
+
+        // Windows: start /B with empty title ("") to avoid first arg being treated as title
+        pclose(popen("start /B \"\" {$cmd}", 'r'));
+    }
+
+    // =============================================
+    // PRICE IMPORT
+    // =============================================
+
+    public function importPrices(Request $request): JsonResponse
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
+        ]);
+
+        set_time_limit(0);
+
+        $import = new ProductPricesImport($request->user()->id);
+        Excel::import($import, $request->file('file'));
+
+        $results = $import->getResults();
+
+        // If there are rejected rows, save as CSV for download
+        $rejectedUrl = null;
+        if (! empty($results['rejected_rows'])) {
+            $filename = 'precos_rejeitados_' . now()->format('Y-m-d_His') . '.xlsx';
+            Excel::store(new RejectedPriceRowsExport($results['rejected_rows']), "temp/{$filename}", 'local');
+            $rejectedUrl = "/products/import-prices/rejected/{$filename}";
+        }
+
+        return response()->json([
+            'success' => $results['success'],
+            'unchanged' => $results['unchanged'],
+            'skipped_locked' => $results['skipped_locked'],
+            'not_found' => $results['not_found'],
+            'errors' => $results['errors'],
+            'error_count' => count($results['errors']),
+            'rejected_count' => count($results['rejected_rows']),
+            'rejected_url' => $rejectedUrl,
+        ]);
+    }
+
+    public function downloadRejected(string $filename)
+    {
+        $path = storage_path("app/temp/{$filename}");
+
+        if (! file_exists($path)) {
+            abort(404, 'Arquivo não encontrado.');
+        }
+
+        return response()->download($path)->deleteFileAfterSend(true);
+    }
+
+    // =============================================
+    // LABEL PRINTING
+    // =============================================
+
+    public function printLabels(Request $request)
+    {
+        $request->validate([
+            'variant_ids' => 'required|array|min:1',
+            'variant_ids.*' => 'exists:product_variants,id',
+            'preset' => 'required|array',
+            'preset.width' => 'required|numeric|min:20|max:200',
+            'preset.height' => 'required|numeric|min:10|max:200',
+            'preset.columns' => 'required|integer|min:1|max:6',
+            'preset.gap' => 'required|numeric|min:0|max:20',
+            'preset.format' => 'required|string|in:A4,custom',
+        ]);
+
+        $service = new LabelPrintService();
+        $pdf = $service->generatePdf($request->variant_ids, $request->preset);
+
+        return $pdf->stream('etiquetas.pdf');
+    }
+
+    public function searchVariants(Request $request): JsonResponse
+    {
+        $search = $request->get('search', '');
+
+        $products = Product::with(['variants' => fn ($q) => $q->active()->with('size')])
+            ->where(function ($q) use ($search) {
+                $q->where('reference', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            })
+            ->active()
+            ->limit(20)
+            ->get()
+            ->map(fn ($p) => [
+                'id' => $p->id,
+                'reference' => $p->reference,
+                'description' => $p->description,
+                'variants' => $p->variants->map(fn ($v) => [
+                    'id' => $v->id,
+                    'size_name' => $v->size?->name ?? $v->size_cigam_code,
+                    'barcode' => $v->barcode,
+                    'aux_reference' => $v->aux_reference,
+                ]),
+            ]);
+
+        return response()->json($products);
     }
 
     private function getEditOptions(): array

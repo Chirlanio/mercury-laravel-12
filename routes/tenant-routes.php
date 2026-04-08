@@ -492,6 +492,12 @@ use Inertia\Inertia;
         Route::get('/products/sync/logs', [ProductController::class, 'syncLogs'])
             ->middleware('permission:' . Permission::SYNC_PRODUCTS->value)->name('products.sync.logs');
         Route::get('/products/filter-options', [ProductController::class, 'filterOptions'])->name('products.filter-options');
+        Route::get('/products/search-variants', [ProductController::class, 'searchVariants'])->name('products.search-variants');
+        Route::post('/products/import-prices', [ProductController::class, 'importPrices'])
+            ->middleware('permission:' . Permission::EDIT_PRODUCTS->value)->name('products.import-prices');
+        Route::get('/products/import-prices/rejected/{filename}', [ProductController::class, 'downloadRejected'])
+            ->middleware('permission:' . Permission::EDIT_PRODUCTS->value)->name('products.import-prices.rejected');
+        Route::post('/products/print-labels', [ProductController::class, 'printLabels'])->name('products.print-labels');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/products/{product}', [ProductController::class, 'show'])->name('products.show');
         Route::get('/products/{product}/edit', [ProductController::class, 'edit'])
@@ -500,6 +506,10 @@ use Inertia\Inertia;
             ->middleware('permission:' . Permission::EDIT_PRODUCTS->value)->name('products.update');
         Route::post('/products/{product}/unlock-sync', [ProductController::class, 'unlockSync'])
             ->middleware('permission:' . Permission::EDIT_PRODUCTS->value)->name('products.unlock-sync');
+        Route::post('/products/{product}/upload-image', [ProductController::class, 'uploadImage'])
+            ->middleware('permission:' . Permission::EDIT_PRODUCTS->value)->name('products.upload-image');
+        Route::delete('/products/{product}/delete-image', [ProductController::class, 'deleteImage'])
+            ->middleware('permission:' . Permission::EDIT_PRODUCTS->value)->name('products.delete-image');
         Route::put('/products/{product}/variants/{variant}', [ProductController::class, 'updateVariant'])
             ->middleware('permission:' . Permission::EDIT_PRODUCTS->value)->name('products.variants.update');
         Route::post('/products/{product}/variants', [ProductController::class, 'storeVariant'])

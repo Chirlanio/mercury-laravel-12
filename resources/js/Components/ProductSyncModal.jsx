@@ -10,6 +10,7 @@ const PHASE_LABELS = {
 const SYNC_TYPES = [
     { value: 'full', label: 'Completa', description: 'Sincroniza todo o catálogo de produtos' },
     { value: 'incremental', label: 'Incremental', description: 'Apenas novos e alterados desde a última sync' },
+    { value: 'by_period', label: 'Por Período', description: 'Sincroniza produtos criados ou alterados em um período específico' },
     { value: 'lookups_only', label: 'Apenas Tabelas Auxiliares', description: 'Sincroniza marcas, categorias, cores etc.' },
     { value: 'prices_only', label: 'Apenas Preços', description: 'Atualiza preços de venda e custo' },
 ];
@@ -17,6 +18,8 @@ const SYNC_TYPES = [
 export default function ProductSyncModal({ show, onClose, onCompleted, activeSyncLog }) {
     const [phase, setPhase] = useState('configuring');
     const [syncType, setSyncType] = useState('full');
+    const [dateStart, setDateStart] = useState('');
+    const [dateEnd, setDateEnd] = useState('');
     const [logId, setLogId] = useState(null);
     const [progress, setProgress] = useState({ total: 0, processed: 0, inserted: 0, updated: 0, skipped: 0, errors: 0 });
     const [currentPhase, setCurrentPhase] = useState(null);
@@ -128,16 +131,22 @@ export default function ProductSyncModal({ show, onClose, onCompleted, activeSyn
             setPhase('running');
             setCurrentPhase('initializing');
 
+            const body = { type: syncType };
+            if (syncType === 'by_period') {
+                body.date_start = dateStart;
+                body.date_end = dateEnd;
+            }
+
             const initData = await fetchJson('/products/sync/init', {
                 method: 'POST',
-                body: JSON.stringify({ type: syncType }),
+                body: JSON.stringify(body),
             });
 
             const log = initData.log;
             setLogId(log.id);
             setProgress(prev => ({ ...prev, total: log.total_records || 0 }));
 
-            // Job is dispatched on the server, start polling
+            // Background process started, poll for progress
             startPolling(log.id);
 
         } catch (err) {
@@ -163,6 +172,8 @@ export default function ProductSyncModal({ show, onClose, onCompleted, activeSyn
         stopPolling();
         setPhase('configuring');
         setSyncType('full');
+        setDateStart('');
+        setDateEnd('');
         setLogId(null);
         setProgress({ total: 0, processed: 0, inserted: 0, updated: 0, skipped: 0, errors: 0 });
         setCurrentPhase(null);
@@ -205,13 +216,30 @@ export default function ProductSyncModal({ show, onClose, onCompleted, activeSyn
                             ))}
                         </div>
 
+                        {/* Date range inputs for by_period */}
+                        {syncType === 'by_period' && (
+                            <div className="flex gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                <div className="flex-1">
+                                    <label className="block text-xs text-gray-500 mb-1">Data Início</label>
+                                    <input type="date" value={dateStart} onChange={(e) => setDateStart(e.target.value)}
+                                        className="w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="block text-xs text-gray-500 mb-1">Data Fim</label>
+                                    <input type="date" value={dateEnd} onChange={(e) => setDateEnd(e.target.value)}
+                                        className="w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                                </div>
+                            </div>
+                        )}
+
                         <div className="flex justify-end gap-3">
                             <button onClick={handleClose}
                                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
                                 Cancelar
                             </button>
                             <button onClick={startSync}
-                                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
+                                disabled={syncType === 'by_period' && (!dateStart || !dateEnd)}
+                                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
                                 Iniciar Sincronização
                             </button>
                         </div>

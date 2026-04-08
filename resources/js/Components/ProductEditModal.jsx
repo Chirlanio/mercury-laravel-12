@@ -174,17 +174,17 @@ export default function ProductEditModal({ show, onClose, productId, onSaved }) 
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                             <SelectField label="Marca" value={form.brand_cigam_code} onChange={v => setField('brand_cigam_code', v)}
                                 options={options.brands} />
-                            <SelectField label="Coleção" value={form.collection_cigam_code} onChange={v => setField('collection_cigam_code', v)}
+                            <SelectField label="Estação" value={form.collection_cigam_code} onChange={v => setField('collection_cigam_code', v)}
                                 options={options.collections} />
-                            <SelectField label="Subcoleção" value={form.subcollection_cigam_code} onChange={v => setField('subcollection_cigam_code', v)}
+                            <SelectField label="Coleção" value={form.subcollection_cigam_code} onChange={v => setField('subcollection_cigam_code', v)}
                                 options={options.subcollections} />
-                            <SelectField label="Categoria" value={form.category_cigam_code} onChange={v => setField('category_cigam_code', v)}
+                            <SelectField label="Tipo" value={form.category_cigam_code} onChange={v => setField('category_cigam_code', v)}
                                 options={options.categories} />
                             <SelectField label="Cor" value={form.color_cigam_code} onChange={v => setField('color_cigam_code', v)}
                                 options={options.colors} />
                             <SelectField label="Material" value={form.material_cigam_code} onChange={v => setField('material_cigam_code', v)}
                                 options={options.materials} />
-                            <SelectField label="Complemento Artigo" value={form.article_complement_cigam_code} onChange={v => setField('article_complement_cigam_code', v)}
+                            <SelectField label="Grupo" value={form.article_complement_cigam_code} onChange={v => setField('article_complement_cigam_code', v)}
                                 options={options.article_complements} />
                         </div>
                     )}

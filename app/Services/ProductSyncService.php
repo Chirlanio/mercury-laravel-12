@@ -161,7 +161,7 @@ class ProductSyncService
      * Initialize a sync: create log and count total products (lightweight).
      * Lookups should be synced separately via syncLookups().
      */
-    public function initSync(string $type, ?int $userId = null): ProductSyncLog
+    public function initSync(string $type, ?int $userId = null, ?string $dateStart = null, ?string $dateEnd = null): ProductSyncLog
     {
         set_time_limit(120);
 
@@ -169,15 +169,24 @@ class ProductSyncService
             'sync_type' => $type,
             'status' => 'pending',
             'started_by_user_id' => $userId,
+            'date_range_start' => $dateStart,
+            'date_range_end' => $dateEnd,
         ]);
 
         $log->markRunning();
 
         // Count total products to process
-        $total = DB::connection('cigam')->table('msl_produtos_')
-            ->select(DB::raw('COUNT(DISTINCT referencia) as total'))
-            ->value('total');
+        $query = DB::connection('cigam')->table('msl_produtos_')
+            ->select(DB::raw('COUNT(DISTINCT referencia) as total'));
 
+        if ($type === 'by_period' && $dateStart && $dateEnd) {
+            $query->where(function ($q) use ($dateStart, $dateEnd) {
+                $q->whereBetween('datacadastro', [$dateStart, $dateEnd])
+                  ->orWhereBetween('dataatulizado', [$dateStart, $dateEnd]);
+            });
+        }
+
+        $total = $query->value('total');
         $log->update(['total_records' => $total ?? 0]);
 
         return $log->fresh();
@@ -187,7 +196,7 @@ class ProductSyncService
      * Process a chunk of products from CIGAM using keyset pagination.
      * Uses `last_reference` cursor instead of OFFSET for O(1) performance on large tables.
      */
-    public function processChunk(int $logId, ?string $lastReference = null, int $size = 500): array
+    public function processChunk(int $logId, ?string $lastReference = null, int $size = 500, ?string $dateStart = null, ?string $dateEnd = null): array
     {
         set_time_limit(120);
 
@@ -210,6 +219,14 @@ class ProductSyncService
 
             if ($lastReference !== null) {
                 $query->where('referencia', '>', $lastReference);
+            }
+
+            // Filter by period if by_period sync
+            if ($dateStart && $dateEnd) {
+                $query->where(function ($q) use ($dateStart, $dateEnd) {
+                    $q->whereBetween('datacadastro', [$dateStart, $dateEnd])
+                      ->orWhereBetween('dataatulizado', [$dateStart, $dateEnd]);
+                });
             }
 
             $references = $query->limit($size)->pluck('referencia');
@@ -320,7 +337,7 @@ class ProductSyncService
     /**
      * Sync prices from msl_prod_valor_.
      */
-    public function syncPrices(int $logId): array
+    public function syncPrices(int $logId, ?string $dateStart = null, ?string $dateEnd = null): array
     {
         set_time_limit(300);
 
@@ -328,9 +345,20 @@ class ProductSyncService
         $updated = 0;
 
         try {
-            $prices = DB::connection('cigam')->table('msl_prod_valor_')
-                ->select('referencia', 'min_vlrvenda', 'min_vlrcusto')
-                ->get();
+            $query = DB::connection('cigam')->table('msl_prod_valor_')
+                ->select('msl_prod_valor_.referencia', 'msl_prod_valor_.min_vlrvenda', 'msl_prod_valor_.min_vlrcusto');
+
+            // Filter by period: only prices for products created/updated in the date range
+            if ($dateStart && $dateEnd) {
+                $query->join('msl_produtos_', 'msl_prod_valor_.referencia', '=', 'msl_produtos_.referencia')
+                    ->where(function ($q) use ($dateStart, $dateEnd) {
+                        $q->whereBetween('msl_produtos_.datacadastro', [$dateStart, $dateEnd])
+                          ->orWhereBetween('msl_produtos_.dataatulizado', [$dateStart, $dateEnd]);
+                    })
+                    ->distinct();
+            }
+
+            $prices = $query->get();
 
             foreach ($prices as $row) {
                 $reference = trim($row->referencia);
@@ -339,8 +367,8 @@ class ProductSyncService
                 $affected = Product::where('reference', $reference)
                     ->where('sync_locked', false)
                     ->update([
-                        'sale_price' => $row->min_vlrvenda,
-                        'cost_price' => $row->min_vlrcusto,
+                        'sale_price' => $row->min_vlrvenda ?? 0,
+                        'cost_price' => $row->min_vlrcusto ?? 0,
                     ]);
 
                 if ($affected) $updated++;

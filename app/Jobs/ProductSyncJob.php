@@ -21,6 +21,8 @@ class ProductSyncJob implements ShouldQueue
     public function __construct(
         public int $logId,
         public string $syncType,
+        public ?string $dateStart = null,
+        public ?string $dateEnd = null,
     ) {}
 
     public function handle(ProductSyncService $service): void
@@ -45,7 +47,7 @@ class ProductSyncJob implements ShouldQueue
                 while ($hasMore) {
                     if ($this->isCancelled($log)) return;
 
-                    $result = $service->processChunk($this->logId, $lastReference, 500);
+                    $result = $service->processChunk($this->logId, $lastReference, 500, $this->dateStart, $this->dateEnd);
                     $hasMore = $result['has_more'];
                     $lastReference = $result['last_reference'] ?? null;
                 }
@@ -56,7 +58,7 @@ class ProductSyncJob implements ShouldQueue
             // Phase 3: Prices
             if ($this->syncType !== 'lookups_only') {
                 $log->update(['current_phase' => 'prices']);
-                $service->syncPrices($this->logId);
+                $service->syncPrices($this->logId, $this->dateStart, $this->dateEnd);
             }
 
             // Phase 4: Finalize
