@@ -232,8 +232,18 @@
     <span class="toc-item level2">8.2. Criar Role Customizada</span>
     <span class="toc-item level2">8.3. Matriz de Permissões</span>
     <span class="toc-item level2">8.4. Gerenciar Permissões de uma Role</span>
-    <span class="toc-item">9. Regras de Negócio</span>
-    <span class="toc-item">10. Glossário</span>
+    <span class="toc-item">9. Faturamento</span>
+    <span class="toc-item level2">9.1. Indicadores (Cards)</span>
+    <span class="toc-item level2">9.2. Criar Fatura Manual</span>
+    <span class="toc-item level2">9.3. Gerar Fatura do Plano</span>
+    <span class="toc-item level2">9.4. Geração em Lote</span>
+    <span class="toc-item level2">9.5. Cobrar via Asaas</span>
+    <span class="toc-item level2">9.6. Sincronizar com Asaas</span>
+    <span class="toc-item level2">9.7. Confirmar Pagamento Manual</span>
+    <span class="toc-item level2">9.8. Cancelar Fatura</span>
+    <span class="toc-item level2">9.9. Configuração do Asaas</span>
+    <span class="toc-item">10. Regras de Negócio</span>
+    <span class="toc-item">11. Glossário</span>
 </div>
 
 {{-- =================== 1. INTRODUÇÃO =================== --}}
@@ -910,7 +920,338 @@
 </div>
 
 {{-- =================== 9. REGRAS =================== --}}
-<h1>9. Regras de Negócio</h1>
+{{-- =================== 9. FATURAMENTO =================== --}}
+<h1>9. Faturamento</h1>
+
+<p>Acessível em <code>/admin/invoices</code>. O módulo de faturamento permite criar, gerenciar e cobrar faturas dos tenants. Integra com o gateway <strong>Asaas</strong> para cobranças via PIX, Boleto e Cartão de Crédito.</p>
+
+<h2>9.1. Indicadores (Cards)</h2>
+
+<p>No topo da página, quatro cards exibem os indicadores financeiros da plataforma:</p>
+
+<table>
+    <tr>
+        <th>Card</th>
+        <th>Descrição</th>
+        <th>Cálculo</th>
+    </tr>
+    <tr>
+        <td><strong>MRR</strong></td>
+        <td>Receita Recorrente Mensal — indica quanto a plataforma gera por mês de forma previsível</td>
+        <td>Soma das faturas mensais pagas no mês + faturas anuais pagas no mês divididas por 12</td>
+    </tr>
+    <tr>
+        <td><strong>Pendentes</strong></td>
+        <td>Aguardando pagamento — total em aberto</td>
+        <td>Soma dos valores de faturas com status "pendente"</td>
+    </tr>
+    <tr>
+        <td><strong>Vencidas</strong></td>
+        <td>Pagamento em atraso</td>
+        <td>Soma das faturas com status "vencido" ou pendentes com data de vencimento ultrapassada</td>
+    </tr>
+    <tr>
+        <td><strong>Pagas este mês</strong></td>
+        <td>Recebido no período atual</td>
+        <td>Soma de todas as faturas pagas no mês corrente (independente do ciclo)</td>
+    </tr>
+</table>
+
+<div class="example">
+    <div class="example-title">Exemplo de MRR</div>
+    <p>Se no mês atual foram pagas 3 faturas mensais de R$ 500 e 1 fatura anual de R$ 6.000:</p>
+    <p><code>MRR = (3 × R$ 500) + (R$ 6.000 ÷ 12) = R$ 1.500 + R$ 500 = R$ 2.000</code></p>
+</div>
+
+<h2>9.2. Criar Fatura Manual</h2>
+
+<p>Clique em <strong>"Nova Fatura"</strong>. Útil para cobranças avulsas, ajustes ou serviços extras.</p>
+
+<table>
+    <tr>
+        <th>Campo</th>
+        <th>Obrigatório</th>
+        <th>Descrição</th>
+        <th>Exemplo</th>
+    </tr>
+    <tr>
+        <td>Tenant</td>
+        <td>Sim</td>
+        <td>Empresa que receberá a cobrança</td>
+        <td><code>Meia Sola Varejo</code></td>
+    </tr>
+    <tr>
+        <td>Ciclo</td>
+        <td>Sim</td>
+        <td>Mensal ou Anual</td>
+        <td><code>Mensal</code></td>
+    </tr>
+    <tr>
+        <td>Valor</td>
+        <td>Sim</td>
+        <td>Valor em reais. Digitação estilo calculadora (tecle os dígitos).</td>
+        <td><code>R$ 499,90</code></td>
+    </tr>
+    <tr>
+        <td>Início do Período</td>
+        <td>Sim</td>
+        <td>Data de início da cobertura da fatura</td>
+        <td><code>01/04/2026</code></td>
+    </tr>
+    <tr>
+        <td>Fim do Período</td>
+        <td>Sim</td>
+        <td>Data de fim da cobertura</td>
+        <td><code>30/04/2026</code></td>
+    </tr>
+    <tr>
+        <td>Vencimento</td>
+        <td>Sim</td>
+        <td>Data limite para pagamento</td>
+        <td><code>10/04/2026</code></td>
+    </tr>
+    <tr>
+        <td>Notas</td>
+        <td>Não</td>
+        <td>Observações internas (não visíveis ao tenant)</td>
+        <td><code>Cobrança de setup inicial</code></td>
+    </tr>
+</table>
+
+<h2>9.3. Gerar Fatura do Plano</h2>
+
+<p>Na página de detalhes do tenant (<code>/admin/tenants/{id}</code>), o sistema pode gerar uma fatura automaticamente baseada no preço do plano associado. Para gerar via endpoint dedicado, use o botão <strong>"Gerar Fatura"</strong>.</p>
+
+<p>O sistema automaticamente:</p>
+<ul>
+    <li>Lê o preço mensal ou anual do plano do tenant</li>
+    <li>Define o período como o mês ou ano corrente</li>
+    <li>Define o vencimento como 10 dias após o início do período</li>
+    <li>Verifica se já existe fatura para o mesmo período (evita duplicatas)</li>
+</ul>
+
+<div class="warning-box">
+    <div class="box-title">Requisitos</div>
+    O tenant precisa ter um plano associado com preço definido para o ciclo selecionado. Tenants sem plano ou com preço R$ 0,00 não geram faturas.
+</div>
+
+<h2>9.4. Geração em Lote</h2>
+
+<p>O botão <strong>"Gerar em Lote"</strong> cria faturas para todos os tenants ativos de uma vez. Selecione o ciclo (Mensal ou Anual) e o sistema:</p>
+
+<ul>
+    <li>Percorre todos os tenants ativos com plano</li>
+    <li>Ignora tenants que já possuem fatura para o período</li>
+    <li>Ignora tenants cujo plano não tem preço definido para o ciclo</li>
+    <li>Cria faturas pendentes para os demais</li>
+    <li>Exibe o resultado: "X faturas geradas, Y ignoradas"</li>
+</ul>
+
+<div class="example">
+    <div class="example-title">Fluxo mensal recomendado</div>
+    <ol>
+        <li>No início de cada mês, acesse <code>/admin/invoices</code></li>
+        <li>Clique em "Gerar em Lote" → Ciclo: Mensal</li>
+        <li>Para cada fatura gerada, clique no botão roxo (Asaas) para criar a cobrança</li>
+        <li>O tenant recebe o link de pagamento por e-mail automaticamente</li>
+    </ol>
+</div>
+
+<h2>9.5. Cobrar via Asaas</h2>
+
+<p>Para faturas pendentes sem cobrança no gateway, o botão roxo <strong>"Cobrar via Asaas"</strong> abre um modal com três opções:</p>
+
+<table>
+    <tr>
+        <th>Tipo</th>
+        <th>Descrição</th>
+        <th>Como o tenant paga</th>
+    </tr>
+    <tr>
+        <td><strong>PIX</strong></td>
+        <td>Gera QR Code e código "copia e cola"</td>
+        <td>Escaneia o QR Code ou cola o código no app do banco</td>
+    </tr>
+    <tr>
+        <td><strong>Boleto</strong></td>
+        <td>Gera boleto bancário</td>
+        <td>Paga no banco, lotérica ou app bancário</td>
+    </tr>
+    <tr>
+        <td><strong>Todos</strong></td>
+        <td>O tenant escolhe o método na página de pagamento</td>
+        <td>Acessa o link e escolhe PIX, Boleto ou Cartão</td>
+    </tr>
+</table>
+
+<p>Ao criar a cobrança, o sistema:</p>
+<ul>
+    <li>Cria (ou atualiza) o cliente no Asaas com os dados do tenant (nome, e-mail, CNPJ)</li>
+    <li>Gera a cobrança no gateway</li>
+    <li>Salva o link de pagamento e o ID da cobrança na fatura</li>
+    <li>O Asaas envia e-mail ao tenant com o link de pagamento</li>
+</ul>
+
+<div class="warning-box">
+    <div class="box-title">CNPJ Obrigatório</div>
+    O Asaas exige CPF ou CNPJ para criar cobranças. Certifique-se de que o tenant tem CNPJ cadastrado antes de cobrar. Edite os dados do tenant na página de detalhes.
+</div>
+
+<h2>9.6. Sincronizar com Asaas</h2>
+
+<p>O botão ciano <strong>"Sincronizar"</strong> (ícone de seta circular) aparece em faturas que possuem cobrança no Asaas. Ao clicar, o sistema consulta o status da cobrança diretamente na API do Asaas e atualiza a fatura:</p>
+
+<table>
+    <tr>
+        <th>Status no Asaas</th>
+        <th>Ação no sistema</th>
+    </tr>
+    <tr>
+        <td>RECEIVED / CONFIRMED</td>
+        <td>Fatura marcada como <strong>paga</strong> com método e data do pagamento</td>
+    </tr>
+    <tr>
+        <td>OVERDUE</td>
+        <td>Fatura marcada como <strong>vencida</strong></td>
+    </tr>
+    <tr>
+        <td>DELETED / REFUNDED</td>
+        <td>Fatura marcada como <strong>cancelada</strong></td>
+    </tr>
+    <tr>
+        <td>PENDING</td>
+        <td>Nenhuma alteração (ainda aguardando pagamento)</td>
+    </tr>
+</table>
+
+<div class="info-box">
+    <div class="box-title">Quando usar</div>
+    Em ambiente de desenvolvimento (sem webhook), use este botão para verificar se o pagamento foi confirmado. Em produção, o webhook atualiza automaticamente — mas o botão serve como fallback caso o webhook falhe.
+</div>
+
+<h2>9.7. Confirmar Pagamento Manual</h2>
+
+<p>O botão verde <strong>"Marcar como pago"</strong> permite confirmar o pagamento manualmente, sem passar pelo Asaas. Útil para pagamentos recebidos fora do gateway (transferência direta, dinheiro, etc.).</p>
+
+<table>
+    <tr>
+        <th>Campo</th>
+        <th>Obrigatório</th>
+        <th>Descrição</th>
+        <th>Exemplo</th>
+    </tr>
+    <tr>
+        <td>Método de Pagamento</td>
+        <td>Sim</td>
+        <td>Como o pagamento foi recebido</td>
+        <td><code>PIX</code>, <code>Boleto</code>, <code>Cartão</code>, <code>Transferência</code>, <code>Dinheiro</code>, <code>Outro</code></td>
+    </tr>
+    <tr>
+        <td>Data do Pagamento</td>
+        <td>Não</td>
+        <td>Data em que o pagamento foi recebido (padrão: hoje)</td>
+        <td><code>08/04/2026</code></td>
+    </tr>
+    <tr>
+        <td>ID da Transação</td>
+        <td>Não</td>
+        <td>Identificador do pagamento no banco ou comprovante</td>
+        <td><code>E12345678202604081234</code></td>
+    </tr>
+</table>
+
+<div class="warning-box">
+    <div class="box-title">Importante</div>
+    A confirmação manual <strong>não notifica o Asaas</strong>. Se a fatura tiver cobrança no gateway, o status pode ficar divergente. Use a confirmação manual apenas para pagamentos recebidos fora do Asaas.
+</div>
+
+<h2>9.8. Cancelar Fatura</h2>
+
+<p>O botão vermelho cancela a fatura. Regras:</p>
+
+<ul>
+    <li>Faturas <strong>pendentes</strong> e <strong>vencidas</strong> podem ser canceladas</li>
+    <li>Faturas <strong>pagas</strong> não podem ser canceladas (estorne pelo Asaas se necessário)</li>
+    <li>O cancelamento é definitivo</li>
+    <li>Se a fatura tem cobrança no Asaas, o cancelamento local <strong>não cancela no Asaas</strong> automaticamente</li>
+</ul>
+
+<h2>9.9. Configuração do Asaas</h2>
+
+<p>Para utilizar as funcionalidades de cobrança, configure as variáveis de ambiente no arquivo <code>.env</code>:</p>
+
+<table>
+    <tr>
+        <th>Variável</th>
+        <th>Descrição</th>
+        <th>Exemplo</th>
+    </tr>
+    <tr>
+        <td><code>ASAAS_API_KEY</code></td>
+        <td>Chave da API obtida no painel do Asaas (Integrações > API Keys)</td>
+        <td><code>$aact_YTU5YTE...</code></td>
+    </tr>
+    <tr>
+        <td><code>ASAAS_BASE_URL</code></td>
+        <td>URL base da API. Sandbox para testes, produção para ambiente real.</td>
+        <td>Sandbox: <code>https://sandbox.asaas.com/api/v3</code><br>Produção: <code>https://api.asaas.com/api/v3</code></td>
+    </tr>
+    <tr>
+        <td><code>ASAAS_WEBHOOK_TOKEN</code></td>
+        <td>Token de autenticação para o webhook. Deve ser o mesmo cadastrado no painel do Asaas.</td>
+        <td><code>meu_token_secreto_123</code></td>
+    </tr>
+</table>
+
+<p><strong>Webhook (produção):</strong> Cadastre a URL <code>https://seudominio.com.br/api/asaas/webhook</code> no painel do Asaas em Configurações > Integrações > Webhooks. O Auth Token deve ser o mesmo valor de <code>ASAAS_WEBHOOK_TOKEN</code>.</p>
+
+<div class="info-box">
+    <div class="box-title">Sem Asaas configurado</div>
+    Se <code>ASAAS_API_KEY</code> não estiver definido, os botões de cobrança Asaas não aparecem. Todo o módulo de faturamento funciona normalmente para gestão manual (criar faturas, marcar como pago, cancelar).
+</div>
+
+<h3>Botões de Ação — Referência Rápida</h3>
+
+<table>
+    <tr>
+        <th>Cor</th>
+        <th>Ação</th>
+        <th>Quando aparece</th>
+    </tr>
+    <tr>
+        <td style="background-color: #e0e7ff; color: #4338ca; padding: 4px 8px; font-weight: bold;">Indigo</td>
+        <td>Ver detalhes</td>
+        <td>Sempre</td>
+    </tr>
+    <tr>
+        <td style="background-color: #fef3c7; color: #92400e; padding: 4px 8px; font-weight: bold;">Amber</td>
+        <td>Editar fatura</td>
+        <td>Pendente ou Vencida</td>
+    </tr>
+    <tr>
+        <td style="background-color: #f3e8ff; color: #7c3aed; padding: 4px 8px; font-weight: bold;">Roxo</td>
+        <td>Cobrar via Asaas</td>
+        <td>Pendente, sem cobrança, Asaas configurado</td>
+    </tr>
+    <tr>
+        <td style="background-color: #cffafe; color: #0e7490; padding: 4px 8px; font-weight: bold;">Ciano</td>
+        <td>Sincronizar com Asaas</td>
+        <td>Pendente/Vencida, com cobrança</td>
+    </tr>
+    <tr>
+        <td style="background-color: #dcfce7; color: #166534; padding: 4px 8px; font-weight: bold;">Verde</td>
+        <td>Marcar como pago</td>
+        <td>Pendente ou Vencida</td>
+    </tr>
+    <tr>
+        <td style="background-color: #fee2e2; color: #991b1b; padding: 4px 8px; font-weight: bold;">Vermelho</td>
+        <td>Cancelar fatura</td>
+        <td>Pendente ou Vencida</td>
+    </tr>
+</table>
+
+{{-- =================== 10. REGRAS =================== --}}
+<h1>10. Regras de Negócio</h1>
 
 <h2>Provisionamento de Tenants</h2>
 <ul>
@@ -950,7 +1291,7 @@
 </ul>
 
 {{-- =================== 10. GLOSSÁRIO =================== --}}
-<h1>10. Glossário</h1>
+<h1>11. Glossário</h1>
 
 <table>
     <tr><th>Termo</th><th>Definição</th></tr>
@@ -966,10 +1307,15 @@
     <tr><td><strong>Middleware</strong></td><td>Camada de verificação que intercepta requisições para validar permissões, limites, etc.</td></tr>
     <tr><td><strong>Central</strong></td><td>Domínio principal da plataforma onde o painel de administração opera.</td></tr>
     <tr><td><strong>Subdomínio</strong></td><td>Endereço do tenant (ex: empresa.mercury.com.br).</td></tr>
+    <tr><td><strong>MRR</strong></td><td>Monthly Recurring Revenue — receita recorrente mensal. Métrica principal de saúde financeira de um SaaS.</td></tr>
+    <tr><td><strong>Gateway</strong></td><td>Plataforma de pagamento que processa cobranças (ex: Asaas, Stripe). Gera boletos, PIX e processa cartões.</td></tr>
+    <tr><td><strong>Webhook</strong></td><td>Notificação automática enviada pelo gateway quando o status de um pagamento muda (confirmado, vencido, etc.).</td></tr>
+    <tr><td><strong>Fatura</strong></td><td>Registro de cobrança associado a um tenant e período. Pode ser manual ou gerada a partir do plano.</td></tr>
+    <tr><td><strong>Asaas</strong></td><td>Gateway de pagamento brasileiro utilizado para cobranças via PIX, Boleto e Cartão de Crédito.</td></tr>
 </table>
 
 <div class="footer">
-    <p>Mercury SaaS — Manual de Administração v1.0 — {{ now()->format('d/m/Y') }}</p>
+    <p>Mercury SaaS — Manual de Administração v1.1 — {{ now()->format('d/m/Y') }}</p>
     <p>Documento gerado automaticamente. Grupo Meia Sola.</p>
 </div>
 
