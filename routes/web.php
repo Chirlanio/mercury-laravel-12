@@ -13,6 +13,8 @@
 use App\Http\Controllers\Central\Auth\LoginController;
 use App\Http\Controllers\Central\DashboardController;
 use App\Http\Controllers\Central\ModuleController;
+use App\Http\Controllers\Central\InvoiceController;
+use App\Http\Controllers\Central\ManualController;
 use App\Http\Controllers\Central\NavigationController;
 use App\Http\Controllers\Central\RolePermissionController;
 use App\Http\Controllers\Central\TenantController;
@@ -97,6 +99,18 @@ foreach ($centralDomains as $domain) {
             Route::put('/roles/{role}', [RolePermissionController::class, 'updateRole'])->name('roles.update');
             Route::delete('/roles/{role}', [RolePermissionController::class, 'destroyRole'])->name('roles.destroy');
             Route::put('/roles/{role}/permissions', [RolePermissionController::class, 'updateRolePermissions'])->name('roles.permissions.update');
+
+            // Invoices / Billing
+            Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
+            Route::post('/invoices', [InvoiceController::class, 'store'])->name('invoices.store');
+            Route::put('/invoices/{invoice}', [InvoiceController::class, 'update'])->name('invoices.update');
+            Route::post('/invoices/{invoice}/mark-paid', [InvoiceController::class, 'markAsPaid'])->name('invoices.markAsPaid');
+            Route::post('/invoices/{invoice}/mark-overdue', [InvoiceController::class, 'markAsOverdue'])->name('invoices.markAsOverdue');
+            Route::post('/invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->name('invoices.cancel');
+            Route::post('/invoices/generate-for-tenant', [InvoiceController::class, 'generateForTenant'])->name('invoices.generateForTenant');
+            Route::post('/invoices/generate-bulk', [InvoiceController::class, 'generateBulk'])->name('invoices.generateBulk');
+
+            Route::get('/manual', [ManualController::class, 'download'])->name('manual.download');
         });
     });
 }

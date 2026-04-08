@@ -14,7 +14,6 @@ class ProductCollection extends Model
         'cigam_code',
         'name',
         'is_active',
-        'merged_into',
         'group_id',
     ];
 
@@ -25,11 +24,6 @@ class ProductCollection extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
-    }
-
-    public function scopeNotMerged(Builder $query): Builder
-    {
-        return $query->whereNull('merged_into');
     }
 
     public function group(): BelongsTo

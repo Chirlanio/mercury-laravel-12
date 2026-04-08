@@ -403,38 +403,23 @@ use Inertia\Inertia;
         Route::resource('management-reasons', ConfigManagementReasonController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::resource('percentage-awards', ConfigPercentageAwardController::class)->only(['index', 'store', 'update', 'destroy']);
 
-        // Cadastro de Produtos - Tabelas auxiliares (CRUD + merge)
+        // Cadastro de Produtos - Tabelas auxiliares
         Route::resource('product-brands', ConfigProductBrandController::class)->only(['index', 'store', 'update', 'destroy']);
-        Route::post('product-brands/merge-preview', [ConfigProductBrandController::class, 'mergePreview'])->name('product-brands.merge-preview');
-        Route::post('product-brands/merge', [ConfigProductBrandController::class, 'merge'])->name('product-brands.merge');
-
+        Route::post('product-brands/assign-group', [ConfigProductBrandController::class, 'assignGroup'])->name('product-brands.assign-group');
         Route::resource('product-categories', ConfigProductCategoryController::class)->only(['index', 'store', 'update', 'destroy']);
-        Route::post('product-categories/merge-preview', [ConfigProductCategoryController::class, 'mergePreview'])->name('product-categories.merge-preview');
-        Route::post('product-categories/merge', [ConfigProductCategoryController::class, 'merge'])->name('product-categories.merge');
-
+        Route::post('product-categories/assign-group', [ConfigProductCategoryController::class, 'assignGroup'])->name('product-categories.assign-group');
         Route::resource('product-collections', ConfigProductCollectionController::class)->only(['index', 'store', 'update', 'destroy']);
-        Route::post('product-collections/merge-preview', [ConfigProductCollectionController::class, 'mergePreview'])->name('product-collections.merge-preview');
-        Route::post('product-collections/merge', [ConfigProductCollectionController::class, 'merge'])->name('product-collections.merge');
-
+        Route::post('product-collections/assign-group', [ConfigProductCollectionController::class, 'assignGroup'])->name('product-collections.assign-group');
         Route::resource('product-subcollections', ConfigProductSubcollectionController::class)->only(['index', 'store', 'update', 'destroy']);
-        Route::post('product-subcollections/merge-preview', [ConfigProductSubcollectionController::class, 'mergePreview'])->name('product-subcollections.merge-preview');
-        Route::post('product-subcollections/merge', [ConfigProductSubcollectionController::class, 'merge'])->name('product-subcollections.merge');
-
+        Route::post('product-subcollections/assign-group', [ConfigProductSubcollectionController::class, 'assignGroup'])->name('product-subcollections.assign-group');
         Route::resource('product-colors', ConfigProductColorController::class)->only(['index', 'store', 'update', 'destroy']);
-        Route::post('product-colors/merge-preview', [ConfigProductColorController::class, 'mergePreview'])->name('product-colors.merge-preview');
-        Route::post('product-colors/merge', [ConfigProductColorController::class, 'merge'])->name('product-colors.merge');
-
+        Route::post('product-colors/assign-group', [ConfigProductColorController::class, 'assignGroup'])->name('product-colors.assign-group');
         Route::resource('product-materials', ConfigProductMaterialController::class)->only(['index', 'store', 'update', 'destroy']);
-        Route::post('product-materials/merge-preview', [ConfigProductMaterialController::class, 'mergePreview'])->name('product-materials.merge-preview');
-        Route::post('product-materials/merge', [ConfigProductMaterialController::class, 'merge'])->name('product-materials.merge');
-
+        Route::post('product-materials/assign-group', [ConfigProductMaterialController::class, 'assignGroup'])->name('product-materials.assign-group');
         Route::resource('product-sizes', ConfigProductSizeController::class)->only(['index', 'store', 'update', 'destroy']);
-        Route::post('product-sizes/merge-preview', [ConfigProductSizeController::class, 'mergePreview'])->name('product-sizes.merge-preview');
-        Route::post('product-sizes/merge', [ConfigProductSizeController::class, 'merge'])->name('product-sizes.merge');
-
+        Route::post('product-sizes/assign-group', [ConfigProductSizeController::class, 'assignGroup'])->name('product-sizes.assign-group');
         Route::resource('product-article-complements', ConfigProductArticleComplementController::class)->only(['index', 'store', 'update', 'destroy']);
-        Route::post('product-article-complements/merge-preview', [ConfigProductArticleComplementController::class, 'mergePreview'])->name('product-article-complements.merge-preview');
-        Route::post('product-article-complements/merge', [ConfigProductArticleComplementController::class, 'merge'])->name('product-article-complements.merge');
+        Route::post('product-article-complements/assign-group', [ConfigProductArticleComplementController::class, 'assignGroup'])->name('product-article-complements.assign-group');
     });
 
     // ==========================================

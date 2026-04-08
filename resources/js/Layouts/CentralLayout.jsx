@@ -9,6 +9,7 @@ import {
     CubeIcon,
     Bars3BottomLeftIcon,
     ShieldCheckIcon,
+    BanknotesIcon,
     ArrowRightOnRectangleIcon,
     Bars3Icon,
     XMarkIcon,
@@ -21,6 +22,7 @@ const navigation = [
     { name: 'Módulos', href: '/admin/modules', icon: CubeIcon },
     { name: 'Navegação', href: '/admin/navigation', icon: Bars3BottomLeftIcon },
     { name: 'Roles', href: '/admin/roles', icon: ShieldCheckIcon },
+    { name: 'Faturas', href: '/admin/invoices', icon: BanknotesIcon },
 ];
 
 export default function CentralLayout({ children, title }) {

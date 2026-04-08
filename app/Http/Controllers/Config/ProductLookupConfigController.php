@@ -3,15 +3,12 @@
 namespace App\Http\Controllers\Config;
 
 use App\Http\Controllers\ConfigController;
-use App\Models\Product;
 use App\Models\ProductLookupGroup;
-use App\Models\ProductVariant;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Base controller for product lookup/auxiliary config modules.
- * Adds merge functionality to consolidate duplicate entries.
+ * Adds group management and bulk group assignment.
  */
 abstract class ProductLookupConfigController extends ConfigController
 {
@@ -26,14 +23,6 @@ abstract class ProductLookupConfigController extends ConfigController
      * e.g. 'brands', 'categories', 'colors'
      */
     abstract protected function lookupType(): string;
-
-    /**
-     * Whether this lookup is referenced by product_variants instead of products.
-     */
-    protected function isVariantLookup(): bool
-    {
-        return false;
-    }
 
     /**
      * Eager load group relationship.
@@ -55,7 +44,7 @@ abstract class ProductLookupConfigController extends ConfigController
     }
 
     /**
-     * Pass groups and merge support flag to the frontend.
+     * Pass groups to the frontend.
      */
     protected function additionalData(): array
     {
@@ -65,94 +54,32 @@ abstract class ProductLookupConfigController extends ConfigController
             ->get(['id', 'name']);
 
         return array_merge(parent::additionalData(), [
-            'supportsMerge' => true,
+            'supportsGroups' => true,
             'groups' => $groups,
         ]);
     }
 
     /**
-     * Preview merge: show how many products will be affected.
+     * Bulk assign a group to multiple records.
      */
-    public function mergePreview(Request $request)
+    public function assignGroup(Request $request)
     {
         $request->validate([
-            'target_id' => 'required|integer',
-            'source_ids' => 'required|array|min:1',
-            'source_ids.*' => 'integer',
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer',
+            'group_id' => 'nullable|integer|exists:product_lookup_groups,id',
         ]);
 
         $modelClass = $this->modelClass();
-        $target = $modelClass::findOrFail($request->target_id);
-        $sources = $modelClass::whereIn('id', $request->source_ids)
-            ->where('id', '!=', $target->id)
-            ->get();
+        $count = $modelClass::whereIn('id', $request->ids)
+            ->update(['group_id' => $request->group_id]);
 
-        if ($sources->isEmpty()) {
-            return back()->with('error', 'Nenhum registro de origem válido selecionado.');
+        if ($request->group_id) {
+            $group = ProductLookupGroup::find($request->group_id);
+
+            return back()->with('success', "{$count} registro(s) atribuído(s) ao grupo \"{$group->name}\".");
         }
 
-        $sourceCodes = $sources->pluck('cigam_code')->toArray();
-        $fk = $this->productForeignKey();
-
-        if ($this->isVariantLookup()) {
-            $affectedCount = ProductVariant::whereIn($fk, $sourceCodes)->count();
-        } else {
-            $affectedCount = Product::whereIn($fk, $sourceCodes)->count();
-        }
-
-        return response()->json([
-            'target' => $target,
-            'sources' => $sources,
-            'affected_products' => $affectedCount,
-        ]);
-    }
-
-    /**
-     * Execute merge: reassign all product references and deactivate sources.
-     */
-    public function merge(Request $request)
-    {
-        $request->validate([
-            'target_id' => 'required|integer',
-            'source_ids' => 'required|array|min:1',
-            'source_ids.*' => 'integer',
-        ]);
-
-        $modelClass = $this->modelClass();
-        $target = $modelClass::findOrFail($request->target_id);
-        $sources = $modelClass::whereIn('id', $request->source_ids)
-            ->where('id', '!=', $target->id)
-            ->get();
-
-        if ($sources->isEmpty()) {
-            return back()->with('error', 'Nenhum registro de origem válido selecionado.');
-        }
-
-        $sourceCodes = $sources->pluck('cigam_code')->toArray();
-        $fk = $this->productForeignKey();
-
-        DB::transaction(function () use ($fk, $sourceCodes, $target, $sources) {
-            // Reassign product references to target
-            if ($this->isVariantLookup()) {
-                ProductVariant::whereIn($fk, $sourceCodes)
-                    ->update([$fk => $target->cigam_code]);
-            } else {
-                Product::whereIn($fk, $sourceCodes)
-                    ->update([$fk => $target->cigam_code]);
-            }
-
-            // Mark source records as merged (not just deactivated)
-            // merged_into tells the sync service this code is an alias
-            foreach ($sources as $source) {
-                $source->update([
-                    'is_active' => false,
-                    'merged_into' => $target->cigam_code,
-                ]);
-            }
-        });
-
-        $count = $sources->count();
-
-        return back()->with('success', "{$count} registro(s) mesclado(s) com sucesso em \"{$target->name}\".");
+        return back()->with('success', "{$count} registro(s) removido(s) do grupo.");
     }
 }

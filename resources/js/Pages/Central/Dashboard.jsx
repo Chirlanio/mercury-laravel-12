@@ -6,6 +6,7 @@ import {
     UserGroupIcon,
     CurrencyDollarIcon,
     ExclamationTriangleIcon,
+    DocumentArrowDownIcon,
 } from '@heroicons/react/24/outline';
 
 const statCards = [
@@ -103,6 +104,18 @@ export default function Dashboard({ stats, recentTenants, planDistribution }) {
                         )}
                     </div>
                 </div>
+            </div>
+
+            {/* Quick Links */}
+            <div className="mt-6 bg-white shadow rounded-lg p-6">
+                <h3 className="text-base font-semibold text-gray-900 mb-3">Recursos</h3>
+                <a
+                    href="/admin/manual"
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-100 rounded-md hover:bg-indigo-200 transition-colors"
+                >
+                    <DocumentArrowDownIcon className="h-5 w-5" />
+                    Baixar Manual de Administração (PDF)
+                </a>
             </div>
 
             {/* Revenue */}

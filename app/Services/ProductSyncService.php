@@ -115,14 +115,6 @@ class ProductSyncService
                         continue;
                     }
 
-                    // Skip records that have been merged into another
-                    $existing = $config['model']::where('cigam_code', $code)->first();
-                    if ($existing && $existing->merged_into) {
-                        $count++;
-
-                        continue;
-                    }
-
                     $config['model']::updateOrCreate(
                         ['cigam_code' => $code],
                         ['name' => $name, 'is_active' => true]
@@ -279,13 +271,13 @@ class ProductSyncService
                 // Upsert product (resolve merged lookup codes to their targets)
                 $productData = [
                     'description' => strtoupper(trim($first->descricao ?? '')),
-                    'brand_cigam_code' => $this->resolveMerged(ProductBrand::class, $first->codmarca ?? null),
-                    'collection_cigam_code' => $this->resolveMerged(ProductCollection::class, $first->codcolecao ?? null),
-                    'subcollection_cigam_code' => $this->resolveMerged(ProductSubcollection::class, $first->codsubcolecao ?? null),
-                    'category_cigam_code' => $this->resolveMerged(ProductCategory::class, $first->codcategoria ?? null),
-                    'color_cigam_code' => $this->resolveMerged(ProductColor::class, $first->codcor ?? null),
-                    'material_cigam_code' => $this->resolveMerged(ProductMaterial::class, $first->codmaterial ?? null),
-                    'article_complement_cigam_code' => $this->resolveMerged(ProductArticleComplement::class, $first->codcompartigo ?? null),
+                    'brand_cigam_code' => $this->trimOrNull($first->codmarca ?? null),
+                    'collection_cigam_code' => $this->trimOrNull($first->codcolecao ?? null),
+                    'subcollection_cigam_code' => $this->trimOrNull($first->codsubcolecao ?? null),
+                    'category_cigam_code' => $this->trimOrNull($first->codcategoria ?? null),
+                    'color_cigam_code' => $this->trimOrNull($first->codcor ?? null),
+                    'material_cigam_code' => $this->trimOrNull($first->codmaterial ?? null),
+                    'article_complement_cigam_code' => $this->trimOrNull($first->codcompartigo ?? null),
                     'supplier_codigo_for' => $this->trimOrNull($first->codigo_for ?? null),
                     'synced_at' => now(),
                 ];
@@ -304,7 +296,7 @@ class ProductSyncService
 
                 // Upsert variants
                 foreach ($variants as $variant) {
-                    $sizeCode = $this->resolveMerged(ProductSize::class, $variant->codtamanho ?? null);
+                    $sizeCode = $this->trimOrNull($variant->codtamanho ?? null);
                     $barcode = $this->trimOrNull($variant->codbarra ?? null);
 
                     ProductVariant::updateOrCreate(
@@ -449,24 +441,5 @@ class ProductSyncService
         $trimmed = trim($value);
 
         return $trimmed === '' ? null : $trimmed;
-    }
-
-    /**
-     * Resolve a CIGAM code to its merge target if it has been merged.
-     * Returns the target cigam_code, or the original (trimmed) code if not merged.
-     */
-    private function resolveMerged(string $modelClass, ?string $value): ?string
-    {
-        $code = $this->trimOrNull($value);
-        if ($code === null) {
-            return null;
-        }
-
-        $record = $modelClass::where('cigam_code', $code)->first();
-        if ($record && $record->merged_into) {
-            return $record->merged_into;
-        }
-
-        return $code;
     }
 }

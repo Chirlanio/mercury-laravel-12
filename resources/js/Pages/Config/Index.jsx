@@ -2,7 +2,7 @@ import DataTable from '@/Components/DataTable';
 import Button from '@/Components/Button';
 import GenericFormModal from '@/Components/GenericFormModal';
 import ConfirmDialog from '@/Components/ConfirmDialog';
-import MergeModal from '@/Components/MergeModal';
+import GroupAssignModal from '@/Components/GroupAssignModal';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
@@ -18,13 +18,13 @@ export default function Index({
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-    const [showMergeModal, setShowMergeModal] = useState(false);
+    const [showGroupModal, setShowGroupModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
     const [selectedIds, setSelectedIds] = useState([]);
     const [deleting, setDeleting] = useState(false);
     const { hasPermission } = usePermissions();
 
-    const supportsMerge = additionalData?.supportsMerge === true;
+    const supportsGroups = additionalData?.supportsGroups === true;
 
     const canCreate = hasPermission(PERMISSIONS.MANAGE_SETTINGS);
     const canEdit = hasPermission(PERMISSIONS.MANAGE_SETTINGS);
@@ -225,17 +225,17 @@ export default function Index({
                                 </p>
                             </div>
                             <div className="flex gap-3">
-                                {supportsMerge && canEdit && selectedIds.length >= 2 && (
+                                {supportsGroups && canEdit && selectedIds.length >= 1 && (
                                     <Button
-                                        onClick={() => setShowMergeModal(true)}
+                                        onClick={() => setShowGroupModal(true)}
                                         variant="warning"
                                         icon={({ className }) => (
                                             <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                                             </svg>
                                         )}
                                     >
-                                        Mesclar ({selectedIds.length})
+                                        Atribuir Grupo ({selectedIds.length})
                                     </Button>
                                 )}
                                 {canCreate && (
@@ -327,7 +327,7 @@ export default function Index({
                         searchPlaceholder="Pesquisar..."
                         emptyMessage="Nenhum registro encontrado"
                         perPageOptions={[10, 15, 25, 50]}
-                        selectable={supportsMerge && canEdit}
+                        selectable={supportsGroups && canEdit}
                         selectedIds={selectedIds}
                         onSelectionChange={setSelectedIds}
                     />
@@ -380,17 +380,17 @@ export default function Index({
                 type="danger"
             />
 
-            {/* Modal de Mesclagem */}
-            {supportsMerge && (
-                <MergeModal
-                    show={showMergeModal}
-                    onClose={(merged) => {
-                        setShowMergeModal(false);
-                        if (merged) setSelectedIds([]);
+            {/* Modal de Atribuição de Grupo */}
+            {supportsGroups && (
+                <GroupAssignModal
+                    show={showGroupModal}
+                    onClose={(assigned) => {
+                        setShowGroupModal(false);
+                        if (assigned) setSelectedIds([]);
                     }}
-                    items={selectedIds}
+                    selectedIds={selectedIds}
                     routeName={config.routeName}
-                    allItems={items.data || []}
+                    groups={additionalData.groups || []}
                 />
             )}
         </>
