@@ -83,7 +83,10 @@ class User extends Authenticatable
 
     public function hasPermissionTo(Permission|string $permission): bool
     {
-        return $this->role->hasPermissionTo($permission);
+        $permValue = $permission instanceof Permission ? $permission->value : $permission;
+
+        return app(\App\Services\CentralRoleResolver::class)
+            ->roleHasPermission($this->role->value, $permValue);
     }
 
     public function canEditUser(User $targetUser): bool

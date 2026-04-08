@@ -25,7 +25,7 @@ class PermissionMiddleware
         // Verificar se o usuário tem pelo menos uma das permissões
         $hasPermission = false;
         foreach ($permissions as $permission) {
-            if ($user->role->hasPermissionTo($permission)) {
+            if ($user->hasPermissionTo($permission)) {
                 $hasPermission = true;
                 break;
             }

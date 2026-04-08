@@ -14,6 +14,7 @@ use App\Http\Controllers\Central\Auth\LoginController;
 use App\Http\Controllers\Central\DashboardController;
 use App\Http\Controllers\Central\ModuleController;
 use App\Http\Controllers\Central\NavigationController;
+use App\Http\Controllers\Central\RolePermissionController;
 use App\Http\Controllers\Central\TenantController;
 use App\Http\Controllers\Central\PlanController;
 use Illuminate\Support\Facades\Route;
@@ -89,6 +90,13 @@ foreach ($centralDomains as $domain) {
             Route::put('/navigation/page-groups/{pageGroup}', [NavigationController::class, 'updatePageGroup'])->name('navigation.pageGroups.update');
             Route::delete('/navigation/page-groups/{pageGroup}', [NavigationController::class, 'destroyPageGroup'])->name('navigation.pageGroups.destroy');
             Route::put('/navigation/defaults', [NavigationController::class, 'updateDefaults'])->name('navigation.defaults.update');
+
+            // Roles & Permissions management
+            Route::get('/roles', [RolePermissionController::class, 'index'])->name('roles.index');
+            Route::post('/roles', [RolePermissionController::class, 'storeRole'])->name('roles.store');
+            Route::put('/roles/{role}', [RolePermissionController::class, 'updateRole'])->name('roles.update');
+            Route::delete('/roles/{role}', [RolePermissionController::class, 'destroyRole'])->name('roles.destroy');
+            Route::put('/roles/{role}/permissions', [RolePermissionController::class, 'updateRolePermissions'])->name('roles.permissions.update');
         });
     });
 }

@@ -4,6 +4,7 @@ namespace App\Helpers;
 
 use App\Enums\Role;
 use App\Models\User;
+use App\Services\CentralRoleResolver;
 
 class PermissionHelper
 {
@@ -50,13 +51,16 @@ class PermissionHelper
 
     public static function getAccessibleRoles(User $user): array
     {
+        $resolver = app(CentralRoleResolver::class);
+        $allRoles = $resolver->getRoleOptions();
+
         if ($user->isSuperAdmin()) {
-            return Role::options();
+            return $allRoles;
         }
 
         if ($user->isAdmin()) {
-            return collect(Role::options())
-                ->except(['super_admin'])
+            return collect($allRoles)
+                ->reject(fn ($label, $name) => $name === 'super_admin')
                 ->toArray();
         }
 

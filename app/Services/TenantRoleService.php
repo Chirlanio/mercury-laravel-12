@@ -6,21 +6,27 @@ use App\Enums\Role;
 
 class TenantRoleService
 {
+    public function __construct(
+        protected CentralRoleResolver $resolver,
+    ) {}
+
     /**
      * Get the allowed role options for the current tenant.
      * Returns all roles if no tenant context or no restriction configured.
      */
     public function getAllowedRoleOptions(): array
     {
+        $allRoles = $this->resolver->getRoleOptions();
+
         $tenant = tenant();
 
         if (! $tenant) {
-            return Role::options();
+            return $allRoles;
         }
 
         $allowed = $tenant->getAllowedRoles();
 
-        return collect(Role::options())
+        return collect($allRoles)
             ->filter(fn ($label, $value) => in_array($value, $allowed))
             ->toArray();
     }
@@ -33,7 +39,7 @@ class TenantRoleService
         $tenant = tenant();
 
         if (! $tenant) {
-            return implode(',', array_column(Role::cases(), 'value'));
+            return implode(',', array_keys($this->resolver->getRoleOptions()));
         }
 
         return implode(',', $tenant->getAllowedRoles());

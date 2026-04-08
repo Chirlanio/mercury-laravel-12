@@ -8,6 +8,7 @@ import {
     CreditCardIcon,
     CubeIcon,
     Bars3BottomLeftIcon,
+    ShieldCheckIcon,
     ArrowRightOnRectangleIcon,
     Bars3Icon,
     XMarkIcon,
@@ -19,6 +20,7 @@ const navigation = [
     { name: 'Planos', href: '/admin/plans', icon: CreditCardIcon },
     { name: 'Módulos', href: '/admin/modules', icon: CubeIcon },
     { name: 'Navegação', href: '/admin/navigation', icon: Bars3BottomLeftIcon },
+    { name: 'Roles', href: '/admin/roles', icon: ShieldCheckIcon },
 ];
 
 export default function CentralLayout({ children, title }) {
