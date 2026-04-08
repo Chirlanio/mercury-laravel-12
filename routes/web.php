@@ -108,6 +108,7 @@ foreach ($centralDomains as $domain) {
             Route::post('/invoices/{invoice}/mark-overdue', [InvoiceController::class, 'markAsOverdue'])->name('invoices.markAsOverdue');
             Route::post('/invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->name('invoices.cancel');
             Route::post('/invoices/{invoice}/charge-asaas', [InvoiceController::class, 'chargeOnAsaas'])->name('invoices.chargeAsaas');
+            Route::post('/invoices/{invoice}/sync-asaas', [InvoiceController::class, 'syncFromAsaas'])->name('invoices.syncAsaas');
             Route::get('/invoices/{invoice}/pix-qrcode', [InvoiceController::class, 'getPixQrCode'])->name('invoices.pixQrCode');
             Route::post('/invoices/generate-for-tenant', [InvoiceController::class, 'generateForTenant'])->name('invoices.generateForTenant');
             Route::post('/invoices/generate-bulk', [InvoiceController::class, 'generateBulk'])->name('invoices.generateBulk');

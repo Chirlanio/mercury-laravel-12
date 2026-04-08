@@ -364,15 +364,26 @@ class InvoiceController extends Controller
     protected function ensureAsaasCustomer(Tenant $tenant): string
     {
         $settings = $tenant->settings ?? [];
+        $customerData = [
+            'name' => $tenant->name,
+            'email' => $tenant->owner_email,
+            'cpfCnpj' => preg_replace('/\D/', '', $tenant->cnpj ?? ''),
+            'externalReference' => $tenant->id,
+            'notificationDisabled' => false,
+        ];
 
-        // Already has Asaas customer ID
+        // Already has Asaas customer ID — update to sync latest data
         if (! empty($settings['asaas_customer_id'])) {
+            $this->asaas->updateCustomer($settings['asaas_customer_id'], $customerData);
+
             return $settings['asaas_customer_id'];
         }
 
         // Try to find by external reference
         $existing = $this->asaas->findCustomerByExternalReference($tenant->id);
         if ($existing) {
+            $this->asaas->updateCustomer($existing['id'], $customerData);
+
             $settings['asaas_customer_id'] = $existing['id'];
             $tenant->update(['settings' => $settings]);
 
@@ -380,18 +391,70 @@ class InvoiceController extends Controller
         }
 
         // Create new customer
-        $customer = $this->asaas->createCustomer([
-            'name' => $tenant->name,
-            'email' => $tenant->owner_email,
-            'cpfCnpj' => preg_replace('/\D/', '', $tenant->cnpj ?? ''),
-            'externalReference' => $tenant->id,
-            'notificationDisabled' => false,
-        ]);
+        $customer = $this->asaas->createCustomer($customerData);
 
         $settings['asaas_customer_id'] = $customer['id'];
         $tenant->update(['settings' => $settings]);
 
         return $customer['id'];
+    }
+
+    /**
+     * Sync invoice status from Asaas (poll instead of webhook).
+     */
+    public function syncFromAsaas(TenantInvoice $invoice)
+    {
+        if (! $this->asaas->isConfigured()) {
+            return back()->with('error', 'Asaas não está configurado.');
+        }
+
+        if (! $invoice->gateway_id || $invoice->gateway_provider !== 'asaas') {
+            return back()->with('error', 'Fatura não possui cobrança no Asaas.');
+        }
+
+        try {
+            $payment = $this->asaas->getPayment($invoice->gateway_id);
+
+            $newStatus = AsaasService::mapStatus($payment['status'] ?? '');
+            $updates = [];
+
+            if ($newStatus === 'paid' && ! $invoice->isPaid()) {
+                $paymentMethod = match ($payment['billingType'] ?? '') {
+                    'PIX' => 'pix',
+                    'BOLETO' => 'boleto',
+                    'CREDIT_CARD' => 'cartao',
+                    default => 'outro',
+                };
+
+                $invoice->markAsPaid(
+                    $paymentMethod,
+                    $payment['id'],
+                    $payment['paymentDate'] ?? $payment['confirmedDate'] ?? null,
+                );
+
+                CentralActivityLog::log('invoice.asaas_synced', "Fatura #{$invoice->id} sincronizada — paga ({$paymentMethod})", $invoice->tenant_id);
+
+                return back()->with('success', "Fatura atualizada: pagamento confirmado via {$paymentMethod}.");
+            }
+
+            if ($newStatus === 'overdue' && $invoice->isPending()) {
+                $invoice->markAsOverdue();
+
+                return back()->with('success', 'Fatura atualizada: marcada como vencida.');
+            }
+
+            if ($newStatus === 'cancelled' && ! $invoice->isPaid()) {
+                $invoice->cancel();
+
+                return back()->with('success', 'Fatura atualizada: cancelada/estornada.');
+            }
+
+            $asaasStatusLabel = $payment['status'] ?? 'desconhecido';
+
+            return back()->with('info', "Status no Asaas: {$asaasStatusLabel}. Nenhuma alteração necessária.");
+        } catch (\Exception $e) {
+            return back()->with('error', 'Erro ao consultar Asaas: ' . $e->getMessage());
+        }
     }
 
     protected function calculatePeriod(string $cycle): array

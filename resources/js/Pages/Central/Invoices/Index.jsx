@@ -68,10 +68,10 @@ export default function Index({ invoices, stats, tenants, plans, filters, asaasC
 
             {/* Statistics */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
-                <StatCard icon={CurrencyDollarIcon} label="MRR" value={formatBRL(stats.mrr)} color="bg-indigo-500" />
-                <StatCard icon={ClockIcon} label="Pendentes" value={formatBRL(stats.total_pending)} color="bg-yellow-500" />
-                <StatCard icon={ExclamationTriangleIcon} label="Vencidas" value={formatBRL(stats.total_overdue)} color="bg-red-500" />
-                <StatCard icon={CheckIcon} label="Pagas este mês" value={formatBRL(stats.paid_this_month)} color="bg-green-500" />
+                <StatCard icon={CurrencyDollarIcon} label="MRR" subtitle="Receita recorrente mensal" value={formatBRL(stats.mrr)} color="bg-indigo-500" />
+                <StatCard icon={ClockIcon} label="Pendentes" subtitle="Aguardando pagamento" value={formatBRL(stats.total_pending)} color="bg-yellow-500" />
+                <StatCard icon={ExclamationTriangleIcon} label="Vencidas" subtitle="Pagamento em atraso" value={formatBRL(stats.total_overdue)} color="bg-red-500" />
+                <StatCard icon={CheckIcon} label="Pagas este mês" subtitle="Recebido no período" value={formatBRL(stats.paid_this_month)} color="bg-green-500" />
             </div>
 
             {/* Filters */}
@@ -151,6 +151,11 @@ export default function Index({ invoices, stats, tenants, plans, filters, asaasC
                                                         <BanknotesIcon className="h-4 w-4" />
                                                     </button>
                                                 )}
+                                                {inv.gateway_id && (
+                                                    <button onClick={() => router.post(`/admin/invoices/${inv.id}/sync-asaas`)} title="Sincronizar com Asaas" className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-cyan-100 text-cyan-700 hover:bg-cyan-200 transition-colors">
+                                                        <ArrowPathIcon className="h-4 w-4" />
+                                                    </button>
+                                                )}
                                                 <button onClick={() => setMarkingPaid(inv)} title="Marcar como pago" className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-green-100 text-green-700 hover:bg-green-200 transition-colors">
                                                     <CheckIcon className="h-4 w-4" />
                                                 </button>
@@ -190,7 +195,7 @@ export default function Index({ invoices, stats, tenants, plans, filters, asaasC
     );
 }
 
-function StatCard({ icon: Icon, label, value, color }) {
+function StatCard({ icon: Icon, label, subtitle, value, color }) {
     return (
         <div className="bg-white shadow rounded-lg p-5">
             <div className="flex items-center">
@@ -198,8 +203,9 @@ function StatCard({ icon: Icon, label, value, color }) {
                     <Icon className="h-5 w-5 text-white" />
                 </div>
                 <div className="ml-4">
-                    <p className="text-sm text-gray-500">{label}</p>
+                    <p className="text-sm font-medium text-gray-500">{label}</p>
                     <p className="text-xl font-bold text-gray-900">{value}</p>
+                    {subtitle && <p className="text-xs text-gray-400">{subtitle}</p>}
                 </div>
             </div>
         </div>

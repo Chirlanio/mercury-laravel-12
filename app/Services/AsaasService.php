@@ -14,10 +14,18 @@ class AsaasService
 {
     protected function client(): PendingRequest
     {
-        return Http::withHeaders([
+        $client = Http::withHeaders([
             'access_token' => config('services.asaas.api_key'),
             'Content-Type' => 'application/json',
         ])->baseUrl(config('services.asaas.base_url'));
+
+        // Fix SSL on Windows dev environments where cainfo isn't picked up
+        $caFile = ini_get('curl.cainfo') ?: ini_get('openssl.cafile');
+        if ($caFile && file_exists($caFile)) {
+            $client = $client->withOptions(['verify' => $caFile]);
+        }
+
+        return $client;
     }
 
     /**
@@ -54,6 +62,18 @@ class AsaasService
     public function getCustomer(string $customerId): array
     {
         return $this->client()->get("/customers/{$customerId}")->json();
+    }
+
+    public function updateCustomer(string $customerId, array $data): array
+    {
+        $response = $this->client()->put("/customers/{$customerId}", $data);
+
+        if ($response->failed()) {
+            Log::error('Asaas updateCustomer failed', ['status' => $response->status(), 'body' => $response->json()]);
+            throw new \RuntimeException('Erro ao atualizar cliente no Asaas: ' . ($response->json('errors.0.description') ?? $response->body()));
+        }
+
+        return $response->json();
     }
 
     // =================== PAYMENTS ===================

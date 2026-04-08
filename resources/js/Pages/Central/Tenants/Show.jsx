@@ -1,6 +1,7 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import CentralLayout from '@/Layouts/CentralLayout';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { useState } from 'react';
+import { ArrowLeftIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { formatDateTime } from '@/Utils/dateHelpers';
 
 export default function Show({ tenant, usage, plans, recentInvoices, allRoles }) {
@@ -21,54 +22,7 @@ export default function Show({ tenant, usage, plans, recentInvoices, allRoles })
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main Info */}
                 <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-white shadow rounded-lg p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-lg font-semibold text-gray-900">{tenant.name}</h2>
-                            <div className="flex gap-2">
-                                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                                    tenant.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                }`}>
-                                    {tenant.is_active ? 'Ativo' : 'Suspenso'}
-                                </span>
-                                {tenant.is_trialing && (
-                                    <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
-                                        Trial ate {tenant.trial_ends_at}
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-
-                        <dl className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                                <dt className="font-medium text-gray-500">Slug / ID</dt>
-                                <dd className="mt-1 text-gray-900">{tenant.slug}</dd>
-                            </div>
-                            <div>
-                                <dt className="font-medium text-gray-500">Domínio</dt>
-                                <dd className="mt-1 text-gray-900">{tenant.domain || '-'}</dd>
-                            </div>
-                            <div>
-                                <dt className="font-medium text-gray-500">CNPJ</dt>
-                                <dd className="mt-1 text-gray-900">{tenant.cnpj || '-'}</dd>
-                            </div>
-                            <div>
-                                <dt className="font-medium text-gray-500">Plano</dt>
-                                <dd className="mt-1 text-gray-900">{tenant.plan?.name || 'Nenhum'}</dd>
-                            </div>
-                            <div>
-                                <dt className="font-medium text-gray-500">Responsável</dt>
-                                <dd className="mt-1 text-gray-900">{tenant.owner_name}</dd>
-                            </div>
-                            <div>
-                                <dt className="font-medium text-gray-500">E-mail</dt>
-                                <dd className="mt-1 text-gray-900">{tenant.owner_email}</dd>
-                            </div>
-                            <div>
-                                <dt className="font-medium text-gray-500">Criado em</dt>
-                                <dd className="mt-1 text-gray-900">{formatDateTime(tenant.created_at)}</dd>
-                            </div>
-                        </dl>
-                    </div>
+                    <TenantInfoCard tenant={tenant} />
 
                     {/* Modules */}
                     <div className="bg-white shadow rounded-lg p-6">
@@ -141,6 +95,129 @@ export default function Show({ tenant, usage, plans, recentInvoices, allRoles })
                 </div>
             </div>
         </CentralLayout>
+    );
+}
+
+function formatCnpj(value) {
+    const digits = value.replace(/\D/g, '').slice(0, 14);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 5) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+    if (digits.length <= 8) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`;
+    if (digits.length <= 12) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`;
+    return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+}
+
+function TenantInfoCard({ tenant }) {
+    const [editing, setEditing] = useState(false);
+    const { data, setData, put, processing, errors } = useForm({
+        name: tenant.name || '',
+        cnpj: tenant.cnpj || '',
+        owner_name: tenant.owner_name || '',
+        owner_email: tenant.owner_email || '',
+    });
+
+    const submit = (e) => {
+        e.preventDefault();
+        put(`/admin/tenants/${tenant.id}`, {
+            onSuccess: () => setEditing(false),
+        });
+    };
+
+    if (!editing) {
+        return (
+            <div className="bg-white shadow rounded-lg p-6">
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-gray-900">{tenant.name}</h2>
+                    <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            tenant.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                            {tenant.is_active ? 'Ativo' : 'Suspenso'}
+                        </span>
+                        {tenant.is_trialing && (
+                            <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
+                                Trial ate {tenant.trial_ends_at}
+                            </span>
+                        )}
+                        <button
+                            onClick={() => setEditing(true)}
+                            title="Editar dados"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors"
+                        >
+                            <PencilIcon className="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
+                <dl className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <dt className="font-medium text-gray-500">Slug / ID</dt>
+                        <dd className="mt-1 text-gray-900">{tenant.slug}</dd>
+                    </div>
+                    <div>
+                        <dt className="font-medium text-gray-500">Domínio</dt>
+                        <dd className="mt-1 text-gray-900">{tenant.domain || '-'}</dd>
+                    </div>
+                    <div>
+                        <dt className="font-medium text-gray-500">CNPJ</dt>
+                        <dd className="mt-1 text-gray-900">{tenant.cnpj || '-'}</dd>
+                    </div>
+                    <div>
+                        <dt className="font-medium text-gray-500">Plano</dt>
+                        <dd className="mt-1 text-gray-900">{tenant.plan?.name || 'Nenhum'}</dd>
+                    </div>
+                    <div>
+                        <dt className="font-medium text-gray-500">Responsável</dt>
+                        <dd className="mt-1 text-gray-900">{tenant.owner_name}</dd>
+                    </div>
+                    <div>
+                        <dt className="font-medium text-gray-500">E-mail</dt>
+                        <dd className="mt-1 text-gray-900">{tenant.owner_email}</dd>
+                    </div>
+                    <div>
+                        <dt className="font-medium text-gray-500">Criado em</dt>
+                        <dd className="mt-1 text-gray-900">{formatDateTime(tenant.created_at)}</dd>
+                    </div>
+                </dl>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-white shadow rounded-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Editar Dados</h2>
+                <span className="text-xs text-gray-400">Slug: {tenant.slug}</span>
+            </div>
+            <form onSubmit={submit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Nome da Empresa</label>
+                        <input type="text" value={data.name} onChange={(e) => setData('name', e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" required />
+                        {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">CNPJ</label>
+                        <input type="text" value={data.cnpj} onChange={(e) => setData('cnpj', formatCnpj(e.target.value))} placeholder="00.000.000/0000-00" maxLength={18} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Responsável</label>
+                        <input type="text" value={data.owner_name} onChange={(e) => setData('owner_name', e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" required />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">E-mail</label>
+                        <input type="email" value={data.owner_email} onChange={(e) => setData('owner_email', e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" required />
+                    </div>
+                </div>
+                <div className="flex justify-end gap-3 pt-3 border-t">
+                    <button type="button" onClick={() => setEditing(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200">
+                        Cancelar
+                    </button>
+                    <button type="submit" disabled={processing} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50">
+                        {processing ? 'Salvando...' : 'Salvar'}
+                    </button>
+                </div>
+            </form>
+        </div>
     );
 }
 
