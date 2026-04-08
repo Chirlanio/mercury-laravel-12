@@ -2,6 +2,7 @@ import DataTable from '@/Components/DataTable';
 import Button from '@/Components/Button';
 import GenericFormModal from '@/Components/GenericFormModal';
 import ConfirmDialog from '@/Components/ConfirmDialog';
+import MergeModal from '@/Components/MergeModal';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
@@ -17,9 +18,13 @@ export default function Index({
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [showMergeModal, setShowMergeModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
+    const [selectedIds, setSelectedIds] = useState([]);
     const [deleting, setDeleting] = useState(false);
     const { hasPermission } = usePermissions();
+
+    const supportsMerge = additionalData?.supportsMerge === true;
 
     const canCreate = hasPermission(PERMISSIONS.MANAGE_SETTINGS);
     const canEdit = hasPermission(PERMISSIONS.MANAGE_SETTINGS);
@@ -220,6 +225,19 @@ export default function Index({
                                 </p>
                             </div>
                             <div className="flex gap-3">
+                                {supportsMerge && canEdit && selectedIds.length >= 2 && (
+                                    <Button
+                                        onClick={() => setShowMergeModal(true)}
+                                        variant="warning"
+                                        icon={({ className }) => (
+                                            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                            </svg>
+                                        )}
+                                    >
+                                        Mesclar ({selectedIds.length})
+                                    </Button>
+                                )}
                                 {canCreate && (
                                     <Button
                                         onClick={() => setShowCreateModal(true)}
@@ -309,6 +327,9 @@ export default function Index({
                         searchPlaceholder="Pesquisar..."
                         emptyMessage="Nenhum registro encontrado"
                         perPageOptions={[10, 15, 25, 50]}
+                        selectable={supportsMerge && canEdit}
+                        selectedIds={selectedIds}
+                        onSelectionChange={setSelectedIds}
                     />
                 </div>
             </div>
@@ -358,6 +379,20 @@ export default function Index({
                 cancelText="Cancelar"
                 type="danger"
             />
+
+            {/* Modal de Mesclagem */}
+            {supportsMerge && (
+                <MergeModal
+                    show={showMergeModal}
+                    onClose={(merged) => {
+                        setShowMergeModal(false);
+                        if (merged) setSelectedIds([]);
+                    }}
+                    items={selectedIds}
+                    routeName={config.routeName}
+                    allItems={items.data || []}
+                />
+            )}
         </>
     );
 }

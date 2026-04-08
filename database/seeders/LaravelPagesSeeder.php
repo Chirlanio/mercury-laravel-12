@@ -137,6 +137,16 @@ class LaravelPagesSeeder extends Seeder
             ['route' => '/config/payment-types', 'page_name' => 'Tipos de Pagamento', 'icon' => 'fas fa-cog', 'controller' => 'ConfigPaymentTypes', 'method' => 'index', 'menu_controller' => 'type-payments', 'menu_method' => 'list'],
             ['route' => '/config/drivers', 'page_name' => 'Motoristas', 'icon' => 'fas fa-cog', 'controller' => 'ConfigDrivers', 'method' => 'index', 'menu_controller' => 'drivers', 'menu_method' => 'list'],
 
+            // Configurações - Cadastro de Produtos
+            ['route' => '/config/product-brands', 'page_name' => 'Marcas de Produto', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductBrands', 'method' => 'index', 'menu_controller' => 'config-product-brands', 'menu_method' => 'index'],
+            ['route' => '/config/product-categories', 'page_name' => 'Categorias de Produto', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductCategories', 'method' => 'index', 'menu_controller' => 'config-product-categories', 'menu_method' => 'index'],
+            ['route' => '/config/product-collections', 'page_name' => 'Coleções de Produto', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductCollections', 'method' => 'index', 'menu_controller' => 'config-product-collections', 'menu_method' => 'index'],
+            ['route' => '/config/product-subcollections', 'page_name' => 'Subcoleções de Produto', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductSubcollections', 'method' => 'index', 'menu_controller' => 'config-product-subcollections', 'menu_method' => 'index'],
+            ['route' => '/config/product-colors', 'page_name' => 'Cores de Produto', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductColors', 'method' => 'index', 'menu_controller' => 'config-product-colors', 'menu_method' => 'index'],
+            ['route' => '/config/product-materials', 'page_name' => 'Materiais de Produto', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductMaterials', 'method' => 'index', 'menu_controller' => 'config-product-materials', 'menu_method' => 'index'],
+            ['route' => '/config/product-sizes', 'page_name' => 'Tamanhos de Produto', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductSizes', 'method' => 'index', 'menu_controller' => 'config-product-sizes', 'menu_method' => 'index'],
+            ['route' => '/config/product-article-complements', 'page_name' => 'Complementos de Artigo', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductArticleComplements', 'method' => 'index', 'menu_controller' => 'config-product-article-complements', 'menu_method' => 'index'],
+
             // Integrações
             ['route' => '/integrations', 'page_name' => 'Integrações', 'icon' => 'fas fa-link', 'controller' => 'Integrations', 'method' => 'index', 'menu_controller' => 'integrations', 'menu_method' => 'index'],
 
@@ -179,6 +189,14 @@ class LaravelPagesSeeder extends Seeder
             '/config/cost-centers' => 'Configurações',
             '/config/payment-types' => 'Configurações',
             '/config/drivers' => 'Configurações',
+            '/config/product-brands' => 'Configurações',
+            '/config/product-categories' => 'Configurações',
+            '/config/product-collections' => 'Configurações',
+            '/config/product-subcollections' => 'Configurações',
+            '/config/product-colors' => 'Configurações',
+            '/config/product-materials' => 'Configurações',
+            '/config/product-sizes' => 'Configurações',
+            '/config/product-article-complements' => 'Configurações',
             '/integrations' => 'Configurações',
             '/logout' => 'Sair',
         ];

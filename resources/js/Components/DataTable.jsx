@@ -2,6 +2,18 @@ import { router } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 
+function formatDateTime(value) {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return value;
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function isDateTimeField(field) {
+    return field && (field.endsWith('_at') || field.endsWith('_date') || field === 'date');
+}
+
 export default function DataTable({
     data = { data: [], links: [], from: 0, to: 0, total: 0, per_page: 10 },
     columns = [],
@@ -10,12 +22,37 @@ export default function DataTable({
     perPageOptions = [10, 25, 50, 100],
     onRowClick = null,
     className = "",
-    emptyMessage = "Nenhum registro encontrado"
+    emptyMessage = "Nenhum registro encontrado",
+    selectable = false,
+    selectedIds = [],
+    onSelectionChange = null,
 }) {
     const [search, setSearch] = useState('');
     const [sortField, setSortField] = useState('');
     const [sortDirection, setSortDirection] = useState('asc');
     const [perPage, setPerPage] = useState(data.per_page || 10);
+
+    const allPageIds = (data.data || []).map(row => row.id);
+    const allPageSelected = allPageIds.length > 0 && allPageIds.every(id => selectedIds.includes(id));
+
+    const toggleSelectAll = () => {
+        if (!onSelectionChange) return;
+        if (allPageSelected) {
+            onSelectionChange(selectedIds.filter(id => !allPageIds.includes(id)));
+        } else {
+            const merged = [...new Set([...selectedIds, ...allPageIds])];
+            onSelectionChange(merged);
+        }
+    };
+
+    const toggleSelectRow = (id) => {
+        if (!onSelectionChange) return;
+        if (selectedIds.includes(id)) {
+            onSelectionChange(selectedIds.filter(sid => sid !== id));
+        } else {
+            onSelectionChange([...selectedIds, id]);
+        }
+    };
 
     useEffect(() => {
         setPerPage(data.per_page || 10);
@@ -125,6 +162,16 @@ export default function DataTable({
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
+                            {selectable && (
+                                <th className="px-4 py-3 w-10">
+                                    <input
+                                        type="checkbox"
+                                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                        checked={allPageSelected}
+                                        onChange={toggleSelectAll}
+                                    />
+                                </th>
+                            )}
                             {columns.map((column, index) => (
                                 <th
                                     key={index}
@@ -146,9 +193,20 @@ export default function DataTable({
                             data.data.map((row, rowIndex) => (
                                 <tr
                                     key={rowIndex}
-                                    className={onRowClick ? 'hover:bg-gray-50 cursor-pointer' : ''}
+                                    className={`${onRowClick ? 'hover:bg-gray-50 cursor-pointer' : ''} ${selectable && selectedIds.includes(row.id) ? 'bg-indigo-50' : ''}`}
                                     onClick={() => onRowClick && onRowClick(row)}
                                 >
+                                    {selectable && (
+                                        <td className="px-4 py-4 w-10">
+                                            <input
+                                                type="checkbox"
+                                                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                                checked={selectedIds.includes(row.id)}
+                                                onChange={() => toggleSelectRow(row.id)}
+                                                onClick={(e) => e.stopPropagation()}
+                                            />
+                                        </td>
+                                    )}
                                     {columns.map((column, colIndex) => (
                                         <td
                                             key={colIndex}
@@ -156,7 +214,9 @@ export default function DataTable({
                                         >
                                             {column.render
                                                 ? column.render(row, rowIndex)
-                                                : row[column.field] || '-'
+                                                : isDateTimeField(column.field)
+                                                    ? formatDateTime(row[column.field])
+                                                    : row[column.field] || '-'
                                             }
                                         </td>
                                     ))}
@@ -165,7 +225,7 @@ export default function DataTable({
                         ) : (
                             <tr>
                                 <td
-                                    colSpan={columns.length}
+                                    colSpan={columns.length + (selectable ? 1 : 0)}
                                     className="px-6 py-12 text-center text-gray-500"
                                 >
                                     {emptyMessage}

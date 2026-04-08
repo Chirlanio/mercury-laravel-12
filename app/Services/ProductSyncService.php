@@ -107,11 +107,21 @@ class ProductSyncService
                     $code = trim($row->{$config['code_field']});
                     $name = strtoupper(trim($row->{$config['name_field']}));
 
-                    if (!empty($config['sanitize_name'])) {
+                    if (! empty($config['sanitize_name'])) {
                         $name = $this->sanitizeCollectionName($name);
                     }
 
-                    if (empty($code)) continue;
+                    if (empty($code)) {
+                        continue;
+                    }
+
+                    // Skip records that have been merged into another
+                    $existing = $config['model']::where('cigam_code', $code)->first();
+                    if ($existing && $existing->merged_into) {
+                        $count++;
+
+                        continue;
+                    }
 
                     $config['model']::updateOrCreate(
                         ['cigam_code' => $code],
@@ -123,7 +133,7 @@ class ProductSyncService
                 $results[$table] = $count;
             } catch (\Exception $e) {
                 Log::error("ProductSync: Error syncing {$table}: {$e->getMessage()}");
-                $results[$table] = 'error: ' . $e->getMessage();
+                $results[$table] = 'error: '.$e->getMessage();
             }
         }
 
@@ -134,7 +144,9 @@ class ProductSyncService
 
             foreach ($suppliers as $row) {
                 $codigoFor = trim($row->codigo_for);
-                if (empty($codigoFor)) continue;
+                if (empty($codigoFor)) {
+                    continue;
+                }
 
                 Supplier::updateOrCreate(
                     ['codigo_for' => $codigoFor],
@@ -151,7 +163,7 @@ class ProductSyncService
             $results['suppliers'] = $count;
         } catch (\Exception $e) {
             Log::error("ProductSync: Error syncing suppliers: {$e->getMessage()}");
-            $results['suppliers'] = 'error: ' . $e->getMessage();
+            $results['suppliers'] = 'error: '.$e->getMessage();
         }
 
         return $results;
@@ -182,7 +194,7 @@ class ProductSyncService
         if ($type === 'by_period' && $dateStart && $dateEnd) {
             $query->where(function ($q) use ($dateStart, $dateEnd) {
                 $q->whereBetween('datacadastro', [$dateStart, $dateEnd])
-                  ->orWhereBetween('dataatulizado', [$dateStart, $dateEnd]);
+                    ->orWhereBetween('dataatulizado', [$dateStart, $dateEnd]);
             });
         }
 
@@ -225,7 +237,7 @@ class ProductSyncService
             if ($dateStart && $dateEnd) {
                 $query->where(function ($q) use ($dateStart, $dateEnd) {
                     $q->whereBetween('datacadastro', [$dateStart, $dateEnd])
-                      ->orWhereBetween('dataatulizado', [$dateStart, $dateEnd]);
+                        ->orWhereBetween('dataatulizado', [$dateStart, $dateEnd]);
                 });
             }
 
@@ -250,7 +262,9 @@ class ProductSyncService
                 $first = $variants->first();
                 $reference = trim($reference);
 
-                if (empty($reference)) continue;
+                if (empty($reference)) {
+                    continue;
+                }
 
                 $currentLastRef = $first->referencia; // raw value for cursor (untrimmed)
 
@@ -258,19 +272,20 @@ class ProductSyncService
                 $existing = Product::where('reference', $reference)->first();
                 if ($existing && $existing->sync_locked) {
                     $skipped++;
+
                     continue;
                 }
 
-                // Upsert product
+                // Upsert product (resolve merged lookup codes to their targets)
                 $productData = [
                     'description' => strtoupper(trim($first->descricao ?? '')),
-                    'brand_cigam_code' => $this->trimOrNull($first->codmarca ?? null),
-                    'collection_cigam_code' => $this->trimOrNull($first->codcolecao ?? null),
-                    'subcollection_cigam_code' => $this->trimOrNull($first->codsubcolecao ?? null),
-                    'category_cigam_code' => $this->trimOrNull($first->codcategoria ?? null),
-                    'color_cigam_code' => $this->trimOrNull($first->codcor ?? null),
-                    'material_cigam_code' => $this->trimOrNull($first->codmaterial ?? null),
-                    'article_complement_cigam_code' => $this->trimOrNull($first->codcompartigo ?? null),
+                    'brand_cigam_code' => $this->resolveMerged(ProductBrand::class, $first->codmarca ?? null),
+                    'collection_cigam_code' => $this->resolveMerged(ProductCollection::class, $first->codcolecao ?? null),
+                    'subcollection_cigam_code' => $this->resolveMerged(ProductSubcollection::class, $first->codsubcolecao ?? null),
+                    'category_cigam_code' => $this->resolveMerged(ProductCategory::class, $first->codcategoria ?? null),
+                    'color_cigam_code' => $this->resolveMerged(ProductColor::class, $first->codcor ?? null),
+                    'material_cigam_code' => $this->resolveMerged(ProductMaterial::class, $first->codmaterial ?? null),
+                    'article_complement_cigam_code' => $this->resolveMerged(ProductArticleComplement::class, $first->codcompartigo ?? null),
                     'supplier_codigo_for' => $this->trimOrNull($first->codigo_for ?? null),
                     'synced_at' => now(),
                 ];
@@ -289,7 +304,7 @@ class ProductSyncService
 
                 // Upsert variants
                 foreach ($variants as $variant) {
-                    $sizeCode = $this->trimOrNull($variant->codtamanho ?? null);
+                    $sizeCode = $this->resolveMerged(ProductSize::class, $variant->codtamanho ?? null);
                     $barcode = $this->trimOrNull($variant->codbarra ?? null);
 
                     ProductVariant::updateOrCreate(
@@ -353,7 +368,7 @@ class ProductSyncService
                 $query->join('msl_produtos_', 'msl_prod_valor_.referencia', '=', 'msl_produtos_.referencia')
                     ->where(function ($q) use ($dateStart, $dateEnd) {
                         $q->whereBetween('msl_produtos_.datacadastro', [$dateStart, $dateEnd])
-                          ->orWhereBetween('msl_produtos_.dataatulizado', [$dateStart, $dateEnd]);
+                            ->orWhereBetween('msl_produtos_.dataatulizado', [$dateStart, $dateEnd]);
                     })
                     ->distinct();
             }
@@ -362,7 +377,9 @@ class ProductSyncService
 
             foreach ($prices as $row) {
                 $reference = trim($row->referencia);
-                if (empty($reference)) continue;
+                if (empty($reference)) {
+                    continue;
+                }
 
                 $affected = Product::where('reference', $reference)
                     ->where('sync_locked', false)
@@ -371,12 +388,15 @@ class ProductSyncService
                         'cost_price' => $row->min_vlrcusto ?? 0,
                     ]);
 
-                if ($affected) $updated++;
+                if ($affected) {
+                    $updated++;
+                }
             }
 
             return ['updated' => $updated];
         } catch (\Exception $e) {
             Log::error("ProductSync: Price sync error: {$e->getMessage()}");
+
             return ['updated' => $updated, 'error' => $e->getMessage()];
         }
     }
@@ -388,6 +408,7 @@ class ProductSyncService
     {
         $log = ProductSyncLog::findOrFail($logId);
         $log->markCompleted();
+
         return $log->fresh();
     }
 
@@ -398,6 +419,7 @@ class ProductSyncService
     {
         $log = ProductSyncLog::findOrFail($logId);
         $log->markCancelled();
+
         return $log->fresh();
     }
 
@@ -421,8 +443,30 @@ class ProductSyncService
 
     private function trimOrNull(?string $value): ?string
     {
-        if ($value === null) return null;
+        if ($value === null) {
+            return null;
+        }
         $trimmed = trim($value);
+
         return $trimmed === '' ? null : $trimmed;
+    }
+
+    /**
+     * Resolve a CIGAM code to its merge target if it has been merged.
+     * Returns the target cigam_code, or the original (trimmed) code if not merged.
+     */
+    private function resolveMerged(string $modelClass, ?string $value): ?string
+    {
+        $code = $this->trimOrNull($value);
+        if ($code === null) {
+            return null;
+        }
+
+        $record = $modelClass::where('cigam_code', $code)->first();
+        if ($record && $record->merged_into) {
+            return $record->merged_into;
+        }
+
+        return $code;
     }
 }

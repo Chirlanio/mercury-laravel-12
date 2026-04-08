@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProductMaterial extends Model
 {
@@ -13,6 +14,8 @@ class ProductMaterial extends Model
         'cigam_code',
         'name',
         'is_active',
+        'merged_into',
+        'group_id',
     ];
 
     protected $casts = [
@@ -22,5 +25,15 @@ class ProductMaterial extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeNotMerged(Builder $query): Builder
+    {
+        return $query->whereNull('merged_into');
+    }
+
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(ProductLookupGroup::class, 'group_id');
     }
 }

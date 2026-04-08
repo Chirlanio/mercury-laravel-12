@@ -86,8 +86,14 @@ class ProductSyncLog extends Model
     public function incrementProcessed(int $inserted = 0, int $updated = 0, int $skipped = 0): void
     {
         $this->increment('processed_records', $inserted + $updated + $skipped);
-        if ($inserted) $this->increment('inserted_records', $inserted);
-        if ($updated) $this->increment('updated_records', $updated);
-        if ($skipped) $this->increment('skipped_records', $skipped);
+        if ($inserted) {
+            $this->increment('inserted_records', $inserted);
+        }
+        if ($updated) {
+            $this->increment('updated_records', $updated);
+        }
+        if ($skipped) {
+            $this->increment('skipped_records', $skipped);
+        }
     }
 }
