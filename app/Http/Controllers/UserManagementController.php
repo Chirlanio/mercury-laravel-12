@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Store;
 use App\Models\ActivityLog;
 use App\Rules\ValidImageRule;
+use App\Services\TenantRoleService;
 
 use Exception;
 use Illuminate\Http\Request;
@@ -18,6 +19,9 @@ use Inertia\Inertia;
 
 class UserManagementController extends Controller
 {
+    public function __construct(
+        protected TenantRoleService $roleService,
+    ) {}
 
     public function index(Request $request)
     {
@@ -72,7 +76,7 @@ class UserManagementController extends Controller
                     'status_id' => $user->status_id,
                 ];
             }),
-            'roles' => Role::options(),
+            'roles' => $this->roleService->getAllowedRoleOptions(),
             'stores' => $stores,
             'filters' => [
                 'search' => $search,
@@ -86,7 +90,7 @@ class UserManagementController extends Controller
     public function create()
     {
         return Inertia::render('UserManagement/Create', [
-            'roles' => Role::options(),
+            'roles' => $this->roleService->getAllowedRoleOptions(),
         ]);
     }
 
@@ -98,7 +102,7 @@ class UserManagementController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'username' => 'nullable|string|max:220|unique:users',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            'role' => 'required|string|in:super_admin,admin,support,user',
+            'role' => 'required|string|in:' . $this->roleService->getAllowedRoleValues(),
             'avatar' => ['nullable', ValidImageRule::avatar()],
             'store_id' => 'required|string|exists:stores,code',
             'status_id' => 'nullable|integer',
@@ -155,7 +159,7 @@ class UserManagementController extends Controller
                 'avatar_url' => $user->avatar_url,
                 'has_custom_avatar' => $user->hasCustomAvatar(),
             ],
-            'roles' => Role::options(),
+            'roles' => $this->roleService->getAllowedRoleOptions(),
         ]);
     }
 
@@ -172,7 +176,7 @@ class UserManagementController extends Controller
                 'avatar_url' => $user->avatar_url,
                 'has_custom_avatar' => $user->hasCustomAvatar(),
             ],
-            'roles' => Role::options(),
+            'roles' => $this->roleService->getAllowedRoleOptions(),
         ]);
     }
 
@@ -190,7 +194,7 @@ class UserManagementController extends Controller
             'nickname' => 'nullable|string|max:220',
             'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . $user->id,
             'username' => 'nullable|string|max:220|unique:users,username,' . $user->id,
-            'role' => 'sometimes|required|string|in:super_admin,admin,support,user',
+            'role' => 'sometimes|required|string|in:' . $this->roleService->getAllowedRoleValues(),
             'avatar' => ['nullable', ValidImageRule::avatar()],
             'remove_avatar' => 'boolean',
             'store_id' => 'required|string|exists:stores,code',
@@ -302,7 +306,7 @@ class UserManagementController extends Controller
         $currentUser = auth()->user();
 
         $request->validate([
-            'role' => 'required|string|in:super_admin,admin,support,user',
+            'role' => 'required|string|in:' . $this->roleService->getAllowedRoleValues(),
         ]);
 
         $newRole = Role::from($request->role);

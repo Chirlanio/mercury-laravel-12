@@ -6,6 +6,8 @@ import {
     HomeIcon,
     BuildingOffice2Icon,
     CreditCardIcon,
+    CubeIcon,
+    Bars3BottomLeftIcon,
     ArrowRightOnRectangleIcon,
     Bars3Icon,
     XMarkIcon,
@@ -15,6 +17,8 @@ const navigation = [
     { name: 'Dashboard', href: '/admin', icon: HomeIcon },
     { name: 'Tenants', href: '/admin/tenants', icon: BuildingOffice2Icon },
     { name: 'Planos', href: '/admin/plans', icon: CreditCardIcon },
+    { name: 'Módulos', href: '/admin/modules', icon: CubeIcon },
+    { name: 'Navegação', href: '/admin/navigation', icon: Bars3BottomLeftIcon },
 ];
 
 export default function CentralLayout({ children, title }) {

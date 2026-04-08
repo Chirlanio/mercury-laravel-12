@@ -12,6 +12,8 @@
 
 use App\Http\Controllers\Central\Auth\LoginController;
 use App\Http\Controllers\Central\DashboardController;
+use App\Http\Controllers\Central\ModuleController;
+use App\Http\Controllers\Central\NavigationController;
 use App\Http\Controllers\Central\TenantController;
 use App\Http\Controllers\Central\PlanController;
 use Illuminate\Support\Facades\Route;
@@ -61,6 +63,7 @@ foreach ($centralDomains as $domain) {
             Route::get('/tenants/{tenant}', [TenantController::class, 'show'])->name('tenants.show');
             Route::put('/tenants/{tenant}', [TenantController::class, 'update'])->name('tenants.update');
             Route::delete('/tenants/{tenant}', [TenantController::class, 'destroy'])->name('tenants.destroy');
+            Route::put('/tenants/{tenant}/allowed-roles', [TenantController::class, 'updateAllowedRoles'])->name('tenants.updateAllowedRoles');
             Route::post('/tenants/{tenant}/suspend', [TenantController::class, 'suspend'])->name('tenants.suspend');
             Route::post('/tenants/{tenant}/reactivate', [TenantController::class, 'reactivate'])->name('tenants.reactivate');
 
@@ -68,6 +71,24 @@ foreach ($centralDomains as $domain) {
             Route::post('/plans', [PlanController::class, 'store'])->name('plans.store');
             Route::put('/plans/{plan}', [PlanController::class, 'update'])->name('plans.update');
             Route::delete('/plans/{plan}', [PlanController::class, 'destroy'])->name('plans.destroy');
+
+            Route::get('/modules', [ModuleController::class, 'index'])->name('modules.index');
+            Route::post('/modules', [ModuleController::class, 'store'])->name('modules.store');
+            Route::put('/modules/{module}', [ModuleController::class, 'update'])->name('modules.update');
+            Route::delete('/modules/{module}', [ModuleController::class, 'destroy'])->name('modules.destroy');
+
+            // Navigation management
+            Route::get('/navigation', [NavigationController::class, 'index'])->name('navigation.index');
+            Route::post('/navigation/menus', [NavigationController::class, 'storeMenu'])->name('navigation.menus.store');
+            Route::put('/navigation/menus/{menu}', [NavigationController::class, 'updateMenu'])->name('navigation.menus.update');
+            Route::delete('/navigation/menus/{menu}', [NavigationController::class, 'destroyMenu'])->name('navigation.menus.destroy');
+            Route::post('/navigation/pages', [NavigationController::class, 'storePage'])->name('navigation.pages.store');
+            Route::put('/navigation/pages/{page}', [NavigationController::class, 'updatePage'])->name('navigation.pages.update');
+            Route::delete('/navigation/pages/{page}', [NavigationController::class, 'destroyPage'])->name('navigation.pages.destroy');
+            Route::post('/navigation/page-groups', [NavigationController::class, 'storePageGroup'])->name('navigation.pageGroups.store');
+            Route::put('/navigation/page-groups/{pageGroup}', [NavigationController::class, 'updatePageGroup'])->name('navigation.pageGroups.update');
+            Route::delete('/navigation/page-groups/{pageGroup}', [NavigationController::class, 'destroyPageGroup'])->name('navigation.pageGroups.destroy');
+            Route::put('/navigation/defaults', [NavigationController::class, 'updateDefaults'])->name('navigation.defaults.update');
         });
     });
 }

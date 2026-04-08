@@ -103,11 +103,11 @@ export default function Index({ tenants, plans, filters }) {
                                 </td>
                                 <td className="px-6 py-4 text-sm text-gray-500">{formatDateTime(tenant.created_at)}</td>
                                 <td className="px-6 py-4 text-right">
-                                    <div className="flex justify-end gap-2">
+                                    <div className="flex justify-end gap-1">
                                         <button
                                             onClick={() => router.get(`/admin/tenants/${tenant.id}`)}
-                                            className="text-indigo-600 hover:text-indigo-800"
                                             title="Ver detalhes"
+                                            className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-colors"
                                         >
                                             <EyeIcon className="h-4 w-4" />
                                         </button>
@@ -118,16 +118,16 @@ export default function Index({ tenants, plans, filters }) {
                                                         router.post(`/admin/tenants/${tenant.id}/suspend`);
                                                     }
                                                 }}
-                                                className="text-yellow-600 hover:text-yellow-800"
                                                 title="Suspender"
+                                                className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors"
                                             >
                                                 <PauseIcon className="h-4 w-4" />
                                             </button>
                                         ) : (
                                             <button
                                                 onClick={() => router.post(`/admin/tenants/${tenant.id}/reactivate`)}
-                                                className="text-green-600 hover:text-green-800"
                                                 title="Reativar"
+                                                className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
                                             >
                                                 <PlayIcon className="h-4 w-4" />
                                             </button>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Central;
 
 use App\Http\Controllers\Controller;
+use App\Models\CentralModule;
 use App\Models\TenantModule;
 use App\Models\TenantPlan;
 use Illuminate\Http\Request;
@@ -33,12 +34,12 @@ class PlanController extends Controller
                 'created_at' => $plan->created_at->format('d/m/Y'),
             ]);
 
-        $allModules = array_keys(config('modules', []));
+        $centralModules = CentralModule::active()->ordered()->get();
 
         return Inertia::render('Central/Plans/Index', [
             'plans' => $plans,
-            'allModules' => $allModules,
-            'moduleLabels' => collect(config('modules', []))->mapWithKeys(fn ($m, $key) => [$key => $m['name']]),
+            'allModules' => $centralModules->pluck('slug')->toArray(),
+            'moduleLabels' => $centralModules->pluck('name', 'slug')->toArray(),
         ]);
     }
 
@@ -71,16 +72,16 @@ class PlanController extends Controller
             'is_active' => true,
         ]);
 
-        $allModules = array_keys(config('modules', []));
-        foreach ($allModules as $module) {
+        $allModuleSlugs = CentralModule::active()->pluck('slug')->toArray();
+        foreach ($allModuleSlugs as $moduleSlug) {
             TenantModule::create([
                 'plan_id' => $plan->id,
-                'module_slug' => $module,
-                'is_enabled' => in_array($module, $validated['modules']),
+                'module_slug' => $moduleSlug,
+                'is_enabled' => in_array($moduleSlug, $validated['modules']),
             ]);
         }
 
-        return redirect()->route('central.plans.index')
+        return redirect('/admin/plans')
             ->with('success', "Plano '{$plan->name}' criado com sucesso.");
     }
 
@@ -106,11 +107,11 @@ class PlanController extends Controller
         $plan->update($validated);
 
         if ($modules !== null) {
-            $allModules = array_keys(config('modules', []));
-            foreach ($allModules as $module) {
+            $allModuleSlugs = CentralModule::active()->pluck('slug')->toArray();
+            foreach ($allModuleSlugs as $moduleSlug) {
                 TenantModule::updateOrCreate(
-                    ['plan_id' => $plan->id, 'module_slug' => $module],
-                    ['is_enabled' => in_array($module, $modules)]
+                    ['plan_id' => $plan->id, 'module_slug' => $moduleSlug],
+                    ['is_enabled' => in_array($moduleSlug, $modules)]
                 );
             }
         }
@@ -126,7 +127,7 @@ class PlanController extends Controller
 
         $plan->delete();
 
-        return redirect()->route('central.plans.index')
+        return redirect('/admin/plans')
             ->with('success', 'Plano excluído.');
     }
 }

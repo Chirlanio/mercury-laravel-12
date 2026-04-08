@@ -98,4 +98,19 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     {
         return $this->trial_ends_at && $this->trial_ends_at->isPast() && ! $this->plan_id;
     }
+
+    /**
+     * Get the roles this tenant is allowed to assign to users.
+     * Returns all role values when no restriction is configured (backward compatible).
+     */
+    public function getAllowedRoles(): array
+    {
+        $allowed = $this->settings['allowed_roles'] ?? null;
+
+        if ($allowed === null || $allowed === []) {
+            return array_map(fn ($case) => $case->value, \App\Enums\Role::cases());
+        }
+
+        return $allowed;
+    }
 }

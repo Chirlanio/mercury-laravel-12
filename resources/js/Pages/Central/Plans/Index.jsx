@@ -52,7 +52,8 @@ export default function Index({ plans, allModules, moduleLabels }) {
                                 <div className="flex gap-1">
                                     <button
                                         onClick={() => setEditingPlan(plan)}
-                                        className="text-gray-400 hover:text-indigo-600"
+                                        title="Editar"
+                                        className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors"
                                     >
                                         <PencilIcon className="h-4 w-4" />
                                     </button>
@@ -63,7 +64,8 @@ export default function Index({ plans, allModules, moduleLabels }) {
                                                     router.delete(`/admin/plans/${plan.id}`);
                                                 }
                                             }}
-                                            className="text-gray-400 hover:text-red-600"
+                                            title="Excluir"
+                                            className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
                                         >
                                             <TrashIcon className="h-4 w-4" />
                                         </button>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\TenantRoleService;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,13 +17,17 @@ use Inertia\Response;
 
 class RegisteredUserController extends Controller
 {
+    public function __construct(
+        protected TenantRoleService $roleService,
+    ) {}
+
     /**
      * Display the registration view.
      */
     public function create(): Response
     {
         return Inertia::render('Auth/Register', [
-            'roles' => Role::options(),
+            'roles' => $this->roleService->getAllowedRoleOptions(),
         ]);
     }
 
@@ -37,7 +42,7 @@ class RegisteredUserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            'role' => 'required|string|in:super_admin,admin,support,user',
+            'role' => 'required|string|in:' . $this->roleService->getAllowedRoleValues(),
         ]);
 
         $user = User::create([

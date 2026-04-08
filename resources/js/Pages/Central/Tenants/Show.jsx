@@ -3,7 +3,7 @@ import CentralLayout from '@/Layouts/CentralLayout';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { formatDateTime } from '@/Utils/dateHelpers';
 
-export default function Show({ tenant, usage, plans, recentInvoices }) {
+export default function Show({ tenant, usage, plans, recentInvoices, allRoles }) {
     const planLimits = tenant.plan ? plans.find(p => p.id === tenant.plan?.id) : null;
 
     return (
@@ -96,14 +96,14 @@ export default function Show({ tenant, usage, plans, recentInvoices }) {
                                             router.post(`/admin/tenants/${tenant.id}/suspend`);
                                         }
                                     }}
-                                    className="px-4 py-2 text-sm font-medium text-yellow-700 bg-yellow-100 rounded-md hover:bg-yellow-200"
+                                    className="px-4 py-2 text-sm font-medium text-amber-800 bg-amber-100 rounded-md hover:bg-amber-200 transition-colors"
                                 >
                                     Suspender
                                 </button>
                             ) : (
                                 <button
                                     onClick={() => router.post(`/admin/tenants/${tenant.id}/reactivate`)}
-                                    className="px-4 py-2 text-sm font-medium text-green-700 bg-green-100 rounded-md hover:bg-green-200"
+                                    className="px-4 py-2 text-sm font-medium text-green-800 bg-green-100 rounded-md hover:bg-green-200 transition-colors"
                                 >
                                     Reativar
                                 </button>
@@ -114,7 +114,7 @@ export default function Show({ tenant, usage, plans, recentInvoices }) {
                                         router.delete(`/admin/tenants/${tenant.id}`);
                                     }
                                 }}
-                                className="px-4 py-2 text-sm font-medium text-red-700 bg-red-100 rounded-md hover:bg-red-200"
+                                className="px-4 py-2 text-sm font-medium text-red-800 bg-red-100 rounded-md hover:bg-red-200 transition-colors"
                             >
                                 Excluir Permanentemente
                             </button>
@@ -132,6 +132,9 @@ export default function Show({ tenant, usage, plans, recentInvoices }) {
                             <UsageItem label="Funcionários" value={usage.employees} />
                         </dl>
                     </div>
+
+                    {/* Allowed Roles */}
+                    <AllowedRolesForm tenantId={tenant.id} allowedRoles={tenant.allowed_roles} allRoles={allRoles} />
 
                     {/* Change Plan */}
                     <ChangePlanForm tenantId={tenant.id} currentPlanId={tenant.plan?.id} plans={plans} />
@@ -161,6 +164,59 @@ function UsageItem({ label, value, max }) {
                     />
                 </div>
             )}
+        </div>
+    );
+}
+
+function AllowedRolesForm({ tenantId, allowedRoles, allRoles = {} }) {
+    const { data, setData, put, processing } = useForm({
+        allowed_roles: allowedRoles || Object.keys(allRoles),
+    });
+
+    const toggleRole = (roleValue) => {
+        const current = data.allowed_roles;
+        if (current.includes(roleValue)) {
+            if (current.length <= 1) return; // Must keep at least one
+            setData('allowed_roles', current.filter(r => r !== roleValue));
+        } else {
+            setData('allowed_roles', [...current, roleValue]);
+        }
+    };
+
+    const submit = (e) => {
+        e.preventDefault();
+        put(`/admin/tenants/${tenantId}/allowed-roles`);
+    };
+
+    return (
+        <div className="bg-white shadow rounded-lg p-6">
+            <h3 className="text-base font-semibold text-gray-900 mb-3">Roles Permitidas</h3>
+            <p className="text-xs text-gray-500 mb-3">
+                Define quais tipos de usuario o admin deste tenant pode criar.
+            </p>
+            <form onSubmit={submit} className="space-y-3">
+                <div className="space-y-2">
+                    {Object.entries(allRoles).map(([value, label]) => (
+                        <label key={value} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={data.allowed_roles.includes(value)}
+                                onChange={() => toggleRole(value)}
+                                className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                            />
+                            <span className="text-sm text-gray-700">{label}</span>
+                            <span className="text-xs text-gray-400">({value})</span>
+                        </label>
+                    ))}
+                </div>
+                <button
+                    type="submit"
+                    disabled={processing}
+                    className="w-full px-3 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50"
+                >
+                    Salvar
+                </button>
+            </form>
         </div>
     );
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Central;
 
+use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\CentralActivityLog;
 use App\Models\Tenant;
@@ -90,7 +91,9 @@ class TenantController extends Controller
                 'is_expired' => $tenant->isExpired(),
                 'created_at' => $tenant->created_at->format('d/m/Y H:i'),
                 'modules' => $tenant->activeModules()->pluck('module_slug'),
+                'allowed_roles' => $tenant->getAllowedRoles(),
             ],
+            'allRoles' => Role::options(),
             'usage' => $usage,
             'plans' => TenantPlan::where('is_active', true)->get(['id', 'name', 'slug', 'max_users', 'max_stores']),
             'recentInvoices' => $tenant->invoices()
@@ -131,7 +134,7 @@ class TenantController extends Controller
 
             CentralActivityLog::log('tenant.created', "Tenant '{$tenant->name}' criado", $tenant->id);
 
-            return redirect()->route('central.tenants.show', $tenant->id)
+            return redirect("/admin/tenants/{$tenant->id}")
                 ->with('success', "Tenant '{$tenant->name}' criado com sucesso.");
         } catch (\Exception $e) {
             return back()->with('error', 'Erro ao criar tenant: ' . $e->getMessage())
@@ -155,6 +158,30 @@ class TenantController extends Controller
         $tenant->update($validated);
 
         return back()->with('success', 'Tenant atualizado com sucesso.');
+    }
+
+    public function updateAllowedRoles(Request $request, string $tenant)
+    {
+        $tenant = Tenant::findOrFail($tenant);
+
+        $validRoles = array_column(Role::cases(), 'value');
+
+        $validated = $request->validate([
+            'allowed_roles' => 'required|array|min:1',
+            'allowed_roles.*' => 'string|in:' . implode(',', $validRoles),
+        ]);
+
+        $settings = $tenant->settings ?? [];
+        $settings['allowed_roles'] = array_values($validated['allowed_roles']);
+        $tenant->update(['settings' => $settings]);
+
+        CentralActivityLog::log(
+            'tenant.updated',
+            "Roles permitidas atualizadas para '{$tenant->name}': " . implode(', ', $validated['allowed_roles']),
+            $tenant->id
+        );
+
+        return back()->with('success', 'Roles permitidas atualizadas com sucesso.');
     }
 
     public function suspend(string $tenant)
@@ -185,7 +212,7 @@ class TenantController extends Controller
 
         $this->provisioning->deleteTenant($tenant);
 
-        return redirect()->route('central.tenants.index')
+        return redirect('/admin/tenants')
             ->with('success', "Tenant '{$name}' excluído permanentemente.");
     }
 
