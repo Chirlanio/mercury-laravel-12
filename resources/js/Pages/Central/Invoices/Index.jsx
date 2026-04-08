@@ -44,12 +44,13 @@ function formatBRL(value) {
     return `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 }
 
-export default function Index({ invoices, stats, tenants, plans, filters }) {
+export default function Index({ invoices, stats, tenants, plans, filters, asaasConfigured }) {
     const [showCreate, setShowCreate] = useState(false);
     const [editing, setEditing] = useState(null);
     const [viewing, setViewing] = useState(null);
     const [markingPaid, setMarkingPaid] = useState(null);
     const [showBulk, setShowBulk] = useState(false);
+    const [chargingAsaas, setChargingAsaas] = useState(null);
     const [search, setSearch] = useState(filters.search || '');
 
     const handleSearch = (e) => {
@@ -145,6 +146,11 @@ export default function Index({ invoices, stats, tenants, plans, filters }) {
                                                 <button onClick={() => setEditing(inv)} title="Editar" className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors">
                                                     <PencilIcon className="h-4 w-4" />
                                                 </button>
+                                                {asaasConfigured && !inv.gateway_id && (
+                                                    <button onClick={() => setChargingAsaas(inv)} title="Cobrar via Asaas" className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors">
+                                                        <BanknotesIcon className="h-4 w-4" />
+                                                    </button>
+                                                )}
                                                 <button onClick={() => setMarkingPaid(inv)} title="Marcar como pago" className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-green-100 text-green-700 hover:bg-green-200 transition-colors">
                                                     <CheckIcon className="h-4 w-4" />
                                                 </button>
@@ -179,6 +185,7 @@ export default function Index({ invoices, stats, tenants, plans, filters }) {
             {viewing && <ViewInvoiceModal invoice={viewing} onClose={() => setViewing(null)} />}
             {markingPaid && <MarkAsPaidModal invoice={markingPaid} onClose={() => setMarkingPaid(null)} />}
             {showBulk && <BulkGenerateModal onClose={() => setShowBulk(false)} />}
+            {chargingAsaas && <ChargeAsaasModal invoice={chargingAsaas} onClose={() => setChargingAsaas(null)} />}
         </CentralLayout>
     );
 }
@@ -380,6 +387,23 @@ function MarkAsPaidModal({ invoice, onClose }) {
 // =================== VIEW INVOICE MODAL ===================
 
 function ViewInvoiceModal({ invoice, onClose }) {
+    const [pixData, setPixData] = useState(null);
+    const [loadingPix, setLoadingPix] = useState(false);
+
+    const loadPixQrCode = async () => {
+        setLoadingPix(true);
+        try {
+            const response = await fetch(`/admin/invoices/${invoice.id}/pix-qrcode`);
+            const data = await response.json();
+            if (data.encodedImage) {
+                setPixData(data);
+            }
+        } catch (e) {
+            // Silently fail
+        }
+        setLoadingPix(false);
+    };
+
     return (
         <Modal title={`Fatura #${invoice.id}`} subtitle={invoice.tenant_name} onClose={onClose}>
             <dl className="grid grid-cols-2 gap-4 text-sm">
@@ -397,14 +421,103 @@ function ViewInvoiceModal({ invoice, onClose }) {
                 <DL label="Pago em" value={invoice.paid_at || '—'} />
                 <DL label="Método" value={invoice.payment_method || '—'} />
                 <DL label="ID Transação" value={invoice.transaction_id || '—'} />
-                {invoice.payment_url && <DL label="Link Pagamento" value={<a href={invoice.payment_url} target="_blank" rel="noopener" className="text-indigo-600 underline truncate block max-w-48">{invoice.payment_url}</a>} />}
-                {invoice.notes && <div className="col-span-2"><DL label="Notas" value={invoice.notes} /></div>}
                 <DL label="Criada em" value={invoice.created_at} />
                 <DL label="Geração" value={invoice.auto_generated ? 'Automática' : 'Manual'} />
             </dl>
+
+            {/* Payment Link */}
+            {invoice.payment_url && (
+                <div className="mt-4 p-3 bg-indigo-50 rounded-lg">
+                    <p className="text-xs font-medium text-indigo-700 mb-1">Link de Pagamento</p>
+                    <a href={invoice.payment_url} target="_blank" rel="noopener" className="text-sm text-indigo-600 underline break-all">{invoice.payment_url}</a>
+                </div>
+            )}
+
+            {/* PIX QR Code */}
+            {invoice.gateway_id && invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-medium text-gray-700">PIX QR Code</p>
+                        {!pixData && (
+                            <button onClick={loadPixQrCode} disabled={loadingPix} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+                                {loadingPix ? 'Carregando...' : 'Carregar QR Code'}
+                            </button>
+                        )}
+                    </div>
+                    {pixData && (
+                        <div className="text-center space-y-2">
+                            <img src={`data:image/png;base64,${pixData.encodedImage}`} alt="PIX QR Code" className="mx-auto w-48 h-48" />
+                            <div className="bg-white border rounded p-2">
+                                <p className="text-xs text-gray-500 mb-1">Copia e Cola:</p>
+                                <p className="text-xs font-mono break-all text-gray-700 select-all">{pixData.payload}</p>
+                            </div>
+                            {pixData.expirationDate && (
+                                <p className="text-xs text-gray-400">Expira em: {pixData.expirationDate}</p>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {invoice.notes && (
+                <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
+                    <p className="text-xs font-medium text-yellow-700 mb-1">Notas</p>
+                    <p className="text-sm text-gray-700">{invoice.notes}</p>
+                </div>
+            )}
+
             <div className="flex justify-end pt-4 mt-4 border-t">
                 <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200">Fechar</button>
             </div>
+        </Modal>
+    );
+}
+
+// =================== CHARGE ASAAS MODAL ===================
+
+function ChargeAsaasModal({ invoice, onClose }) {
+    const { data, setData, post, processing } = useForm({
+        billing_type: 'PIX',
+    });
+
+    const submit = (e) => {
+        e.preventDefault();
+        post(`/admin/invoices/${invoice.id}/charge-asaas`, { onSuccess: onClose });
+    };
+
+    return (
+        <Modal title="Cobrar via Asaas" subtitle={`Fatura #${invoice.id} — ${invoice.tenant_name} — ${formatBRL(invoice.amount)}`} onClose={onClose}>
+            <form onSubmit={submit} className="space-y-4">
+                <Field label="Tipo de Cobrança *" help="Como o tenant poderá pagar esta fatura.">
+                    <div className="grid grid-cols-3 gap-3 mt-1">
+                        {[
+                            { value: 'PIX', label: 'PIX', desc: 'QR Code + Copia e Cola', color: 'border-green-300 bg-green-50' },
+                            { value: 'BOLETO', label: 'Boleto', desc: 'Boleto bancário', color: 'border-blue-300 bg-blue-50' },
+                            { value: 'UNDEFINED', label: 'Todos', desc: 'Tenant escolhe', color: 'border-purple-300 bg-purple-50' },
+                        ].map((opt) => (
+                            <label key={opt.value} className={`relative flex flex-col items-center p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                                data.billing_type === opt.value ? opt.color + ' ring-2 ring-indigo-500' : 'border-gray-200 hover:border-gray-300'
+                            }`}>
+                                <input type="radio" name="billing_type" value={opt.value} checked={data.billing_type === opt.value} onChange={(e) => setData('billing_type', e.target.value)} className="sr-only" />
+                                <span className="text-sm font-semibold text-gray-900">{opt.label}</span>
+                                <span className="text-xs text-gray-500 text-center">{opt.desc}</span>
+                            </label>
+                        ))}
+                    </div>
+                </Field>
+
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+                    <strong>O que acontece:</strong>
+                    <ul className="mt-1 ml-4 list-disc text-xs space-y-1">
+                        <li>Um cliente é criado/atualizado no Asaas para este tenant</li>
+                        <li>A cobrança é gerada e o tenant recebe o link de pagamento por email</li>
+                        <li>Quando o pagamento for confirmado, o webhook atualiza a fatura automaticamente</li>
+                        <li>O link de pagamento fica disponível nos detalhes da fatura</li>
+                    </ul>
+                </div>
+
+                <ModalActions onClose={onClose} processing={processing} label="Criar Cobrança" color="bg-purple-600 hover:bg-purple-700" />
+            </form>
         </Modal>
     );
 }

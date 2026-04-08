@@ -10,9 +10,15 @@
 |
 */
 
+use App\Http\Controllers\Api\AsaasWebhookController;
 use App\Http\Controllers\Api\IntegrationWebhookController;
 use App\Http\Controllers\Api\IntegrationApiController;
 use Illuminate\Support\Facades\Route;
+
+// Asaas payment webhook (no CSRF, no auth — verified by asaas-access-token header)
+Route::post('/asaas/webhook', [AsaasWebhookController::class, 'handle'])
+    ->middleware('throttle:webhooks')
+    ->name('api.asaas.webhook');
 
 Route::prefix('v1')->group(function () {
     // Webhook receiver - external systems push data to Mercury

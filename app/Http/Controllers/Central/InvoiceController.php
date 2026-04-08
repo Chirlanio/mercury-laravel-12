@@ -7,12 +7,17 @@ use App\Models\CentralActivityLog;
 use App\Models\Tenant;
 use App\Models\TenantInvoice;
 use App\Models\TenantPlan;
+use App\Services\AsaasService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class InvoiceController extends Controller
 {
+    public function __construct(
+        protected AsaasService $asaas,
+    ) {}
+
     public function index(Request $request)
     {
         $query = TenantInvoice::with('tenant', 'plan');
@@ -71,6 +76,7 @@ class InvoiceController extends Controller
             'tenants' => Tenant::orderBy('name')->get(['id', 'name']),
             'plans' => TenantPlan::where('is_active', true)->get(['id', 'name']),
             'filters' => $request->only(['search', 'status', 'billing_cycle', 'plan_id', 'date_from', 'date_to']),
+            'asaasConfigured' => $this->asaas->isConfigured(),
         ]);
     }
 
@@ -279,6 +285,113 @@ class InvoiceController extends Controller
         CentralActivityLog::log('invoice.bulk_generated', "{$created} faturas geradas em lote ({$cycle}), {$skipped} ignoradas");
 
         return back()->with('success', "{$created} faturas geradas, {$skipped} ignoradas (já existiam ou sem preço).");
+    }
+
+    /**
+     * Create a charge on Asaas for an existing invoice.
+     */
+    public function chargeOnAsaas(Request $request, TenantInvoice $invoice)
+    {
+        if (! $this->asaas->isConfigured()) {
+            return back()->with('error', 'Asaas não está configurado. Defina ASAAS_API_KEY no .env.');
+        }
+
+        if ($invoice->isPaid() || $invoice->isCancelled()) {
+            return back()->with('error', 'Fatura já está paga ou cancelada.');
+        }
+
+        $validated = $request->validate([
+            'billing_type' => 'required|in:PIX,BOLETO,UNDEFINED',
+        ]);
+
+        $tenant = Tenant::findOrFail($invoice->tenant_id);
+
+        try {
+            // Ensure tenant has an Asaas customer
+            $customerId = $this->ensureAsaasCustomer($tenant);
+
+            // Create payment on Asaas
+            $payment = $this->asaas->createPayment([
+                'customer' => $customerId,
+                'billingType' => $validated['billing_type'],
+                'value' => (float) $invoice->amount,
+                'dueDate' => $invoice->due_at->format('Y-m-d'),
+                'description' => "Fatura #{$invoice->id} - {$tenant->name}",
+                'externalReference' => "invoice_{$invoice->id}",
+            ]);
+
+            // Update invoice with Asaas data
+            $invoice->update([
+                'gateway_provider' => 'asaas',
+                'gateway_id' => $payment['id'],
+                'payment_url' => $payment['invoiceUrl'] ?? null,
+            ]);
+
+            CentralActivityLog::log(
+                'invoice.asaas_charged',
+                "Cobrança Asaas criada para fatura #{$invoice->id} ({$validated['billing_type']})",
+                $invoice->tenant_id
+            );
+
+            return back()->with('success', "Cobrança {$validated['billing_type']} criada no Asaas.");
+        } catch (\Exception $e) {
+            return back()->with('error', 'Erro ao criar cobrança: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get PIX QR Code for an invoice charged on Asaas.
+     */
+    public function getPixQrCode(TenantInvoice $invoice)
+    {
+        if (! $invoice->gateway_id || $invoice->gateway_provider !== 'asaas') {
+            return response()->json(['error' => 'Fatura não possui cobrança Asaas.'], 400);
+        }
+
+        try {
+            $qrCode = $this->asaas->getPixQrCode($invoice->gateway_id);
+
+            return response()->json($qrCode);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Ensure the tenant has a customer record on Asaas.
+     * Creates one if it doesn't exist, stores the ID in tenant settings.
+     */
+    protected function ensureAsaasCustomer(Tenant $tenant): string
+    {
+        $settings = $tenant->settings ?? [];
+
+        // Already has Asaas customer ID
+        if (! empty($settings['asaas_customer_id'])) {
+            return $settings['asaas_customer_id'];
+        }
+
+        // Try to find by external reference
+        $existing = $this->asaas->findCustomerByExternalReference($tenant->id);
+        if ($existing) {
+            $settings['asaas_customer_id'] = $existing['id'];
+            $tenant->update(['settings' => $settings]);
+
+            return $existing['id'];
+        }
+
+        // Create new customer
+        $customer = $this->asaas->createCustomer([
+            'name' => $tenant->name,
+            'email' => $tenant->owner_email,
+            'cpfCnpj' => preg_replace('/\D/', '', $tenant->cnpj ?? ''),
+            'externalReference' => $tenant->id,
+            'notificationDisabled' => false,
+        ]);
+
+        $settings['asaas_customer_id'] = $customer['id'];
+        $tenant->update(['settings' => $settings]);
+
+        return $customer['id'];
     }
 
     protected function calculatePeriod(string $cycle): array
