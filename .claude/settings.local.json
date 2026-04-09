@@ -55,7 +55,19 @@
       "Bash(C:\\\\Users\\\\MSDEV\\\\php84\\\\php.exe C:\\\\xampp\\\\htdocs\\\\mercury-laravel\\\\artisan:*)",
       "Bash(/c/Users/MSDEV/php84/php.exe:*)",
       "Bash(find:*)",
-      "Bash(C:/Users/MSDEV/php84/php.exe artisan:*)"
+      "Bash(C:/Users/MSDEV/php84/php.exe artisan:*)",
+      "Bash(npx vite:*)",
+      "Bash(C:/wamp64/bin/php/php8.4.0/php.exe artisan:*)",
+      "Bash(rm:*)",
+      "Bash(vendor/bin/pint app/Http/Controllers/Config/ProductLookupConfigController.php app/Services/ProductSyncService.php)",
+      "Bash(vendor/bin/pint app/Services/ProductSyncService.php app/Http/Controllers/ProductController.php)",
+      "Bash(npm list:*)",
+      "Bash(npm install:*)",
+      "Bash(vendor/bin/pint --test app/Http/Controllers/OrderPaymentController.php app/Exports/OrderPaymentExport.php)",
+      "Bash(vendor/bin/pint app/Http/Controllers/OrderPaymentController.php app/Exports/OrderPaymentExport.php)",
+      "Bash(vendor/bin/pint app/Models/Holiday.php app/Models/Vacation.php app/Models/VacationPeriod.php app/Models/VacationLog.php app/Models/VacationAlertLog.php app/Services/VacationCalculationService.php app/Services/VacationValidatorService.php app/Services/VacationTransitionService.php app/Services/VacationPeriodGeneratorService.php app/Http/Controllers/VacationController.php app/Enums/Permission.php app/Enums/Role.php)",
+      "Bash(vendor/bin/pint app/Models/StockAudit*.php app/Services/StockAudit*.php app/Http/Controllers/StockAuditController.php app/Http/Controllers/Config/StockAuditCycleController.php app/Http/Controllers/Config/StockAuditVendorController.php app/Exports/StockAuditExport.php app/Imports/StockAuditCountImport.php --test)",
+      "Bash(vendor/bin/pint app/Models/StockAudit*.php app/Services/StockAudit*.php app/Http/Controllers/StockAuditController.php app/Http/Controllers/Config/StockAuditCycleController.php app/Http/Controllers/Config/StockAuditVendorController.php app/Exports/StockAuditExport.php app/Imports/StockAuditCountImport.php)"
     ],
     "deny": [],
     "ask": []

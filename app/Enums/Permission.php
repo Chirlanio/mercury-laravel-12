@@ -105,9 +105,28 @@ enum Permission: string
     case VIEW_MOVEMENTS = 'movements.view';
     case SYNC_MOVEMENTS = 'movements.sync';
 
+    // Férias
+    case VIEW_VACATIONS = 'vacations.view';
+    case CREATE_VACATIONS = 'vacations.create';
+    case EDIT_VACATIONS = 'vacations.edit';
+    case DELETE_VACATIONS = 'vacations.delete';
+    case APPROVE_VACATIONS_MANAGER = 'vacations.approve_manager';
+    case APPROVE_VACATIONS_RH = 'vacations.approve_rh';
+    case MANAGE_HOLIDAYS = 'vacations.manage_holidays';
+
+    // Auditoria de estoque
+    case VIEW_STOCK_AUDITS = 'stock_audits.view';
+    case CREATE_STOCK_AUDITS = 'stock_audits.create';
+    case EDIT_STOCK_AUDITS = 'stock_audits.edit';
+    case DELETE_STOCK_AUDITS = 'stock_audits.delete';
+    case AUTHORIZE_STOCK_AUDITS = 'stock_audits.authorize';
+    case COUNT_STOCK_AUDITS = 'stock_audits.count';
+    case RECONCILE_STOCK_AUDITS = 'stock_audits.reconcile';
+    case MANAGE_STOCK_AUDIT_CONFIG = 'stock_audits.manage_config';
+
     public function label(): string
     {
-        return match($this) {
+        return match ($this) {
             self::VIEW_USERS => 'Visualizar usuários',
             self::CREATE_USERS => 'Criar usuários',
             self::EDIT_USERS => 'Editar usuários',
@@ -190,12 +209,29 @@ enum Permission: string
 
             self::VIEW_MOVEMENTS => 'Visualizar movimentações',
             self::SYNC_MOVEMENTS => 'Sincronizar movimentações',
+
+            self::VIEW_VACATIONS => 'Visualizar férias',
+            self::CREATE_VACATIONS => 'Criar solicitação de férias',
+            self::EDIT_VACATIONS => 'Editar férias',
+            self::DELETE_VACATIONS => 'Excluir férias',
+            self::APPROVE_VACATIONS_MANAGER => 'Aprovar férias (Gestor)',
+            self::APPROVE_VACATIONS_RH => 'Aprovar férias (RH)',
+            self::MANAGE_HOLIDAYS => 'Gerenciar feriados',
+
+            self::VIEW_STOCK_AUDITS => 'Visualizar auditorias de estoque',
+            self::CREATE_STOCK_AUDITS => 'Criar auditorias de estoque',
+            self::EDIT_STOCK_AUDITS => 'Editar auditorias de estoque',
+            self::DELETE_STOCK_AUDITS => 'Excluir auditorias de estoque',
+            self::AUTHORIZE_STOCK_AUDITS => 'Autorizar auditorias de estoque',
+            self::COUNT_STOCK_AUDITS => 'Realizar contagem de estoque',
+            self::RECONCILE_STOCK_AUDITS => 'Conciliar auditorias de estoque',
+            self::MANAGE_STOCK_AUDIT_CONFIG => 'Gerenciar config. de auditoria',
         };
     }
 
     public function description(): string
     {
-        return match($this) {
+        return match ($this) {
             self::VIEW_USERS => 'Permite visualizar lista de usuários e detalhes',
             self::CREATE_USERS => 'Permite criar novos usuários no sistema',
             self::EDIT_USERS => 'Permite editar informações de usuários',
@@ -278,19 +314,36 @@ enum Permission: string
 
             self::VIEW_MOVEMENTS => 'Permite visualizar movimentações diárias',
             self::SYNC_MOVEMENTS => 'Permite sincronizar movimentações do CIGAM',
+
+            self::VIEW_VACATIONS => 'Permite visualizar solicitações de férias',
+            self::CREATE_VACATIONS => 'Permite criar solicitações de férias',
+            self::EDIT_VACATIONS => 'Permite editar solicitações de férias',
+            self::DELETE_VACATIONS => 'Permite excluir solicitações de férias',
+            self::APPROVE_VACATIONS_MANAGER => 'Permite aprovar/rejeitar férias como gestor',
+            self::APPROVE_VACATIONS_RH => 'Permite aprovar/rejeitar férias como RH e iniciar/finalizar gozo',
+            self::MANAGE_HOLIDAYS => 'Permite cadastrar e gerenciar feriados',
+
+            self::VIEW_STOCK_AUDITS => 'Permite visualizar auditorias de estoque',
+            self::CREATE_STOCK_AUDITS => 'Permite criar novas auditorias de estoque',
+            self::EDIT_STOCK_AUDITS => 'Permite editar auditorias de estoque',
+            self::DELETE_STOCK_AUDITS => 'Permite excluir auditorias de estoque',
+            self::AUTHORIZE_STOCK_AUDITS => 'Permite autorizar o inicio de auditorias de estoque',
+            self::COUNT_STOCK_AUDITS => 'Permite realizar contagem fisica de estoque',
+            self::RECONCILE_STOCK_AUDITS => 'Permite conciliar divergencias em auditorias de estoque',
+            self::MANAGE_STOCK_AUDIT_CONFIG => 'Permite gerenciar ciclos e empresas auditoras',
         };
     }
 
     public static function all(): array
     {
-        return array_map(fn($case) => $case->value, self::cases());
+        return array_map(fn ($case) => $case->value, self::cases());
     }
 
     public static function options(): array
     {
         return array_combine(
-            array_map(fn($case) => $case->value, self::cases()),
-            array_map(fn($case) => $case->label(), self::cases())
+            array_map(fn ($case) => $case->value, self::cases()),
+            array_map(fn ($case) => $case->label(), self::cases())
         );
     }
 }

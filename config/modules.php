@@ -152,4 +152,30 @@ return [
         'routes' => ['integrations.*'],
         'icon' => 'LinkIcon',
     ],
+    'store_goals' => [
+        'name' => 'Metas de Loja',
+        'description' => 'Definição e acompanhamento de metas por loja.',
+        'routes' => ['store-goals.*'],
+        'icon' => 'ChartBarIcon',
+    ],
+    'movements' => [
+        'name' => 'Movimentações',
+        'description' => 'Movimentações diárias de estoque sincronizadas do CIGAM.',
+        'routes' => ['movements.*'],
+        'icon' => 'ArrowPathIcon',
+    ],
+    'vacations' => [
+        'name' => 'Férias',
+        'description' => 'Solicitação, aprovação e controle de férias.',
+        'routes' => ['vacations.*'],
+        'icon' => 'SunIcon',
+        'dependencies' => ['employees'],
+    ],
+    'stock_audits' => [
+        'name' => 'Auditoria de Estoque',
+        'description' => 'Inventário com contagem, conciliação CIGAM e relatórios.',
+        'routes' => ['stock-audits.*'],
+        'icon' => 'ClipboardDocumentCheckIcon',
+        'dependencies' => ['products', 'stores'],
+    ],
 ];

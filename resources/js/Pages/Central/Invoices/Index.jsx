@@ -258,43 +258,45 @@ function CreateInvoiceModal({ tenants, plans, onClose }) {
 
     return (
         <Modal title="Nova Fatura" subtitle="Crie uma fatura manualmente para um tenant." onClose={onClose}>
-            <form onSubmit={submit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                    <Field label="Tenant *" help="Empresa que receberá a cobrança.">
-                        <select value={data.tenant_id} onChange={(e) => handleTenantChange(e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm" required>
-                            <option value="">Selecione...</option>
-                            {tenants.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                        </select>
-                        {errors.tenant_id && <p className="mt-1 text-xs text-red-600">{errors.tenant_id}</p>}
-                    </Field>
-                    <Field label="Ciclo *" help="Mensal ou anual.">
-                        <select value={data.billing_cycle} onChange={(e) => setData('billing_cycle', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm">
-                            <option value="monthly">Mensal</option>
-                            <option value="yearly">Anual</option>
-                        </select>
-                    </Field>
-                </div>
-                <Field label="Valor *" help="Valor em reais (R$). Digite como calculadora.">
-                    <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">R$</span>
-                        <input type="text" value={centsToDisplay(cents)} onKeyDown={handleCurrencyKeyDown} onChange={() => {}} className="block w-full pl-9 pr-3 py-2 rounded-md border-gray-300 shadow-sm text-sm text-right" inputMode="numeric" />
+            <form onSubmit={submit} className="flex flex-col flex-1 min-h-0">
+                <div className="overflow-y-auto flex-1 p-6 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <Field label="Tenant *" help="Empresa que receberá a cobrança.">
+                            <select value={data.tenant_id} onChange={(e) => handleTenantChange(e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm" required>
+                                <option value="">Selecione...</option>
+                                {tenants.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            </select>
+                            {errors.tenant_id && <p className="mt-1 text-xs text-red-600">{errors.tenant_id}</p>}
+                        </Field>
+                        <Field label="Ciclo *" help="Mensal ou anual.">
+                            <select value={data.billing_cycle} onChange={(e) => setData('billing_cycle', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm">
+                                <option value="monthly">Mensal</option>
+                                <option value="yearly">Anual</option>
+                            </select>
+                        </Field>
                     </div>
-                    {errors.amount && <p className="mt-1 text-xs text-red-600">{errors.amount}</p>}
-                </Field>
-                <div className="grid grid-cols-2 gap-4">
-                    <Field label="Início do Período *" help="Data de início da cobertura.">
-                        <input type="date" value={data.billing_period_start} onChange={(e) => setData('billing_period_start', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm" required />
+                    <Field label="Valor *" help="Valor em reais (R$). Digite como calculadora.">
+                        <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">R$</span>
+                            <input type="text" value={centsToDisplay(cents)} onKeyDown={handleCurrencyKeyDown} onChange={() => {}} className="block w-full pl-9 pr-3 py-2 rounded-md border-gray-300 shadow-sm text-sm text-right" inputMode="numeric" />
+                        </div>
+                        {errors.amount && <p className="mt-1 text-xs text-red-600">{errors.amount}</p>}
                     </Field>
-                    <Field label="Fim do Período *" help="Data de fim da cobertura.">
-                        <input type="date" value={data.billing_period_end} onChange={(e) => setData('billing_period_end', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm" required />
+                    <div className="grid grid-cols-2 gap-4">
+                        <Field label="Início do Período *" help="Data de início da cobertura.">
+                            <input type="date" value={data.billing_period_start} onChange={(e) => setData('billing_period_start', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm" required />
+                        </Field>
+                        <Field label="Fim do Período *" help="Data de fim da cobertura.">
+                            <input type="date" value={data.billing_period_end} onChange={(e) => setData('billing_period_end', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm" required />
+                        </Field>
+                    </div>
+                    <Field label="Vencimento *" help="Data limite para pagamento.">
+                        <input type="date" value={data.due_at} onChange={(e) => setData('due_at', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm" required />
+                    </Field>
+                    <Field label="Notas" help="Observações internas (não visíveis ao tenant).">
+                        <textarea value={data.notes} onChange={(e) => setData('notes', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm" rows="2" />
                     </Field>
                 </div>
-                <Field label="Vencimento *" help="Data limite para pagamento.">
-                    <input type="date" value={data.due_at} onChange={(e) => setData('due_at', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm" required />
-                </Field>
-                <Field label="Notas" help="Observações internas (não visíveis ao tenant).">
-                    <textarea value={data.notes} onChange={(e) => setData('notes', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm" rows="2" />
-                </Field>
                 <ModalActions onClose={onClose} processing={processing} label="Criar Fatura" />
             </form>
         </Modal>
@@ -579,12 +581,12 @@ function Modal({ title, subtitle, onClose, children }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="fixed inset-0 bg-gray-600/75" onClick={onClose} />
-            <div className="relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
-                <div className="px-6 py-4 border-b">
+            <div className="relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] flex flex-col">
+                <div className="px-6 py-4 border-b shrink-0">
                     <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
                     {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
                 </div>
-                <div className="p-6">{children}</div>
+                <div className="flex-1 min-h-0 flex flex-col">{children}</div>
             </div>
         </div>
     );
@@ -602,8 +604,8 @@ function Field({ label, help, children }) {
 
 function ModalActions({ onClose, processing, label, color = 'bg-indigo-600 hover:bg-indigo-700' }) {
     return (
-        <div className="flex justify-end gap-3 pt-4 border-t">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200">Cancelar</button>
+        <div className="px-6 py-4 border-t bg-gray-50 rounded-b-lg shrink-0 flex justify-end gap-3">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
             <button type="submit" disabled={processing} className={`px-4 py-2 text-sm font-medium text-white rounded-md disabled:opacity-50 ${color}`}>
                 {processing ? 'Salvando...' : label}
             </button>

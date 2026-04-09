@@ -11,9 +11,9 @@ use App\Models\ProductColor;
 use App\Models\ProductMaterial;
 use App\Models\ProductSize;
 use App\Models\ProductSubcollection;
+use App\Models\ProductSupplier;
 use App\Models\ProductSyncLog;
 use App\Models\ProductVariant;
-use App\Models\Supplier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -47,11 +47,13 @@ class ProductSyncService
 
     /**
      * Sync all 8 lookup tables + suppliers from CIGAM.
+     * Optionally reports progress to a ProductSyncLog.
      */
-    public function syncLookups(): array
+    public function syncLookups(?int $logId = null): array
     {
         set_time_limit(300);
         $results = [];
+        $log = $logId ? ProductSyncLog::find($logId) : null;
 
         $lookupMappings = [
             'msl_prod_categoria_' => [
@@ -98,14 +100,38 @@ class ProductSyncService
             ],
         ];
 
+        $lookupLabels = [
+            'msl_prod_categoria_' => 'Categorias',
+            'msl_prod_colecao_' => 'Coleções',
+            'msl_prod_subcolecao_' => 'Subcoleções',
+            'msl_prod_cor_' => 'Cores',
+            'msl_prod_marca_' => 'Marcas',
+            'msl_prod_material_' => 'Materiais',
+            'msl_prod_tamanho_' => 'Tamanhos',
+            'msl_prod_compartigo_' => 'Compl. Artigo',
+        ];
+
+        // Total = 8 lookup tables + 1 suppliers
+        if ($log) {
+            $log->update(['lookup_total' => count($lookupMappings) + 1, 'lookup_processed' => 0]);
+        }
+
+        $processed = 0;
+
         foreach ($lookupMappings as $table => $config) {
+            if ($log) {
+                $log->update(['lookup_current' => $lookupLabels[$table] ?? $table]);
+            }
+
             try {
+                // Set per-query timeout on PostgreSQL (120s per table)
+                DB::connection('cigam')->statement("SET statement_timeout = '120s'");
                 $rows = DB::connection('cigam')->table($table)->get();
                 $count = 0;
 
                 foreach ($rows as $row) {
                     $code = trim($row->{$config['code_field']});
-                    $name = strtoupper(trim($row->{$config['name_field']}));
+                    $name = mb_strtoupper(trim($row->{$config['name_field']}));
 
                     if (! empty($config['sanitize_name'])) {
                         $name = $this->sanitizeCollectionName($name);
@@ -127,10 +153,26 @@ class ProductSyncService
                 Log::error("ProductSync: Error syncing {$table}: {$e->getMessage()}");
                 $results[$table] = 'error: '.$e->getMessage();
             }
+
+            $processed++;
+            if ($log) {
+                $log->update(['lookup_processed' => $processed]);
+
+                // Check if cancelled
+                $log->refresh();
+                if ($log->status === 'cancelled') {
+                    return $results;
+                }
+            }
         }
 
-        // Sync suppliers
+        // Sync product suppliers (from CIGAM, separate from service suppliers)
+        if ($log) {
+            $log->update(['lookup_current' => 'Fornecedores']);
+        }
+
         try {
+            DB::connection('cigam')->statement("SET statement_timeout = '120s'");
             $suppliers = DB::connection('cigam')->table('msl_dfornecedor_')->get();
             $count = 0;
 
@@ -140,22 +182,26 @@ class ProductSyncService
                     continue;
                 }
 
-                Supplier::updateOrCreate(
+                ProductSupplier::updateOrCreate(
                     ['codigo_for' => $codigoFor],
                     [
                         'cnpj' => trim($row->cnpj ?? ''),
-                        'razao_social' => strtoupper(trim($row->razao_social ?? '')),
-                        'nome_fantasia' => strtoupper(trim($row->nome_fantasia ?? '')),
+                        'razao_social' => mb_strtoupper(trim($row->razao_social ?? '')),
+                        'nome_fantasia' => mb_strtoupper(trim($row->nome_fantasia ?? '')),
                         'is_active' => true,
                     ]
                 );
                 $count++;
             }
 
-            $results['suppliers'] = $count;
+            $results['product_suppliers'] = $count;
         } catch (\Exception $e) {
-            Log::error("ProductSync: Error syncing suppliers: {$e->getMessage()}");
-            $results['suppliers'] = 'error: '.$e->getMessage();
+            Log::error("ProductSync: Error syncing product suppliers: {$e->getMessage()}");
+            $results['product_suppliers'] = 'error: '.$e->getMessage();
+        }
+
+        if ($log) {
+            $log->update(['lookup_processed' => $processed + 1, 'lookup_current' => null]);
         }
 
         return $results;
@@ -270,7 +316,7 @@ class ProductSyncService
 
                 // Upsert product (resolve merged lookup codes to their targets)
                 $productData = [
-                    'description' => strtoupper(trim($first->descricao ?? '')),
+                    'description' => mb_strtoupper(trim($first->descricao ?? '')),
                     'brand_cigam_code' => $this->trimOrNull($first->codmarca ?? null),
                     'collection_cigam_code' => $this->trimOrNull($first->codcolecao ?? null),
                     'subcollection_cigam_code' => $this->trimOrNull($first->codsubcolecao ?? null),
@@ -298,11 +344,13 @@ class ProductSyncService
                 foreach ($variants as $variant) {
                     $sizeCode = $this->trimOrNull($variant->codtamanho ?? null);
                     $barcode = $this->trimOrNull($variant->codbarra ?? null);
+                    $auxReference = $this->trimOrNull($variant->refauxiliar ?? null);
 
                     ProductVariant::updateOrCreate(
                         ['product_id' => $product->id, 'size_cigam_code' => $sizeCode],
                         [
                             'barcode' => $barcode,
+                            'aux_reference' => $auxReference,
                             'is_active' => true,
                         ]
                     );
@@ -346,16 +394,16 @@ class ProductSyncService
      */
     public function syncPrices(int $logId, ?string $dateStart = null, ?string $dateEnd = null): array
     {
-        set_time_limit(300);
+        set_time_limit(0);
 
         $log = ProductSyncLog::findOrFail($logId);
         $updated = 0;
+        $chunkSize = 1000;
 
         try {
             $query = DB::connection('cigam')->table('msl_prod_valor_')
                 ->select('msl_prod_valor_.referencia', 'msl_prod_valor_.min_vlrvenda', 'msl_prod_valor_.min_vlrcusto');
 
-            // Filter by period: only prices for products created/updated in the date range
             if ($dateStart && $dateEnd) {
                 $query->join('msl_produtos_', 'msl_prod_valor_.referencia', '=', 'msl_produtos_.referencia')
                     ->where(function ($q) use ($dateStart, $dateEnd) {
@@ -365,25 +413,45 @@ class ProductSyncService
                     ->distinct();
             }
 
-            $prices = $query->get();
+            // Count total first
+            $total = (clone $query)->count();
+            $log->update(['price_total' => $total, 'price_processed' => 0]);
 
-            foreach ($prices as $row) {
+            $processed = 0;
+
+            // Process in chunks using orderBy + offset to avoid loading all into memory
+            $query->orderBy('msl_prod_valor_.referencia');
+
+            foreach ($query->lazy($chunkSize) as $row) {
                 $reference = trim($row->referencia);
-                if (empty($reference)) {
-                    continue;
+                if (! empty($reference)) {
+                    $affected = Product::where('reference', $reference)
+                        ->where('sync_locked', false)
+                        ->update([
+                            'sale_price' => $row->min_vlrvenda ?? 0,
+                            'cost_price' => $row->min_vlrcusto ?? 0,
+                        ]);
+
+                    if ($affected) {
+                        $updated++;
+                    }
                 }
 
-                $affected = Product::where('reference', $reference)
-                    ->where('sync_locked', false)
-                    ->update([
-                        'sale_price' => $row->min_vlrvenda ?? 0,
-                        'cost_price' => $row->min_vlrcusto ?? 0,
-                    ]);
+                $processed++;
 
-                if ($affected) {
-                    $updated++;
+                // Update progress and check cancellation every chunk
+                if ($processed % $chunkSize === 0) {
+                    $log->update(['price_processed' => $processed]);
+
+                    $log->refresh();
+                    if ($log->status === 'cancelled') {
+                        return ['updated' => $updated, 'cancelled' => true];
+                    }
                 }
             }
+
+            // Final progress update
+            $log->update(['price_processed' => $processed]);
 
             return ['updated' => $updated];
         } catch (\Exception $e) {
@@ -430,7 +498,7 @@ class ProductSyncService
             $name = explode('/', $name)[0];
         }
 
-        return strtoupper(trim($name));
+        return mb_strtoupper(trim($name));
     }
 
     private function trimOrNull(?string $value): ?string

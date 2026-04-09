@@ -208,11 +208,12 @@ function CreateTenantModal({ plans, onClose }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="fixed inset-0 bg-gray-600/75" onClick={onClose} />
-            <div className="relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
-                <div className="px-6 py-4 border-b">
+            <div className="relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] flex flex-col">
+                <div className="px-6 py-4 border-b shrink-0">
                     <h3 className="text-lg font-semibold text-gray-900">Novo Tenant</h3>
                 </div>
-                <form onSubmit={submit} className="p-6 space-y-4">
+                <form onSubmit={submit} className="flex flex-col flex-1 min-h-0">
+                <div className="p-6 space-y-4 overflow-y-auto flex-1">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2">
                             <label className="block text-sm font-medium text-gray-700">Nome da Empresa *</label>
@@ -264,7 +265,8 @@ function CreateTenantModal({ plans, onClose }) {
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-3 pt-4 border-t">
+                    </div>
+                    <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-lg shrink-0">
                         <button type="button" onClick={onClose}
                             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
                             Cancelar

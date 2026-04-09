@@ -102,11 +102,17 @@ class LaravelPagesSeeder extends Seeder
             // Ajustes de Estoque
             ['route' => '/stock-adjustments', 'page_name' => 'Ajustes de Estoque', 'icon' => 'fas fa-clipboard-check', 'controller' => 'StockAdjustments', 'method' => 'index', 'menu_controller' => 'stock-adjustments', 'menu_method' => 'list'],
 
+            // Auditorias de Estoque
+            ['route' => '/stock-audits', 'page_name' => 'Auditoria de Estoque', 'icon' => 'fas fa-clipboard-list', 'controller' => 'StockAudits', 'method' => 'index', 'menu_controller' => 'stock-audit', 'menu_method' => 'list'],
+
             // Ordens de Pagamento
             ['route' => '/order-payments', 'page_name' => 'Ordens de Pagamento', 'icon' => 'fas fa-money-bill-wave', 'controller' => 'OrderPayments', 'method' => 'index', 'menu_controller' => 'order-payments', 'menu_method' => 'list'],
 
             // Fornecedores
             ['route' => '/suppliers', 'page_name' => 'Fornecedores', 'icon' => 'fas fa-truck', 'controller' => 'Suppliers', 'method' => 'index', 'menu_controller' => 'supplier', 'menu_method' => 'list'],
+
+            // Férias
+            ['route' => '/vacations', 'page_name' => 'Férias', 'icon' => 'fas fa-umbrella-beach', 'controller' => 'Vacations', 'method' => 'index', 'menu_controller' => 'vacation', 'menu_method' => 'list'],
 
             // Atestados Médicos
             ['route' => '/medical-certificates', 'page_name' => 'Atestados Médicos', 'icon' => 'fas fa-file-medical', 'controller' => 'MedicalCertificates', 'method' => 'index', 'menu_controller' => 'medical-certificate', 'menu_method' => 'list'],
@@ -138,14 +144,15 @@ class LaravelPagesSeeder extends Seeder
             ['route' => '/config/drivers', 'page_name' => 'Motoristas', 'icon' => 'fas fa-cog', 'controller' => 'ConfigDrivers', 'method' => 'index', 'menu_controller' => 'drivers', 'menu_method' => 'list'],
 
             // Configurações - Cadastro de Produtos
-            ['route' => '/config/product-brands', 'page_name' => 'Marcas de Produto', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductBrands', 'method' => 'index', 'menu_controller' => 'config-product-brands', 'menu_method' => 'index'],
-            ['route' => '/config/product-categories', 'page_name' => 'Categorias de Produto', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductCategories', 'method' => 'index', 'menu_controller' => 'config-product-categories', 'menu_method' => 'index'],
-            ['route' => '/config/product-collections', 'page_name' => 'Coleções de Produto', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductCollections', 'method' => 'index', 'menu_controller' => 'config-product-collections', 'menu_method' => 'index'],
-            ['route' => '/config/product-subcollections', 'page_name' => 'Subcoleções de Produto', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductSubcollections', 'method' => 'index', 'menu_controller' => 'config-product-subcollections', 'menu_method' => 'index'],
+            ['route' => '/config/product-lookup-groups', 'page_name' => 'Agrupamentos', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductLookupGroups', 'method' => 'index', 'menu_controller' => 'config-product-lookup-groups', 'menu_method' => 'index'],
+            ['route' => '/config/product-brands', 'page_name' => 'Marcas', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductBrands', 'method' => 'index', 'menu_controller' => 'config-product-brands', 'menu_method' => 'index'],
+            ['route' => '/config/product-categories', 'page_name' => 'Tipo', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductCategories', 'method' => 'index', 'menu_controller' => 'config-product-categories', 'menu_method' => 'index'],
+            ['route' => '/config/product-collections', 'page_name' => 'Estação', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductCollections', 'method' => 'index', 'menu_controller' => 'config-product-collections', 'menu_method' => 'index'],
+            ['route' => '/config/product-subcollections', 'page_name' => 'Coleção', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductSubcollections', 'method' => 'index', 'menu_controller' => 'config-product-subcollections', 'menu_method' => 'index'],
             ['route' => '/config/product-colors', 'page_name' => 'Cores de Produto', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductColors', 'method' => 'index', 'menu_controller' => 'config-product-colors', 'menu_method' => 'index'],
-            ['route' => '/config/product-materials', 'page_name' => 'Materiais de Produto', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductMaterials', 'method' => 'index', 'menu_controller' => 'config-product-materials', 'menu_method' => 'index'],
-            ['route' => '/config/product-sizes', 'page_name' => 'Tamanhos de Produto', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductSizes', 'method' => 'index', 'menu_controller' => 'config-product-sizes', 'menu_method' => 'index'],
-            ['route' => '/config/product-article-complements', 'page_name' => 'Complementos de Artigo', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductArticleComplements', 'method' => 'index', 'menu_controller' => 'config-product-article-complements', 'menu_method' => 'index'],
+            ['route' => '/config/product-materials', 'page_name' => 'Material', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductMaterials', 'method' => 'index', 'menu_controller' => 'config-product-materials', 'menu_method' => 'index'],
+            ['route' => '/config/product-sizes', 'page_name' => 'Tamanho', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductSizes', 'method' => 'index', 'menu_controller' => 'config-product-sizes', 'menu_method' => 'index'],
+            ['route' => '/config/product-article-complements', 'page_name' => 'Grupo', 'icon' => 'fas fa-cog', 'controller' => 'ConfigProductArticleComplements', 'method' => 'index', 'menu_controller' => 'config-product-article-complements', 'menu_method' => 'index'],
 
             // Integrações
             ['route' => '/integrations', 'page_name' => 'Integrações', 'icon' => 'fas fa-link', 'controller' => 'Integrations', 'method' => 'index', 'menu_controller' => 'integrations', 'menu_method' => 'index'],
@@ -170,8 +177,10 @@ class LaravelPagesSeeder extends Seeder
             '/user-sessions' => 'RH',
             '/transfers' => 'Operações',
             '/stock-adjustments' => 'Operações',
+            '/stock-audits' => 'Operações',
             '/order-payments' => 'Financeiro',
             '/suppliers' => 'Configurações',
+            '/vacations' => 'RH',
             '/medical-certificates' => 'RH',
             '/absences' => 'RH',
             '/overtime-records' => 'RH',
@@ -189,6 +198,7 @@ class LaravelPagesSeeder extends Seeder
             '/config/cost-centers' => 'Configurações',
             '/config/payment-types' => 'Configurações',
             '/config/drivers' => 'Configurações',
+            '/config/product-lookup-groups' => 'Configurações',
             '/config/product-brands' => 'Configurações',
             '/config/product-categories' => 'Configurações',
             '/config/product-collections' => 'Configurações',

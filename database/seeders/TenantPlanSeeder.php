@@ -17,7 +17,8 @@ class TenantPlanSeeder extends Seeder
             'products', 'transfers', 'stock_adjustments', 'order_payments',
             'suppliers', 'checklists', 'medical_certificates', 'absences',
             'overtime', 'color_themes', 'activity_logs', 'user_sessions',
-            'config', 'integrations',
+            'config', 'integrations', 'store_goals', 'movements',
+            'vacations', 'stock_audits',
         ];
 
         // Essential modules for Starter plan

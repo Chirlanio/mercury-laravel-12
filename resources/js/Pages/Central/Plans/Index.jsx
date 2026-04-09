@@ -198,84 +198,86 @@ function PlanFormModal({ plan, allModules, moduleLabels, onClose }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="fixed inset-0 bg-gray-600/75" onClick={onClose} />
-            <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-                <div className="px-6 py-4 border-b">
+            <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] flex flex-col">
+                <div className="px-6 py-4 border-b shrink-0">
                     <h3 className="text-lg font-semibold text-gray-900">
                         {isEditing ? `Editar: ${plan.name}` : 'Novo Plano'}
                     </h3>
                 </div>
-                <form onSubmit={submit} className="p-6 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Nome *</label>
-                            <input type="text" value={data.name} onChange={(e) => setData('name', e.target.value)}
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" required />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Slug *</label>
-                            <input type="text" value={data.slug} onChange={(e) => setData('slug', e.target.value)}
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" required disabled={isEditing} />
-                        </div>
-                        <div className="col-span-2">
-                            <label className="block text-sm font-medium text-gray-700">Descrição</label>
-                            <textarea value={data.description} onChange={(e) => setData('description', e.target.value)}
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" rows="2" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Máx Usuários (0=ilimitado)</label>
-                            <input type="number" value={data.max_users} onChange={(e) => setData('max_users', parseInt(e.target.value))}
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" min="0" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Máx Lojas (0=ilimitado)</label>
-                            <input type="number" value={data.max_stores} onChange={(e) => setData('max_stores', parseInt(e.target.value))}
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" min="0" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Preço Mensal</label>
-                            <div className="mt-1 relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">R$</span>
-                                <input type="text" value={centsToDisplay(monthlyCents)}
-                                    onKeyDown={handleCurrencyKeyDown(monthlyCents, setMonthlyCents, 'price_monthly')}
-                                    onChange={() => {}}
-                                    className="block w-full pl-9 pr-3 py-2 rounded-md border-gray-300 shadow-sm text-sm text-right"
-                                    inputMode="numeric" />
+                <form onSubmit={submit} className="flex flex-col flex-1 min-h-0">
+                    <div className="overflow-y-auto flex-1 p-6 space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Nome *</label>
+                                <input type="text" value={data.name} onChange={(e) => setData('name', e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" required />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Slug *</label>
+                                <input type="text" value={data.slug} onChange={(e) => setData('slug', e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" required disabled={isEditing} />
+                            </div>
+                            <div className="col-span-2">
+                                <label className="block text-sm font-medium text-gray-700">Descrição</label>
+                                <textarea value={data.description} onChange={(e) => setData('description', e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" rows="2" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Máx Usuários (0=ilimitado)</label>
+                                <input type="number" value={data.max_users} onChange={(e) => setData('max_users', parseInt(e.target.value))}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" min="0" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Máx Lojas (0=ilimitado)</label>
+                                <input type="number" value={data.max_stores} onChange={(e) => setData('max_stores', parseInt(e.target.value))}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" min="0" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Preço Mensal</label>
+                                <div className="mt-1 relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">R$</span>
+                                    <input type="text" value={centsToDisplay(monthlyCents)}
+                                        onKeyDown={handleCurrencyKeyDown(monthlyCents, setMonthlyCents, 'price_monthly')}
+                                        onChange={() => {}}
+                                        className="block w-full pl-9 pr-3 py-2 rounded-md border-gray-300 shadow-sm text-sm text-right"
+                                        inputMode="numeric" />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Preço Anual</label>
+                                <div className="mt-1 relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">R$</span>
+                                    <input type="text" value={centsToDisplay(yearlyCents)}
+                                        onKeyDown={handleCurrencyKeyDown(yearlyCents, setYearlyCents, 'price_yearly')}
+                                        onChange={() => {}}
+                                        className="block w-full pl-9 pr-3 py-2 rounded-md border-gray-300 shadow-sm text-sm text-right"
+                                        inputMode="numeric" />
+                                </div>
                             </div>
                         </div>
+
+                        {/* Modules */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Preço Anual</label>
-                            <div className="mt-1 relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">R$</span>
-                                <input type="text" value={centsToDisplay(yearlyCents)}
-                                    onKeyDown={handleCurrencyKeyDown(yearlyCents, setYearlyCents, 'price_yearly')}
-                                    onChange={() => {}}
-                                    className="block w-full pl-9 pr-3 py-2 rounded-md border-gray-300 shadow-sm text-sm text-right"
-                                    inputMode="numeric" />
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Módulos ({data.modules.length}/{allModules.length})
+                            </label>
+                            <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto border rounded-md p-3">
+                                {allModules.map((mod) => (
+                                    <label key={mod} className="flex items-center gap-2 text-sm cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={data.modules.includes(mod)}
+                                            onChange={() => toggleModule(mod)}
+                                            className="rounded border-gray-300 text-indigo-600"
+                                        />
+                                        <span className="text-gray-700">{moduleLabels[mod] || mod}</span>
+                                    </label>
+                                ))}
                             </div>
                         </div>
                     </div>
 
-                    {/* Modules */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Módulos ({data.modules.length}/{allModules.length})
-                        </label>
-                        <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto border rounded-md p-3">
-                            {allModules.map((mod) => (
-                                <label key={mod} className="flex items-center gap-2 text-sm cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={data.modules.includes(mod)}
-                                        onChange={() => toggleModule(mod)}
-                                        className="rounded border-gray-300 text-indigo-600"
-                                    />
-                                    <span className="text-gray-700">{moduleLabels[mod] || mod}</span>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end gap-3 pt-4 border-t">
+                    <div className="px-6 py-4 border-t bg-gray-50 rounded-b-lg shrink-0 flex justify-end gap-3">
                         <button type="button" onClick={onClose}
                             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
                             Cancelar

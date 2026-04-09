@@ -2,24 +2,26 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\OrderPayment;
-use App\Models\OrderPaymentInstallment;
-use App\Models\Store;
-use App\Models\Supplier;
-use App\Models\Manager;
+use App\Exports\OrderPaymentExport;
 use App\Models\Bank;
 use App\Models\Brand;
 use App\Models\CostCenter;
 use App\Models\ManagementReason;
+use App\Models\Manager;
+use App\Models\OrderPayment;
+use App\Models\OrderPaymentInstallment;
 use App\Models\PaymentType;
 use App\Models\PixKeyType;
 use App\Models\Sector;
-use App\Services\OrderPaymentTransitionService;
-use App\Services\OrderPaymentDeleteService;
+use App\Models\Store;
+use App\Models\Supplier;
 use App\Services\OrderPaymentAllocationService;
+use App\Services\OrderPaymentDeleteService;
+use App\Services\OrderPaymentTransitionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 
 class OrderPaymentController extends Controller
 {
@@ -144,7 +146,7 @@ class OrderPaymentController extends Controller
             'allocations' => 'nullable|array',
         ]);
 
-        $order = DB::transaction(function () use ($validated, $request) {
+        $order = DB::transaction(function () use ($validated) {
             $totalValue = $validated['total_value'];
             $advanceAmount = $validated['advance_amount'] ?? 0;
 
@@ -152,12 +154,12 @@ class OrderPaymentController extends Controller
                 ...$validated,
                 'status' => ($validated['advance'] ?? false) ? OrderPayment::STATUS_WAITING : OrderPayment::STATUS_BACKLOG,
                 'diff_payment_advance' => $totalValue - $advanceAmount,
-                'has_allocation' => !empty($validated['allocations']),
+                'has_allocation' => ! empty($validated['allocations']),
                 'created_by_user_id' => auth()->id(),
             ]);
 
             // Create installments
-            if (!empty($validated['installment_items'])) {
+            if (! empty($validated['installment_items'])) {
                 foreach ($validated['installment_items'] as $index => $item) {
                     $order->installmentItems()->create([
                         'installment_number' => $index + 1,
@@ -168,7 +170,7 @@ class OrderPaymentController extends Controller
             }
 
             // Create allocations
-            if (!empty($validated['allocations'])) {
+            if (! empty($validated['allocations'])) {
                 $validation = $this->allocationService->validate($totalValue, $validated['allocations']);
                 if ($validation['valid']) {
                     $this->allocationService->create($order, $validated['allocations']);
@@ -184,7 +186,7 @@ class OrderPaymentController extends Controller
         });
 
         return redirect()->route('order-payments.index')
-            ->with('success', 'Ordem de pagamento #' . $order->id . ' criada com sucesso.');
+            ->with('success', 'Ordem de pagamento #'.$order->id.' criada com sucesso.');
     }
 
     /**
@@ -271,7 +273,7 @@ class OrderPaymentController extends Controller
             $advanceAmount = $validated['advance_amount'] ?? 0;
 
             $validated['diff_payment_advance'] = $totalValue - $advanceAmount;
-            $validated['has_allocation'] = !empty($validated['allocations']);
+            $validated['has_allocation'] = ! empty($validated['allocations']);
             $validated['updated_by_user_id'] = auth()->id();
 
             $orderPayment->update($validated);
@@ -290,7 +292,7 @@ class OrderPaymentController extends Controller
 
             // Sync allocations
             if (isset($validated['allocations'])) {
-                if (!empty($validated['allocations'])) {
+                if (! empty($validated['allocations'])) {
                     $validation = $this->allocationService->validate($totalValue, $validated['allocations']);
                     if ($validation['valid']) {
                         $this->allocationService->update($orderPayment, $validated['allocations']);
@@ -335,7 +337,7 @@ class OrderPaymentController extends Controller
             $orderPayment, $newStatus, $validated
         );
 
-        if (!$validation['valid']) {
+        if (! $validation['valid']) {
             return response()->json([
                 'error' => true,
                 'message' => implode(' ', $validation['errors']),
@@ -364,7 +366,7 @@ class OrderPaymentController extends Controller
 
         return response()->json([
             'error' => false,
-            'message' => 'Status atualizado para: ' . (OrderPayment::STATUS_LABELS[$newStatus] ?? $newStatus),
+            'message' => 'Status atualizado para: '.(OrderPayment::STATUS_LABELS[$newStatus] ?? $newStatus),
             'status' => $newStatus,
             'status_label' => OrderPayment::STATUS_LABELS[$newStatus] ?? $newStatus,
         ]);
@@ -387,8 +389,9 @@ class OrderPaymentController extends Controller
 
         foreach ($validated['order_ids'] as $orderId) {
             $order = OrderPayment::find($orderId);
-            if (!$order || $order->is_deleted) {
+            if (! $order || $order->is_deleted) {
                 $failed[] = ['id' => $orderId, 'error' => 'Ordem não encontrada ou excluída.'];
+
                 continue;
             }
 
@@ -396,8 +399,9 @@ class OrderPaymentController extends Controller
                 $order, $validated['new_status'], []
             );
 
-            if (!$validation['valid']) {
+            if (! $validation['valid']) {
                 $failed[] = ['id' => $orderId, 'error' => implode(' ', $validation['errors'])];
+
                 continue;
             }
 
@@ -411,7 +415,7 @@ class OrderPaymentController extends Controller
         return response()->json([
             'succeeded' => $succeeded,
             'failed' => $failed,
-            'message' => count($succeeded) . ' ordem(ns) movida(s) com sucesso.',
+            'message' => count($succeeded).' ordem(ns) movida(s) com sucesso.',
         ]);
     }
 
@@ -423,7 +427,7 @@ class OrderPaymentController extends Controller
         $user = $request->user();
         $permission = $this->deleteService->canDelete($orderPayment, $user);
 
-        if (!$permission['allowed']) {
+        if (! $permission['allowed']) {
             return response()->json(['error' => true, 'message' => $permission['message']], 403);
         }
 
@@ -431,7 +435,7 @@ class OrderPaymentController extends Controller
             return response()->json(['error' => true, 'message' => 'Motivo da exclusão é obrigatório.'], 422);
         }
 
-        if ($permission['require_confirmation'] && !$request->boolean('confirmed')) {
+        if ($permission['require_confirmation'] && ! $request->boolean('confirmed')) {
             return response()->json([
                 'error' => true,
                 'message' => 'Confirmação necessária para excluir esta ordem.',
@@ -464,7 +468,7 @@ class OrderPaymentController extends Controller
     {
         $restored = $this->deleteService->restore($orderPayment, auth()->user());
 
-        if (!$restored) {
+        if (! $restored) {
             return response()->json(['error' => true, 'message' => 'Sem permissão para restaurar.'], 403);
         }
 
@@ -491,7 +495,7 @@ class OrderPaymentController extends Controller
             $orderPayment->total_value, $validated['allocations']
         );
 
-        if (!$validation['valid']) {
+        if (! $validation['valid']) {
             return response()->json([
                 'error' => true,
                 'errors' => $validation['errors'],
@@ -588,6 +592,82 @@ class OrderPaymentController extends Controller
             'overdue' => ['count' => $overdueCount, 'total' => $overdueTotal],
             'monthly_flow' => $monthlyFlow,
             'installments' => $installmentSummary,
+        ]);
+    }
+
+    /**
+     * Export order payments to Excel
+     */
+    public function export(Request $request)
+    {
+        $filters = $request->only(['search', 'status', 'store_id', 'date_from', 'date_to']);
+        $filename = 'ordens_pagamento_'.now()->format('Y-m-d_His').'.xlsx';
+
+        return Excel::download(new OrderPaymentExport($filters), $filename);
+    }
+
+    /**
+     * Dashboard analytics data (by area, by supplier, by month)
+     */
+    public function dashboard(Request $request)
+    {
+        // By area (sector)
+        $byArea = OrderPayment::active()
+            ->selectRaw('area_id, count(*) as count, coalesce(sum(total_value), 0) as total')
+            ->groupBy('area_id')
+            ->get()
+            ->map(function ($item) {
+                $sector = $item->area_id ? Sector::find($item->area_id) : null;
+
+                return [
+                    'area' => $sector?->sector_name ?? 'Sem área',
+                    'count' => $item->count,
+                    'total' => round($item->total, 2),
+                ];
+            });
+
+        // Top 10 suppliers by total value
+        $bySupplier = OrderPayment::active()
+            ->selectRaw('supplier_id, count(*) as count, coalesce(sum(total_value), 0) as total')
+            ->whereNotNull('supplier_id')
+            ->groupBy('supplier_id')
+            ->orderByDesc('total')
+            ->limit(10)
+            ->get()
+            ->map(function ($item) {
+                $supplier = Supplier::find($item->supplier_id);
+
+                return [
+                    'supplier' => $supplier?->nome_fantasia ?? 'Desconhecido',
+                    'count' => $item->count,
+                    'total' => round($item->total, 2),
+                ];
+            });
+
+        // Monthly totals (last 12 months)
+        $monthlyDetailed = [];
+        for ($i = 11; $i >= 0; $i--) {
+            $date = now()->subMonths($i);
+            $monthQuery = OrderPayment::active()
+                ->whereMonth('date_payment', $date->month)
+                ->whereYear('date_payment', $date->year);
+
+            $monthlyDetailed[] = [
+                'month' => $date->format('M/Y'),
+                'total' => round((clone $monthQuery)->sum('total_value'), 2),
+                'count' => (clone $monthQuery)->count(),
+                'paid' => round(OrderPayment::active()
+                    ->where('status', 'done')
+                    ->whereMonth('date_paid', $date->month)
+                    ->whereYear('date_paid', $date->year)
+                    ->sum('total_value'), 2),
+            ];
+        }
+
+        return response()->json([
+            'by_area' => $byArea,
+            'by_supplier' => $bySupplier,
+            'monthly_detailed' => $monthlyDetailed,
         ]);
     }
 

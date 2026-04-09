@@ -254,38 +254,40 @@ function MenuFormModal({ menu, parentMenus, onClose }) {
 
     return (
         <Modal title={isEditing ? `Editar: ${menu.name}` : 'Novo Menu'} onClose={onClose}>
-            <form onSubmit={submit} className="space-y-4">
-                <Field label="Nome *" help="Nome exibido no menu lateral do tenant.">
-                    <input type="text" value={data.name} onChange={(e) => setData('name', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm" required />
-                    {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
-                </Field>
-
-                <Field label="Icone" help="Icone Font Awesome exibido no menu lateral.">
-                    <FaIconPicker value={data.icon} onChange={(v) => setData('icon', v)} />
-                </Field>
-
-                <div className="grid grid-cols-2 gap-4">
-                    <Field label="Tipo" help="Categoria do menu para agrupamento.">
-                        <select value={data.type} onChange={(e) => setData('type', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm">
-                            {Object.entries(MENU_TYPES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                        </select>
+            <form onSubmit={submit} className="flex flex-col flex-1 min-h-0">
+                <div className="p-6 space-y-4 overflow-y-auto flex-1">
+                    <Field label="Nome *" help="Nome exibido no menu lateral do tenant.">
+                        <input type="text" value={data.name} onChange={(e) => setData('name', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm" required />
+                        {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
                     </Field>
-                    {!isEditing && (
-                        <Field label="Menu Pai" help="Selecione para criar submenu.">
-                            <select value={data.parent_id} onChange={(e) => setData('parent_id', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm">
-                                <option value="">Nenhum (menu principal)</option>
-                                {parentMenus.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+
+                    <Field label="Ícone" help="Ícone Font Awesome exibido no menu lateral.">
+                        <FaIconPicker value={data.icon} onChange={(v) => setData('icon', v)} />
+                    </Field>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <Field label="Tipo" help="Categoria do menu para agrupamento.">
+                            <select value={data.type} onChange={(e) => setData('type', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm">
+                                {Object.entries(MENU_TYPES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                             </select>
                         </Field>
+                        {!isEditing && (
+                            <Field label="Menu Pai" help="Selecione para criar submenu.">
+                                <select value={data.parent_id} onChange={(e) => setData('parent_id', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm">
+                                    <option value="">Nenhum (menu principal)</option>
+                                    {parentMenus.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                </select>
+                            </Field>
+                        )}
+                    </div>
+
+                    {isEditing && (
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} className="rounded border-gray-300 text-indigo-600" />
+                            <span className="text-sm text-gray-700">Menu ativo</span>
+                        </label>
                     )}
                 </div>
-
-                {isEditing && (
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} className="rounded border-gray-300 text-indigo-600" />
-                        <span className="text-sm text-gray-700">Menu ativo</span>
-                    </label>
-                )}
                 <ModalActions onClose={onClose} processing={processing} isEditing={isEditing} />
             </form>
         </Modal>
@@ -396,48 +398,50 @@ function PageFormModal({ page, pageGroups, allModules, onClose }) {
 
     return (
         <Modal title={isEditing ? `Editar: ${page.page_name}` : 'Nova Página'} onClose={onClose}>
-            <form onSubmit={submit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                    <Field label="Nome *" help="Nome de exibição da página.">
-                        <input type="text" value={data.page_name} onChange={(e) => setData('page_name', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm" required />
-                    </Field>
-                    <Field label="Rota" help="Rota Laravel da página (ex: /sales).">
-                        <input type="text" value={data.route} onChange={(e) => setData('route', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm font-mono" placeholder="/exemplo" />
-                    </Field>
-                </div>
+            <form onSubmit={submit} className="flex flex-col flex-1 min-h-0">
+                <div className="p-6 space-y-4 overflow-y-auto flex-1">
+                    <div className="grid grid-cols-2 gap-4">
+                        <Field label="Nome *" help="Nome de exibição da página.">
+                            <input type="text" value={data.page_name} onChange={(e) => setData('page_name', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm" required />
+                        </Field>
+                        <Field label="Rota" help="Rota Laravel da página (ex: /sales).">
+                            <input type="text" value={data.route} onChange={(e) => setData('route', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm font-mono" placeholder="/exemplo" />
+                        </Field>
+                    </div>
 
-                <Field label="Icone" help="Icone Font Awesome exibido ao lado do nome da página.">
-                    <FaIconPicker value={data.icon} onChange={(v) => setData('icon', v)} />
-                </Field>
-
-                <div className="grid grid-cols-2 gap-4">
-                    <Field label="Módulo" help="Módulo ao qual esta página pertence. Páginas sem módulo aparecem para todos os planos.">
-                        <select value={data.central_module_id} onChange={(e) => setData('central_module_id', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm">
-                            <option value="">Nenhum</option>
-                            {allModules.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                        </select>
+                    <Field label="Ícone" help="Ícone Font Awesome exibido ao lado do nome da página.">
+                        <FaIconPicker value={data.icon} onChange={(v) => setData('icon', v)} />
                     </Field>
-                    <Field label="Grupo" help="Tipo de ação da página (Listar, Cadastrar, etc.).">
-                        <select value={data.central_page_group_id} onChange={(e) => setData('central_page_group_id', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm">
-                            <option value="">Nenhum</option>
-                            {pageGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                        </select>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <Field label="Módulo" help="Módulo ao qual esta página pertence. Páginas sem módulo aparecem para todos os planos.">
+                            <select value={data.central_module_id} onChange={(e) => setData('central_module_id', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm">
+                                <option value="">Nenhum</option>
+                                {allModules.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                            </select>
+                        </Field>
+                        <Field label="Grupo" help="Tipo de ação da página (Listar, Cadastrar, etc.).">
+                            <select value={data.central_page_group_id} onChange={(e) => setData('central_page_group_id', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm">
+                                <option value="">Nenhum</option>
+                                {pageGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                            </select>
+                        </Field>
+                    </div>
+
+                    <Field label="Notas" help="Observações internas sobre a página (não exibidas ao usuário).">
+                        <textarea value={data.notes} onChange={(e) => setData('notes', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm" rows="2" />
                     </Field>
-                </div>
 
-                <Field label="Notas" help="Observações internas sobre a página (não exibidas ao usuário).">
-                    <textarea value={data.notes} onChange={(e) => setData('notes', e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm text-sm" rows="2" />
-                </Field>
-
-                <div className="flex gap-6">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} className="rounded border-gray-300 text-indigo-600" />
-                        <span className="text-sm text-gray-700">Ativa</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" checked={data.is_public} onChange={(e) => setData('is_public', e.target.checked)} className="rounded border-gray-300 text-indigo-600" />
-                        <span className="text-sm text-gray-700">Pública (acesso sem login)</span>
-                    </label>
+                    <div className="flex gap-6">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} className="rounded border-gray-300 text-indigo-600" />
+                            <span className="text-sm text-gray-700">Ativa</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={data.is_public} onChange={(e) => setData('is_public', e.target.checked)} className="rounded border-gray-300 text-indigo-600" />
+                            <span className="text-sm text-gray-700">Pública (acesso sem login)</span>
+                        </label>
+                    </div>
                 </div>
                 <ModalActions onClose={onClose} processing={processing} isEditing={isEditing} />
             </form>
@@ -568,11 +572,11 @@ function Modal({ title, onClose, children }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="fixed inset-0 bg-gray-600/75" onClick={onClose} />
-            <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-                <div className="px-6 py-4 border-b">
+            <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] flex flex-col">
+                <div className="px-6 py-4 border-b shrink-0">
                     <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
                 </div>
-                <div className="p-6">{children}</div>
+                <div className="flex-1 min-h-0 flex flex-col">{children}</div>
             </div>
         </div>
     );
@@ -590,8 +594,8 @@ function Field({ label, help, children }) {
 
 function ModalActions({ onClose, processing, isEditing }) {
     return (
-        <div className="flex justify-end gap-3 pt-4 border-t">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200">
+        <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-lg shrink-0">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
                 Cancelar
             </button>
             <button type="submit" disabled={processing} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50">

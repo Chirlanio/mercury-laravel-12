@@ -189,8 +189,9 @@ export default function Index({
         return [{ fields, columns }];
     };
 
-    // Adaptar largura do modal ao número de campos
+    // Adaptar largura do modal ao número de campos (ou usar valor definido pelo backend)
     const getModalMaxWidth = () => {
+        if (config.modalMaxWidth) return config.modalMaxWidth;
         const fieldCount = (config.formFields || []).length;
         if (fieldCount <= 2) return 'lg';
         if (fieldCount <= 4) return 'xl';

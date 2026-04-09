@@ -126,6 +126,14 @@ abstract class ConfigController extends Controller
     abstract protected function routeName(): string;
 
     /**
+     * Largura maxima do modal (sm, md, lg, xl, 2xl, 3xl)
+     */
+    protected function modalMaxWidth(): ?string
+    {
+        return null;
+    }
+
+    /**
      * Index - Listagem com busca, ordenacao e paginacao
      */
     public function index(Request $request)
@@ -137,19 +145,19 @@ abstract class ConfigController extends Controller
         $sortDirection = $request->get('direction', $this->defaultSortDirection());
 
         // Validar campo de ordenacao
-        if (!in_array($sortField, $this->sortableFields())) {
+        if (! in_array($sortField, $this->sortableFields())) {
             $sortField = $this->defaultSort();
         }
 
         // Validar direcao
-        if (!in_array($sortDirection, ['asc', 'desc'])) {
+        if (! in_array($sortDirection, ['asc', 'desc'])) {
             $sortDirection = $this->defaultSortDirection();
         }
 
         $query = $modelClass::query();
 
         // Eager load
-        if (!empty($this->with())) {
+        if (! empty($this->with())) {
             $query->with($this->with());
         }
 
@@ -187,6 +195,7 @@ abstract class ConfigController extends Controller
                 'columns' => $this->columns(),
                 'formFields' => $this->formFields(),
                 'routeName' => $this->routeName(),
+                'modalMaxWidth' => $this->modalMaxWidth(),
             ],
             'filters' => [
                 'search' => $search,
@@ -211,7 +220,7 @@ abstract class ConfigController extends Controller
         // Campos com regra 'boolean' que nao vieram no request => false
         foreach ($rules as $field => $rule) {
             $ruleStr = is_array($rule) ? implode('|', $rule) : $rule;
-            if (str_contains($ruleStr, 'boolean') && !$request->has($field)) {
+            if (str_contains($ruleStr, 'boolean') && ! $request->has($field)) {
                 $data[$field] = false;
             }
         }
@@ -230,7 +239,7 @@ abstract class ConfigController extends Controller
         $modelClass = $this->modelClass();
         $modelClass::create($this->getRequestData($request, $rules));
 
-        return back()->with('success', $this->viewTitle() . ' criado com sucesso!');
+        return back()->with('success', $this->viewTitle().' criado com sucesso!');
     }
 
     /**
@@ -246,7 +255,7 @@ abstract class ConfigController extends Controller
 
         $model->update($this->getRequestData($request, $rules));
 
-        return back()->with('success', $this->viewTitle() . ' atualizado com sucesso!');
+        return back()->with('success', $this->viewTitle().' atualizado com sucesso!');
     }
 
     /**
@@ -265,6 +274,6 @@ abstract class ConfigController extends Controller
 
         $model->delete();
 
-        return back()->with('success', $this->viewTitle() . ' excluido com sucesso!');
+        return back()->with('success', $this->viewTitle().' excluido com sucesso!');
     }
 }

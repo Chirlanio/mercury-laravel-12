@@ -11,7 +11,7 @@ enum Role: string
 
     public function label(): string
     {
-        return match($this) {
+        return match ($this) {
             self::SUPER_ADMIN => 'Super Administrador',
             self::ADMIN => 'Administrador',
             self::SUPPORT => 'Suporte',
@@ -33,7 +33,7 @@ enum Role: string
 
     public function permissions(): array
     {
-        return match($this) {
+        return match ($this) {
             self::SUPER_ADMIN => [
                 // Todas as permissões
                 Permission::VIEW_USERS->value,
@@ -101,6 +101,23 @@ enum Role: string
                 Permission::DELETE_STORE_GOALS->value,
                 Permission::VIEW_MOVEMENTS->value,
                 Permission::SYNC_MOVEMENTS->value,
+                // Férias (todas)
+                Permission::VIEW_VACATIONS->value,
+                Permission::CREATE_VACATIONS->value,
+                Permission::EDIT_VACATIONS->value,
+                Permission::DELETE_VACATIONS->value,
+                Permission::APPROVE_VACATIONS_MANAGER->value,
+                Permission::APPROVE_VACATIONS_RH->value,
+                Permission::MANAGE_HOLIDAYS->value,
+                // Auditoria de estoque (todas)
+                Permission::VIEW_STOCK_AUDITS->value,
+                Permission::CREATE_STOCK_AUDITS->value,
+                Permission::EDIT_STOCK_AUDITS->value,
+                Permission::DELETE_STOCK_AUDITS->value,
+                Permission::AUTHORIZE_STOCK_AUDITS->value,
+                Permission::COUNT_STOCK_AUDITS->value,
+                Permission::RECONCILE_STOCK_AUDITS->value,
+                Permission::MANAGE_STOCK_AUDIT_CONFIG->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -166,6 +183,23 @@ enum Role: string
                 Permission::DELETE_STORE_GOALS->value,
                 Permission::VIEW_MOVEMENTS->value,
                 Permission::SYNC_MOVEMENTS->value,
+                // Férias (CRUD + aprovação RH)
+                Permission::VIEW_VACATIONS->value,
+                Permission::CREATE_VACATIONS->value,
+                Permission::EDIT_VACATIONS->value,
+                Permission::DELETE_VACATIONS->value,
+                Permission::APPROVE_VACATIONS_MANAGER->value,
+                Permission::APPROVE_VACATIONS_RH->value,
+                Permission::MANAGE_HOLIDAYS->value,
+                // Auditoria de estoque (todas)
+                Permission::VIEW_STOCK_AUDITS->value,
+                Permission::CREATE_STOCK_AUDITS->value,
+                Permission::EDIT_STOCK_AUDITS->value,
+                Permission::DELETE_STOCK_AUDITS->value,
+                Permission::AUTHORIZE_STOCK_AUDITS->value,
+                Permission::COUNT_STOCK_AUDITS->value,
+                Permission::RECONCILE_STOCK_AUDITS->value,
+                Permission::MANAGE_STOCK_AUDIT_CONFIG->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -190,12 +224,26 @@ enum Role: string
                 Permission::VIEW_OVERTIME->value,
                 Permission::VIEW_STORE_GOALS->value,
                 Permission::VIEW_MOVEMENTS->value,
+                // Férias (visualização + aprovação gestor)
+                Permission::VIEW_VACATIONS->value,
+                Permission::CREATE_VACATIONS->value,
+                Permission::EDIT_VACATIONS->value,
+                Permission::APPROVE_VACATIONS_MANAGER->value,
+                // Auditoria de estoque (view, create, edit, count, reconcile)
+                Permission::VIEW_STOCK_AUDITS->value,
+                Permission::CREATE_STOCK_AUDITS->value,
+                Permission::EDIT_STOCK_AUDITS->value,
+                Permission::COUNT_STOCK_AUDITS->value,
+                Permission::RECONCILE_STOCK_AUDITS->value,
             ],
             self::USER => [
                 // Apenas próprio perfil
                 Permission::VIEW_OWN_PROFILE->value,
                 Permission::EDIT_OWN_PROFILE->value,
                 Permission::ACCESS_DASHBOARD->value,
+                // Auditoria de estoque (view + count)
+                Permission::VIEW_STOCK_AUDITS->value,
+                Permission::COUNT_STOCK_AUDITS->value,
             ],
         };
     }
@@ -203,12 +251,13 @@ enum Role: string
     public function hasPermissionTo(Permission|string $permission): bool
     {
         $permissionValue = $permission instanceof Permission ? $permission->value : $permission;
+
         return in_array($permissionValue, $this->permissions());
     }
 
     public function canManageRole(Role $targetRole): bool
     {
-        return match($this) {
+        return match ($this) {
             self::SUPER_ADMIN => true, // Pode gerenciar todos
             self::ADMIN => $targetRole !== self::SUPER_ADMIN, // Não pode gerenciar super admin
             self::SUPPORT, self::USER => false, // Não pode gerenciar roles

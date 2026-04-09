@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use App\Traits\Auditable;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -78,7 +78,7 @@ class Product extends Model
 
     public function supplier(): BelongsTo
     {
-        return $this->belongsTo(Supplier::class, 'supplier_codigo_for', 'codigo_for');
+        return $this->belongsTo(ProductSupplier::class, 'supplier_codigo_for', 'codigo_for');
     }
 
     public function variants(): HasMany
@@ -110,17 +110,17 @@ class Product extends Model
     {
         return $query->where(function (Builder $q) use ($term) {
             $q->where('reference', 'like', "%{$term}%")
-              ->orWhere('description', 'like', "%{$term}%");
+                ->orWhere('description', 'like', "%{$term}%");
         });
     }
 
     public function getFormattedSalePriceAttribute(): string
     {
-        return $this->sale_price ? 'R$ ' . number_format((float) $this->sale_price, 2, ',', '.') : '-';
+        return $this->sale_price ? 'R$ '.number_format((float) $this->sale_price, 2, ',', '.') : '-';
     }
 
     public function getFormattedCostPriceAttribute(): string
     {
-        return $this->cost_price ? 'R$ ' . number_format((float) $this->cost_price, 2, ',', '.') : '-';
+        return $this->cost_price ? 'R$ '.number_format((float) $this->cost_price, 2, ',', '.') : '-';
     }
 }

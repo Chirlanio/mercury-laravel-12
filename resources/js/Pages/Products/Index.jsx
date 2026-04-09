@@ -180,11 +180,16 @@ export default function Index({ auth, products, filters, stats, cigamAvailable, 
                             <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent flex-shrink-0"></div>
                             <div className="min-w-0">
                                 <p className="text-xs text-blue-800 sm:text-sm">
-                                    Sync: {(liveSync.processed_records || 0).toLocaleString('pt-BR')} / {(liveSync.total_records || 0).toLocaleString('pt-BR')}
+                                    {liveSync.current_phase === 'lookups' && liveSync.lookup_current
+                                        ? `Tabelas Auxiliares: ${liveSync.lookup_current} (${liveSync.lookup_processed || 0}/${liveSync.lookup_total || 0})`
+                                        : liveSync.current_phase === 'prices' && liveSync.price_total > 0
+                                            ? `Preços: ${(liveSync.price_processed || 0).toLocaleString('pt-BR')} / ${(liveSync.price_total || 0).toLocaleString('pt-BR')}`
+                                            : `Sync: ${(liveSync.processed_records || 0).toLocaleString('pt-BR')} / ${(liveSync.total_records || 0).toLocaleString('pt-BR')}`
+                                    }
                                 </p>
-                                {liveSync.current_phase && (
+                                {liveSync.current_phase && liveSync.current_phase !== 'lookups' && (
                                     <p className="text-xs text-blue-600 mt-0.5">
-                                        {liveSync.current_phase === 'lookups' ? 'Tabelas Auxiliares' : liveSync.current_phase === 'products' ? 'Produtos' : liveSync.current_phase === 'prices' ? 'Preços' : liveSync.current_phase}
+                                        {liveSync.current_phase === 'products' ? 'Produtos' : liveSync.current_phase === 'prices' ? 'Preços' : liveSync.current_phase}
                                         {liveSync.total_records > 0 && ` (${Math.round((liveSync.processed_records / liveSync.total_records) * 100)}%)`}
                                     </p>
                                 )}
@@ -205,6 +210,15 @@ export default function Index({ auth, products, filters, stats, cigamAvailable, 
                             Concluída: {(liveSync.inserted_records || 0).toLocaleString('pt-BR')} inseridos, {(liveSync.updated_records || 0).toLocaleString('pt-BR')} atualizados
                         </p>
                         <button onClick={() => setLiveSync(null)} className="text-emerald-600 hover:text-emerald-800 text-xs ml-2">Fechar</button>
+                    </div>
+                )}
+
+                {liveSync && (liveSync.status === 'cancelled' || liveSync.status === 'failed') && liveSync.id !== activeSyncLog?.id && (
+                    <div className="mb-3 bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center justify-between sm:mb-4">
+                        <p className="text-xs text-gray-700 sm:text-sm">
+                            {liveSync.status === 'cancelled' ? 'Sincronização cancelada.' : 'Sincronização falhou.'}
+                        </p>
+                        <button onClick={() => setLiveSync(null)} className="text-gray-500 hover:text-gray-700 text-xs ml-2">Fechar</button>
                     </div>
                 )}
 

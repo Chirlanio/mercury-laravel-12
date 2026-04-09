@@ -20,6 +20,11 @@ class ProductSyncLog extends Model
         'error_details',
         'date_range_start',
         'date_range_end',
+        'lookup_total',
+        'lookup_processed',
+        'lookup_current',
+        'price_total',
+        'price_processed',
         'started_at',
         'completed_at',
         'started_by_user_id',
@@ -37,6 +42,10 @@ class ProductSyncLog extends Model
         'updated_records' => 'integer',
         'skipped_records' => 'integer',
         'error_count' => 'integer',
+        'lookup_total' => 'integer',
+        'lookup_processed' => 'integer',
+        'price_total' => 'integer',
+        'price_processed' => 'integer',
     ];
 
     public function startedBy(): BelongsTo

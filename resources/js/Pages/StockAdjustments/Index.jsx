@@ -213,9 +213,12 @@ export default function Index({ adjustments, stores = [], filters = {}, statusOp
                     {/* Modal Criar */}
                     {showCreateModal && (
                         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-                            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-                                <h3 className="text-lg font-medium text-gray-900 mb-4">Novo Ajuste de Estoque</h3>
-                                <form onSubmit={handleCreate} className="space-y-4">
+                            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
+                                <div className="px-6 py-4 border-b shrink-0">
+                                    <h3 className="text-lg font-medium text-gray-900">Novo Ajuste de Estoque</h3>
+                                </div>
+                                <form onSubmit={handleCreate} className="flex flex-col flex-1 min-h-0">
+                                <div className="p-6 space-y-4 overflow-y-auto flex-1">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700">Loja *</label>
                                         <select
@@ -284,7 +287,8 @@ export default function Index({ adjustments, stores = [], filters = {}, statusOp
                                         </div>
                                     </div>
 
-                                    <div className="flex justify-end space-x-3 pt-4">
+                                    </div>
+                                    <div className="flex justify-end space-x-3 px-6 py-4 border-t bg-gray-50 rounded-b-lg shrink-0">
                                         <button
                                             type="button"
                                             onClick={() => setShowCreateModal(false)}

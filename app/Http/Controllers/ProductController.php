@@ -2,7 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\ProductSyncJob;
+use App\Exports\RejectedPriceRowsExport;
+use App\Imports\ProductPricesImport;
 use App\Models\Product;
 use App\Models\ProductArticleComplement;
 use App\Models\ProductBrand;
@@ -12,11 +13,9 @@ use App\Models\ProductColor;
 use App\Models\ProductMaterial;
 use App\Models\ProductSize;
 use App\Models\ProductSubcollection;
+use App\Models\ProductSupplier;
 use App\Models\ProductSyncLog;
 use App\Models\ProductVariant;
-use App\Models\Supplier;
-use App\Exports\RejectedPriceRowsExport;
-use App\Imports\ProductPricesImport;
 use App\Services\EanGeneratorService;
 use App\Services\ImageUploadService;
 use App\Services\LabelPrintService;
@@ -87,6 +86,11 @@ class ProductController extends Controller
 
         $syncService = app(ProductSyncService::class);
 
+        // Auto-fail syncs stuck running for over 30 minutes (orphaned processes)
+        ProductSyncLog::where('status', 'running')
+            ->where('started_at', '<', now()->subMinutes(30))
+            ->each(fn ($log) => $log->markFailed('Processo encerrado automaticamente após 30 minutos sem resposta.'));
+
         $activeSyncLog = ProductSyncLog::where('status', 'running')
             ->latest('started_at')
             ->first();
@@ -109,7 +113,7 @@ class ProductController extends Controller
         ]);
 
         $data = $product->toArray();
-        $data['image_url'] = $product->image ? asset('storage/' . $product->image) : null;
+        $data['image_url'] = $product->image ? asset('storage/'.$product->image) : null;
         $data['markup'] = ($product->cost_price && $product->cost_price > 0)
             ? round((($product->sale_price - $product->cost_price) / $product->cost_price) * 100, 1)
             : null;
@@ -192,7 +196,7 @@ class ProductController extends Controller
             abort(404);
         }
 
-        $ean = (new EanGeneratorService())->generate($product->id, $variant->id);
+        $ean = (new EanGeneratorService)->generate($product->id, $variant->id);
         $variant->update(['aux_reference' => $ean]);
 
         return response()->json(['message' => 'EAN-13 gerado.', 'ean' => $ean, 'variant' => $variant->fresh()]);
@@ -208,9 +212,14 @@ class ProductController extends Controller
 
         $syncService = app(ProductSyncService::class);
 
-        if (!$syncService->isAvailable()) {
+        if (! $syncService->isAvailable()) {
             return response()->json(['error' => 'Conexão CIGAM não disponível.'], 503);
         }
+
+        // Auto-fail orphaned syncs (running > 30 min)
+        ProductSyncLog::where('status', 'running')
+            ->where('started_at', '<', now()->subMinutes(30))
+            ->each(fn ($log) => $log->markFailed('Processo encerrado automaticamente após 30 minutos sem resposta.'));
 
         // Reject if a sync is already running
         $running = ProductSyncLog::where('status', 'running')->first();
@@ -221,20 +230,20 @@ class ProductController extends Controller
             ], 409);
         }
 
-        // For lookups_only, sync them inline and return immediately (fast)
+        // For lookups_only, spawn background process (same as other types)
         if ($validated['type'] === 'lookups_only') {
             $log = ProductSyncLog::create([
                 'sync_type' => 'lookups_only',
                 'status' => 'running',
                 'current_phase' => 'lookups',
+                'total_records' => 0,
                 'started_at' => now(),
                 'started_by_user_id' => $request->user()->id,
             ]);
 
-            $results = $syncService->syncLookups();
-            $log->markCompleted();
+            $this->spawnSyncProcess($log->id, 'lookups_only', $request->user()->id);
 
-            return response()->json(['log' => $log->fresh(), 'lookups' => $results]);
+            return response()->json(['log' => $log]);
         }
 
         // Spawn background process with the PHP that has pdo_pgsql
@@ -256,7 +265,7 @@ class ProductController extends Controller
     {
         $syncService = app(ProductSyncService::class);
 
-        if (!$syncService->isAvailable()) {
+        if (! $syncService->isAvailable()) {
             return response()->json(['error' => 'Conexão CIGAM não disponível.'], 503);
         }
 
@@ -278,6 +287,11 @@ class ProductController extends Controller
             'skipped_records' => $log->skipped_records,
             'error_count' => $log->error_count,
             'error_details' => $log->error_details,
+            'lookup_total' => $log->lookup_total,
+            'lookup_processed' => $log->lookup_processed,
+            'lookup_current' => $log->lookup_current,
+            'price_total' => $log->price_total,
+            'price_processed' => $log->price_processed,
             'started_at' => $log->started_at,
             'completed_at' => $log->completed_at,
         ]);
@@ -354,7 +368,7 @@ class ProductController extends Controller
             'categories' => ProductCategory::active()->orderBy('name')->get(['cigam_code', 'name']),
             'colors' => ProductColor::active()->orderBy('name')->get(['cigam_code', 'name']),
             'materials' => ProductMaterial::active()->orderBy('name')->get(['cigam_code', 'name']),
-            'suppliers' => Supplier::active()->orderBy('razao_social')->get(['codigo_for', 'razao_social', 'nome_fantasia']),
+            'suppliers' => ProductSupplier::active()->orderBy('razao_social')->get(['codigo_for', 'razao_social', 'nome_fantasia']),
         ]);
     }
 
@@ -384,7 +398,7 @@ class ProductController extends Controller
         return response()->json([
             'message' => 'Imagem atualizada.',
             'image' => $path,
-            'image_url' => asset('storage/' . $path),
+            'image_url' => asset('storage/'.$path),
         ]);
     }
 
@@ -414,16 +428,16 @@ class ProductController extends Controller
 
         $args = [
             $php, $artisan, 'products:sync', $type,
-            '--tenant=' . $tenantId,
-            '--log-id=' . $logId,
-            '--user-id=' . $userId,
+            '--tenant='.$tenantId,
+            '--log-id='.$logId,
+            '--user-id='.$userId,
         ];
 
         if ($dateStart) {
-            $args[] = '--date-start=' . $dateStart;
+            $args[] = '--date-start='.$dateStart;
         }
         if ($dateEnd) {
-            $args[] = '--date-end=' . $dateEnd;
+            $args[] = '--date-end='.$dateEnd;
         }
 
         $cmd = implode(' ', array_map('escapeshellarg', $args));
@@ -452,7 +466,7 @@ class ProductController extends Controller
         // If there are rejected rows, save as CSV for download
         $rejectedUrl = null;
         if (! empty($results['rejected_rows'])) {
-            $filename = 'precos_rejeitados_' . now()->format('Y-m-d_His') . '.xlsx';
+            $filename = 'precos_rejeitados_'.now()->format('Y-m-d_His').'.xlsx';
             Excel::store(new RejectedPriceRowsExport($results['rejected_rows']), "temp/{$filename}", 'local');
             $rejectedUrl = "/products/import-prices/rejected/{$filename}";
         }
@@ -497,7 +511,7 @@ class ProductController extends Controller
             'preset.format' => 'required|string|in:A4,custom',
         ]);
 
-        $service = new LabelPrintService();
+        $service = new LabelPrintService;
         $pdf = $service->generatePdf($request->variant_ids, $request->preset);
 
         return $pdf->stream('etiquetas.pdf');
@@ -510,7 +524,7 @@ class ProductController extends Controller
         $products = Product::with(['variants' => fn ($q) => $q->active()->with('size')])
             ->where(function ($q) use ($search) {
                 $q->where('reference', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+                    ->orWhere('description', 'like', "%{$search}%");
             })
             ->active()
             ->limit(20)

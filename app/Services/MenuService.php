@@ -49,6 +49,7 @@ class MenuService
 
             // Estoque
             'ajuste/listar-ajuste' => '/stock-adjustments',
+            'stock-audit/list' => '/stock-audits',
             'transferencia/listar-transf' => '/transfers',
             'relocation/list' => '/relocations',
             'consignments/list' => '/consignments',
@@ -69,6 +70,7 @@ class MenuService
             'medical-certificate/list' => '/medical-certificates',
             'absence-control/list' => '/absences',
             'overtime-control/list' => '/overtime-records',
+            'vacation/list' => '/vacations',
             'internal-transfer-system/list' => '/internal-transfers',
 
             // Financeiro

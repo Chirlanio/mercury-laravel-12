@@ -44,7 +44,7 @@ class SyncProductsCommand extends Command
         $userId = $this->option('user-id') ? (int) $this->option('user-id') : null;
 
         if (! $service->isAvailable()) {
-            $this->error('  CIGAM indisponível: ' . ($service->getUnavailableReason ?? 'driver não encontrado'));
+            $this->error('  CIGAM indisponível: '.($service->getUnavailableReason ?? 'driver não encontrado'));
             $this->failLog('CIGAM indisponível');
 
             return;
@@ -62,7 +62,14 @@ class SyncProductsCommand extends Command
             if ($type !== 'prices_only') {
                 $log->update(['current_phase' => 'lookups']);
                 $this->line('  Sincronizando tabelas auxiliares...');
-                $service->syncLookups();
+                $service->syncLookups($log->id);
+
+                $log->refresh();
+                if ($log->status === 'cancelled') {
+                    $this->warn('  Sincronização cancelada pelo usuário.');
+
+                    return;
+                }
             }
 
             // Phase 2: Product chunks
@@ -86,11 +93,25 @@ class SyncProductsCommand extends Command
                 }
             }
 
+            // Check cancellation before prices
+            $log->refresh();
+            if ($log->status === 'cancelled') {
+                $this->warn('  Sincronização cancelada pelo usuário.');
+
+                return;
+            }
+
             // Phase 3: Prices
             if ($type !== 'lookups_only') {
                 $log->update(['current_phase' => 'prices']);
                 $this->line('  Sincronizando preços...');
-                $service->syncPrices($log->id, $dateStart, $dateEnd);
+                $result = $service->syncPrices($log->id, $dateStart, $dateEnd);
+
+                if (! empty($result['cancelled'])) {
+                    $this->warn('  Sincronização cancelada pelo usuário.');
+
+                    return;
+                }
             }
 
             // Finalize

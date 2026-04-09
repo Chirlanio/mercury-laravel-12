@@ -237,8 +237,8 @@ function ModuleFormModal({ module, onClose }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="fixed inset-0 bg-gray-600/75" onClick={onClose} />
-            <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-                <div className="px-6 py-4 border-b">
+            <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] flex flex-col">
+                <div className="px-6 py-4 border-b shrink-0">
                     <h3 className="text-lg font-semibold text-gray-900">
                         {isEditing ? `Editar: ${module.name}` : 'Novo Módulo'}
                     </h3>
@@ -249,7 +249,8 @@ function ModuleFormModal({ module, onClose }) {
                     </p>
                 </div>
 
-                <form onSubmit={submit} className="p-6 space-y-5">
+                <form onSubmit={submit} className="flex flex-col flex-1 min-h-0">
+                    <div className="overflow-y-auto flex-1 p-6 space-y-5">
                     {/* Name & Slug */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -465,8 +466,10 @@ function ModuleFormModal({ module, onClose }) {
                         </div>
                     )}
 
+                    </div>
+
                     {/* Actions */}
-                    <div className="flex justify-end gap-3 pt-4 border-t">
+                    <div className="px-6 py-4 border-t bg-gray-50 rounded-b-lg shrink-0 flex justify-end gap-3">
                         <button
                             type="button"
                             onClick={onClose}

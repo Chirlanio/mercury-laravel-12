@@ -22,6 +22,8 @@ export default function ProductSyncModal({ show, onClose, onCompleted, activeSyn
     const [dateEnd, setDateEnd] = useState('');
     const [logId, setLogId] = useState(null);
     const [progress, setProgress] = useState({ total: 0, processed: 0, inserted: 0, updated: 0, skipped: 0, errors: 0 });
+    const [lookupProgress, setLookupProgress] = useState({ total: 0, processed: 0, current: null });
+    const [priceProgress, setPriceProgress] = useState({ total: 0, processed: 0 });
     const [currentPhase, setCurrentPhase] = useState(null);
     const [errorMessage, setErrorMessage] = useState('');
     const pollingRef = useRef(null);
@@ -60,6 +62,15 @@ export default function ProductSyncModal({ show, onClose, onCompleted, activeSyn
             updated: log.updated_records || 0,
             skipped: log.skipped_records || 0,
             errors: log.error_count || 0,
+        });
+        setLookupProgress({
+            total: log.lookup_total || 0,
+            processed: log.lookup_processed || 0,
+            current: log.lookup_current || null,
+        });
+        setPriceProgress({
+            total: log.price_total || 0,
+            processed: log.price_processed || 0,
         });
         setCurrentPhase(log.current_phase);
 
@@ -115,19 +126,6 @@ export default function ProductSyncModal({ show, onClose, onCompleted, activeSyn
         setProgress({ total: 0, processed: 0, inserted: 0, updated: 0, skipped: 0, errors: 0 });
 
         try {
-            if (syncType === 'lookups_only') {
-                setPhase('running');
-                setCurrentPhase('lookups');
-                const data = await fetchJson('/products/sync/init', {
-                    method: 'POST',
-                    body: JSON.stringify({ type: 'lookups_only' }),
-                });
-                setPhase('completed');
-                setCurrentPhase(null);
-                onCompleted && onCompleted();
-                return;
-            }
-
             setPhase('running');
             setCurrentPhase('initializing');
 
@@ -144,6 +142,7 @@ export default function ProductSyncModal({ show, onClose, onCompleted, activeSyn
 
             const log = initData.log;
             setLogId(log.id);
+            setCurrentPhase(log.current_phase || 'initializing');
             setProgress(prev => ({ ...prev, total: log.total_records || 0 }));
 
             // Background process started, poll for progress
@@ -166,6 +165,7 @@ export default function ProductSyncModal({ show, onClose, onCompleted, activeSyn
             } catch {}
         }
         setPhase('cancelled');
+        onCompleted && onCompleted();
     };
 
     const handleClose = () => {
@@ -176,6 +176,8 @@ export default function ProductSyncModal({ show, onClose, onCompleted, activeSyn
         setDateEnd('');
         setLogId(null);
         setProgress({ total: 0, processed: 0, inserted: 0, updated: 0, skipped: 0, errors: 0 });
+        setLookupProgress({ total: 0, processed: 0, current: null });
+        setPriceProgress({ total: 0, processed: 0 });
         setCurrentPhase(null);
         setErrorMessage('');
         onClose();
@@ -271,8 +273,42 @@ export default function ProductSyncModal({ show, onClose, onCompleted, activeSyn
                             </div>
                         )}
 
-                        {/* Progress bar */}
-                        {progress.total > 0 && (
+                        {/* Lookup progress bar */}
+                        {currentPhase === 'lookups' && lookupProgress.total > 0 && (
+                            <div>
+                                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                    <span>
+                                        {lookupProgress.current
+                                            ? `Sincronizando: ${lookupProgress.current}`
+                                            : `${lookupProgress.processed} / ${lookupProgress.total} tabelas`
+                                        }
+                                    </span>
+                                    <span>{lookupProgress.processed} / {lookupProgress.total}</span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-3">
+                                    <div className="h-3 rounded-full transition-all duration-300 bg-amber-500"
+                                        style={{ width: `${Math.round((lookupProgress.processed / lookupProgress.total) * 100)}%` }}></div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Price progress bar */}
+                        {currentPhase === 'prices' && priceProgress.total > 0 && (
+                            <div>
+                                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                    <span>Atualizando preços</span>
+                                    <span>{priceProgress.processed.toLocaleString()} / {priceProgress.total.toLocaleString()} ({priceProgress.total > 0 ? Math.round((priceProgress.processed / priceProgress.total) * 100) : 0}%)</span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-3">
+                                    <div className={`h-3 rounded-full transition-all duration-300 ${
+                                        phase === 'completed' ? 'bg-green-500' : 'bg-purple-500'
+                                    }`} style={{ width: `${Math.round((priceProgress.processed / priceProgress.total) * 100)}%` }}></div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Product progress bar */}
+                        {progress.total > 0 && currentPhase !== 'lookups' && currentPhase !== 'prices' && (
                             <div>
                                 <div className="flex justify-between text-xs text-gray-500 mb-1">
                                     <span>{progress.processed.toLocaleString()} / {progress.total.toLocaleString()} produtos</span>

@@ -123,6 +123,7 @@ class CentralNavigationSeeder extends Seeder
             '/user-sessions' => 'user_sessions',
             '/transfers' => 'transfers',
             '/stock-adjustments' => 'stock_adjustments',
+            '/stock-audits' => 'stock_audits',
             '/order-payments' => 'order_payments',
             '/suppliers' => 'suppliers',
             '/medical-certificates' => 'medical_certificates',
@@ -133,6 +134,9 @@ class CentralNavigationSeeder extends Seeder
             '/config/' => 'config',
             '/integrations' => 'integrations',
             '/color-themes' => 'color_themes',
+            '/store-goals' => 'store_goals',
+            '/movements' => 'movements',
+            '/vacations' => 'vacations',
         ];
 
         $pages = [
@@ -147,6 +151,7 @@ class CentralNavigationSeeder extends Seeder
             ['route' => '/user-sessions', 'page_name' => 'Usuários Online', 'icon' => 'fas fa-wifi'],
             ['route' => '/transfers', 'page_name' => 'Transferências', 'icon' => 'fas fa-exchange-alt'],
             ['route' => '/stock-adjustments', 'page_name' => 'Ajustes de Estoque', 'icon' => 'fas fa-clipboard-check'],
+            ['route' => '/stock-audits', 'page_name' => 'Auditoria de Estoque', 'icon' => 'fas fa-clipboard-list'],
             ['route' => '/order-payments', 'page_name' => 'Ordens de Pagamento', 'icon' => 'fas fa-money-bill-wave'],
             ['route' => '/suppliers', 'page_name' => 'Fornecedores', 'icon' => 'fas fa-truck'],
             ['route' => '/medical-certificates', 'page_name' => 'Atestados Médicos', 'icon' => 'fas fa-file-medical'],
@@ -169,6 +174,9 @@ class CentralNavigationSeeder extends Seeder
             ['route' => '/integrations', 'page_name' => 'Integrações', 'icon' => 'fas fa-link'],
             ['route' => '/store-goals', 'page_name' => 'Metas de Loja', 'icon' => 'fas fa-bullseye'],
             ['route' => '/movements', 'page_name' => 'Movimentações', 'icon' => 'fas fa-arrows-alt'],
+            ['route' => '/vacations', 'page_name' => 'Férias', 'icon' => 'fas fa-umbrella-beach'],
+            ['route' => '/config/stock-audit-cycles', 'page_name' => 'Ciclos de Auditoria', 'icon' => 'fas fa-cog'],
+            ['route' => '/config/stock-audit-vendors', 'page_name' => 'Empresas Auditoras', 'icon' => 'fas fa-cog'],
             ['route' => '/logout', 'page_name' => 'Sair', 'icon' => 'fas fa-sign-out-alt', 'is_public' => true],
         ];
 
@@ -214,6 +222,7 @@ class CentralNavigationSeeder extends Seeder
             '/user-sessions' => 'RH',
             '/transfers' => 'Operações',
             '/stock-adjustments' => 'Operações',
+            '/stock-audits' => 'Operações',
             '/order-payments' => 'Financeiro',
             '/suppliers' => 'Configurações',
             '/medical-certificates' => 'RH',
@@ -236,6 +245,9 @@ class CentralNavigationSeeder extends Seeder
             '/integrations' => 'Configurações',
             '/store-goals' => 'Comercial',
             '/movements' => 'Comercial',
+            '/vacations' => 'RH',
+            '/config/stock-audit-cycles' => 'Configurações',
+            '/config/stock-audit-vendors' => 'Configurações',
             '/logout' => 'Sair',
         ];
 
@@ -249,7 +261,7 @@ class CentralNavigationSeeder extends Seeder
             '/transfers', '/stock-adjustments', '/order-payments', '/suppliers',
             '/checklists', '/medical-certificates', '/absences', '/overtime-records',
             '/user-sessions', '/work-shifts', '/work-schedules', '/activity-logs',
-            '/store-goals', '/movements',
+            '/store-goals', '/movements', '/vacations', '/stock-audits',
         ];
 
         $userRoutes = ['/dashboard', '/logout'];
