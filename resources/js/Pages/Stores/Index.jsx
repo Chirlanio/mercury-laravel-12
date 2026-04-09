@@ -3,9 +3,11 @@ import { useState } from "react";
 import Modal from "@/Components/Modal";
 import DataTable from "@/Components/DataTable";
 import Button from "@/Components/Button";
+import ActionButtons from "@/Components/ActionButtons";
 import StoreCreateModal from "@/Components/StoreCreateModal";
 import StoreEditModal from "@/Components/StoreEditModal";
 import StoreViewModal from "@/Components/StoreViewModal";
+import { PlusIcon, XMarkIcon, TrashIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 
 export default function Index({ auth, stores, networks, statuses, managers, filters }) {
     const [selectedStore, setSelectedStore] = useState(null);
@@ -194,54 +196,11 @@ export default function Index({ auth, stores, networks, statuses, managers, filt
             field: "actions",
             sortable: false,
             render: (store) => (
-                <div className="flex space-x-2">
-                    <Button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            viewStore(store);
-                        }}
-                        variant="secondary"
-                        size="sm"
-                        iconOnly={true}
-                        icon={({ className }) => (
-                            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                        )}
-                        title="Visualizar detalhes da loja"
-                    />
-                    <Button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            editStore(store);
-                        }}
-                        variant="warning"
-                        size="sm"
-                        iconOnly={true}
-                        icon={({ className }) => (
-                            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                        )}
-                        title="Editar loja"
-                    />
-                    <Button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            openDeleteModal(store);
-                        }}
-                        variant="danger"
-                        size="sm"
-                        iconOnly={true}
-                        icon={({ className }) => (
-                            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                        )}
-                        title="Excluir loja"
-                    />
-                </div>
+                <ActionButtons
+                    onView={() => viewStore(store)}
+                    onEdit={() => editStore(store)}
+                    onDelete={() => openDeleteModal(store)}
+                />
             )
         }
     ];
@@ -267,11 +226,7 @@ export default function Index({ auth, stores, networks, statuses, managers, filt
                                 <Button
                                     variant="primary"
                                     onClick={openCreateModal}
-                                    icon={({ className }) => (
-                                        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                        </svg>
-                                    )}
+                                    icon={PlusIcon}
                                 >
                                     Nova Loja
                                 </Button>
@@ -359,11 +314,7 @@ export default function Index({ auth, stores, networks, statuses, managers, filt
                                         });
                                     }}
                                     disabled={!filters?.network && !filters?.status}
-                                    icon={({ className }) => (
-                                        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    )}
+                                    icon={XMarkIcon}
                                 >
                                     Limpar Filtros
                                 </Button>
@@ -415,9 +366,7 @@ export default function Index({ auth, stores, networks, statuses, managers, filt
                 <div className="space-y-6">
                     <div className="flex items-start space-x-4">
                         <div className="flex-shrink-0">
-                            <svg className="h-12 w-12 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                            </svg>
+                            <ExclamationTriangleIcon className="h-12 w-12 text-red-600" />
                         </div>
                         <div className="flex-1">
                             <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -448,11 +397,7 @@ export default function Index({ auth, stores, networks, statuses, managers, filt
                             type="button"
                             variant="danger"
                             onClick={handleDeleteStore}
-                            icon={({ className }) => (
-                                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                            )}
+                            icon={TrashIcon}
                         >
                             Excluir Loja
                         </Button>

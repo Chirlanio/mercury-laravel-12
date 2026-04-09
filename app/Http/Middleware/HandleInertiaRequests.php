@@ -66,6 +66,7 @@ class HandleInertiaRequests extends Middleware
                     'name' => $user->name,
                     'email' => $user->email,
                     'role' => $user->role,
+                    'store_id' => $user->store_id,
                     'avatar' => $user->avatar,
                     'avatar_url' => $user->avatar_url,
                     'has_custom_avatar' => $user->hasCustomAvatar(),

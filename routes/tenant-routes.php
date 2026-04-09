@@ -25,6 +25,7 @@ use App\Http\Controllers\UserSessionController;
 use App\Http\Controllers\TransferController;
 use App\Http\Controllers\StockAdjustmentController;
 use App\Http\Controllers\OrderPaymentController;
+use App\Http\Controllers\VacationController;
 use App\Http\Controllers\ChecklistController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\IntegrationController;
@@ -61,8 +62,12 @@ use App\Http\Controllers\Config\ProductColorController as ConfigProductColorCont
 use App\Http\Controllers\Config\ProductMaterialController as ConfigProductMaterialController;
 use App\Http\Controllers\Config\ProductSizeController as ConfigProductSizeController;
 use App\Http\Controllers\Config\ProductArticleComplementController as ConfigProductArticleComplementController;
+use App\Http\Controllers\Config\ProductLookupGroupController as ConfigProductLookupGroupController;
 use App\Http\Controllers\LgpdController;
 use App\Http\Controllers\MovementController;
+use App\Http\Controllers\StockAuditController;
+use App\Http\Controllers\Config\StockAuditCycleController as ConfigStockAuditCycleController;
+use App\Http\Controllers\Config\StockAuditVendorController as ConfigStockAuditVendorController;
 use App\Enums\Permission;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -403,7 +408,8 @@ use Inertia\Inertia;
         Route::resource('management-reasons', ConfigManagementReasonController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::resource('percentage-awards', ConfigPercentageAwardController::class)->only(['index', 'store', 'update', 'destroy']);
 
-        // Cadastro de Produtos - Tabelas auxiliares
+        // Cadastro de Produtos - Grupos e Tabelas auxiliares
+        Route::resource('product-lookup-groups', ConfigProductLookupGroupController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::resource('product-brands', ConfigProductBrandController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::post('product-brands/assign-group', [ConfigProductBrandController::class, 'assignGroup'])->name('product-brands.assign-group');
         Route::resource('product-categories', ConfigProductCategoryController::class)->only(['index', 'store', 'update', 'destroy']);
@@ -569,6 +575,7 @@ use Inertia\Inertia;
         // ==========================================
         Route::middleware('permission:' . Permission::VIEW_TRANSFERS->value)->group(function () {
             Route::get('/transfers', [TransferController::class, 'index'])->name('transfers.index');
+            Route::get('/transfers/statistics', [TransferController::class, 'statistics'])->name('transfers.statistics');
             Route::get('/transfers/{transfer}', [TransferController::class, 'show'])->name('transfers.show');
             Route::middleware('permission:' . Permission::CREATE_TRANSFERS->value)->group(function () {
                 Route::post('/transfers', [TransferController::class, 'store'])->name('transfers.store');
@@ -609,6 +616,8 @@ use Inertia\Inertia;
         Route::middleware('permission:' . Permission::VIEW_ORDER_PAYMENTS->value)->group(function () {
             Route::get('/order-payments', [OrderPaymentController::class, 'index'])->name('order-payments.index');
             Route::get('/order-payments/statistics', [OrderPaymentController::class, 'statistics'])->name('order-payments.statistics');
+            Route::get('/order-payments/dashboard', [OrderPaymentController::class, 'dashboard'])->name('order-payments.dashboard');
+            Route::get('/order-payments/export', [OrderPaymentController::class, 'export'])->name('order-payments.export');
             Route::get('/order-payments/{orderPayment}', [OrderPaymentController::class, 'show'])->name('order-payments.show');
             Route::get('/order-payments/{orderPayment}/delete-check', [OrderPaymentController::class, 'checkDeletePermission'])->name('order-payments.delete-check');
             Route::middleware('permission:' . Permission::CREATE_ORDER_PAYMENTS->value)->group(function () {
@@ -641,6 +650,33 @@ use Inertia\Inertia;
             });
             Route::middleware('permission:' . Permission::DELETE_SUPPLIERS->value)->group(function () {
                 Route::delete('/suppliers/{supplier}', [SupplierController::class, 'destroy'])->name('suppliers.destroy');
+            });
+        });
+
+        // ==========================================
+        // Férias (Vacations)
+        // ==========================================
+        Route::middleware('permission:' . Permission::VIEW_VACATIONS->value)->group(function () {
+            Route::get('/vacations', [VacationController::class, 'index'])->name('vacations.index');
+            Route::get('/vacations/check-date', [VacationController::class, 'checkDate'])->name('vacations.check-date');
+            Route::get('/vacations/holidays', [VacationController::class, 'holidays'])->name('vacations.holidays');
+            Route::get('/vacations/{vacation}', [VacationController::class, 'show'])->name('vacations.show');
+            Route::get('/employees/{employee}/vacation-balance', [VacationController::class, 'balance'])->name('vacations.balance');
+            Route::middleware('permission:' . Permission::CREATE_VACATIONS->value)->group(function () {
+                Route::post('/vacations', [VacationController::class, 'store'])->name('vacations.store');
+                Route::post('/vacations/generate-periods', [VacationController::class, 'generatePeriods'])->name('vacations.generate-periods');
+            });
+            Route::middleware('permission:' . Permission::EDIT_VACATIONS->value)->group(function () {
+                Route::put('/vacations/{vacation}', [VacationController::class, 'update'])->name('vacations.update');
+                Route::post('/vacations/{vacation}/transition', [VacationController::class, 'transition'])->name('vacations.transition');
+            });
+            Route::middleware('permission:' . Permission::DELETE_VACATIONS->value)->group(function () {
+                Route::delete('/vacations/{vacation}', [VacationController::class, 'destroy'])->name('vacations.destroy');
+            });
+            Route::middleware('permission:' . Permission::MANAGE_HOLIDAYS->value)->group(function () {
+                Route::post('/vacations/holidays', [VacationController::class, 'storeHoliday'])->name('vacations.holidays.store');
+                Route::put('/vacations/holidays/{holiday}', [VacationController::class, 'updateHoliday'])->name('vacations.holidays.update');
+                Route::delete('/vacations/holidays/{holiday}', [VacationController::class, 'destroyHoliday'])->name('vacations.holidays.destroy');
             });
         });
 
@@ -726,6 +762,62 @@ use Inertia\Inertia;
             Route::post('/{integration}/test', [IntegrationController::class, 'testConnection'])->name('test');
             Route::post('/{integration}/sync', [IntegrationController::class, 'triggerSync'])->name('sync');
             Route::get('/{integration}/logs', [IntegrationController::class, 'syncLogs'])->name('logs');
+        });
+
+        // ==========================================
+        // Stock Audits (Auditoria de Estoque)
+        // ==========================================
+        Route::middleware('permission:' . Permission::VIEW_STOCK_AUDITS->value)->group(function () {
+            Route::get('/stock-audits/statistics', [StockAuditController::class, 'statistics'])->name('stock-audits.statistics');
+            Route::get('/stock-audits/accuracy-history', [StockAuditController::class, 'accuracyHistory'])->name('stock-audits.accuracy-history');
+            Route::get('/stock-audits', [StockAuditController::class, 'index'])->name('stock-audits.index');
+            Route::get('/stock-audits/{stockAudit}', [StockAuditController::class, 'show'])->name('stock-audits.show');
+            Route::get('/stock-audits/{stockAudit}/report', [StockAuditController::class, 'report'])->name('stock-audits.report');
+            Route::get('/stock-audits/{stockAudit}/pendencies', [StockAuditController::class, 'pendencies'])->name('stock-audits.pendencies');
+
+            Route::middleware('permission:' . Permission::CREATE_STOCK_AUDITS->value)->group(function () {
+                Route::post('/stock-audits', [StockAuditController::class, 'store'])->name('stock-audits.store');
+            });
+
+            Route::middleware('permission:' . Permission::EDIT_STOCK_AUDITS->value)->group(function () {
+                Route::put('/stock-audits/{stockAudit}', [StockAuditController::class, 'update'])->name('stock-audits.update');
+                Route::post('/stock-audits/{stockAudit}/transition', [StockAuditController::class, 'transition'])->name('stock-audits.transition');
+                Route::post('/stock-audits/{stockAudit}/areas', [StockAuditController::class, 'areas'])->name('stock-audits.areas');
+                Route::post('/stock-audits/{stockAudit}/teams', [StockAuditController::class, 'teams'])->name('stock-audits.teams');
+                Route::post('/stock-audits/{stockAudit}/sign', [StockAuditController::class, 'sign'])->name('stock-audits.sign');
+                Route::post('/stock-audits/{stockAudit}/justify', [StockAuditController::class, 'submitJustification'])->name('stock-audits.justify');
+            });
+
+            Route::middleware('permission:' . Permission::COUNT_STOCK_AUDITS->value)->group(function () {
+                Route::get('/stock-audits/{stockAudit}/counting', [StockAuditController::class, 'counting'])->name('stock-audits.counting');
+                Route::post('/stock-audits/{stockAudit}/count', [StockAuditController::class, 'count'])->name('stock-audits.count');
+                Route::post('/stock-audits/{stockAudit}/clear-count', [StockAuditController::class, 'clearCount'])->name('stock-audits.clear-count');
+                Route::post('/stock-audits/{stockAudit}/finalize-round', [StockAuditController::class, 'finalizeRound'])->name('stock-audits.finalize-round');
+                Route::post('/stock-audits/{stockAudit}/import', [StockAuditController::class, 'importCount'])->name('stock-audits.import');
+            });
+
+            Route::middleware('permission:' . Permission::RECONCILE_STOCK_AUDITS->value)->group(function () {
+                Route::get('/stock-audits/{stockAudit}/reconciliation', [StockAuditController::class, 'reconciliation'])->name('stock-audits.reconciliation');
+                Route::post('/stock-audits/{stockAudit}/reconcile-a', [StockAuditController::class, 'reconcilePhaseA'])->name('stock-audits.reconcile-a');
+                Route::post('/stock-audits/{stockAudit}/reconcile-b', [StockAuditController::class, 'reconcilePhaseB'])->name('stock-audits.reconcile-b');
+                Route::post('/stock-audits/{stockAudit}/review-justification', [StockAuditController::class, 'reviewJustification'])->name('stock-audits.review-justification');
+            });
+
+            Route::middleware('permission:' . Permission::DELETE_STOCK_AUDITS->value)->group(function () {
+                Route::delete('/stock-audits/{stockAudit}', [StockAuditController::class, 'destroy'])->name('stock-audits.destroy');
+            });
+        });
+
+        // Stock Audit Config (Ciclos e Empresas Auditoras)
+        Route::middleware('permission:' . Permission::MANAGE_STOCK_AUDIT_CONFIG->value)->group(function () {
+            Route::get('/config/stock-audit-cycles', [ConfigStockAuditCycleController::class, 'index'])->name('config.stock-audit-cycles.index');
+            Route::post('/config/stock-audit-cycles', [ConfigStockAuditCycleController::class, 'store'])->name('config.stock-audit-cycles.store');
+            Route::put('/config/stock-audit-cycles/{stockAuditCycle}', [ConfigStockAuditCycleController::class, 'update'])->name('config.stock-audit-cycles.update');
+            Route::delete('/config/stock-audit-cycles/{stockAuditCycle}', [ConfigStockAuditCycleController::class, 'destroy'])->name('config.stock-audit-cycles.destroy');
+            Route::get('/config/stock-audit-vendors', [ConfigStockAuditVendorController::class, 'index'])->name('config.stock-audit-vendors.index');
+            Route::post('/config/stock-audit-vendors', [ConfigStockAuditVendorController::class, 'store'])->name('config.stock-audit-vendors.store');
+            Route::put('/config/stock-audit-vendors/{stockAuditVendor}', [ConfigStockAuditVendorController::class, 'update'])->name('config.stock-audit-vendors.update');
+            Route::delete('/config/stock-audit-vendors/{stockAuditVendor}', [ConfigStockAuditVendorController::class, 'destroy'])->name('config.stock-audit-vendors.destroy');
         });
 
         // ==========================================

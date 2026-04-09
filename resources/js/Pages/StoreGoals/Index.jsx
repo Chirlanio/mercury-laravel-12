@@ -1,6 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 import Button from '@/Components/Button';
+import ActionButtons from '@/Components/ActionButtons';
 import Modal from '@/Components/Modal';
 import StatisticsCards from '@/Components/StoreGoals/StatisticsCards';
 import CreateModal from '@/Components/StoreGoals/CreateModal';
@@ -11,6 +12,11 @@ import ConsultantRankingModal from '@/Components/StoreGoals/ConsultantRankingMod
 import ConfirmSalesModal from '@/Components/StoreGoals/ConfirmSalesModal';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import { useConfirm } from '@/Hooks/useConfirm';
+import {
+    ChartBarIcon, DocumentArrowDownIcon, ArrowUpTrayIcon,
+    PlusIcon, XMarkIcon, CheckBadgeIcon, CheckCircleIcon,
+} from '@heroicons/react/24/outline';
+import { CheckCircleIcon as CheckCircleSolid } from '@heroicons/react/24/solid';
 
 export default function Index({ auth, goals, stores, filters }) {
     const { hasPermission } = usePermissions();
@@ -122,11 +128,7 @@ export default function Index({ auth, goals, stores, filters }) {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setIsRankingModalOpen(true)}
-                                    icon={({ className }) => (
-                                        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                        </svg>
-                                    )}
+                                    icon={ChartBarIcon}
                                 >
                                     Ranking
                                 </Button>
@@ -134,11 +136,7 @@ export default function Index({ auth, goals, stores, filters }) {
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        icon={({ className }) => (
-                                            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                            </svg>
-                                        )}
+                                        icon={DocumentArrowDownIcon}
                                     >
                                         Exportar
                                     </Button>
@@ -163,11 +161,7 @@ export default function Index({ auth, goals, stores, filters }) {
                                             variant="secondary"
                                             size="sm"
                                             onClick={() => setIsImportModalOpen(true)}
-                                            icon={({ className }) => (
-                                                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                                </svg>
-                                            )}
+                                            icon={ArrowUpTrayIcon}
                                         >
                                             Importar
                                         </Button>
@@ -175,11 +169,7 @@ export default function Index({ auth, goals, stores, filters }) {
                                             variant="primary"
                                             size="sm"
                                             onClick={() => setIsCreateModalOpen(true)}
-                                            icon={({ className }) => (
-                                                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                                </svg>
-                                            )}
+                                            icon={PlusIcon}
                                         >
                                             Nova Meta
                                         </Button>
@@ -243,11 +233,7 @@ export default function Index({ auth, goals, stores, filters }) {
                                     className="h-[42px] w-[150px]"
                                     onClick={clearFilters}
                                     disabled={!filters.store_id}
-                                    icon={({ className }) => (
-                                        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    )}
+                                    icon={XMarkIcon}
                                 >
                                     Limpar Filtros
                                 </Button>
@@ -278,9 +264,7 @@ export default function Index({ auth, goals, stores, filters }) {
                                                     <span className="text-sm font-medium text-gray-900">{goal.store_name}</span>
                                                     {goal.has_confirmed_sales && (
                                                         <span className="inline-flex items-center" title="Vendas confirmadas">
-                                                            <svg className="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
-                                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                                            </svg>
+                                                            <CheckCircleSolid className="w-4 h-4 text-emerald-500" />
                                                         </span>
                                                     )}
                                                 </div>
@@ -303,51 +287,20 @@ export default function Index({ auth, goals, stores, filters }) {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <button
-                                                        onClick={() => handleView(goal.id)}
-                                                        className="text-indigo-600 hover:text-indigo-900"
-                                                        title="Visualizar"
-                                                    >
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                        </svg>
-                                                    </button>
+                                                <ActionButtons
+                                                    onView={() => handleView(goal.id)}
+                                                    onEdit={hasPermission(PERMISSIONS.EDIT_STORE_GOALS) ? () => handleEdit(goal) : null}
+                                                    onDelete={hasPermission(PERMISSIONS.DELETE_STORE_GOALS) ? () => handleDelete(goal) : null}
+                                                >
                                                     {hasPermission(PERMISSIONS.EDIT_STORE_GOALS) && (
-                                                        <button
-                                                            onClick={() => { setConfirmGoalId(goal.id); setIsConfirmSalesOpen(true); }}
-                                                            className={`${goal.has_confirmed_sales ? 'text-emerald-600 hover:text-emerald-900' : 'text-gray-400 hover:text-gray-600'}`}
+                                                        <ActionButtons.Custom
+                                                            variant={goal.has_confirmed_sales ? 'success' : 'light'}
+                                                            icon={CheckCircleIcon}
                                                             title="Confirmar Vendas"
-                                                        >
-                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                            </svg>
-                                                        </button>
+                                                            onClick={() => { setConfirmGoalId(goal.id); setIsConfirmSalesOpen(true); }}
+                                                        />
                                                     )}
-                                                    {hasPermission(PERMISSIONS.EDIT_STORE_GOALS) && (
-                                                        <button
-                                                            onClick={() => handleEdit(goal)}
-                                                            className="text-amber-600 hover:text-amber-900"
-                                                            title="Editar"
-                                                        >
-                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                            </svg>
-                                                        </button>
-                                                    )}
-                                                    {hasPermission(PERMISSIONS.DELETE_STORE_GOALS) && (
-                                                        <button
-                                                            onClick={() => handleDelete(goal)}
-                                                            className="text-red-600 hover:text-red-900"
-                                                            title="Excluir"
-                                                        >
-                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                            </svg>
-                                                        </button>
-                                                    )}
-                                                </div>
+                                                </ActionButtons>
                                             </td>
                                         </tr>
                                     )) : (

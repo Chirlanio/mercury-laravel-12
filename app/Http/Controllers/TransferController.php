@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Transfer;
+use App\Enums\Role;
 use App\Models\Store;
+use App\Models\Transfer;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -17,12 +18,19 @@ class TransferController extends Controller
             'createdBy:id,name',
         ])->latest();
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
+        // Filter by store for non-admin users
+        $user = $request->user();
+        if (! $this->isAdminUser()) {
+            $userStoreId = $this->resolveUserStoreId();
+            if ($userStoreId) {
+                $query->forStore($userStoreId);
+            }
+        } elseif ($request->filled('store_id')) {
+            $query->forStore($request->store_id);
         }
 
-        if ($request->filled('store_id')) {
-            $query->forStore($request->store_id);
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
         }
 
         if ($request->filled('transfer_type')) {
@@ -42,6 +50,8 @@ class TransferController extends Controller
             'id' => $t->id,
             'origin_store' => $t->originStore ? ['id' => $t->originStore->id, 'name' => $t->originStore->display_name] : null,
             'destination_store' => $t->destinationStore ? ['id' => $t->destinationStore->id, 'name' => $t->destinationStore->display_name] : null,
+            'origin_store_id' => $t->origin_store_id,
+            'destination_store_id' => $t->destination_store_id,
             'invoice_number' => $t->invoice_number,
             'volumes_qty' => $t->volumes_qty,
             'products_qty' => $t->products_qty,
@@ -49,6 +59,7 @@ class TransferController extends Controller
             'type_label' => $t->type_label,
             'status' => $t->status,
             'status_label' => $t->status_label,
+            'observations' => $t->observations,
             'created_by' => $t->createdBy?->name,
             'created_at' => $t->created_at->format('d/m/Y H:i'),
         ]);
@@ -95,13 +106,56 @@ class TransferController extends Controller
             'confirmedBy:id,name',
         ]);
 
-        return response()->json($transfer);
+        $userStoreId = $this->resolveUserStoreId();
+        $isAdmin = $this->isAdminUser();
+
+        return response()->json([
+            'transfer' => [
+                'id' => $transfer->id,
+                'origin_store' => $transfer->originStore ? ['id' => $transfer->originStore->id, 'name' => $transfer->originStore->display_name] : null,
+                'destination_store' => $transfer->destinationStore ? ['id' => $transfer->destinationStore->id, 'name' => $transfer->destinationStore->display_name] : null,
+                'origin_store_id' => $transfer->origin_store_id,
+                'destination_store_id' => $transfer->destination_store_id,
+                'invoice_number' => $transfer->invoice_number,
+                'volumes_qty' => $transfer->volumes_qty,
+                'products_qty' => $transfer->products_qty,
+                'transfer_type' => $transfer->transfer_type,
+                'type_label' => $transfer->type_label,
+                'status' => $transfer->status,
+                'status_label' => $transfer->status_label,
+                'observations' => $transfer->observations,
+                'created_by' => $transfer->createdBy?->name,
+                'driver_name' => $transfer->driver?->name,
+                'confirmed_by' => $transfer->confirmedBy?->name,
+                'receiver_name' => $transfer->receiver_name,
+                'pickup_date' => $transfer->pickup_date?->format('d/m/Y'),
+                'pickup_time' => $transfer->pickup_time,
+                'delivery_date' => $transfer->delivery_date?->format('d/m/Y'),
+                'delivery_time' => $transfer->delivery_time,
+                'confirmed_at' => $transfer->confirmed_at?->format('d/m/Y H:i'),
+                'created_at' => $transfer->created_at->format('d/m/Y H:i'),
+                'updated_at' => $transfer->updated_at->format('d/m/Y H:i'),
+            ],
+            'can_edit' => $transfer->status === 'pending' && ($isAdmin || $transfer->origin_store_id === $userStoreId),
+            'can_confirm_pickup' => $transfer->status === 'pending',
+            'can_confirm_delivery' => $transfer->status === 'in_transit',
+            'can_confirm_receipt' => $transfer->status === 'delivered' && ($isAdmin || $transfer->destination_store_id === $userStoreId),
+            'can_cancel' => ! in_array($transfer->status, ['confirmed', 'cancelled']),
+        ]);
     }
 
     public function update(Request $request, Transfer $transfer)
     {
         if ($transfer->status !== 'pending') {
             return redirect()->back()->with('error', 'Apenas transferências pendentes podem ser editadas.');
+        }
+
+        // Store-based permission check
+        if (! $this->isAdminUser()) {
+            $userStoreId = $this->resolveUserStoreId();
+            if ($userStoreId && $transfer->origin_store_id !== $userStoreId) {
+                return redirect()->back()->with('error', 'Você só pode editar transferências originadas na sua loja.');
+            }
         }
 
         $validated = $request->validate([
@@ -112,6 +166,13 @@ class TransferController extends Controller
             'transfer_type' => 'required|in:transfer,relocation,return,exchange',
             'observations' => 'nullable|string',
         ]);
+
+        // Non-admin users have restricted fields
+        if (! $this->isAdminUser()) {
+            $validated = array_intersect_key($validated, array_flip([
+                'destination_store_id', 'invoice_number', 'volumes_qty', 'products_qty', 'observations',
+            ]));
+        }
 
         $transfer->update($validated);
 
@@ -175,6 +236,14 @@ class TransferController extends Controller
             return redirect()->back()->with('error', 'Transferência não foi entregue.');
         }
 
+        // Only destination store (or admin) can confirm receipt
+        if (! $this->isAdminUser()) {
+            $userStoreId = $this->resolveUserStoreId();
+            if ($userStoreId && $transfer->destination_store_id !== $userStoreId) {
+                return redirect()->back()->with('error', 'Apenas a loja destino pode confirmar o recebimento.');
+            }
+        }
+
         $transfer->update([
             'status' => 'confirmed',
             'confirmed_at' => now(),
@@ -195,5 +264,65 @@ class TransferController extends Controller
 
         return redirect()->route('transfers.index')
             ->with('success', 'Transferência cancelada.');
+    }
+
+    public function statistics(Request $request)
+    {
+        $query = Transfer::query();
+
+        // Apply same store-based filtering as index
+        if (! $this->isAdminUser()) {
+            $userStoreId = $this->resolveUserStoreId();
+            if ($userStoreId) {
+                $query->forStore($userStoreId);
+            }
+        } elseif ($request->filled('store_id')) {
+            $query->forStore($request->store_id);
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('transfer_type')) {
+            $query->where('transfer_type', $request->transfer_type);
+        }
+
+        $total = (clone $query)->count();
+        $totalVolumes = (int) (clone $query)->sum('volumes_qty');
+        $totalProducts = (int) (clone $query)->sum('products_qty');
+        $avgProducts = $total > 0 ? round($totalProducts / $total, 1) : 0;
+
+        return response()->json([
+            'total_transfers' => $total,
+            'total_volumes' => $totalVolumes,
+            'total_products' => $totalProducts,
+            'avg_products' => $avgProducts,
+            'pending' => (clone $query)->where('status', 'pending')->count(),
+            'in_transit' => (clone $query)->where('status', 'in_transit')->count(),
+            'delivered' => (clone $query)->where('status', 'delivered')->count(),
+            'confirmed' => (clone $query)->where('status', 'confirmed')->count(),
+        ]);
+    }
+
+    private function resolveUserStoreId(): ?int
+    {
+        $user = auth()->user();
+
+        // Try employee relationship first (if exists), then fall back to user's store_id
+        if ($user->employee && $user->employee->store_id) {
+            return Store::where('code', $user->employee->store_id)->value('id');
+        }
+
+        if ($user->store_id) {
+            return Store::where('code', $user->store_id)->value('id');
+        }
+
+        return null;
+    }
+
+    private function isAdminUser(): bool
+    {
+        return in_array(auth()->user()->role, [Role::ADMIN, Role::SUPER_ADMIN]);
     }
 }

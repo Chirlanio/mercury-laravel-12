@@ -2,7 +2,9 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import Button from '@/Components/Button';
+import ActionButtons from '@/Components/ActionButtons';
 import { formatDateTime } from '@/Utils/dateHelpers';
+import { PlusIcon } from '@heroicons/react/24/outline';
 
 export default function Index({ auth, certificates, employees = [], filters = {} }) {
     const { hasPermission } = usePermissions();
@@ -58,11 +60,7 @@ export default function Index({ auth, certificates, employees = [], filters = {}
                         </div>
                         {canCreate && (
                             <Button variant="primary" onClick={() => setShowCreateModal(true)}
-                                icon={({ className }) => (
-                                    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                    </svg>
-                                )}>Novo Atestado</Button>
+                                icon={PlusIcon}>Novo Atestado</Button>
                         )}
                     </div>
 
@@ -123,17 +121,11 @@ export default function Index({ auth, certificates, employees = [], filters = {}
                                             </span>
                                         </td>
                                         <td className="px-4 py-3">
-                                            <div className="flex space-x-2">
-                                                <Button onClick={() => openView(c)} variant="secondary" size="sm" iconOnly
-                                                    icon={({ className }) => <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>}
-                                                    title="Visualizar" />
-                                                {canEdit && <Button onClick={() => openEdit(c)} variant="warning" size="sm" iconOnly
-                                                    icon={({ className }) => <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>}
-                                                    title="Editar" />}
-                                                {canDelete && <Button onClick={() => setDeleting(c)} variant="danger" size="sm" iconOnly
-                                                    icon={({ className }) => <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>}
-                                                    title="Excluir" />}
-                                            </div>
+                                            <ActionButtons
+                                                onView={() => openView(c)}
+                                                onEdit={canEdit ? () => openEdit(c) : null}
+                                                onDelete={canDelete ? () => setDeleting(c) : null}
+                                            />
                                         </td>
                                     </tr>
                                 )) : (
@@ -178,12 +170,13 @@ function FormModal({ certificate = null, employees, onClose }) {
 
     return (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
-                <div className={`${isEdit ? 'bg-indigo-600' : 'bg-green-600'} text-white px-6 py-4 rounded-t-lg flex justify-between items-center`}>
-                    <h3 className="text-lg font-semibold">{isEdit ? 'Editar Atestado' : 'Novo Atestado Medico'}</h3>
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col">
+                <div className={`${isEdit ? 'bg-indigo-600' : 'bg-green-600'} text-white px-6 py-4 rounded-t-lg flex justify-between items-center shrink-0`}>
+                    <h3 className="text-lg font-semibold">{isEdit ? 'Editar Atestado' : 'Novo Atestado Médico'}</h3>
                     <button onClick={onClose} className="text-white hover:opacity-80 text-2xl leading-none">&times;</button>
                 </div>
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+                <div className="p-6 space-y-4 overflow-y-auto flex-1">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Funcionario *</label>
@@ -238,10 +231,11 @@ function FormModal({ certificate = null, employees, onClose }) {
                         <textarea value={form.data.notes} onChange={e => form.setData('notes', e.target.value)} rows="3"
                             className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
                     </div>
-                    <div className="flex justify-end space-x-3 pt-4 border-t">
+                    </div>
+                    <div className="flex justify-end space-x-3 px-6 py-4 border-t bg-gray-50 rounded-b-lg shrink-0">
                         <Button variant="outline" onClick={onClose}>Cancelar</Button>
                         <Button type="submit" variant={isEdit ? 'primary' : 'success'} loading={form.processing}>
-                            {isEdit ? 'Salvar Alteracoes' : 'Cadastrar Atestado'}
+                            {isEdit ? 'Salvar Alterações' : 'Cadastrar Atestado'}
                         </Button>
                     </div>
                 </form>

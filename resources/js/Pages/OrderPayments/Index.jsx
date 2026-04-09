@@ -3,11 +3,14 @@ import { Head, router, useForm } from '@inertiajs/react';
 import {
     PlusIcon, MagnifyingGlassIcon, Squares2X2Icon, TableCellsIcon,
     ArrowRightIcon, ArrowLeftIcon, BookmarkIcon, DocumentCheckIcon,
-    ExclamationTriangleIcon,
+    ExclamationTriangleIcon, ChartBarIcon, ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
 import { useState, useMemo } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import { maskMoney, parseMoney, maskCpfCnpj, maskPhone, handleMasked } from '@/Hooks/useMasks';
+import ActionButtons from '@/Components/ActionButtons';
+import DashboardCharts from '@/Components/OrderPayments/DashboardCharts';
+import DetailModal from '@/Components/OrderPayments/DetailModal';
 
 const STATUS_COLORS = {
     backlog: { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300', header: 'bg-gray-600' },
@@ -40,6 +43,8 @@ export default function Index({
     const [showTransitionModal, setShowTransitionModal] = useState(false);
     const [transitionData, setTransitionData] = useState(null);
     const [transitionError, setTransitionError] = useState('');
+    const [showDashboard, setShowDashboard] = useState(false);
+    const [detailOrderId, setDetailOrderId] = useState(null);
 
     const applyFilters = () => {
         router.get(route('order-payments.index'), {
@@ -62,6 +67,16 @@ export default function Index({
                     <h2 className="text-xl font-semibold leading-tight text-gray-800">Ordens de Pagamento</h2>
                     <div className="flex items-center space-x-3">
                         <ViewToggle viewMode={viewMode} setViewMode={setViewMode} />
+                        <button onClick={() => setShowDashboard(true)}
+                            className="inline-flex items-center px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50"
+                            title="Dashboard">
+                            <ChartBarIcon className="h-4 w-4" />
+                        </button>
+                        <a href={route('order-payments.export', { search: search || undefined, status: statusFilter || undefined, store_id: storeFilter || undefined })}
+                            className="inline-flex items-center px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50"
+                            title="Exportar Excel">
+                            <ArrowDownTrayIcon className="h-4 w-4" />
+                        </a>
                         {canCreate && (
                             <button onClick={() => setShowCreateModal(true)}
                                 className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700">
@@ -84,13 +99,14 @@ export default function Index({
                     {/* Kanban */}
                     {viewMode === 'kanban' && (
                         <KanbanBoard statusOptions={statusOptions} kanbanData={kanbanData}
-                            kanbanCards={kanbanCards} canEdit={canEdit} onTransition={openTransitionModal} />
+                            kanbanCards={kanbanCards} canEdit={canEdit} onTransition={openTransitionModal}
+                            onDetail={(id) => setDetailOrderId(id)} />
                     )}
 
                     {/* Table */}
                     {viewMode === 'table' && (
                         <TableView payments={payments} canEdit={canEdit} statusOptions={statusOptions}
-                            onTransition={openTransitionModal} />
+                            onTransition={openTransitionModal} onDetail={(id) => setDetailOrderId(id)} />
                     )}
 
                     {/* Create Modal */}
@@ -104,6 +120,17 @@ export default function Index({
                             selects={selects} error={transitionError} setError={setTransitionError}
                             onClose={() => setShowTransitionModal(false)} />
                     )}
+
+                    {/* Dashboard Charts */}
+                    <DashboardCharts show={showDashboard} onClose={() => setShowDashboard(false)}
+                        statisticsUrl={route('order-payments.statistics')}
+                        dashboardUrl={route('order-payments.dashboard')} />
+
+                    {/* Detail Modal */}
+                    <DetailModal orderId={detailOrderId}
+                        onClose={() => setDetailOrderId(null)}
+                        onTransition={(order, newSt) => { setDetailOrderId(null); openTransitionModal(order, newSt); }}
+                        canEdit={canEdit} />
                 </div>
             </div>
         </>
@@ -208,13 +235,14 @@ function CreateModal({ selects, onClose }) {
 
     return (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl mx-4 max-h-[95vh] overflow-y-auto">
-                <div className="bg-green-600 text-white px-6 py-4 rounded-t-lg flex justify-between items-center">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl mx-4 max-h-[95vh] flex flex-col">
+                <div className="bg-green-600 text-white px-6 py-4 rounded-t-lg flex justify-between items-center shrink-0">
                     <h3 className="text-lg font-semibold">Nova Ordem de Pagamento</h3>
                     <button onClick={onClose} className="text-white hover:text-green-200 text-2xl leading-none">&times;</button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+                <div className="p-6 space-y-6 overflow-y-auto flex-1">
                     {/* Card 1: Informações Básicas */}
                     <Card title="Informações Básicas" icon="📋">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -428,8 +456,9 @@ function CreateModal({ selects, onClose }) {
                             className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
                     </Card>
 
-                    {/* Actions */}
-                    <div className="flex justify-end space-x-3 pt-4 border-t">
+                    </div>
+                    {/* Actions - footer fixo */}
+                    <div className="flex justify-end space-x-3 px-6 py-4 border-t bg-gray-50 rounded-b-lg shrink-0">
                         <button type="button" onClick={onClose}
                             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-md hover:bg-gray-50">
                             Cancelar
@@ -483,52 +512,88 @@ function TransitionModal({ data, statusOptions, selects, error, setError, onClos
     const set = (k, v) => setFormData(prev => ({ ...prev, [k]: v }));
 
     return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-4">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">{forward ? 'Avançar' : 'Retornar'}: #{order.id}</h3>
-                <div className="flex items-center justify-center space-x-3 py-2 mb-4">
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${STATUS_COLORS[order.status]?.bg} ${STATUS_COLORS[order.status]?.text}`}>
-                        {statusOptions[order.status]}
-                    </span>
-                    <ArrowRightIcon className="h-5 w-5 text-gray-400" />
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${STATUS_COLORS[newStatus]?.bg} ${STATUS_COLORS[newStatus]?.text}`}>
-                        {statusOptions[newStatus]}
-                    </span>
-                </div>
-
-                {error && (
-                    <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700 mb-4">
-                        <ExclamationTriangleIcon className="inline h-4 w-4 mr-1" />{error}
-                    </div>
-                )}
-
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    {showNf && <Input label="Número NF *" value={formData.number_nf} onChange={v => set('number_nf', v)} required />}
-                    {showLaunch && <Input label="Número Lançamento *" value={formData.launch_number} onChange={v => set('launch_number', v)} required />}
-                    {showDatePaid && <Input label="Data de Pagamento *" type="date" value={formData.date_paid} onChange={v => set('date_paid', v)} required />}
-                    {showBank && (
-                        <div className="grid grid-cols-3 gap-3">
-                            <Input label="Banco *" value={formData.bank_name} onChange={v => set('bank_name', v)} />
-                            <Input label="Agência *" value={formData.agency} onChange={v => set('agency', v)} />
-                            <Input label="Conta *" value={formData.checking_account} onChange={v => set('checking_account', v)} />
-                        </div>
-                    )}
-                    {showPix && (
-                        <div className="grid grid-cols-2 gap-3">
-                            <Select label="Tipo Chave PIX *" value={formData.pix_key_type} onChange={v => set('pix_key_type', v)}
-                                options={(selects.pixKeyTypes || []).map(t => ({ value: t.name, label: t.name }))} />
-                            <Input label="Chave PIX *" value={formData.pix_key} onChange={v => set('pix_key', v)} />
-                        </div>
-                    )}
-                    {showNotes && <Textarea label="Motivo do retorno *" value={formData.notes} onChange={v => set('notes', v)} required rows={2} />}
-
-                    <div className="flex justify-end space-x-3 pt-4 border-t">
-                        <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-700 bg-white border rounded-md hover:bg-gray-50">Cancelar</button>
-                        <button type="submit" className={`px-4 py-2 text-sm font-medium text-white rounded-md ${forward ? 'bg-green-600 hover:bg-green-700' : 'bg-yellow-500 hover:bg-yellow-600'}`}>
-                            {forward ? 'Avançar' : 'Retornar'}
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex min-h-full items-start justify-center p-4 pt-20">
+                <div className="fixed inset-0 bg-gray-500/75 transition-opacity" onClick={onClose} />
+                <div className="relative w-full max-w-lg bg-white rounded-xl shadow-2xl">
+                    {/* Header */}
+                    <div className={`${forward ? 'bg-green-600' : 'bg-yellow-500'} rounded-t-xl px-6 py-4 flex items-center justify-between`}>
+                        <h3 className="text-lg font-semibold text-white">
+                            {forward ? 'Avançar' : 'Retornar'} Ordem #{order.id}
+                        </h3>
+                        <button onClick={onClose} className="text-white/70 hover:text-white">
+                            <span className="text-2xl leading-none">&times;</span>
                         </button>
                     </div>
-                </form>
+
+                    {/* Status Transition Visual */}
+                    <div className="px-6 py-4 bg-gray-50 border-b">
+                        <div className="flex items-center justify-center space-x-4">
+                            <div className="text-center">
+                                <span className={`inline-flex px-3 py-1.5 rounded-full text-sm font-medium ${STATUS_COLORS[order.status]?.bg} ${STATUS_COLORS[order.status]?.text}`}>
+                                    {statusOptions[order.status]}
+                                </span>
+                                <p className="text-[10px] text-gray-400 mt-1 uppercase">Atual</p>
+                            </div>
+                            <ArrowRightIcon className="h-6 w-6 text-gray-300 shrink-0" />
+                            <div className="text-center">
+                                <span className={`inline-flex px-3 py-1.5 rounded-full text-sm font-medium ring-2 ${STATUS_COLORS[newStatus]?.bg} ${STATUS_COLORS[newStatus]?.text} ring-offset-1`}
+                                    style={{ ringColor: STATUS_COLORS[newStatus]?.border }}>
+                                    {statusOptions[newStatus]}
+                                </span>
+                                <p className="text-[10px] text-gray-400 mt-1 uppercase">Novo</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="p-6">
+                        {error && (
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 mb-4 flex items-start gap-2">
+                                <ExclamationTriangleIcon className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                                <span>{error}</span>
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            {showNf && <Input label="Número NF *" value={formData.number_nf} onChange={v => set('number_nf', v)} required />}
+                            {showLaunch && <Input label="Número Lançamento *" value={formData.launch_number} onChange={v => set('launch_number', v)} required />}
+                            {showDatePaid && <Input label="Data de Pagamento *" type="date" value={formData.date_paid} onChange={v => set('date_paid', v)} required />}
+                            {showBank && (
+                                <div className="grid grid-cols-3 gap-3">
+                                    <Input label="Banco *" value={formData.bank_name} onChange={v => set('bank_name', v)} />
+                                    <Input label="Agência *" value={formData.agency} onChange={v => set('agency', v)} />
+                                    <Input label="Conta *" value={formData.checking_account} onChange={v => set('checking_account', v)} />
+                                </div>
+                            )}
+                            {showPix && (
+                                <div className="grid grid-cols-2 gap-3">
+                                    <Select label="Tipo Chave PIX *" value={formData.pix_key_type} onChange={v => set('pix_key_type', v)}
+                                        options={(selects.pixKeyTypes || []).map(t => ({ value: t.name, label: t.name }))} />
+                                    <Input label="Chave PIX *" value={formData.pix_key} onChange={v => set('pix_key', v)} />
+                                </div>
+                            )}
+                            {showNotes && <Textarea label="Motivo do retorno *" value={formData.notes} onChange={v => set('notes', v)} required rows={3} />}
+
+                            {/* Se não tem campos específicos, mostra confirmação */}
+                            {!showNf && !showLaunch && !showDatePaid && !showBank && !showPix && !showNotes && (
+                                <p className="text-sm text-gray-500 text-center py-2">
+                                    Confirma o {forward ? 'avançamento' : 'retorno'} desta ordem?
+                                </p>
+                            )}
+
+                            <div className="flex justify-end space-x-3 pt-4 border-t">
+                                <button type="button" onClick={onClose}
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                                    Cancelar
+                                </button>
+                                <button type="submit"
+                                    className={`px-5 py-2 text-sm font-medium text-white rounded-lg ${forward ? 'bg-green-600 hover:bg-green-700' : 'bg-yellow-500 hover:bg-yellow-600'}`}>
+                                    {forward ? 'Avançar' : 'Retornar'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -537,7 +602,7 @@ function TransitionModal({ data, statusOptions, selects, error, setError, onClos
 // ============================================================
 // KANBAN BOARD
 // ============================================================
-function KanbanBoard({ statusOptions, kanbanData, kanbanCards, canEdit, onTransition }) {
+function KanbanBoard({ statusOptions, kanbanData, kanbanCards, canEdit, onTransition, onDetail }) {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {Object.entries(statusOptions).map(([status, label]) => (
@@ -552,7 +617,8 @@ function KanbanBoard({ statusOptions, kanbanData, kanbanCards, canEdit, onTransi
                     </div>
                     <div className="p-2 space-y-2 flex-1 overflow-y-auto max-h-[600px]">
                         {(kanbanCards[status] || []).map((p) => (
-                            <div key={p.id} className={`border rounded-lg p-3 ${p.is_overdue ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'} hover:shadow-md transition-shadow`}>
+                            <div key={p.id} className={`border rounded-lg p-3 cursor-pointer ${p.is_overdue ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'} hover:shadow-md transition-shadow`}
+                                onClick={() => onDetail(p.id)}>
                                 <div className="flex justify-between items-start mb-1">
                                     <span className="text-xs font-bold text-gray-500">#{p.id}</span>
                                     <div className="flex space-x-1">
@@ -567,9 +633,17 @@ function KanbanBoard({ statusOptions, kanbanData, kanbanCards, canEdit, onTransi
                                     <p><strong>Valor:</strong> <span className="text-gray-900 font-medium">{p.formatted_total}</span></p>
                                 </div>
                                 {canEdit && (
-                                    <div className="flex justify-end space-x-1 mt-2 pt-2 border-t border-gray-100">
-                                        {status !== 'done' && <button onClick={() => onTransition(p, nextStatus(status))} className="p-1 text-green-600 hover:bg-green-50 rounded"><ArrowRightIcon className="h-3.5 w-3.5" /></button>}
-                                        {status !== 'backlog' && <button onClick={() => onTransition(p, prevStatus(status))} className="p-1 text-yellow-600 hover:bg-yellow-50 rounded"><ArrowLeftIcon className="h-3.5 w-3.5" /></button>}
+                                    <div className="flex justify-end mt-2 pt-2 border-t border-gray-100">
+                                        <ActionButtons size="xs">
+                                            {status !== 'done' && (
+                                                <ActionButtons.Custom variant="success" icon={ArrowRightIcon} title="Avançar" size="xs"
+                                                    onClick={() => onTransition(p, nextStatus(status))} />
+                                            )}
+                                            {status !== 'backlog' && (
+                                                <ActionButtons.Custom variant="warning" icon={ArrowLeftIcon} title="Retornar" size="xs"
+                                                    onClick={() => onTransition(p, prevStatus(status))} />
+                                            )}
+                                        </ActionButtons>
                                     </div>
                                 )}
                             </div>
@@ -585,7 +659,7 @@ function KanbanBoard({ statusOptions, kanbanData, kanbanCards, canEdit, onTransi
 // ============================================================
 // TABLE VIEW
 // ============================================================
-function TableView({ payments, canEdit, statusOptions, onTransition }) {
+function TableView({ payments, canEdit, statusOptions, onTransition, onDetail }) {
     return (
         <div className="bg-white shadow rounded-lg overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200">
@@ -598,7 +672,7 @@ function TableView({ payments, canEdit, statusOptions, onTransition }) {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                     {payments.data?.length > 0 ? payments.data.map((p) => (
-                        <tr key={p.id} className={`hover:bg-gray-50 ${p.is_overdue ? 'bg-red-50' : ''}`}>
+                        <tr key={p.id} className={`hover:bg-gray-50 cursor-pointer ${p.is_overdue ? 'bg-red-50' : ''}`} onClick={() => onDetail(p.id)}>
                             <td className="px-4 py-3 text-sm font-medium text-gray-900">
                                 #{p.id}
                                 {p.advance && <BookmarkIcon className="inline h-3.5 w-3.5 ml-1 text-yellow-500" />}
@@ -609,11 +683,19 @@ function TableView({ payments, canEdit, statusOptions, onTransition }) {
                             <td className="px-4 py-3 text-sm"><span className={p.is_overdue ? 'text-red-600 font-medium' : 'text-gray-500'}>{p.date_payment || '-'}</span></td>
                             <td className="px-4 py-3 text-sm text-gray-500 font-mono">{p.number_nf || '-'}</td>
                             <td className="px-4 py-3"><span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[p.status]?.bg} ${STATUS_COLORS[p.status]?.text}`}>{p.status_label}</span></td>
-                            <td className="px-4 py-3">
-                                <div className="flex space-x-1">
-                                    {canEdit && p.status !== 'done' && <button onClick={() => onTransition(p, nextStatus(p.status))} className="p-1 text-green-600 hover:bg-green-50 rounded"><ArrowRightIcon className="h-4 w-4" /></button>}
-                                    {canEdit && p.status !== 'backlog' && <button onClick={() => onTransition(p, prevStatus(p.status))} className="p-1 text-yellow-600 hover:bg-yellow-50 rounded"><ArrowLeftIcon className="h-4 w-4" /></button>}
-                                </div>
+                            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                <ActionButtons
+                                    onView={() => onDetail(p.id)}
+                                >
+                                    {canEdit && p.status !== 'done' && (
+                                        <ActionButtons.Custom variant="success" icon={ArrowRightIcon} title="Avançar"
+                                            onClick={() => onTransition(p, nextStatus(p.status))} />
+                                    )}
+                                    {canEdit && p.status !== 'backlog' && (
+                                        <ActionButtons.Custom variant="warning" icon={ArrowLeftIcon} title="Retornar"
+                                            onClick={() => onTransition(p, prevStatus(p.status))} />
+                                    )}
+                                </ActionButtons>
                             </td>
                         </tr>
                     )) : (
