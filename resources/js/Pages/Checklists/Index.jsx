@@ -230,7 +230,7 @@ export default function Index({ checklists, stats, stores = [], filters = {} }) 
             </PageHeader>
 
             <div className="py-6">
-                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div className="mx-auto max-w-full px-4 sm:px-6 lg:px-8">
                     {/* Statistics Cards */}
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                         <StatCard label="Total" value={stats.total} color="gray" />

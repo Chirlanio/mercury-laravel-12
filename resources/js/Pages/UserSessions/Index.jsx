@@ -34,7 +34,7 @@ export default function Index({ sessions, stores = [], filters = {}, onlineCount
             </PageHeader>
 
             <div className="py-6">
-                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div className="mx-auto max-w-full px-4 sm:px-6 lg:px-8">
                     {/* Filtros */}
                     <div className="bg-white shadow rounded-lg p-4 mb-6">
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

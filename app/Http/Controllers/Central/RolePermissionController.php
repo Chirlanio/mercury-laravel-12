@@ -152,6 +152,8 @@ class RolePermissionController extends Controller
             'overtime' => 'Horas Extras',
             'store_goals' => 'Metas de Loja',
             'movements' => 'Movimentações',
+            'vacations' => 'Férias',
+            'stock_audits' => 'Auditoria de Estoque',
             default => ucfirst(str_replace('_', ' ', $group)),
         };
     }

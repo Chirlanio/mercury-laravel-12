@@ -294,7 +294,7 @@ export default function Counting({ audit, items, areas = [], summary }) {
             </PageHeader>
 
             <div className="py-6">
-                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6">
+                <div className="mx-auto max-w-full px-4 sm:px-6 lg:px-8 space-y-6">
 
                     {/* Summary Cards */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

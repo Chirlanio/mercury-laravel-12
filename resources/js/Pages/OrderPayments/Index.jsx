@@ -1,16 +1,17 @@
-import PageHeader from '@/Components/PageHeader';
 import { Head, router, useForm } from '@inertiajs/react';
 import {
-    PlusIcon, MagnifyingGlassIcon, Squares2X2Icon, TableCellsIcon,
+    PlusIcon, XMarkIcon, MagnifyingGlassIcon, Squares2X2Icon, TableCellsIcon,
     ArrowRightIcon, ArrowLeftIcon, BookmarkIcon, DocumentCheckIcon,
     ExclamationTriangleIcon, ChartBarIcon, ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
 import { useState, useMemo } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import { maskMoney, parseMoney, maskCpfCnpj, maskPhone, handleMasked } from '@/Hooks/useMasks';
+import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import DashboardCharts from '@/Components/OrderPayments/DashboardCharts';
 import DetailModal from '@/Components/OrderPayments/DetailModal';
+import StandardModal from '@/Components/StandardModal';
 
 const STATUS_COLORS = {
     backlog: { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300', header: 'bg-gray-600' },
@@ -62,32 +63,48 @@ export default function Index({
     return (
         <>
             <Head title="Ordens de Pagamento" />
-            <PageHeader>
-                <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800">Ordens de Pagamento</h2>
-                    <div className="flex items-center space-x-3">
-                        <ViewToggle viewMode={viewMode} setViewMode={setViewMode} />
-                        <button onClick={() => setShowDashboard(true)}
-                            className="inline-flex items-center px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50"
-                            title="Dashboard">
-                            <ChartBarIcon className="h-4 w-4" />
-                        </button>
-                        <a href={route('order-payments.export', { search: search || undefined, status: statusFilter || undefined, store_id: storeFilter || undefined })}
-                            className="inline-flex items-center px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50"
-                            title="Exportar Excel">
-                            <ArrowDownTrayIcon className="h-4 w-4" />
-                        </a>
-                        {canCreate && (
-                            <button onClick={() => setShowCreateModal(true)}
-                                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700">
-                                <PlusIcon className="h-4 w-4 mr-2" />Nova Ordem
-                            </button>
-                        )}
+
+            <div className="py-12">
+                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+                    {/* Header */}
+                    <div className="mb-6">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h1 className="text-3xl font-bold text-gray-900">
+                                    Ordens de Pagamento
+                                </h1>
+                                <p className="mt-1 text-sm text-gray-600">
+                                    Solicitações e controle de pagamentos
+                                </p>
+                            </div>
+                            <div className="flex items-center space-x-3">
+                                <ViewToggle viewMode={viewMode} setViewMode={setViewMode} />
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setShowDashboard(true)}
+                                    icon={ChartBarIcon}
+                                    iconOnly
+                                    title="Dashboard"
+                                />
+                                <a href={route('order-payments.export', { search: search || undefined, status: statusFilter || undefined, store_id: storeFilter || undefined })}
+                                    className="inline-flex items-center px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
+                                    title="Exportar Excel">
+                                    <ArrowDownTrayIcon className="h-4 w-4" />
+                                </a>
+                                {canCreate && (
+                                    <Button
+                                        variant="primary"
+                                        onClick={() => setShowCreateModal(true)}
+                                        icon={PlusIcon}
+                                    >
+                                        Nova Ordem
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </PageHeader>
-            <div className="py-6">
-                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+
                     {/* KPI */}
                     <KpiCards kanbanData={kanbanData} />
 
@@ -108,31 +125,31 @@ export default function Index({
                         <TableView payments={payments} canEdit={canEdit} statusOptions={statusOptions}
                             onTransition={openTransitionModal} onDetail={(id) => setDetailOrderId(id)} />
                     )}
-
-                    {/* Create Modal */}
-                    {showCreateModal && (
-                        <CreateModal selects={selects} onClose={() => setShowCreateModal(false)} />
-                    )}
-
-                    {/* Transition Modal */}
-                    {showTransitionModal && transitionData && (
-                        <TransitionModal data={transitionData} statusOptions={statusOptions}
-                            selects={selects} error={transitionError} setError={setTransitionError}
-                            onClose={() => setShowTransitionModal(false)} />
-                    )}
-
-                    {/* Dashboard Charts */}
-                    <DashboardCharts show={showDashboard} onClose={() => setShowDashboard(false)}
-                        statisticsUrl={route('order-payments.statistics')}
-                        dashboardUrl={route('order-payments.dashboard')} />
-
-                    {/* Detail Modal */}
-                    <DetailModal orderId={detailOrderId}
-                        onClose={() => setDetailOrderId(null)}
-                        onTransition={(order, newSt) => { setDetailOrderId(null); openTransitionModal(order, newSt); }}
-                        canEdit={canEdit} />
                 </div>
             </div>
+
+            {/* Create Modal */}
+            {showCreateModal && (
+                <CreateModal selects={selects} onClose={() => setShowCreateModal(false)} />
+            )}
+
+            {/* Transition Modal */}
+            {showTransitionModal && transitionData && (
+                <TransitionModal data={transitionData} statusOptions={statusOptions}
+                    selects={selects} error={transitionError} setError={setTransitionError}
+                    onClose={() => setShowTransitionModal(false)} />
+            )}
+
+            {/* Dashboard Charts */}
+            <DashboardCharts show={showDashboard} onClose={() => setShowDashboard(false)}
+                statisticsUrl={route('order-payments.statistics')}
+                dashboardUrl={route('order-payments.dashboard')} />
+
+            {/* Detail Modal */}
+            <DetailModal orderId={detailOrderId}
+                onClose={() => setDetailOrderId(null)}
+                onTransition={(order, newSt) => { setDetailOrderId(null); openTransitionModal(order, newSt); }}
+                canEdit={canEdit} />
         </>
     );
 }
@@ -207,8 +224,7 @@ function CreateModal({ selects, onClose }) {
         form.setData('allocations', form.data.allocations.map(a => ({ ...a, percentage: pct, value: val })));
     };
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
+    const handleSubmit = () => {
         const pt = (selects.paymentTypes || []).find(t => t.id == form.data.payment_type_id);
         const submitData = {
             ...form.data,
@@ -234,17 +250,25 @@ function CreateModal({ selects, onClose }) {
     };
 
     return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl mx-4 max-h-[95vh] flex flex-col">
-                <div className="bg-green-600 text-white px-6 py-4 rounded-t-lg flex justify-between items-center shrink-0">
-                    <h3 className="text-lg font-semibold">Nova Ordem de Pagamento</h3>
-                    <button onClick={onClose} className="text-white hover:text-green-200 text-2xl leading-none">&times;</button>
-                </div>
-
-                <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-                <div className="p-6 space-y-6 overflow-y-auto flex-1">
+        <StandardModal
+            show={true}
+            onClose={onClose}
+            title="Nova Ordem de Pagamento"
+            headerColor="bg-green-600"
+            maxWidth="7xl"
+            onSubmit={handleSubmit}
+            footer={
+                <StandardModal.Footer
+                    onCancel={onClose}
+                    onSubmit="submit"
+                    submitLabel={form.processing ? 'Salvando...' : 'Salvar Ordem de Pagamento'}
+                    submitColor="bg-green-600 hover:bg-green-700"
+                    processing={form.processing}
+                />
+            }
+        >
                     {/* Card 1: Informações Básicas */}
-                    <Card title="Informações Básicas" icon="📋">
+                    <StandardModal.Section title="Informações Básicas" icon="📋">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <Select label="Área *" value={form.data.area_id} onChange={v => form.setData('area_id', v)}
                                 options={(selects.areas || []).map(a => ({ value: a.id, label: a.name }))} error={form.errors.area_id} required />
@@ -259,10 +283,10 @@ function CreateModal({ selects, onClose }) {
                             <Select label="Motivo Gerencial" value={form.data.management_reason_id} onChange={v => form.setData('management_reason_id', v)}
                                 options={(selects.managementReasons || []).map(r => ({ value: r.id, label: r.name }))} />
                         </div>
-                    </Card>
+                    </StandardModal.Section>
 
                     {/* Card 2: Fornecedor e Valores */}
-                    <Card title="Fornecedor e Valores" icon="💰">
+                    <StandardModal.Section title="Fornecedor e Valores" icon="💰">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Select label="Fornecedor *" value={form.data.supplier_id} onChange={v => form.setData('supplier_id', v)}
                                 options={(selects.suppliers || []).map(s => ({ value: s.id, label: `${s.nome_fantasia}${s.cnpj ? ` (${s.cnpj})` : ''}` }))}
@@ -278,10 +302,10 @@ function CreateModal({ selects, onClose }) {
                             <Input label="Descrição *" value={form.data.description}
                                 onChange={v => form.setData('description', v)} error={form.errors.description} required />
                         </div>
-                    </Card>
+                    </StandardModal.Section>
 
                     {/* Card 3: Pagamento e Adiantamento */}
-                    <Card title="Pagamento e Adiantamento" icon="💳">
+                    <StandardModal.Section title="Pagamento e Adiantamento" icon="💳">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <Select label="Forma de Pagamento *" value={form.data.payment_type_id}
                                 onChange={v => form.setData('payment_type_id', v)}
@@ -327,10 +351,10 @@ function CreateModal({ selects, onClose }) {
                                 )}
                             </div>
                         )}
-                    </Card>
+                    </StandardModal.Section>
 
                     {/* Card 4: Dados Bancários */}
-                    <Card title="Dados Bancários" icon="🏦">
+                    <StandardModal.Section title="Dados Bancários" icon="🏦">
                         {isPix ? (
                             <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
                                 <p className="text-xs font-semibold text-purple-700 mb-3 uppercase">Pagamento via PIX</p>
@@ -364,10 +388,10 @@ function CreateModal({ selects, onClose }) {
                                     onChange={v => form.setData('document_number_supplier', v)} />
                             </div>
                         )}
-                    </Card>
+                    </StandardModal.Section>
 
                     {/* Card 5: Rateio (Allocation) */}
-                    <Card title="Rateio" icon="📊">
+                    <StandardModal.Section title="Rateio" icon="📊">
                         <div className="flex items-center space-x-2 mb-4">
                             <input type="checkbox" checked={form.data.has_allocation}
                                 onChange={e => {
@@ -447,30 +471,15 @@ function CreateModal({ selects, onClose }) {
                                 </div>
                             </div>
                         )}
-                    </Card>
+                    </StandardModal.Section>
 
                     {/* Card 6: Observações */}
-                    <Card title="Observações" icon="📝">
+                    <StandardModal.Section title="Observações" icon="📝">
                         <textarea value={form.data.observations} onChange={e => form.setData('observations', e.target.value)}
                             rows={3} placeholder="Observações adicionais..."
                             className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
-                    </Card>
-
-                    </div>
-                    {/* Actions - footer fixo */}
-                    <div className="flex justify-end space-x-3 px-6 py-4 border-t bg-gray-50 rounded-b-lg shrink-0">
-                        <button type="button" onClick={onClose}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-md hover:bg-gray-50">
-                            Cancelar
-                        </button>
-                        <button type="submit" disabled={form.processing}
-                            className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50">
-                            {form.processing ? 'Salvando...' : 'Salvar Ordem de Pagamento'}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+                    </StandardModal.Section>
+        </StandardModal>
     );
 }
 
@@ -493,8 +502,7 @@ function TransitionModal({ data, statusOptions, selects, error, setError, onClos
     const showPix = order.status === 'doing' && newStatus === 'waiting' && order.payment_type === 'PIX';
     const showNotes = !forward;
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
+    const handleSubmit = () => {
         setError('');
         fetch(route('order-payments.transition', order.id), {
             method: 'POST',
@@ -512,49 +520,41 @@ function TransitionModal({ data, statusOptions, selects, error, setError, onClos
     const set = (k, v) => setFormData(prev => ({ ...prev, [k]: v }));
 
     return (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex min-h-full items-start justify-center p-4 pt-20">
-                <div className="fixed inset-0 bg-gray-500/75 transition-opacity" onClick={onClose} />
-                <div className="relative w-full max-w-lg bg-white rounded-xl shadow-2xl">
-                    {/* Header */}
-                    <div className={`${forward ? 'bg-green-600' : 'bg-yellow-500'} rounded-t-xl px-6 py-4 flex items-center justify-between`}>
-                        <h3 className="text-lg font-semibold text-white">
-                            {forward ? 'Avançar' : 'Retornar'} Ordem #{order.id}
-                        </h3>
-                        <button onClick={onClose} className="text-white/70 hover:text-white">
-                            <span className="text-2xl leading-none">&times;</span>
-                        </button>
-                    </div>
-
+        <StandardModal
+            show={true}
+            onClose={onClose}
+            title={`${forward ? 'Avançar' : 'Retornar'} Ordem #${order.id}`}
+            headerColor={forward ? 'bg-green-600' : 'bg-yellow-500'}
+            maxWidth="lg"
+            onSubmit={handleSubmit}
+            errorMessage={error}
+            footer={
+                <StandardModal.Footer
+                    onCancel={onClose}
+                    onSubmit="submit"
+                    submitLabel={forward ? 'Avançar' : 'Retornar'}
+                    submitColor={forward ? 'bg-green-600 hover:bg-green-700' : 'bg-yellow-500 hover:bg-yellow-600'}
+                />
+            }
+        >
                     {/* Status Transition Visual */}
-                    <div className="px-6 py-4 bg-gray-50 border-b">
-                        <div className="flex items-center justify-center space-x-4">
-                            <div className="text-center">
-                                <span className={`inline-flex px-3 py-1.5 rounded-full text-sm font-medium ${STATUS_COLORS[order.status]?.bg} ${STATUS_COLORS[order.status]?.text}`}>
-                                    {statusOptions[order.status]}
-                                </span>
-                                <p className="text-[10px] text-gray-400 mt-1 uppercase">Atual</p>
-                            </div>
-                            <ArrowRightIcon className="h-6 w-6 text-gray-300 shrink-0" />
-                            <div className="text-center">
-                                <span className={`inline-flex px-3 py-1.5 rounded-full text-sm font-medium ring-2 ${STATUS_COLORS[newStatus]?.bg} ${STATUS_COLORS[newStatus]?.text} ring-offset-1`}
-                                    style={{ ringColor: STATUS_COLORS[newStatus]?.border }}>
-                                    {statusOptions[newStatus]}
-                                </span>
-                                <p className="text-[10px] text-gray-400 mt-1 uppercase">Novo</p>
-                            </div>
+                    <div className="flex items-center justify-center space-x-4 bg-gray-50 -mx-6 -mt-5 mb-5 px-6 py-4 border-b">
+                        <div className="text-center">
+                            <span className={`inline-flex px-3 py-1.5 rounded-full text-sm font-medium ${STATUS_COLORS[order.status]?.bg} ${STATUS_COLORS[order.status]?.text}`}>
+                                {statusOptions[order.status]}
+                            </span>
+                            <p className="text-[10px] text-gray-400 mt-1 uppercase">Atual</p>
+                        </div>
+                        <ArrowRightIcon className="h-6 w-6 text-gray-300 shrink-0" />
+                        <div className="text-center">
+                            <span className={`inline-flex px-3 py-1.5 rounded-full text-sm font-medium ring-2 ${STATUS_COLORS[newStatus]?.bg} ${STATUS_COLORS[newStatus]?.text} ring-offset-1`}
+                                style={{ ringColor: STATUS_COLORS[newStatus]?.border }}>
+                                {statusOptions[newStatus]}
+                            </span>
+                            <p className="text-[10px] text-gray-400 mt-1 uppercase">Novo</p>
                         </div>
                     </div>
 
-                    <div className="p-6">
-                        {error && (
-                            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 mb-4 flex items-start gap-2">
-                                <ExclamationTriangleIcon className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-                                <span>{error}</span>
-                            </div>
-                        )}
-
-                        <form onSubmit={handleSubmit} className="space-y-4">
                             {showNf && <Input label="Número NF *" value={formData.number_nf} onChange={v => set('number_nf', v)} required />}
                             {showLaunch && <Input label="Número Lançamento *" value={formData.launch_number} onChange={v => set('launch_number', v)} required />}
                             {showDatePaid && <Input label="Data de Pagamento *" type="date" value={formData.date_paid} onChange={v => set('date_paid', v)} required />}
@@ -580,22 +580,7 @@ function TransitionModal({ data, statusOptions, selects, error, setError, onClos
                                     Confirma o {forward ? 'avançamento' : 'retorno'} desta ordem?
                                 </p>
                             )}
-
-                            <div className="flex justify-end space-x-3 pt-4 border-t">
-                                <button type="button" onClick={onClose}
-                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
-                                    Cancelar
-                                </button>
-                                <button type="submit"
-                                    className={`px-5 py-2 text-sm font-medium text-white rounded-lg ${forward ? 'bg-green-600 hover:bg-green-700' : 'bg-yellow-500 hover:bg-yellow-600'}`}>
-                                    {forward ? 'Avançar' : 'Retornar'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
+        </StandardModal>
     );
 }
 
@@ -779,16 +764,6 @@ function ViewToggle({ viewMode, setViewMode }) {
     );
 }
 
-function Card({ title, icon, children }) {
-    return (
-        <div className="bg-white border border-gray-200 rounded-lg">
-            <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 rounded-t-lg">
-                <h4 className="text-sm font-semibold text-gray-700">{icon} {title}</h4>
-            </div>
-            <div className="p-4">{children}</div>
-        </div>
-    );
-}
 
 function Input({ label, error, onChange, ...props }) {
     return (

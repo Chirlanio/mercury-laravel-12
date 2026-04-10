@@ -1,218 +1,113 @@
-import Modal from '@/Components/Modal';
+import StandardModal from '@/Components/StandardModal';
 import UserAvatar from '@/Components/UserAvatar';
-import Button from '@/Components/Button';
-import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, TrashIcon, UserIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
+
+const ROLE_COLORS = {
+    super_admin: 'bg-red-100 text-red-800',
+    admin: 'bg-blue-100 text-blue-800',
+    support: 'bg-yellow-100 text-yellow-800',
+    user: 'bg-green-100 text-green-800',
+};
+
+const ROLE_PERMISSIONS = {
+    super_admin: { title: 'Super Administrador', items: ['Acesso total ao sistema', 'Gerenciar todos os usuários', 'Alterar níveis de acesso', 'Configurações do sistema'] },
+    admin: { title: 'Administrador', items: ['Gerenciar usuários (exceto super admin)', 'Acesso a relatórios', 'Configurações gerais', 'Suporte avançado'] },
+    support: { title: 'Suporte', items: ['Visualizar usuários', 'Acesso a relatórios básicos', 'Suporte ao cliente', 'Documentação'] },
+    user: { title: 'Usuário', items: ['Acesso básico ao sistema', 'Visualizar próprios dados', 'Funcionalidades padrão', 'Suporte básico'] },
+};
 
 export default function UserViewModal({ show, onClose, user, roles = {}, onEdit, onDelete, canEdit = false, canDelete = false }) {
-    const getRoleBadgeColor = (role) => {
-        const colors = {
-            super_admin: 'bg-red-100 text-red-800',
-            admin: 'bg-blue-100 text-blue-800',
-            support: 'bg-yellow-100 text-yellow-800',
-            user: 'bg-green-100 text-green-800'
-        };
-        return colors[role] || 'bg-gray-100 text-gray-800';
-    };
+    if (!user) return null;
+
+    const rolePerm = ROLE_PERMISSIONS[user.role];
+    const fmtDate = (d) => d ? new Date(d).toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' }) : '-';
+    const fmtDateTime = (d) => d ? new Date(d).toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
 
     return (
-        <Modal show={show} onClose={onClose} title="Detalhes do Usuário" maxWidth="85vw">
-            {user && <div className="space-y-6">
-                {/* Avatar e informações básicas */}
-                <div className="flex items-center space-x-4">
-                    <div className="flex-shrink-0">
-                        <UserAvatar user={user} size="2xl" />
-                    </div>
-                    <div className="flex-1">
-                        <h3 className="text-xl font-semibold text-gray-900">{user.name}</h3>
-                        {user.nickname && (
-                            <p className="text-sm text-gray-500 italic">"{user.nickname}"</p>
-                        )}
-                        <p className="text-gray-600">{user.email}</p>
-                        <div className="mt-2">
-                            <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${getRoleBadgeColor(user.role)}`}>
-                                {roles[user.role] || user.role}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Informações detalhadas */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                        <h4 className="text-sm font-medium text-gray-900 mb-3">
-                            Informações da Conta
-                        </h4>
-                        <div className="space-y-2 text-sm">
-                            <div>
-                                <span className="font-medium text-gray-600">ID:</span>
-                                <span className="ml-2 text-gray-900">#{user.id}</span>
-                            </div>
-                            <div>
-                                <span className="font-medium text-gray-600">Nome:</span>
-                                <span className="ml-2 text-gray-900">{user.name}</span>
-                            </div>
-                            {user.nickname && (
-                                <div>
-                                    <span className="font-medium text-gray-600">Apelido:</span>
-                                    <span className="ml-2 text-gray-900">{user.nickname}</span>
-                                </div>
-                            )}
-                            <div>
-                                <span className="font-medium text-gray-600">E-mail:</span>
-                                <span className="ml-2 text-gray-900">{user.email}</span>
-                            </div>
-                            {user.username && (
-                                <div>
-                                    <span className="font-medium text-gray-600">Usuário:</span>
-                                    <span className="ml-2 text-gray-900">{user.username}</span>
-                                </div>
-                            )}
-                            <div>
-                                <span className="font-medium text-gray-600">Nível de Acesso:</span>
-                                <span className="ml-2 text-gray-900">{roles[user.role] || user.role}</span>
-                            </div>
-                            {user.store_id && (
-                                <div>
-                                    <span className="font-medium text-gray-600">Loja:</span>
-                                    <span className="ml-2 text-gray-900">{user.store_id}</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                        <h4 className="text-sm font-medium text-gray-900 mb-3">
-                            Status da Conta
-                        </h4>
-                        <div className="space-y-2 text-sm">
-                            <div>
-                                <span className="font-medium text-gray-600">Criado em:</span>
-                                <span className="ml-2 text-gray-900">
-                                    {new Date(user.created_at).toLocaleDateString('pt-BR', {
-                                        year: 'numeric',
-                                        month: 'long',
-                                        day: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                    })}
-                                </span>
-                            </div>
-                            <div>
-                                <span className="font-medium text-gray-600">E-mail verificado:</span>
-                                <span className={`ml-2 font-medium ${user.email_verified_at ? 'text-green-600' : 'text-red-600'}`}>
-                                    {user.email_verified_at ? 'Verificado' : 'Não verificado'}
-                                </span>
-                            </div>
-                            {user.email_verified_at && (
-                                <div>
-                                    <span className="font-medium text-gray-600">Verificado em:</span>
-                                    <span className="ml-2 text-gray-900">
-                                        {new Date(user.email_verified_at).toLocaleDateString('pt-BR', {
-                                            year: 'numeric',
-                                            month: 'long',
-                                            day: 'numeric'
-                                        })}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Permissões baseadas no role */}
-                <div className="bg-blue-50 p-4 rounded-lg">
-                    <h4 className="text-sm font-medium text-blue-900 mb-3">
-                        Permissões do Nível de Acesso
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        {user.role === 'super_admin' && (
-                            <div>
-                                <h5 className="font-medium text-blue-800 mb-2">Super Administrador</h5>
-                                <ul className="text-blue-700 space-y-1">
-                                    <li>• Acesso total ao sistema</li>
-                                    <li>• Gerenciar todos os usuários</li>
-                                    <li>• Alterar níveis de acesso</li>
-                                    <li>• Configurações do sistema</li>
-                                </ul>
-                            </div>
-                        )}
-                        {user.role === 'admin' && (
-                            <div>
-                                <h5 className="font-medium text-blue-800 mb-2">Administrador</h5>
-                                <ul className="text-blue-700 space-y-1">
-                                    <li>• Gerenciar usuários (exceto super admin)</li>
-                                    <li>• Acesso a relatórios</li>
-                                    <li>• Configurações gerais</li>
-                                    <li>• Suporte avançado</li>
-                                </ul>
-                            </div>
-                        )}
-                        {user.role === 'support' && (
-                            <div>
-                                <h5 className="font-medium text-blue-800 mb-2">Suporte</h5>
-                                <ul className="text-blue-700 space-y-1">
-                                    <li>• Visualizar usuários</li>
-                                    <li>• Acesso a relatórios básicos</li>
-                                    <li>• Suporte ao cliente</li>
-                                    <li>• Documentação</li>
-                                </ul>
-                            </div>
-                        )}
-                        {user.role === 'user' && (
-                            <div>
-                                <h5 className="font-medium text-blue-800 mb-2">Usuário</h5>
-                                <ul className="text-blue-700 space-y-1">
-                                    <li>• Acesso básico ao sistema</li>
-                                    <li>• Visualizar próprios dados</li>
-                                    <li>• Funcionalidades padrão</li>
-                                    <li>• Suporte básico</li>
-                                </ul>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Ações disponíveis */}
-                {(canEdit || canDelete) && (
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                        <h4 className="text-sm font-medium text-blue-900 mb-3">
-                            Ações Disponíveis
-                        </h4>
-                        <div className="flex flex-wrap gap-3">
-                            {canEdit && onEdit && (
-                                <Button
-                                    onClick={() => onEdit(user)}
-                                    variant="warning"
-                                    size="md"
-                                    icon={PencilIcon}
-                                >
-                                    Editar Usuário
-                                </Button>
-                            )}
-                            {canDelete && onDelete && (
-                                <Button
-                                    onClick={() => onDelete(user)}
-                                    variant="danger"
-                                    size="md"
-                                    icon={TrashIcon}
-                                >
-                                    Excluir Usuário
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                <div className="flex justify-end space-x-3">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded transition-colors"
-                    >
+        <StandardModal
+            show={show}
+            onClose={onClose}
+            title={`${user.name}`}
+            headerColor="bg-indigo-600"
+            headerBadges={[{ text: roles[user.role] || user.role, className: ROLE_COLORS[user.role] || 'bg-gray-100 text-gray-800' }]}
+            maxWidth="7xl"
+            footer={(canEdit || canDelete) ? (
+                <StandardModal.Footer>
+                    {canEdit && onEdit && (
+                        <button onClick={() => onEdit(user)}
+                            className="inline-flex items-center px-4 py-2 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors">
+                            <PencilIcon className="h-4 w-4 mr-1.5" /> Editar
+                        </button>
+                    )}
+                    {canDelete && onDelete && (
+                        <button onClick={() => onDelete(user)}
+                            className="inline-flex items-center px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors">
+                            <TrashIcon className="h-4 w-4 mr-1.5" /> Excluir
+                        </button>
+                    )}
+                    <button onClick={onClose}
+                        className="ml-auto px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                         Fechar
                     </button>
+                </StandardModal.Footer>
+            ) : (
+                <StandardModal.Footer onCancel={onClose} cancelLabel="Fechar" />
+            )}
+        >
+            {/* Avatar + Info básica */}
+            <div className="flex items-center gap-4">
+                <UserAvatar user={user} size="2xl" />
+                <div>
+                    <h3 className="text-lg font-semibold text-gray-900">{user.name}</h3>
+                    {user.nickname && <p className="text-sm text-gray-500 italic">"{user.nickname}"</p>}
+                    <p className="text-sm text-gray-600">{user.email}</p>
                 </div>
-            </div>}
-        </Modal>
+            </div>
+
+            {/* Grid de informações */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <StandardModal.Section title="Informações da Conta" icon={<UserIcon className="h-4 w-4" />}>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                        <StandardModal.Field label="ID" value={`#${user.id}`} mono />
+                        <StandardModal.Field label="Nome" value={user.name} />
+                        {user.nickname && <StandardModal.Field label="Apelido" value={user.nickname} />}
+                        <StandardModal.Field label="E-mail" value={user.email} />
+                        {user.username && <StandardModal.Field label="Usuário" value={user.username} mono />}
+                        <StandardModal.Field label="Nível de Acesso" value={roles[user.role] || user.role}
+                            badge={user.role === 'super_admin' ? 'red' : user.role === 'admin' ? 'blue' : user.role === 'support' ? 'yellow' : 'green'} />
+                        {user.store_id && <StandardModal.Field label="Loja" value={user.store_id} />}
+                    </div>
+                </StandardModal.Section>
+
+                <StandardModal.Section title="Status da Conta" icon={<ShieldCheckIcon className="h-4 w-4" />}>
+                    <div className="grid grid-cols-1 gap-y-3">
+                        <StandardModal.Field label="Criado em" value={fmtDateTime(user.created_at)} />
+                        <div>
+                            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">E-mail verificado</p>
+                            <span className={`inline-flex mt-0.5 px-2 py-0.5 rounded text-xs font-medium ${user.email_verified_at ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                {user.email_verified_at ? 'Verificado' : 'Não verificado'}
+                            </span>
+                        </div>
+                        {user.email_verified_at && (
+                            <StandardModal.Field label="Verificado em" value={fmtDate(user.email_verified_at)} />
+                        )}
+                    </div>
+                </StandardModal.Section>
+            </div>
+
+            {/* Permissões */}
+            {rolePerm && (
+                <StandardModal.Section title={`Permissões — ${rolePerm.title}`} icon={<ShieldCheckIcon className="h-4 w-4" />}>
+                    <div className="grid grid-cols-2 gap-2">
+                        {rolePerm.items.map((item, i) => (
+                            <div key={i} className="flex items-center gap-2 text-sm text-gray-700">
+                                <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 shrink-0" />
+                                {item}
+                            </div>
+                        ))}
+                    </div>
+                </StandardModal.Section>
+            )}
+        </StandardModal>
     );
 }

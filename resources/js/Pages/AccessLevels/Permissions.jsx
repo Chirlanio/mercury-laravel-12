@@ -436,7 +436,7 @@ export default function Permissions({ auth, accessLevel, pages, menus, stats }) 
             <Head title={`Permissões - ${accessLevel.name}`} />
 
             <div className="py-12">
-                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
+                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
                     {/* Header */}
                     <div className="mb-6">
                         <div className="flex items-center justify-between">

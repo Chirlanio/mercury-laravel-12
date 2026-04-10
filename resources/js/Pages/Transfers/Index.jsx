@@ -1,13 +1,14 @@
-import PageHeader from '@/Components/PageHeader';
 import { Head, router, useForm } from '@inertiajs/react';
 import {
-    ArrowsRightLeftIcon, PlusIcon, MagnifyingGlassIcon, ExclamationTriangleIcon,
+    ArrowsRightLeftIcon, PlusIcon, XMarkIcon, ExclamationTriangleIcon,
     TruckIcon, CheckCircleIcon, XCircleIcon,
 } from '@heroicons/react/24/outline';
 import { CheckCircleIcon as CheckCircleSolid } from '@heroicons/react/24/solid';
 import { useState, useMemo } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
+import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
+import DataTable from '@/Components/DataTable';
 import StatisticsCards from '@/Components/Transfers/StatisticsCards';
 import DetailModal from '@/Components/Transfers/DetailModal';
 import EditModal from '@/Components/Transfers/EditModal';
@@ -26,23 +27,27 @@ export default function Index({ transfers, stores = [], filters = {}, statusOpti
     const canEdit = hasPermission(PERMISSIONS.EDIT_TRANSFERS);
     const canDelete = hasPermission(PERMISSIONS.DELETE_TRANSFERS);
 
-    const [search, setSearch] = useState(filters.search || '');
-    const [statusFilter, setStatusFilter] = useState(filters.status || '');
-    const [storeFilter, setStoreFilter] = useState(filters.store_id || '');
-    const [typeFilter, setTypeFilter] = useState(filters.transfer_type || '');
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [detailTransferId, setDetailTransferId] = useState(null);
     const [editTransfer, setEditTransfer] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
 
-    const applyFilters = () => {
-        router.get(route('transfers.index'), {
-            search: search || undefined,
-            status: statusFilter || undefined,
-            store_id: storeFilter || undefined,
-            transfer_type: typeFilter || undefined,
-        }, { preserveState: true });
+    const applyFilter = (key, value) => {
+        const currentUrl = new URL(window.location);
+        if (value) {
+            currentUrl.searchParams.set(key, value);
+        } else {
+            currentUrl.searchParams.delete(key);
+        }
+        currentUrl.searchParams.delete('page');
+        router.visit(currentUrl.toString(), { preserveState: true, preserveScroll: true });
     };
+
+    const clearFilters = () => {
+        router.visit(route('transfers.index'), { preserveState: true, preserveScroll: true });
+    };
+
+    const hasActiveFilters = filters.status || filters.store_id || filters.transfer_type;
 
     const handleDelete = (transfer) => {
         if (confirm(`Tem certeza que deseja excluir a transferência #${transfer.id}?`)) {
@@ -67,230 +72,220 @@ export default function Index({ transfers, stores = [], filters = {}, statusOpti
         }
     };
 
+    const columns = [
+        {
+            field: 'id',
+            label: 'ID',
+            sortable: true,
+            render: (transfer) => (
+                <span className="font-medium text-gray-900">#{transfer.id}</span>
+            ),
+        },
+        {
+            field: 'origin_store',
+            label: 'Origem',
+            render: (transfer) => transfer.origin_store?.name || '-',
+        },
+        {
+            field: 'destination_store',
+            label: 'Destino',
+            render: (transfer) => transfer.destination_store?.name || '-',
+        },
+        {
+            field: 'transfer_type',
+            label: 'Tipo',
+            sortable: true,
+            render: (transfer) => transfer.type_label,
+        },
+        {
+            field: 'invoice_number',
+            label: 'NF',
+            render: (transfer) => (
+                <span className="font-mono">{transfer.invoice_number || '-'}</span>
+            ),
+        },
+        {
+            field: 'volumes_qty',
+            label: 'Vol/Prod',
+            render: (transfer) => `${transfer.volumes_qty ?? '-'} / ${transfer.products_qty ?? '-'}`,
+        },
+        {
+            field: 'status',
+            label: 'Status',
+            sortable: true,
+            render: (transfer) => (
+                <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[transfer.status] || 'bg-gray-100 text-gray-800'}`}>
+                    {transfer.status_label}
+                </span>
+            ),
+        },
+        {
+            field: 'created_at',
+            label: 'Data',
+            sortable: true,
+        },
+        {
+            field: 'actions',
+            label: 'Ações',
+            render: (transfer) => (
+                <ActionButtons
+                    onView={() => setDetailTransferId(transfer.id)}
+                    onEdit={canEdit && transfer.status === 'pending' ? () => openEdit(transfer) : null}
+                    onDelete={canDelete && transfer.status === 'pending' ? () => handleDelete(transfer) : null}
+                >
+                    {canEdit && transfer.status === 'pending' && (
+                        <ActionButtons.Custom variant="info" icon={TruckIcon} title="Confirmar Coleta"
+                            onClick={() => handleConfirmPickup(transfer)} />
+                    )}
+                    {canEdit && transfer.status === 'in_transit' && (
+                        <ActionButtons.Custom variant="success" icon={CheckCircleIcon} title="Confirmar Entrega"
+                            onClick={() => setDetailTransferId(transfer.id)} />
+                    )}
+                    {canEdit && transfer.status === 'delivered' && (
+                        <ActionButtons.Custom variant="success" icon={CheckCircleSolid} title="Confirmar Recebimento"
+                            onClick={() => setDetailTransferId(transfer.id)} />
+                    )}
+                    {canEdit && !['confirmed', 'cancelled'].includes(transfer.status) && transfer.status !== 'pending' && (
+                        <ActionButtons.Custom variant="danger" icon={XCircleIcon} title="Cancelar"
+                            onClick={() => handleCancel(transfer)} />
+                    )}
+                </ActionButtons>
+            ),
+        },
+    ];
+
     return (
         <>
             <Head title="Transferências" />
-            <PageHeader>
-                <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800">
-                        Transferências
-                    </h2>
-                    {canCreate && (
-                        <button
-                            onClick={() => setShowCreateModal(true)}
-                            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700"
-                        >
-                            <PlusIcon className="h-4 w-4 mr-2" />
-                            Nova Transferência
-                        </button>
-                    )}
-                </div>
-            </PageHeader>
 
-            <div className="py-6">
-                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    {/* Statistics Cards */}
-                    <StatisticsCards filters={{ store_id: storeFilter, status: statusFilter, transfer_type: typeFilter }} />
-
-                    {/* Filtros */}
-                    <div className="bg-white shadow rounded-lg p-4 mb-6">
-                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
-                            <div className="relative">
-                                <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Buscar NF, observações..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
-                                    className="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                />
+            <div className="py-12">
+                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+                    {/* Header */}
+                    <div className="mb-6">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h1 className="text-3xl font-bold text-gray-900">
+                                    Transferências
+                                </h1>
+                                <p className="mt-1 text-sm text-gray-600">
+                                    Gerencie transferências entre lojas
+                                </p>
                             </div>
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                                className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                            >
-                                <option value="">Todos os Status</option>
-                                {Object.entries(statusOptions).map(([key, label]) => (
-                                    <option key={key} value={key}>{label}</option>
-                                ))}
-                            </select>
-                            <select
-                                value={storeFilter}
-                                onChange={(e) => setStoreFilter(e.target.value)}
-                                className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                            >
-                                <option value="">Todas as Lojas</option>
-                                {stores.map((store) => (
-                                    <option key={store.id} value={store.id}>
-                                        {store.code} - {store.name}
-                                    </option>
-                                ))}
-                            </select>
-                            <select
-                                value={typeFilter}
-                                onChange={(e) => setTypeFilter(e.target.value)}
-                                className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                            >
-                                <option value="">Todos os Tipos</option>
-                                {Object.entries(typeOptions).map(([key, label]) => (
-                                    <option key={key} value={key}>{label}</option>
-                                ))}
-                            </select>
-                            <button
-                                onClick={applyFilters}
-                                className="inline-flex justify-center items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700"
-                            >
-                                Filtrar
-                            </button>
+                            {canCreate && (
+                                <Button
+                                    variant="primary"
+                                    onClick={() => setShowCreateModal(true)}
+                                    icon={PlusIcon}
+                                >
+                                    Nova Transferência
+                                </Button>
+                            )}
                         </div>
                     </div>
 
-                    {/* Tabela */}
-                    <div className="bg-white shadow rounded-lg overflow-hidden">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ID</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Origem</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Destino</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Tipo</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">NF</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Vol/Prod</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Data</th>
-                                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {transfers.data && transfers.data.length > 0 ? (
-                                    transfers.data.map((transfer) => (
-                                        <tr
-                                            key={transfer.id}
-                                            className="hover:bg-gray-50 cursor-pointer"
-                                            onClick={() => setDetailTransferId(transfer.id)}
-                                        >
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                #{transfer.id}
-                                            </td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                                                {transfer.origin_store?.name || '-'}
-                                            </td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                                                {transfer.destination_store?.name || '-'}
-                                            </td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                                                {transfer.type_label}
-                                            </td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 font-mono">
-                                                {transfer.invoice_number || '-'}
-                                            </td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                                                {transfer.volumes_qty ?? '-'} / {transfer.products_qty ?? '-'}
-                                            </td>
-                                            <td className="px-4 py-3 whitespace-nowrap">
-                                                <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[transfer.status] || 'bg-gray-100 text-gray-800'}`}>
-                                                    {transfer.status_label}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                                                {transfer.created_at}
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                                <ActionButtons
-                                                    onView={() => setDetailTransferId(transfer.id)}
-                                                    onEdit={canEdit && transfer.status === 'pending' ? () => openEdit(transfer) : null}
-                                                    onDelete={canDelete && transfer.status === 'pending' ? () => handleDelete(transfer) : null}
-                                                >
-                                                    {canEdit && transfer.status === 'pending' && (
-                                                        <ActionButtons.Custom variant="info" icon={TruckIcon} title="Confirmar Coleta"
-                                                            onClick={() => handleConfirmPickup(transfer)} />
-                                                    )}
-                                                    {canEdit && transfer.status === 'in_transit' && (
-                                                        <ActionButtons.Custom variant="success" icon={CheckCircleIcon} title="Confirmar Entrega"
-                                                            onClick={() => setDetailTransferId(transfer.id)} />
-                                                    )}
-                                                    {canEdit && transfer.status === 'delivered' && (
-                                                        <ActionButtons.Custom variant="success" icon={CheckCircleSolid} title="Confirmar Recebimento"
-                                                            onClick={() => setDetailTransferId(transfer.id)} />
-                                                    )}
-                                                    {canEdit && !['confirmed', 'cancelled'].includes(transfer.status) && transfer.status !== 'pending' && (
-                                                        <ActionButtons.Custom variant="danger" icon={XCircleIcon} title="Cancelar"
-                                                            onClick={() => handleCancel(transfer)} />
-                                                    )}
-                                                </ActionButtons>
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan="9" className="px-4 py-12 text-center text-gray-500">
-                                            Nenhuma transferência encontrada.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+                    {/* Statistics Cards */}
+                    <StatisticsCards filters={{ store_id: filters.store_id, status: filters.status, transfer_type: filters.transfer_type }} />
 
-                        {/* Paginação */}
-                        {transfers.links && transfers.last_page > 1 && (
-                            <div className="px-4 py-3 border-t border-gray-200 flex justify-between items-center">
-                                <span className="text-sm text-gray-700">
-                                    {transfers.from} a {transfers.to} de {transfers.total}
-                                </span>
-                                <div className="flex space-x-1">
-                                    {transfers.links.map((link, i) => (
-                                        <button
-                                            key={i}
-                                            onClick={() => link.url && router.get(link.url)}
-                                            disabled={!link.url}
-                                            className={`px-3 py-1 text-sm rounded ${
-                                                link.active
-                                                    ? 'bg-indigo-600 text-white'
-                                                    : link.url
-                                                    ? 'bg-white text-gray-700 hover:bg-gray-50 border'
-                                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                            }`}
-                                            dangerouslySetInnerHTML={{ __html: link.label }}
-                                        />
+                    {/* Filtros */}
+                    <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                                <select
+                                    value={filters.status || ''}
+                                    onChange={(e) => applyFilter('status', e.target.value)}
+                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                >
+                                    <option value="">Todos os Status</option>
+                                    {Object.entries(statusOptions).map(([key, label]) => (
+                                        <option key={key} value={key}>{label}</option>
                                     ))}
-                                </div>
+                                </select>
                             </div>
-                        )}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Loja</label>
+                                <select
+                                    value={filters.store_id || ''}
+                                    onChange={(e) => applyFilter('store_id', e.target.value)}
+                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                >
+                                    <option value="">Todas as Lojas</option>
+                                    {stores.map((store) => (
+                                        <option key={store.id} value={store.id}>
+                                            {store.code} - {store.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
+                                <select
+                                    value={filters.transfer_type || ''}
+                                    onChange={(e) => applyFilter('transfer_type', e.target.value)}
+                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                >
+                                    <option value="">Todos os Tipos</option>
+                                    {Object.entries(typeOptions).map(([key, label]) => (
+                                        <option key={key} value={key}>{label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    className="h-[42px] w-[150px]"
+                                    onClick={clearFilters}
+                                    disabled={!hasActiveFilters}
+                                    icon={XMarkIcon}
+                                >
+                                    Limpar Filtros
+                                </Button>
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Modal Criar */}
-                    {showCreateModal && (
-                        <CreateModal
-                            stores={stores}
-                            typeOptions={typeOptions}
-                            onClose={() => setShowCreateModal(false)}
-                        />
-                    )}
-
-                    {/* Detail Modal */}
-                    <DetailModal
-                        transferId={detailTransferId}
-                        onClose={() => setDetailTransferId(null)}
-                        onRefresh={() => { setDetailTransferId(null); router.reload(); }}
-                        onEdit={() => {
-                            const t = transfers.data?.find(t => t.id === detailTransferId);
-                            if (t) openEdit(t);
-                        }}
-                    />
-
-                    {/* Edit Modal */}
-                    <EditModal
-                        isOpen={showEditModal}
-                        onClose={() => { setShowEditModal(false); setEditTransfer(null); }}
-                        onSuccess={() => { setShowEditModal(false); setEditTransfer(null); router.reload(); }}
-                        transfer={editTransfer}
-                        stores={stores}
-                        typeOptions={typeOptions}
+                    {/* DataTable */}
+                    <DataTable
+                        data={transfers}
+                        columns={columns}
+                        searchPlaceholder="Buscar NF, observações..."
+                        emptyMessage="Nenhuma transferência encontrada"
+                        onRowClick={(transfer) => setDetailTransferId(transfer.id)}
+                        perPageOptions={[15, 25, 50]}
                     />
                 </div>
             </div>
+
+            {/* Modal Criar */}
+            {showCreateModal && (
+                <CreateModal
+                    stores={stores}
+                    typeOptions={typeOptions}
+                    onClose={() => setShowCreateModal(false)}
+                />
+            )}
+
+            {/* Detail Modal */}
+            <DetailModal
+                transferId={detailTransferId}
+                onClose={() => setDetailTransferId(null)}
+                onRefresh={() => { setDetailTransferId(null); router.reload(); }}
+                onEdit={() => {
+                    const t = transfers.data?.find(t => t.id === detailTransferId);
+                    if (t) openEdit(t);
+                }}
+            />
+
+            {/* Edit Modal */}
+            <EditModal
+                isOpen={showEditModal}
+                onClose={() => { setShowEditModal(false); setEditTransfer(null); }}
+                onSuccess={() => { setShowEditModal(false); setEditTransfer(null); router.reload(); }}
+                transfer={editTransfer}
+                stores={stores}
+                typeOptions={typeOptions}
+            />
         </>
     );
 }

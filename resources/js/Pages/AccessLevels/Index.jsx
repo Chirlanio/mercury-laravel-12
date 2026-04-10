@@ -188,7 +188,7 @@ export default function Index({ auth, accessLevels, categories, groupedAccessLev
             <Head title="Niveis de Acesso" />
 
             <div className="py-12">
-                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
+                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
                     {/* Flash Messages */}
                     {flash?.success && (
                         <div className="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">

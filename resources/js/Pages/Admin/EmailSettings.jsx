@@ -9,7 +9,7 @@ export default function EmailSettings({ auth, settings }) {
             <>
                 <Head title="Configurações de E-mail" />
                 <div className="py-12">
-                    <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
+                    <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
                             <div className="text-center text-red-600">
                                 Você não tem permissão para acessar esta página.
@@ -49,7 +49,7 @@ export default function EmailSettings({ auth, settings }) {
             <Head title="Configurações de E-mail" />
 
             <div className="py-12">
-                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
+                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
                     {/* Header */}
                     <div className="mb-6">
                         <div className="flex items-center justify-between">

@@ -71,7 +71,7 @@ export default function Manage({ accessLevel, menu, pages = [] }) {
         return (
             <>
                 <Head title="Erro" />
-                <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+                <div className="mx-auto max-w-full space-y-6 px-4 py-8 sm:px-6 lg:px-8">
                     <div className="overflow-hidden bg-white shadow-sm sm:rounded-lg dark:bg-gray-800">
                         <div className="p-6 text-gray-900 dark:text-gray-100">
                             <p>Erro ao carregar dados. Por favor, tente novamente.</p>
@@ -86,7 +86,7 @@ export default function Manage({ accessLevel, menu, pages = [] }) {
         <>
             <Head title={`Gerenciar Páginas - ${menu.name} - ${accessLevel.name}`} />
 
-            <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-full space-y-6 px-4 py-8 sm:px-6 lg:px-8">
                 {/* Mensagens de Sucesso/Erro */}
                 {flash?.success && (
                     <div className="mb-4 rounded-lg bg-green-100 p-4 text-green-700 dark:bg-green-900 dark:text-green-100">

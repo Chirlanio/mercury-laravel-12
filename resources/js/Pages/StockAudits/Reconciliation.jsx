@@ -907,7 +907,7 @@ export default function Reconciliation({ audit, items, areas = [] }) {
             </PageHeader>
 
             <div className="py-6">
-                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div className="mx-auto max-w-full px-4 sm:px-6 lg:px-8">
                     {/* Flash message */}
                     {flashMessage && (
                         <div

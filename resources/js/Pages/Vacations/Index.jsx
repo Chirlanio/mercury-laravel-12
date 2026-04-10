@@ -1,13 +1,15 @@
-import PageHeader from '@/Components/PageHeader';
 import { Head, router, useForm } from '@inertiajs/react';
 import {
-    PlusIcon, MagnifyingGlassIcon, CalendarDaysIcon, ArrowRightIcon,
+    PlusIcon, XMarkIcon, ArrowRightIcon,
     CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, ClockIcon,
     ArrowPathIcon, PaperAirplaneIcon, PlayIcon, FlagIcon,
 } from '@heroicons/react/24/outline';
 import { useState, useEffect, useMemo } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
+import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
+import DataTable from '@/Components/DataTable';
+import StandardModal from '@/Components/StandardModal';
 
 const STATUS_STYLES = {
     draft:            { bg: 'bg-gray-100',   text: 'text-gray-800',   dot: 'bg-gray-400' },
@@ -30,180 +32,229 @@ export default function Index({
     const canApproveManager = hasPermission(PERMISSIONS.APPROVE_VACATIONS_MANAGER);
     const canApproveRH = hasPermission(PERMISSIONS.APPROVE_VACATIONS_RH);
 
-    const [search, setSearch] = useState(filters.search || '');
-    const [statusFilter, setStatusFilter] = useState(filters.status || '');
-    const [storeFilter, setStoreFilter] = useState(filters.store_id || '');
-
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [detailId, setDetailId] = useState(null);
     const [showTransitionModal, setShowTransitionModal] = useState(false);
     const [transitionData, setTransitionData] = useState(null);
 
-    const applyFilters = () => {
-        router.get(route('vacations.index'), {
-            search: search || undefined,
-            status: statusFilter || undefined,
-            store_id: storeFilter || undefined,
-        }, { preserveState: true });
+    const applyFilter = (key, value) => {
+        const currentUrl = new URL(window.location);
+        if (value) {
+            currentUrl.searchParams.set(key, value);
+        } else {
+            currentUrl.searchParams.delete(key);
+        }
+        currentUrl.searchParams.delete('page');
+        router.visit(currentUrl.toString(), { preserveState: true, preserveScroll: true });
     };
 
+    const clearFilters = () => {
+        router.visit(route('vacations.index'), { preserveState: true, preserveScroll: true });
+    };
+
+    const hasActiveFilters = filters.status || filters.store_id;
+
     const openDetail = (id) => { setDetailId(id); setShowDetailModal(true); };
+
+    const columns = [
+        {
+            field: 'employee_name',
+            label: 'Funcionário',
+            sortable: true,
+            render: (v) => (
+                <div>
+                    <div className="text-sm font-medium text-gray-900">{v.employee_short_name || v.employee_name}</div>
+                    <div className="text-xs text-gray-500">{v.position}</div>
+                </div>
+            ),
+        },
+        {
+            field: 'store',
+            label: 'Loja',
+            render: (v) => v.store?.name || '-',
+        },
+        {
+            field: 'date_start',
+            label: 'Período',
+            sortable: true,
+            render: (v) => (
+                <div>
+                    <div className="text-sm text-gray-900">{v.date_start} - {v.date_end}</div>
+                    <div className="text-xs text-gray-500">Retorno: {v.date_return}</div>
+                </div>
+            ),
+        },
+        {
+            field: 'days_quantity',
+            label: 'Dias',
+            sortable: true,
+            render: (v) => (
+                <>
+                    <span className="text-sm font-semibold text-gray-900">{v.days_quantity}</span>
+                    {v.sell_days > 0 && <span className="text-xs text-orange-600 ml-1">(+{v.sell_days} abono)</span>}
+                </>
+            ),
+        },
+        {
+            field: 'installment',
+            label: 'Parcela',
+            render: (v) => (
+                <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
+                    {v.installment}
+                </span>
+            ),
+        },
+        {
+            field: 'status',
+            label: 'Status',
+            sortable: true,
+            render: (v) => (
+                <>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[v.status]?.bg} ${STATUS_STYLES[v.status]?.text}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full mr-1.5 ${STATUS_STYLES[v.status]?.dot}`} />
+                        {v.status_label}
+                    </span>
+                    {v.is_retroactive && <span className="ml-1 text-xs text-purple-600 font-medium">(Retroativa)</span>}
+                </>
+            ),
+        },
+        {
+            field: 'payment_deadline',
+            label: 'Prazo Pgto',
+            sortable: true,
+            render: (v) => v.payment_deadline || '-',
+        },
+        {
+            field: 'actions',
+            label: 'Ações',
+            render: (v) => (
+                <ActionButtons onView={() => openDetail(v.id)}>
+                    {canEdit && v.status === 'draft' && (
+                        <ActionButtons.Custom variant="info" icon={PaperAirplaneIcon} title="Enviar para Gestor"
+                            onClick={() => { setTransitionData({ vacation: v, newStatus: 'pending_manager' }); setShowTransitionModal(true); }} />
+                    )}
+                    {canApproveManager && v.status === 'pending_manager' && (
+                        <>
+                            <ActionButtons.Custom variant="success" icon={CheckCircleIcon} title="Aprovar (Gestor)"
+                                onClick={() => { setTransitionData({ vacation: v, newStatus: 'approved_manager' }); setShowTransitionModal(true); }} />
+                            <ActionButtons.Custom variant="danger" icon={XCircleIcon} title="Rejeitar (Gestor)"
+                                onClick={() => { setTransitionData({ vacation: v, newStatus: 'rejected_manager' }); setShowTransitionModal(true); }} />
+                        </>
+                    )}
+                    {canApproveRH && v.status === 'approved_manager' && (
+                        <>
+                            <ActionButtons.Custom variant="success" icon={CheckCircleIcon} title="Aprovar (RH)"
+                                onClick={() => { setTransitionData({ vacation: v, newStatus: 'approved_rh' }); setShowTransitionModal(true); }} />
+                            <ActionButtons.Custom variant="danger" icon={XCircleIcon} title="Rejeitar (RH)"
+                                onClick={() => { setTransitionData({ vacation: v, newStatus: 'rejected_rh' }); setShowTransitionModal(true); }} />
+                        </>
+                    )}
+                    {canEdit && v.status === 'approved_rh' && (
+                        <ActionButtons.Custom variant="success" icon={PlayIcon} title="Iniciar Gozo"
+                            onClick={() => { setTransitionData({ vacation: v, newStatus: 'in_progress' }); setShowTransitionModal(true); }} />
+                    )}
+                    {canEdit && v.status === 'in_progress' && (
+                        <ActionButtons.Custom variant="success" icon={FlagIcon} title="Finalizar"
+                            onClick={() => { setTransitionData({ vacation: v, newStatus: 'completed' }); setShowTransitionModal(true); }} />
+                    )}
+                </ActionButtons>
+            ),
+        },
+    ];
 
     return (
         <>
             <Head title="Férias" />
-            <PageHeader>
-                <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800">
-                        <CalendarDaysIcon className="inline h-6 w-6 mr-2 text-indigo-600" />
-                        Gestão de Férias
-                    </h2>
-                    <div className="flex items-center space-x-3">
-                        {canCreate && (
-                            <button onClick={() => setShowCreateModal(true)}
-                                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700">
-                                <PlusIcon className="h-4 w-4 mr-2" />Nova Solicitação
-                            </button>
-                        )}
-                    </div>
-                </div>
-            </PageHeader>
 
-            <div className="py-6">
-                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    {/* Status Cards */}
-                    <StatusCards statusCounts={statusCounts} onFilter={setStatusFilter} activeFilter={statusFilter} onApply={applyFilters} />
-
-                    {/* Filtros */}
-                    <div className="bg-white shadow rounded-lg p-4 mb-6">
-                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                            <div className="relative">
-                                <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                                <input type="text" placeholder="Buscar funcionário..." value={search}
-                                    onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && applyFilters()}
-                                    className="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+            <div className="py-12">
+                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+                    {/* Header */}
+                    <div className="mb-6">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h1 className="text-3xl font-bold text-gray-900">
+                                    Gestão de Férias
+                                </h1>
+                                <p className="mt-1 text-sm text-gray-600">
+                                    Solicitação, aprovação e controle de férias
+                                </p>
                             </div>
-                            <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); }}
-                                className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                                <option value="">Todos os Status</option>
-                                {Object.entries(statusOptions).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                            </select>
-                            <select value={storeFilter} onChange={e => setStoreFilter(e.target.value)}
-                                className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                                <option value="">Todas as Lojas</option>
-                                {(selects.stores || []).map(s => <option key={s.id} value={s.id}>{s.code} - {s.name}</option>)}
-                            </select>
-                            <button onClick={applyFilters}
-                                className="inline-flex justify-center items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700">
-                                Filtrar
-                            </button>
+                            {canCreate && (
+                                <Button
+                                    variant="primary"
+                                    onClick={() => setShowCreateModal(true)}
+                                    icon={PlusIcon}
+                                >
+                                    Nova Solicitação
+                                </Button>
+                            )}
                         </div>
                     </div>
 
-                    {/* Tabela */}
-                    <div className="bg-white shadow rounded-lg overflow-hidden">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Funcionário</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Loja</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Período</th>
-                                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Dias</th>
-                                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Parcela</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Prazo Pgto</th>
-                                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200">
-                                {vacations.data?.length > 0 ? vacations.data.map(v => (
-                                    <tr key={v.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openDetail(v.id)}>
-                                        <td className="px-4 py-3">
-                                            <div className="text-sm font-medium text-gray-900">{v.employee_short_name || v.employee_name}</div>
-                                            <div className="text-xs text-gray-500">{v.position}</div>
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-gray-500">{v.store?.name || '-'}</td>
-                                        <td className="px-4 py-3">
-                                            <div className="text-sm text-gray-900">{v.date_start} - {v.date_end}</div>
-                                            <div className="text-xs text-gray-500">Retorno: {v.date_return}</div>
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            <span className="text-sm font-semibold text-gray-900">{v.days_quantity}</span>
-                                            {v.sell_days > 0 && <span className="text-xs text-orange-600 ml-1">(+{v.sell_days} abono)</span>}
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
-                                                {v.installment}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[v.status]?.bg} ${STATUS_STYLES[v.status]?.text}`}>
-                                                <span className={`h-1.5 w-1.5 rounded-full mr-1.5 ${STATUS_STYLES[v.status]?.dot}`} />
-                                                {v.status_label}
-                                            </span>
-                                            {v.is_retroactive && <span className="ml-1 text-xs text-purple-600 font-medium">(Retroativa)</span>}
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-gray-500">{v.payment_deadline || '-'}</td>
-                                        <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
-                                            <ActionButtons
-                                                onView={() => openDetail(v.id)}
-                                            >
-                                                {canEdit && v.status === 'draft' && (
-                                                    <ActionButtons.Custom variant="info" icon={PaperAirplaneIcon} title="Enviar para Gestor"
-                                                        onClick={() => { setTransitionData({ vacation: v, newStatus: 'pending_manager' }); setShowTransitionModal(true); }} />
-                                                )}
-                                                {canApproveManager && v.status === 'pending_manager' && (
-                                                    <>
-                                                        <ActionButtons.Custom variant="success" icon={CheckCircleIcon} title="Aprovar (Gestor)"
-                                                            onClick={() => { setTransitionData({ vacation: v, newStatus: 'approved_manager' }); setShowTransitionModal(true); }} />
-                                                        <ActionButtons.Custom variant="danger" icon={XCircleIcon} title="Rejeitar (Gestor)"
-                                                            onClick={() => { setTransitionData({ vacation: v, newStatus: 'rejected_manager' }); setShowTransitionModal(true); }} />
-                                                    </>
-                                                )}
-                                                {canApproveRH && v.status === 'approved_manager' && (
-                                                    <>
-                                                        <ActionButtons.Custom variant="success" icon={CheckCircleIcon} title="Aprovar (RH)"
-                                                            onClick={() => { setTransitionData({ vacation: v, newStatus: 'approved_rh' }); setShowTransitionModal(true); }} />
-                                                        <ActionButtons.Custom variant="danger" icon={XCircleIcon} title="Rejeitar (RH)"
-                                                            onClick={() => { setTransitionData({ vacation: v, newStatus: 'rejected_rh' }); setShowTransitionModal(true); }} />
-                                                    </>
-                                                )}
-                                                {canEdit && v.status === 'approved_rh' && (
-                                                    <ActionButtons.Custom variant="success" icon={PlayIcon} title="Iniciar Gozo"
-                                                        onClick={() => { setTransitionData({ vacation: v, newStatus: 'in_progress' }); setShowTransitionModal(true); }} />
-                                                )}
-                                                {canEdit && v.status === 'in_progress' && (
-                                                    <ActionButtons.Custom variant="success" icon={FlagIcon} title="Finalizar"
-                                                        onClick={() => { setTransitionData({ vacation: v, newStatus: 'completed' }); setShowTransitionModal(true); }} />
-                                                )}
-                                            </ActionButtons>
-                                        </td>
-                                    </tr>
-                                )) : (
-                                    <tr>
-                                        <td colSpan="8" className="px-4 py-12 text-center text-gray-500">
-                                            Nenhuma solicitação de férias encontrada.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-
-                        {/* Paginação */}
-                        {vacations.last_page > 1 && (
-                            <div className="px-4 py-3 border-t flex justify-between items-center">
-                                <span className="text-sm text-gray-700">{vacations.from} a {vacations.to} de {vacations.total}</span>
-                                <div className="flex space-x-1">
-                                    {vacations.links.map((link, i) => (
-                                        <button key={i} onClick={() => link.url && router.get(link.url)} disabled={!link.url}
-                                            className={`px-3 py-1 text-sm rounded ${link.active ? 'bg-indigo-600 text-white' : link.url ? 'bg-white text-gray-700 hover:bg-gray-50 border' : 'bg-gray-100 text-gray-400'}`}
-                                            dangerouslySetInnerHTML={{ __html: link.label }} />
-                                    ))}
+                    {/* Stats Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        {['pending_manager', 'approved_rh', 'in_progress', 'completed'].map(status => {
+                            const data = statusCounts[status] || { label: status, count: 0 };
+                            const style = STATUS_STYLES[status] || {};
+                            return (
+                                <div key={status} className="bg-white shadow-sm rounded-lg p-4">
+                                    <div className="text-sm font-medium text-gray-500">{data.label}</div>
+                                    <div className={`text-2xl font-bold ${style.text || 'text-gray-900'}`}>{data.count}</div>
                                 </div>
-                            </div>
-                        )}
+                            );
+                        })}
                     </div>
+
+                    {/* Filtros */}
+                    <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                                <select
+                                    value={filters.status || ''}
+                                    onChange={(e) => applyFilter('status', e.target.value)}
+                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                >
+                                    <option value="">Todos os Status</option>
+                                    {Object.entries(statusOptions).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Loja</label>
+                                <select
+                                    value={filters.store_id || ''}
+                                    onChange={(e) => applyFilter('store_id', e.target.value)}
+                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                >
+                                    <option value="">Todas as Lojas</option>
+                                    {(selects.stores || []).map(s => <option key={s.id} value={s.id}>{s.code} - {s.name}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    className="h-[42px] w-[150px]"
+                                    onClick={clearFilters}
+                                    disabled={!hasActiveFilters}
+                                    icon={XMarkIcon}
+                                >
+                                    Limpar Filtros
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* DataTable */}
+                    <DataTable
+                        data={vacations}
+                        columns={columns}
+                        searchPlaceholder="Buscar funcionário..."
+                        emptyMessage="Nenhuma solicitação de férias encontrada"
+                        onRowClick={(v) => openDetail(v.id)}
+                        perPageOptions={[15, 25, 50]}
+                    />
                 </div>
             </div>
 
@@ -228,28 +279,6 @@ export default function Index({
     );
 }
 
-// ============================================================
-// STATUS CARDS
-// ============================================================
-function StatusCards({ statusCounts, onFilter, activeFilter, onApply }) {
-    const mainStatuses = ['pending_manager', 'approved_rh', 'in_progress', 'completed'];
-    return (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {mainStatuses.map(status => {
-                const data = statusCounts[status] || { label: status, count: 0 };
-                const style = STATUS_STYLES[status] || {};
-                const isActive = activeFilter === status;
-                return (
-                    <button key={status} onClick={() => { onFilter(isActive ? '' : status); setTimeout(onApply, 0); }}
-                        className={`rounded-lg p-4 border-2 text-left transition ${isActive ? 'ring-2 ring-indigo-500 border-indigo-300' : 'border-transparent'} ${style.bg}`}>
-                        <p className={`text-xs font-medium uppercase ${style.text}`}>{data.label}</p>
-                        <p className={`text-2xl font-bold mt-1 ${style.text}`}>{data.count}</p>
-                    </button>
-                );
-            })}
-        </div>
-    );
-}
 
 // ============================================================
 // CREATE MODAL — Fiel à implementação v1
@@ -352,35 +381,30 @@ function CreateModal({ selects, onClose }) {
     const selectedPeriod = balance?.periods?.find(p => p.id == form.data.vacation_period_id);
     const needsOverride = balance && parseInt(form.data.days_quantity) !== (balance.default_days || 30) && parseInt(form.data.days_quantity) > 0;
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
+    const handleSubmit = () => {
         form.post(route('vacations.store'), { onSuccess: () => onClose() });
     };
 
     return (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex min-h-full items-start justify-center p-4 pt-8">
-                <div className="fixed inset-0 bg-gray-500/75 transition-opacity" onClick={onClose} />
-                <div className="relative w-full max-w-4xl bg-white rounded-xl shadow-2xl max-h-[95vh] flex flex-col">
-                    <div className="bg-indigo-600 rounded-t-xl px-6 py-4 flex justify-between items-center shrink-0">
-                        <h3 className="text-lg font-semibold text-white">
-                            <CalendarDaysIcon className="inline h-5 w-5 mr-2" />
-                            Nova Solicitação de Férias
-                        </h3>
-                        <button onClick={onClose} className="text-white/70 hover:text-white text-2xl">&times;</button>
-                    </div>
-
-                    <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-                    <div className="p-6 space-y-5 overflow-y-auto flex-1">
-                        {form.errors.vacation && (
-                            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 flex items-start gap-2">
-                                <ExclamationTriangleIcon className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-                                <span>{form.errors.vacation}</span>
-                            </div>
-                        )}
-
+        <StandardModal
+            show={true}
+            onClose={onClose}
+            title="Nova Solicitação de Férias"
+            headerIcon={<CalendarDaysIcon className="h-5 w-5" />}
+            headerColor="bg-indigo-600"
+            onSubmit={handleSubmit}
+            errorMessage={form.errors.vacation}
+            footer={
+                <StandardModal.Footer
+                    onCancel={onClose}
+                    onSubmit="submit"
+                    submitLabel={form.data.is_retroactive ? 'Registrar Retroativa' : 'Criar Solicitação'}
+                    processing={form.processing}
+                />
+            }
+        >
                         {/* Card 1: Funcionário */}
-                        <FormCard title="Funcionário" icon="👤">
+                        <StandardModal.Section title="Funcionário" icon="👤">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Loja</label>
@@ -417,11 +441,11 @@ function CreateModal({ selects, onClose }) {
                             {balance && balance.periods.length === 0 && (
                                 <p className="text-sm text-red-600 mt-3">Nenhum período com saldo disponível para este funcionário.</p>
                             )}
-                        </FormCard>
+                        </StandardModal.Section>
 
                         {/* Card 2: Saldo do Período (aparece após selecionar período) */}
                         {selectedPeriod && (
-                            <FormCard title="Saldo do Período" icon="📊">
+                            <StandardModal.Section title="Saldo do Período" icon="📊">
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     <div className="bg-blue-50 rounded-lg p-3 text-center">
                                         <p className="text-[10px] font-semibold text-blue-500 uppercase">Dias de Direito</p>
@@ -444,11 +468,11 @@ function CreateModal({ selects, onClose }) {
                                     </div>
                                 </div>
                                 <p className="text-xs text-gray-500 mt-2">Dias padrão para este cargo: <strong>{balance.default_days}</strong> dias</p>
-                            </FormCard>
+                            </StandardModal.Section>
                         )}
 
                         {/* Card 3: Datas */}
-                        <FormCard title="Datas" icon="📅">
+                        <StandardModal.Section title="Datas" icon="📅">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Data Início *</label>
@@ -514,10 +538,10 @@ function CreateModal({ selects, onClose }) {
                                     Período retroativo válido: {calculatedDates.date_end} já passou.
                                 </div>
                             )}
-                        </FormCard>
+                        </StandardModal.Section>
 
                         {/* Card 4: Opções */}
-                        <FormCard title="Opções" icon="⚙️">
+                        <StandardModal.Section title="Opções" icon="⚙️">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Parcela *</label>
@@ -573,10 +597,10 @@ function CreateModal({ selects, onClose }) {
                                     </p>
                                 </div>
                             )}
-                        </FormCard>
+                        </StandardModal.Section>
 
                         {/* Card 5: Retroativa */}
-                        <FormCard title="Férias Retroativas" icon="🔄">
+                        <StandardModal.Section title="Férias Retroativas" icon="🔄">
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" checked={form.data.is_retroactive}
                                     onChange={e => form.setData('is_retroactive', e.target.checked)}
@@ -596,45 +620,19 @@ function CreateModal({ selects, onClose }) {
                                         className="w-full rounded-md border-purple-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 sm:text-sm" />
                                 </div>
                             )}
-                        </FormCard>
+                        </StandardModal.Section>
 
                         {/* Card 6: Observações */}
-                        <FormCard title="Observações" icon="📝">
+                        <StandardModal.Section title="Observações" icon="📝">
                             <textarea value={form.data.notes} onChange={e => form.setData('notes', e.target.value)}
                                 rows={3} maxLength={1000} placeholder="Observações adicionais..."
                                 className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
                             <p className="text-xs text-gray-400 mt-1 text-right">{(form.data.notes || '').length}/1000</p>
-                        </FormCard>
-
-                        </div>
-                        {/* Ações - footer fixo */}
-                        <div className="flex justify-end space-x-3 px-6 py-4 border-t bg-gray-50 rounded-b-xl shrink-0">
-                            <button type="button" onClick={onClose}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
-                                Cancelar
-                            </button>
-                            <button type="submit" disabled={form.processing}
-                                className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50">
-                                {form.processing ? 'Salvando...' : form.data.is_retroactive ? 'Registrar Retroativa' : 'Criar Solicitação'}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
+                        </StandardModal.Section>
+        </StandardModal>
     );
 }
 
-function FormCard({ title, icon, children }) {
-    return (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200">
-                <h4 className="text-sm font-semibold text-gray-700">{icon} {title}</h4>
-            </div>
-            <div className="p-4">{children}</div>
-        </div>
-    );
-}
 
 // ============================================================
 // DETAIL MODAL
@@ -675,34 +673,47 @@ function DetailModal({ vacationId, canEdit, onClose, onTransition }) {
         cancelled: { label: 'Cancelar', color: 'bg-red-600 hover:bg-red-700' },
     };
 
-    return (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex min-h-full items-start justify-center p-4 pt-10">
-                <div className="fixed inset-0 bg-gray-500/75" onClick={onClose} />
-                <div className="relative w-full max-w-4xl bg-white rounded-xl shadow-2xl">
-                    {loading ? (
-                        <div className="flex justify-center py-24"><div className="animate-spin h-10 w-10 border-4 border-indigo-600 border-t-transparent rounded-full" /></div>
-                    ) : !v ? (
-                        <div className="p-8 text-center text-gray-500">Erro ao carregar.<button onClick={onClose} className="block mx-auto mt-4 text-indigo-600 hover:underline text-sm">Fechar</button></div>
-                    ) : (
-                        <>
-                            {/* Header */}
-                            <div className="bg-indigo-600 rounded-t-xl px-6 py-4 flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <h3 className="text-lg font-semibold text-white">Férias #{v.id} — {v.employee_name}</h3>
-                                    <span className="bg-white/20 text-white text-xs font-bold px-2.5 py-1 rounded-full">{v.status_label}</span>
-                                    {v.is_retroactive && <span className="bg-purple-400/50 text-white text-xs px-2 py-0.5 rounded-full">Retroativa</span>}
-                                </div>
-                                <button onClick={onClose} className="text-white/70 hover:text-white"><span className="text-2xl">&times;</span></button>
-                            </div>
+    const badges = [];
+    if (v) {
+        badges.push({ text: v.status_label });
+        if (v.is_retroactive) badges.push({ text: 'Retroativa', className: 'bg-purple-400/50 text-white' });
+    }
 
-                            <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+    return (
+        <StandardModal
+            show={true}
+            onClose={onClose}
+            title={v ? `Férias #${v.id} — ${v.employee_name}` : 'Férias'}
+            headerColor="bg-indigo-600"
+            headerBadges={badges}
+            loading={loading}
+            errorMessage={!loading && !v ? 'Erro ao carregar.' : undefined}
+            footer={canEdit && v && available.length > 0 ? (
+                <StandardModal.Footer>
+                    {available.map(ns => {
+                        const t = transitionLabels[ns] || {};
+                        return (
+                            <button key={ns} onClick={() => onTransition(v, ns)}
+                                className={`px-4 py-2 text-sm font-medium text-white rounded-lg ${t.color}`}>
+                                {t.label}
+                            </button>
+                        );
+                    })}
+                    {!['completed', 'cancelled', 'rejected_manager', 'rejected_rh'].includes(v.status) && (
+                        <button onClick={() => onTransition(v, 'cancelled')}
+                            className="ml-auto px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100">
+                            Cancelar Férias
+                        </button>
+                    )}
+                </StandardModal.Footer>
+            ) : undefined}
+        >
                                 {/* Resumo */}
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                                    <InfoCard label="Início" value={v.date_start} icon={<CalendarDaysIcon className="h-4 w-4" />} />
-                                    <InfoCard label="Fim" value={v.date_end} />
-                                    <InfoCard label="Dias" value={v.days_quantity} highlight />
-                                    <InfoCard label="Retorno" value={v.date_return} />
+                                    <StandardModal.InfoCard label="Início" value={v.date_start} icon={<CalendarDaysIcon className="h-4 w-4" />} />
+                                    <StandardModal.InfoCard label="Fim" value={v.date_end} />
+                                    <StandardModal.InfoCard label="Dias" value={v.days_quantity} highlight />
+                                    <StandardModal.InfoCard label="Retorno" value={v.date_return} />
                                 </div>
 
                                 {/* Detalhes */}
@@ -721,10 +732,10 @@ function DetailModal({ vacationId, canEdit, onClose, onTransition }) {
                                 </div>
 
                                 <div className="grid grid-cols-4 gap-3">
-                                    <MiniField label="Parcela" value={`${v.installment}ª`} />
-                                    <MiniField label="Abono" value={v.sell_allowance ? `${v.sell_days} dias` : 'Não'} />
-                                    <MiniField label="13º Antecipado" value={v.advance_13th ? 'Sim' : 'Não'} />
-                                    <MiniField label="Prazo Pagamento" value={v.payment_deadline || '-'} />
+                                    <StandardModal.MiniField label="Parcela" value={`${v.installment}ª`} />
+                                    <StandardModal.MiniField label="Abono" value={v.sell_allowance ? `${v.sell_days} dias` : 'Não'} />
+                                    <StandardModal.MiniField label="13º Antecipado" value={v.advance_13th ? 'Sim' : 'Não'} />
+                                    <StandardModal.MiniField label="Prazo Pagamento" value={v.payment_deadline || '-'} />
                                 </div>
 
                                 {/* Aprovações */}
@@ -759,53 +770,10 @@ function DetailModal({ vacationId, canEdit, onClose, onTransition }) {
                                     </div>
                                 )}
 
-                            </div>
-
-                            {/* Footer fixo com ações */}
-                            {canEdit && available.length > 0 && (
-                                <div className="px-6 py-4 border-t bg-gray-50 rounded-b-xl flex flex-wrap gap-2">
-                                    {available.map(ns => {
-                                        const t = transitionLabels[ns] || {};
-                                        return (
-                                            <button key={ns} onClick={() => onTransition(v, ns)}
-                                                className={`px-4 py-2 text-sm font-medium text-white rounded-lg ${t.color}`}>
-                                                {t.label}
-                                            </button>
-                                        );
-                                    })}
-                                    {!['completed', 'cancelled', 'rejected_manager', 'rejected_rh'].includes(v.status) && (
-                                        <button onClick={() => onTransition(v, 'cancelled')}
-                                            className="ml-auto px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100">
-                                            Cancelar Férias
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-                        </>
-                    )}
-                </div>
-            </div>
-        </div>
+        </StandardModal>
     );
 }
 
-function InfoCard({ label, value, icon, highlight }) {
-    return (
-        <div className="bg-gray-50 rounded-lg p-3 text-center">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase flex items-center justify-center gap-1">{icon}{label}</p>
-            <p className={`text-lg font-bold mt-0.5 ${highlight ? 'text-indigo-700' : 'text-gray-900'}`}>{value}</p>
-        </div>
-    );
-}
-
-function MiniField({ label, value }) {
-    return (
-        <div className="bg-gray-50 rounded p-2">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase">{label}</p>
-            <p className="text-sm text-gray-900 mt-0.5">{value}</p>
-        </div>
-    );
-}
 
 // ============================================================
 // TRANSITION MODAL
@@ -836,8 +804,7 @@ function TransitionModal({ data, statusOptions, onClose }) {
         cancelled: 'bg-red-600', pending_manager: 'bg-yellow-500', draft: 'bg-gray-500',
     };
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
+    const handleSubmit = () => {
         if (needsReason && !notes.trim()) { setError('Motivo é obrigatório.'); return; }
         setSubmitting(true);
         setError('');
@@ -857,22 +824,25 @@ function TransitionModal({ data, statusOptions, onClose }) {
     };
 
     return (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex min-h-full items-start justify-center p-4 pt-20">
-                <div className="fixed inset-0 bg-gray-500/75" onClick={onClose} />
-                <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl">
-                    <div className={`${headerColors[newStatus] || 'bg-gray-600'} rounded-t-xl px-6 py-4`}>
-                        <h3 className="text-lg font-semibold text-white">{labels[newStatus] || newStatus}</h3>
-                        <p className="text-sm text-white/70 mt-0.5">{vacation.employee_name || vacation.employee_short_name} — #{vacation.id}</p>
-                    </div>
-
-                    <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                        {error && (
-                            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-                                <ExclamationTriangleIcon className="inline h-4 w-4 mr-1" />{error}
-                            </div>
-                        )}
-
+        <StandardModal
+            show={true}
+            onClose={onClose}
+            title={labels[newStatus] || newStatus}
+            subtitle={`${vacation.employee_name || vacation.employee_short_name} — #${vacation.id}`}
+            headerColor={headerColors[newStatus] || 'bg-gray-600'}
+            maxWidth="md"
+            onSubmit={handleSubmit}
+            errorMessage={error}
+            footer={
+                <StandardModal.Footer
+                    onCancel={onClose}
+                    onSubmit="submit"
+                    submitLabel="Confirmar"
+                    submitColor={headerColors[newStatus] || 'bg-indigo-600 hover:bg-indigo-700'}
+                    processing={submitting}
+                />
+            }
+        >
                         <div className="text-sm text-gray-600">
                             <p><strong>Período:</strong> {vacation.date_start} a {vacation.date_end} ({vacation.days_quantity} dias)</p>
                             <p><strong>Status atual:</strong> {vacation.status_label}</p>
@@ -886,20 +856,6 @@ function TransitionModal({ data, statusOptions, onClose }) {
                                 rows={3} required={needsReason} placeholder={needsReason ? 'Informe o motivo...' : 'Observações opcionais...'}
                                 className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
                         </div>
-
-                        <div className="flex justify-end space-x-3 pt-3 border-t">
-                            <button type="button" onClick={onClose}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-lg hover:bg-gray-50">
-                                Cancelar
-                            </button>
-                            <button type="submit" disabled={submitting}
-                                className={`px-5 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 ${headerColors[newStatus] || 'bg-indigo-600 hover:bg-indigo-700'}`}>
-                                {submitting ? 'Processando...' : 'Confirmar'}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
+        </StandardModal>
     );
 }
