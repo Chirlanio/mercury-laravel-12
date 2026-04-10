@@ -19,12 +19,12 @@ class MenuController extends Controller
 
         // Validar campos de ordenação permitidos
         $allowedSortFields = ['name', 'order', 'is_active', 'created_at'];
-        if (!in_array($sortField, $allowedSortFields)) {
+        if (! in_array($sortField, $allowedSortFields)) {
             $sortField = 'order';
         }
 
         // Validar direção da ordenação
-        if (!in_array($sortDirection, ['asc', 'desc'])) {
+        if (! in_array($sortDirection, ['asc', 'desc'])) {
             $sortDirection = 'asc';
         }
 
@@ -222,6 +222,7 @@ class MenuController extends Controller
 
     /**
      * Retorna menus baseados na estrutura antiga (menus com children)
+     *
      * @deprecated Usar getDynamicSidebarMenus() para menu baseado em access_level_pages
      */
     public function getSidebarMenus()
@@ -237,42 +238,27 @@ class MenuController extends Controller
     }
 
     /**
-     * Retorna menus dinâmicos baseados no nível de acesso do usuário autenticado
-     * Usa access_level_pages para determinar quais páginas aparecem em cada menu
+     * Retorna menus dinâmicos baseados no role do usuário e módulos ativos do tenant.
+     * Usa tabelas centrais (central_menu_page_defaults) gerenciadas pelo Admin SaaS.
      */
     public function getDynamicSidebarMenus()
     {
         $user = auth()->user();
 
-        if (!$user) {
-            return response()->json([
-                'main' => [],
-                'hr' => [],
-                'utility' => [],
-                'system' => [],
-            ]);
+        $emptyGroups = ['main' => [], 'hr' => [], 'utility' => [], 'system' => []];
+
+        if (! $user) {
+            return response()->json($emptyGroups);
         }
 
         try {
-            // Lógica unificada: sempre usa getMenuForUser, que contém a lógica correta para todos os níveis de acesso.
-            // A diferenciação de permissões é tratada pelo serviço, não pelo controlador.
-            $menuStructure = \App\Services\MenuService::getMenuForUser($user->id);
+            $resolver = app(\App\Services\CentralMenuResolver::class);
+            $menuStructure = $resolver->getMenuForUser($user);
 
-            $menuGroups = [
-                'main' => [],
-                'hr' => [],
-                'utility' => [],
-                'system' => [],
-            ];
+            $menuGroups = $emptyGroups;
 
             foreach ($menuStructure as $menu) {
-                $menuModel = Menu::find($menu['id']);
-
-                if (!$menuModel) {
-                    continue;
-                }
-
-                $group = match ($menuModel->type) {
+                $group = match ($menu['type'] ?? 'main') {
                     'hr' => 'hr',
                     'utility' => 'utility',
                     'system' => 'system',
@@ -284,13 +270,9 @@ class MenuController extends Controller
 
             return response()->json($menuGroups);
         } catch (\Exception $e) {
-            Log::error('Erro ao carregar menus dinâmicos: ' . $e->getMessage());
-            return response()->json([
-                'main' => [],
-                'hr' => [],
-                'utility' => [],
-                'system' => [],
-            ], 500);
+            Log::error('Erro ao carregar menus dinâmicos: '.$e->getMessage());
+
+            return response()->json($emptyGroups, 500);
         }
     }
 }

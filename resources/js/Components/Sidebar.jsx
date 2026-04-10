@@ -7,13 +7,10 @@ import {
     ChevronLeftIcon,
     Bars3Icon,
 } from "@heroicons/react/24/outline";
-import { usePermissions, PERMISSIONS } from "@/Hooks/usePermissions";
-
 const SIDEBAR_COLLAPSED_KEY = "sidebar_collapsed";
 
 export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }) {
     const { url } = usePage();
-    const { hasPermission } = usePermissions();
     const [menuGroups, setMenuGroups] = useState({});
     const [expandedSubmenus, setExpandedSubmenus] = useState({});
     const [loading, setLoading] = useState(true);
@@ -114,60 +111,16 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
         }));
     };
 
-    const getMenuRoute = (menuName) => {
-        const menuRoutes = {
-            Home: { route: "/dashboard", permission: null },
-            Usuário: { route: "/users", permission: PERMISSIONS.VIEW_USERS },
-            "FAQ's": { route: "/support", permission: PERMISSIONS.ACCESS_SUPPORT_PANEL },
-            "Dashboard's": { route: "/dashboard", permission: null },
-            Configurações: { route: "/admin", permission: PERMISSIONS.ACCESS_ADMIN_PANEL },
-            "Gerenciar Níveis": { route: "/access-levels", permission: PERMISSIONS.VIEW_USERS },
-            "Gerenciar Menus": { route: "/menus", permission: PERMISSIONS.VIEW_USERS },
-            "Gerenciar Páginas": { route: "/pages", permission: PERMISSIONS.VIEW_USERS },
-            "Logs de Atividade": { route: "/activity-logs", permission: PERMISSIONS.VIEW_ACTIVITY_LOGS },
-            "Configurações de Email": { route: "/admin/email-settings", permission: PERMISSIONS.MANAGE_SETTINGS },
-            Produto: { route: "/products", permission: PERMISSIONS.VIEW_PRODUCTS },
-            Planejamento: { route: "/planejamento", permission: null },
-            Financeiro: { route: "/financeiro", permission: null },
-            "Ativo Fixo": { route: "/ativo-fixo", permission: null },
-            Comercial: { route: "/comercial", permission: null },
-            Delivery: { route: "/delivery", permission: null },
-            Rotas: { route: "/rotas", permission: null },
-            "E-commerce": { route: "/ecommerce", permission: null },
-            Qualidade: { route: "/qualidade", permission: null },
-            "Pessoas & Cultura": { route: "/pessoas-cultura", permission: null },
-            "Departamento Pessoal": { route: "/departamento-pessoal", permission: null },
-            "Escola Digital": { route: "/escola-digital", permission: null },
-            Movidesk: { route: "/movidesk", permission: null },
-            "Biblioteca de Processos": { route: "/biblioteca-processos", permission: null },
-            Funcionários: { route: "/employees", permission: PERMISSIONS.VIEW_USERS },
-            "Controle de Jornada": { route: "/work-shifts", permission: PERMISSIONS.VIEW_USERS },
-            "Usuários Online": { route: "/user-sessions", permission: PERMISSIONS.VIEW_USER_SESSIONS },
-            Transferências: { route: "/transfers", permission: PERMISSIONS.VIEW_TRANSFERS },
-            "Ajustes de Estoque": { route: "/stock-adjustments", permission: PERMISSIONS.VIEW_ADJUSTMENTS },
-            "Ordens de Pagamento": { route: "/order-payments", permission: PERMISSIONS.VIEW_ORDER_PAYMENTS },
-            Fornecedores: { route: "/suppliers", permission: PERMISSIONS.VIEW_SUPPLIERS },
-            "Escalas de Trabalho": { route: "/work-schedules", permission: PERMISSIONS.VIEW_USERS },
-            Turnos: { route: "/work-shifts", permission: PERMISSIONS.VIEW_USERS },
-            Lojas: { route: "/stores", permission: PERMISSIONS.MANAGE_SETTINGS },
-            Vendas: { route: "/sales", permission: PERMISSIONS.VIEW_SALES },
-            RH: { route: "/employees", permission: PERMISSIONS.VIEW_USERS },
-            Operações: { route: "/transfers", permission: PERMISSIONS.VIEW_TRANSFERS },
-        };
-        return menuRoutes[menuName] || null;
-    };
-
-    const handleMenuClick = (menuName) => {
-        const menuConfig = getMenuRoute(menuName);
-        if (menuConfig) {
-            if (!menuConfig.permission || hasPermission(menuConfig.permission)) {
-                router.get(menuConfig.route);
+    const handleMenuClick = (menuName, directItems = []) => {
+        // Menu items are already filtered by role + modules on the backend.
+        // Navigate to the first direct item's route, or the first dropdown item's route.
+        const firstItem = directItems[0];
+        if (firstItem?.route) {
+            if (firstItem.route === '/logout') {
+                router.post('/logout');
             } else {
-                console.warn(`Sem permissão para acessar "${menuName}"`);
-                return;
+                router.get(firstItem.route);
             }
-        } else {
-            console.log(`Navegação para "${menuName}" ainda não implementada`);
         }
         if (window.innerWidth < 1024) {
             onClose();

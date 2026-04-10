@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Helpers\PermissionHelper;
+use App\Services\CentralRoleResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Middleware;
@@ -71,7 +71,7 @@ class HandleInertiaRequests extends Middleware
                     'avatar_url' => $user->avatar_url,
                     'has_custom_avatar' => $user->hasCustomAvatar(),
                 ] : null,
-                'permissions' => $user ? PermissionHelper::getUserPermissions($user) : [],
+                'permissions' => $user && $user->role ? app(CentralRoleResolver::class)->getPermissionsForRole($user->role->value) : [],
             ],
             'tenant' => [
                 'id' => $currentTenant->id,

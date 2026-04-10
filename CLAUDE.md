@@ -61,11 +61,14 @@ vendor/bin/pint        # Laravel Pint (PHP code style fixer)
 
 ### Backend Structure
 
-**Auth & RBAC:**
-- 4 roles defined in `app/Enums/Role.php`: SUPER_ADMIN > ADMIN > SUPPORT > USER (hierarchical)
-- 23 permissions in `app/Enums/Permission.php` (e.g., `VIEW_SALES`, `MANAGE_SETTINGS`)
-- `PermissionMiddleware` checks `$user->role->hasPermissionTo($permission)` — permission logic lives in the Role enum, not a pivot table
-- Routes protect endpoints with `middleware('permission:PERMISSION_NAME')`
+**Auth & RBAC (centralized, database-driven):**
+- 4 roles: SUPER_ADMIN > ADMIN > SUPPORT > USER — defined as enum in `app/Enums/Role.php` but **permissions are managed via central DB** (`central_roles` + `central_permissions` tables)
+- `CentralRoleResolver` (`app/Services/CentralRoleResolver.php`) resolves role→permissions from central DB with enum fallback, cached 5 min
+- `PermissionMiddleware` checks `$user->hasPermissionTo($permission)` which delegates to `CentralRoleResolver`
+- Routes protect endpoints with `middleware('permission:PERMISSION_NAME')` and `middleware('tenant.module:MODULE_SLUG')`
+- Module access per plan: `CheckTenantModule` middleware blocks routes if tenant's plan doesn't include the module
+- SaaS Admin manages roles/permissions at `/admin/roles-permissions` — changes propagate to all tenants without code deployment
+- Tenant admins can only manage users (assign roles); they cannot manage menus, pages, or access levels
 
 **Config Module Pattern:**
 - `app/Http/Controllers/ConfigController.php` is an abstract base for CRUD modules with minimal boilerplate
@@ -78,7 +81,9 @@ vendor/bin/pint        # Laravel Pint (PHP code style fixer)
 - `AuditLogService` — activity tracking (used via `Auditable` trait on models)
 - `CigamSyncService` — syncs sales from CIGAM PostgreSQL (`msl_fmovimentodiario_` table)
 - `ImageUploadService` — avatar/image handling with `intervention/image`
-- `MenuService` — dynamic sidebar menu with permission filtering
+- `CentralMenuResolver` — sidebar menu from central DB tables, filtered by user role + tenant's active modules
+- `CentralRoleResolver` — resolves role permissions from central DB with enum fallback and caching
+- `TenantRoleService` — filters allowed roles per tenant settings
 
 ### Frontend Structure
 
@@ -95,16 +100,18 @@ resources/js/
 │   └── ...
 ├── Components/
 │   ├── DataTable.jsx            # Reusable table with sort/filter/paginate
-│   ├── Sidebar.jsx              # Permission-aware navigation
+│   ├── Sidebar.jsx              # Module & role-aware navigation (menu from CentralMenuResolver)
 │   ├── Shared/                  # Modal, Button variants, Input, Checkbox, etc.
 │   └── Modals/                  # GenericFormModal, GenericDetailModal, module-specific modals
 └── Hooks/
-    ├── usePermissions.js        # Frontend permission/role checking (mirrors backend Role enum)
+    ├── usePermissions.js        # Frontend permission checking (reads from backend-provided props)
+    ├── useTenant.js             # Tenant context: hasModule(), plan info, settings
     └── useConfirm.jsx           # Confirmation dialog hook
 ```
 
 **Key frontend patterns:**
-- `usePermissions()` hook mirrors the backend RBAC — check with `hasPermission()`, `isAdmin()`, `canViewUsers()`, etc.
+- `usePermissions()` reads permissions from `props.auth.permissions` (provided by `CentralRoleResolver` via Inertia) — no hardcoded permission maps
+- `useTenant()` provides `hasModule(slug)` to conditionally render UI based on tenant's active modules
 - `GenericFormModal` renders forms from a field definition array (used by all Config modules)
 - `DataTable` is the standard list component with sorting, search, and pagination
 - Flash messages from Laravel are displayed as toasts via `react-toastify`

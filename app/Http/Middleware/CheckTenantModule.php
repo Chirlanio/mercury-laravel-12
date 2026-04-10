@@ -12,8 +12,9 @@ class CheckTenantModule
     {
         $tenant = tenant();
 
+        // Sem tenant context (testes, desenvolvimento local sem subdomínio)
         if (! $tenant) {
-            abort(403, 'Nenhum tenant ativo.');
+            return $next($request);
         }
 
         if (! $tenant->hasModule($moduleSlug)) {

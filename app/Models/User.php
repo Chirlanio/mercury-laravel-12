@@ -3,8 +3,8 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use App\Enums\Role;
 use App\Enums\Permission;
+use App\Enums\Role;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -13,7 +13,7 @@ use Illuminate\Notifications\Notifiable;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, Auditable;
+    use Auditable, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -83,6 +83,10 @@ class User extends Authenticatable
 
     public function hasPermissionTo(Permission|string $permission): bool
     {
+        if (! $this->role) {
+            return false;
+        }
+
         $permValue = $permission instanceof Permission ? $permission->value : $permission;
 
         return app(\App\Services\CentralRoleResolver::class)
@@ -133,7 +137,7 @@ class User extends Authenticatable
     public function getAvatarUrlAttribute(): string
     {
         if ($this->avatar) {
-            return asset('storage/avatars/' . $this->avatar);
+            return asset('storage/avatars/'.$this->avatar);
         }
 
         // Retorna avatar padrão baseado nas iniciais do nome
@@ -161,9 +165,11 @@ class User extends Authenticatable
         $initials = '';
 
         foreach ($words as $word) {
-            if (!empty($word)) {
+            if (! empty($word)) {
                 $initials .= strtoupper(substr($word, 0, 1));
-                if (strlen($initials) >= 2) break;
+                if (strlen($initials) >= 2) {
+                    break;
+                }
             }
         }
 
@@ -178,10 +184,11 @@ class User extends Authenticatable
         $colors = [
             '3B82F6', '8B5CF6', 'EF4444', 'F59E0B',
             '10B981', 'F97316', '6366F1', 'EC4899',
-            '84CC16', '06B6D4', 'F59E0B', '8B5CF6'
+            '84CC16', '06B6D4', 'F59E0B', '8B5CF6',
         ];
 
         $index = crc32($this->name) % count($colors);
+
         return $colors[abs($index)];
     }
 
@@ -190,7 +197,7 @@ class User extends Authenticatable
      */
     public function hasCustomAvatar(): bool
     {
-        return !empty($this->avatar) && file_exists(storage_path('app/public/' . $this->avatar));
+        return ! empty($this->avatar) && file_exists(storage_path('app/public/'.$this->avatar));
     }
 
     /**
@@ -198,11 +205,12 @@ class User extends Authenticatable
      */
     public function removeAvatar(): bool
     {
-        if ($this->avatar && file_exists(storage_path('app/public/' . $this->avatar))) {
-            unlink(storage_path('app/public/' . $this->avatar));
+        if ($this->avatar && file_exists(storage_path('app/public/'.$this->avatar))) {
+            unlink(storage_path('app/public/'.$this->avatar));
         }
 
         $this->avatar = null;
+
         return $this->save();
     }
 

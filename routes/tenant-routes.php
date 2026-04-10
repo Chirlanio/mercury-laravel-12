@@ -134,7 +134,7 @@ use Inertia\Inertia;
     // ==========================================
     // User Management
     // ==========================================
-    Route::middleware('auth')->group(function () {
+    Route::middleware(['auth', 'tenant.module:users'])->group(function () {
         Route::get('/users', [UserManagementController::class, 'index'])
             ->middleware('permission:' . Permission::VIEW_USERS->value)
             ->name('users.index');
@@ -167,7 +167,7 @@ use Inertia\Inertia;
     // ==========================================
     // Activity Logs
     // ==========================================
-    Route::middleware(['auth', 'permission:' . Permission::VIEW_ACTIVITY_LOGS->value])->group(function () {
+    Route::middleware(['auth', 'tenant.module:activity_logs', 'permission:' . Permission::VIEW_ACTIVITY_LOGS->value])->group(function () {
         Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');
         Route::get('/activity-logs/{log}', [ActivityLogController::class, 'show'])->name('activity-logs.show');
         Route::post('/activity-logs/export', [ActivityLogController::class, 'export'])
@@ -179,90 +179,18 @@ use Inertia\Inertia;
     });
 
     // ==========================================
-    // Menus
+    // Menus API (dynamic sidebar - kept for menu rendering)
     // ==========================================
     Route::middleware('auth')->get('/api/menus/sidebar', [MenuController::class, 'getSidebarMenus'])->name('menus.sidebar');
     Route::middleware('auth')->get('/api/menus/dynamic-sidebar', [MenuController::class, 'getDynamicSidebarMenus'])->name('menus.dynamic-sidebar');
 
-    Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
-        Route::get('/menus', [MenuController::class, 'index'])->name('menus.index');
-        Route::get('/menus/{menu}', [MenuController::class, 'show'])->name('menus.show');
-        Route::middleware('permission:' . Permission::MANAGE_SYSTEM_SETTINGS->value)->group(function () {
-            Route::post('/menus', [MenuController::class, 'store'])->name('menus.store');
-            Route::put('/menus/{menu}', [MenuController::class, 'update'])->name('menus.update');
-            Route::post('/menus/{menu}/activate', [MenuController::class, 'activate'])->name('menus.activate');
-            Route::post('/menus/{menu}/deactivate', [MenuController::class, 'deactivate'])->name('menus.deactivate');
-            Route::post('/menus/{menu}/move-up', [MenuController::class, 'moveUp'])->name('menus.moveUp');
-            Route::post('/menus/{menu}/move-down', [MenuController::class, 'moveDown'])->name('menus.moveDown');
-            Route::post('/menus/reorder', [MenuController::class, 'reorder'])->name('menus.reorder');
-            Route::delete('/menus/{menu}', [MenuController::class, 'destroy'])->name('menus.destroy');
-        });
-    });
-
-    // ==========================================
-    // Pages
-    // ==========================================
-    Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
-        Route::get('/pages', [PageController::class, 'index'])->name('pages.index');
-        Route::post('/pages', [PageController::class, 'store'])->name('pages.store');
-        Route::get('/pages/{page}', [PageController::class, 'show'])->name('pages.show');
-        Route::patch('/pages/{page}', [PageController::class, 'update'])->name('pages.update');
-        Route::middleware('permission:' . Permission::MANAGE_SYSTEM_SETTINGS->value)->group(function () {
-            Route::post('/pages/{page}/activate', [PageController::class, 'activate'])->name('pages.activate');
-            Route::post('/pages/{page}/deactivate', [PageController::class, 'deactivate'])->name('pages.deactivate');
-            Route::post('/pages/{page}/make-public', [PageController::class, 'makePublic'])->name('pages.makePublic');
-            Route::post('/pages/{page}/make-private', [PageController::class, 'makePrivate'])->name('pages.makePrivate');
-            Route::delete('/pages/{page}', [PageController::class, 'destroy'])->name('pages.destroy');
-            Route::post('/pages/sync-permissions', [PageController::class, 'syncPermissions'])->name('pages.syncPermissions');
-        });
-    });
-
-    // ==========================================
-    // Page Groups
-    // ==========================================
-    Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
-        Route::get('/page-groups', [PageGroupController::class, 'index'])->name('page-groups.index');
-        Route::get('/page-groups/{pageGroup}', [PageGroupController::class, 'show'])->name('page-groups.show');
-        Route::middleware('permission:' . Permission::MANAGE_SYSTEM_SETTINGS->value)->group(function () {
-            Route::post('/page-groups', [PageGroupController::class, 'store'])->name('page-groups.store');
-            Route::put('/page-groups/{pageGroup}', [PageGroupController::class, 'update'])->name('page-groups.update');
-            Route::delete('/page-groups/{pageGroup}', [PageGroupController::class, 'destroy'])->name('page-groups.destroy');
-        });
-    });
-
-    // ==========================================
-    // Access Levels
-    // ==========================================
-    Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
-        Route::get('/access-levels', [AccessLevelController::class, 'index'])->name('access-levels.index');
-        Route::get('/access-levels/{accessLevel}/permissions', [AccessLevelController::class, 'getPermissions'])
-            ->name('access-levels.permissions');
-        Route::post('/access-levels/{accessLevel}/permissions', [AccessLevelController::class, 'updatePermissions'])
-            ->middleware('permission:' . Permission::EDIT_USERS->value)
-            ->name('access-levels.permissions.update');
-        Route::get('/access-levels/{accessLevel}', [AccessLevelController::class, 'show'])->name('access-levels.show');
-        Route::post('/access-levels', [AccessLevelController::class, 'store'])
-            ->middleware('permission:' . Permission::CREATE_USERS->value)
-            ->name('access-levels.store');
-        Route::put('/access-levels/{accessLevel}', [AccessLevelController::class, 'update'])
-            ->middleware('permission:' . Permission::EDIT_USERS->value)
-            ->name('access-levels.update');
-        Route::delete('/access-levels/{accessLevel}', [AccessLevelController::class, 'destroy'])
-            ->middleware('permission:' . Permission::DELETE_USERS->value)
-            ->name('access-levels.destroy');
-        Route::get('/access-levels/{accessLevel}/menus/{menu}/pages', [AccessLevelPageController::class, 'manage'])
-            ->name('access-levels.menus.pages.manage');
-        Route::get('/access-levels/{accessLevel}/menus/{menu}/pages/json', [AccessLevelPageController::class, 'getPages'])
-            ->name('access-levels.menus.pages.get');
-        Route::post('/access-levels/{accessLevel}/menus/{menu}/pages', [AccessLevelPageController::class, 'updatePermissions'])
-            ->middleware('permission:' . Permission::EDIT_USERS->value)
-            ->name('access-levels.menus.pages.update');
-    });
+    // Menus, Pages, Page Groups, Access Levels — gerenciados exclusivamente
+    // pelo Admin Central em /admin/navigation. Rotas CRUD removidas do tenant.
 
     // ==========================================
     // Employees
     // ==========================================
-    Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
+    Route::middleware(['auth', 'tenant.module:employees', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
         Route::get('/employees/export', [EmployeeController::class, 'export'])->name('employees.export');
         Route::get('/employees/list-json', [EmployeeController::class, 'listJson'])->name('employees.list-json');
         Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
@@ -301,7 +229,7 @@ use Inertia\Inertia;
     // ==========================================
     // Work Shifts
     // ==========================================
-    Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
+    Route::middleware(['auth', 'tenant.module:work_shifts', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
         Route::get('/work-shifts', [WorkShiftController::class, 'index'])->name('work-shifts.index');
         Route::get('/work-shifts/export', [WorkShiftController::class, 'export'])->name('work-shifts.export');
         Route::get('/work-shifts/print-summary', [WorkShiftController::class, 'printSummary'])->name('work-shifts.print-summary');
@@ -319,7 +247,7 @@ use Inertia\Inertia;
     // ==========================================
     // Work Schedules
     // ==========================================
-    Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
+    Route::middleware(['auth', 'tenant.module:work_schedules', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
         Route::get('/work-schedules', [WorkScheduleController::class, 'index'])->name('work-schedules.index');
         Route::get('/work-schedules/list-json', [WorkScheduleController::class, 'listJson'])->name('work-schedules.list-json');
         Route::get('/work-schedules/{workSchedule}', [WorkScheduleController::class, 'show'])->name('work-schedules.show');
@@ -348,7 +276,7 @@ use Inertia\Inertia;
     // ==========================================
     // Stores
     // ==========================================
-    Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
+    Route::middleware(['auth', 'tenant.module:stores', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
         Route::get('/api/stores/select', [StoreController::class, 'getForSelect'])->name('stores.select');
         Route::get('/stores', [StoreController::class, 'index'])->name('stores.index');
         Route::post('/stores/reorder', [StoreController::class, 'reorder'])
@@ -371,7 +299,7 @@ use Inertia\Inertia;
     // ==========================================
     // Color Themes
     // ==========================================
-    Route::middleware(['auth', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
+    Route::middleware(['auth', 'tenant.module:color_themes', 'permission:' . Permission::VIEW_USERS->value])->group(function () {
         Route::get('/color-themes', [ColorThemeController::class, 'index'])->name('color-themes.index');
         Route::post('/color-themes', [ColorThemeController::class, 'store'])
             ->middleware('permission:' . Permission::CREATE_USERS->value)->name('color-themes.store');
@@ -384,7 +312,7 @@ use Inertia\Inertia;
     // ==========================================
     // Config Modules
     // ==========================================
-    Route::middleware(['auth', 'permission:' . Permission::MANAGE_SETTINGS->value])->prefix('config')->name('config.')->group(function () {
+    Route::middleware(['auth', 'tenant.module:config', 'permission:' . Permission::MANAGE_SETTINGS->value])->prefix('config')->name('config.')->group(function () {
         Route::resource('positions', ConfigPositionController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::resource('position-levels', ConfigPositionLevelController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::resource('sectors', ConfigSectorController::class)->only(['index', 'store', 'update', 'destroy']);
@@ -431,7 +359,7 @@ use Inertia\Inertia;
     // ==========================================
     // Sales
     // ==========================================
-    Route::middleware(['auth', 'permission:' . Permission::VIEW_SALES->value])->group(function () {
+    Route::middleware(['auth', 'tenant.module:sales', 'permission:' . Permission::VIEW_SALES->value])->group(function () {
         Route::get('/sales/statistics', [SaleController::class, 'statistics'])->name('sales.statistics');
         Route::get('/sales/employee-daily', [SaleController::class, 'employeeDailySales'])->name('sales.employee-daily');
         Route::get('/sales', [SaleController::class, 'index'])->name('sales.index');
@@ -455,7 +383,7 @@ use Inertia\Inertia;
     // ==========================================
     // Movements (Movimentações Diárias)
     // ==========================================
-    Route::middleware(['auth', 'permission:' . Permission::VIEW_MOVEMENTS->value])->group(function () {
+    Route::middleware(['auth', 'tenant.module:movements', 'permission:' . Permission::VIEW_MOVEMENTS->value])->group(function () {
         Route::get('/movements/statistics', [MovementController::class, 'statistics'])->name('movements.statistics');
         Route::get('/movements/sync-logs', [MovementController::class, 'syncLogs'])->name('movements.sync-logs');
         Route::get('/movements', [MovementController::class, 'index'])->name('movements.index');
@@ -474,7 +402,7 @@ use Inertia\Inertia;
     // ==========================================
     // Store Goals (Metas de Loja)
     // ==========================================
-    Route::middleware(['auth', 'permission:' . Permission::VIEW_STORE_GOALS->value])->group(function () {
+    Route::middleware(['auth', 'tenant.module:store_goals', 'permission:' . Permission::VIEW_STORE_GOALS->value])->group(function () {
         // Fixed routes (must come before {storeGoal} wildcard)
         Route::get('/store-goals/statistics', [StoreGoalController::class, 'statistics'])->name('store-goals.statistics');
         Route::get('/store-goals/achievement/consultants', [StoreGoalController::class, 'achievementByConsultant'])
@@ -506,7 +434,7 @@ use Inertia\Inertia;
     // ==========================================
     // Products
     // ==========================================
-    Route::middleware(['auth', 'permission:' . Permission::VIEW_PRODUCTS->value])->group(function () {
+    Route::middleware(['auth', 'tenant.module:products', 'permission:' . Permission::VIEW_PRODUCTS->value])->group(function () {
         Route::post('/products/sync/init', [ProductController::class, 'syncInit'])
             ->middleware('permission:' . Permission::SYNC_PRODUCTS->value)->name('products.sync.init');
         Route::post('/products/sync/lookups', [ProductController::class, 'syncLookupsEndpoint'])
@@ -565,7 +493,7 @@ use Inertia\Inertia;
         // ==========================================
         // User Sessions
         // ==========================================
-        Route::middleware('permission:' . Permission::VIEW_USER_SESSIONS->value)->group(function () {
+        Route::middleware(['tenant.module:user_sessions', 'permission:' . Permission::VIEW_USER_SESSIONS->value])->group(function () {
             Route::get('/user-sessions', [UserSessionController::class, 'index'])->name('user-sessions.index');
         });
         Route::post('/user-sessions/heartbeat', [UserSessionController::class, 'heartbeat'])->name('user-sessions.heartbeat');
@@ -573,7 +501,7 @@ use Inertia\Inertia;
         // ==========================================
         // Transfers
         // ==========================================
-        Route::middleware('permission:' . Permission::VIEW_TRANSFERS->value)->group(function () {
+        Route::middleware(['tenant.module:transfers', 'permission:' . Permission::VIEW_TRANSFERS->value])->group(function () {
             Route::get('/transfers', [TransferController::class, 'index'])->name('transfers.index');
             Route::get('/transfers/statistics', [TransferController::class, 'statistics'])->name('transfers.statistics');
             Route::get('/transfers/{transfer}', [TransferController::class, 'show'])->name('transfers.show');
@@ -595,7 +523,7 @@ use Inertia\Inertia;
         // ==========================================
         // Stock Adjustments
         // ==========================================
-        Route::middleware('permission:' . Permission::VIEW_ADJUSTMENTS->value)->group(function () {
+        Route::middleware(['tenant.module:stock_adjustments', 'permission:' . Permission::VIEW_ADJUSTMENTS->value])->group(function () {
             Route::get('/stock-adjustments', [StockAdjustmentController::class, 'index'])->name('stock-adjustments.index');
             Route::get('/stock-adjustments/{stockAdjustment}', [StockAdjustmentController::class, 'show'])->name('stock-adjustments.show');
             Route::middleware('permission:' . Permission::CREATE_ADJUSTMENTS->value)->group(function () {
@@ -613,7 +541,7 @@ use Inertia\Inertia;
         // ==========================================
         // Order Payments
         // ==========================================
-        Route::middleware('permission:' . Permission::VIEW_ORDER_PAYMENTS->value)->group(function () {
+        Route::middleware(['tenant.module:order_payments', 'permission:' . Permission::VIEW_ORDER_PAYMENTS->value])->group(function () {
             Route::get('/order-payments', [OrderPaymentController::class, 'index'])->name('order-payments.index');
             Route::get('/order-payments/statistics', [OrderPaymentController::class, 'statistics'])->name('order-payments.statistics');
             Route::get('/order-payments/dashboard', [OrderPaymentController::class, 'dashboard'])->name('order-payments.dashboard');
@@ -639,7 +567,7 @@ use Inertia\Inertia;
         // ==========================================
         // Suppliers
         // ==========================================
-        Route::middleware('permission:' . Permission::VIEW_SUPPLIERS->value)->group(function () {
+        Route::middleware(['tenant.module:suppliers', 'permission:' . Permission::VIEW_SUPPLIERS->value])->group(function () {
             Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
             Route::get('/suppliers/{supplier}', [SupplierController::class, 'show'])->name('suppliers.show');
             Route::middleware('permission:' . Permission::CREATE_SUPPLIERS->value)->group(function () {
@@ -656,7 +584,7 @@ use Inertia\Inertia;
         // ==========================================
         // Férias (Vacations)
         // ==========================================
-        Route::middleware('permission:' . Permission::VIEW_VACATIONS->value)->group(function () {
+        Route::middleware(['tenant.module:vacations', 'permission:' . Permission::VIEW_VACATIONS->value])->group(function () {
             Route::get('/vacations', [VacationController::class, 'index'])->name('vacations.index');
             Route::get('/vacations/check-date', [VacationController::class, 'checkDate'])->name('vacations.check-date');
             Route::get('/vacations/holidays', [VacationController::class, 'holidays'])->name('vacations.holidays');
@@ -683,7 +611,7 @@ use Inertia\Inertia;
         // ==========================================
         // Medical Certificates
         // ==========================================
-        Route::middleware('permission:' . Permission::VIEW_MEDICAL_CERTIFICATES->value)->group(function () {
+        Route::middleware(['tenant.module:medical_certificates', 'permission:' . Permission::VIEW_MEDICAL_CERTIFICATES->value])->group(function () {
             Route::get('/medical-certificates', [MedicalCertificateController::class, 'index'])->name('medical-certificates.index');
             Route::get('/medical-certificates/{medical_certificate}', [MedicalCertificateController::class, 'show'])->name('medical-certificates.show');
             Route::middleware('permission:' . Permission::CREATE_MEDICAL_CERTIFICATES->value)->group(function () {
@@ -700,7 +628,7 @@ use Inertia\Inertia;
         // ==========================================
         // Absences
         // ==========================================
-        Route::middleware('permission:' . Permission::VIEW_ABSENCES->value)->group(function () {
+        Route::middleware(['tenant.module:absences', 'permission:' . Permission::VIEW_ABSENCES->value])->group(function () {
             Route::get('/absences', [AbsenceController::class, 'index'])->name('absences.index');
             Route::get('/absences/{absence}', [AbsenceController::class, 'show'])->name('absences.show');
             Route::middleware('permission:' . Permission::CREATE_ABSENCES->value)->group(function () {
@@ -717,7 +645,7 @@ use Inertia\Inertia;
         // ==========================================
         // Overtime Records
         // ==========================================
-        Route::middleware('permission:' . Permission::VIEW_OVERTIME->value)->group(function () {
+        Route::middleware(['tenant.module:overtime', 'permission:' . Permission::VIEW_OVERTIME->value])->group(function () {
             Route::get('/overtime-records', [OvertimeRecordController::class, 'index'])->name('overtime-records.index');
             Route::get('/overtime-records/{overtime_record}', [OvertimeRecordController::class, 'show'])->name('overtime-records.show');
             Route::middleware('permission:' . Permission::CREATE_OVERTIME->value)->group(function () {
@@ -734,7 +662,7 @@ use Inertia\Inertia;
         // ==========================================
         // Checklists
         // ==========================================
-        Route::middleware('permission:' . Permission::VIEW_CHECKLISTS->value)->group(function () {
+        Route::middleware(['tenant.module:checklists', 'permission:' . Permission::VIEW_CHECKLISTS->value])->group(function () {
             Route::get('/checklists', [ChecklistController::class, 'index'])->name('checklists.index');
             Route::get('/checklists/employees', [ChecklistController::class, 'employees'])->name('checklists.employees');
             Route::get('/checklists/{checklist}', [ChecklistController::class, 'show'])->name('checklists.show');
@@ -753,7 +681,7 @@ use Inertia\Inertia;
         // ==========================================
         // Integrations
         // ==========================================
-        Route::middleware('permission:' . Permission::MANAGE_SETTINGS->value)->prefix('integrations')->name('integrations.')->group(function () {
+        Route::middleware(['tenant.module:integrations', 'permission:' . Permission::MANAGE_SETTINGS->value])->prefix('integrations')->name('integrations.')->group(function () {
             Route::get('/', [IntegrationController::class, 'index'])->name('index');
             Route::post('/', [IntegrationController::class, 'store'])->name('store');
             Route::get('/{integration}', [IntegrationController::class, 'show'])->name('show');
@@ -767,7 +695,7 @@ use Inertia\Inertia;
         // ==========================================
         // Stock Audits (Auditoria de Estoque)
         // ==========================================
-        Route::middleware('permission:' . Permission::VIEW_STOCK_AUDITS->value)->group(function () {
+        Route::middleware(['tenant.module:stock_audits', 'permission:' . Permission::VIEW_STOCK_AUDITS->value])->group(function () {
             Route::get('/stock-audits/statistics', [StockAuditController::class, 'statistics'])->name('stock-audits.statistics');
             Route::get('/stock-audits/accuracy-history', [StockAuditController::class, 'accuracyHistory'])->name('stock-audits.accuracy-history');
             Route::get('/stock-audits', [StockAuditController::class, 'index'])->name('stock-audits.index');
@@ -809,7 +737,7 @@ use Inertia\Inertia;
         });
 
         // Stock Audit Config (Ciclos e Empresas Auditoras)
-        Route::middleware('permission:' . Permission::MANAGE_STOCK_AUDIT_CONFIG->value)->group(function () {
+        Route::middleware(['tenant.module:stock_audits', 'permission:' . Permission::MANAGE_STOCK_AUDIT_CONFIG->value])->group(function () {
             Route::get('/config/stock-audit-cycles', [ConfigStockAuditCycleController::class, 'index'])->name('config.stock-audit-cycles.index');
             Route::post('/config/stock-audit-cycles', [ConfigStockAuditCycleController::class, 'store'])->name('config.stock-audit-cycles.store');
             Route::put('/config/stock-audit-cycles/{stockAuditCycle}', [ConfigStockAuditCycleController::class, 'update'])->name('config.stock-audit-cycles.update');
