@@ -118,6 +118,27 @@ enum Role: string
                 Permission::COUNT_STOCK_AUDITS->value,
                 Permission::RECONCILE_STOCK_AUDITS->value,
                 Permission::MANAGE_STOCK_AUDIT_CONFIG->value,
+                // Movimentação de Pessoal
+                Permission::VIEW_PERSONNEL_MOVEMENTS->value,
+                Permission::CREATE_PERSONNEL_MOVEMENTS->value,
+                Permission::EDIT_PERSONNEL_MOVEMENTS->value,
+                Permission::DELETE_PERSONNEL_MOVEMENTS->value,
+                // Treinamentos (todas)
+                Permission::VIEW_TRAININGS->value,
+                Permission::CREATE_TRAININGS->value,
+                Permission::EDIT_TRAININGS->value,
+                Permission::DELETE_TRAININGS->value,
+                Permission::MANAGE_TRAINING_ATTENDANCE->value,
+                Permission::MANAGE_TRAINING_CONTENT->value,
+                Permission::VIEW_TRAINING_COURSES->value,
+                Permission::CREATE_TRAINING_COURSES->value,
+                Permission::EDIT_TRAINING_COURSES->value,
+                Permission::DELETE_TRAINING_COURSES->value,
+                Permission::MANAGE_TRAINING_QUIZZES->value,
+                // Avaliacao de experiencia (todas)
+                Permission::VIEW_EXPERIENCE_TRACKER->value,
+                Permission::MANAGE_EXPERIENCE_TRACKER->value,
+                Permission::FILL_EXPERIENCE_EVALUATION->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -200,6 +221,27 @@ enum Role: string
                 Permission::COUNT_STOCK_AUDITS->value,
                 Permission::RECONCILE_STOCK_AUDITS->value,
                 Permission::MANAGE_STOCK_AUDIT_CONFIG->value,
+                // Movimentação de Pessoal
+                Permission::VIEW_PERSONNEL_MOVEMENTS->value,
+                Permission::CREATE_PERSONNEL_MOVEMENTS->value,
+                Permission::EDIT_PERSONNEL_MOVEMENTS->value,
+                Permission::DELETE_PERSONNEL_MOVEMENTS->value,
+                // Treinamentos (todas)
+                Permission::VIEW_TRAININGS->value,
+                Permission::CREATE_TRAININGS->value,
+                Permission::EDIT_TRAININGS->value,
+                Permission::DELETE_TRAININGS->value,
+                Permission::MANAGE_TRAINING_ATTENDANCE->value,
+                Permission::MANAGE_TRAINING_CONTENT->value,
+                Permission::VIEW_TRAINING_COURSES->value,
+                Permission::CREATE_TRAINING_COURSES->value,
+                Permission::EDIT_TRAINING_COURSES->value,
+                Permission::DELETE_TRAINING_COURSES->value,
+                Permission::MANAGE_TRAINING_QUIZZES->value,
+                // Avaliacao de experiencia (todas)
+                Permission::VIEW_EXPERIENCE_TRACKER->value,
+                Permission::MANAGE_EXPERIENCE_TRACKER->value,
+                Permission::FILL_EXPERIENCE_EVALUATION->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -235,6 +277,17 @@ enum Role: string
                 Permission::EDIT_STOCK_AUDITS->value,
                 Permission::COUNT_STOCK_AUDITS->value,
                 Permission::RECONCILE_STOCK_AUDITS->value,
+                // Movimentação de Pessoal (view, create, edit)
+                Permission::VIEW_PERSONNEL_MOVEMENTS->value,
+                Permission::CREATE_PERSONNEL_MOVEMENTS->value,
+                Permission::EDIT_PERSONNEL_MOVEMENTS->value,
+                // Treinamentos (view + presença)
+                Permission::VIEW_TRAININGS->value,
+                Permission::MANAGE_TRAINING_ATTENDANCE->value,
+                Permission::VIEW_TRAINING_COURSES->value,
+                // Avaliacao de experiencia (view + fill)
+                Permission::VIEW_EXPERIENCE_TRACKER->value,
+                Permission::FILL_EXPERIENCE_EVALUATION->value,
             ],
             self::USER => [
                 // Apenas próprio perfil
@@ -244,6 +297,9 @@ enum Role: string
                 // Auditoria de estoque (view + count)
                 Permission::VIEW_STOCK_AUDITS->value,
                 Permission::COUNT_STOCK_AUDITS->value,
+                // Treinamentos (view)
+                Permission::VIEW_TRAININGS->value,
+                Permission::VIEW_TRAINING_COURSES->value,
             ],
         };
     }

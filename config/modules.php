@@ -178,4 +178,25 @@ return [
         'icon' => 'ClipboardDocumentCheckIcon',
         'dependencies' => ['products', 'stores'],
     ],
+    'personnel_movements' => [
+        'name' => 'Movimentação de Pessoal',
+        'description' => 'Gestão de movimentações: desligamento, promoção, transferência e reativação.',
+        'routes' => ['personnel-movements.*'],
+        'icon' => 'ArrowsUpDownIcon',
+        'dependencies' => ['employees'],
+    ],
+    'training' => [
+        'name' => 'Treinamentos',
+        'description' => 'Gestão de treinamentos, eventos de capacitação, facilitadores e certificados.',
+        'routes' => ['trainings.*', 'training-contents.*', 'training-content-categories.*', 'training-courses.*', 'my-trainings.*', 'training-reports.*', 'training-quizzes.*', 'training-quiz-attempts.*'],
+        'icon' => 'AcademicCapIcon',
+        'dependencies' => ['employees', 'stores'],
+    ],
+    'experience-tracker' => [
+        'name' => 'Avaliacao de Experiencia',
+        'description' => 'Acompanhamento do periodo de experiencia (45/90 dias).',
+        'routes' => ['experience-tracker.*'],
+        'icon' => 'ClipboardDocumentCheckIcon',
+        'dependencies' => ['employees', 'stores'],
+    ],
 ];

@@ -24,3 +24,9 @@ Schedule::command('store-goals:midmonth-alert')
     ->monthlyOn(15, '09:00')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/midmonth-alert.log'));
+
+// Experience Tracker notifications: daily at 08:00
+Schedule::command('experience:notify')
+    ->dailyAt('08:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/experience-notifications.log'));

@@ -12,6 +12,7 @@
 
 use App\Http\Controllers\Central\Auth\LoginController;
 use App\Http\Controllers\Central\DashboardController;
+use App\Http\Controllers\Central\GoogleAuthController;
 use App\Http\Controllers\Central\ModuleController;
 use App\Http\Controllers\Central\InvoiceController;
 use App\Http\Controllers\Central\ManualController;
@@ -44,6 +45,14 @@ foreach ($centralDomains as $domain) {
         })->name('central.welcome');
 
         Route::get('/health', fn () => response()->json(['status' => 'ok']))->name('health');
+
+        // Google OAuth (public training + experience evaluation)
+        Route::prefix('mercury')->group(function () {
+            Route::get('/public-training/google-redirect', [GoogleAuthController::class, 'redirectTraining'])->name('google.training.redirect');
+            Route::get('/public-training/google-callback', [GoogleAuthController::class, 'callbackTraining'])->name('google.training.callback');
+            Route::get('/public-experience-evaluation/google-redirect', [GoogleAuthController::class, 'redirectExperience'])->name('google.experience.redirect');
+            Route::get('/public-experience-evaluation/google-callback', [GoogleAuthController::class, 'callbackExperience'])->name('google.experience.callback');
+        });
 
         // Central auth
         Route::middleware('guest:central')->group(function () {

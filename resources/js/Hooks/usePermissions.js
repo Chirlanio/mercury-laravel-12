@@ -121,6 +121,30 @@ export const PERMISSIONS = {
     COUNT_STOCK_AUDITS: 'stock_audits.count',
     RECONCILE_STOCK_AUDITS: 'stock_audits.reconcile',
     MANAGE_STOCK_AUDIT_CONFIG: 'stock_audits.manage_config',
+
+    // Movimentação de Pessoal
+    VIEW_PERSONNEL_MOVEMENTS: 'personnel_movements.view',
+    CREATE_PERSONNEL_MOVEMENTS: 'personnel_movements.create',
+    EDIT_PERSONNEL_MOVEMENTS: 'personnel_movements.edit',
+    DELETE_PERSONNEL_MOVEMENTS: 'personnel_movements.delete',
+
+    // Treinamentos
+    VIEW_TRAININGS: 'trainings.view',
+    CREATE_TRAININGS: 'trainings.create',
+    EDIT_TRAININGS: 'trainings.edit',
+    DELETE_TRAININGS: 'trainings.delete',
+    MANAGE_TRAINING_ATTENDANCE: 'trainings.manage_attendance',
+    MANAGE_TRAINING_CONTENT: 'training_content.manage',
+    VIEW_TRAINING_COURSES: 'training_courses.view',
+    CREATE_TRAINING_COURSES: 'training_courses.create',
+    EDIT_TRAINING_COURSES: 'training_courses.edit',
+    DELETE_TRAINING_COURSES: 'training_courses.delete',
+    MANAGE_TRAINING_QUIZZES: 'training_quizzes.manage',
+
+    // Avaliacao de experiencia
+    VIEW_EXPERIENCE_TRACKER: 'experience_tracker.view',
+    MANAGE_EXPERIENCE_TRACKER: 'experience_tracker.manage',
+    FILL_EXPERIENCE_EVALUATION: 'experience_tracker.fill',
 };
 
 export const ROLES = {

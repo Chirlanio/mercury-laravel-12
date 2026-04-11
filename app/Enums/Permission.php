@@ -124,6 +124,34 @@ enum Permission: string
     case RECONCILE_STOCK_AUDITS = 'stock_audits.reconcile';
     case MANAGE_STOCK_AUDIT_CONFIG = 'stock_audits.manage_config';
 
+    // Movimentação de Pessoal
+    case VIEW_PERSONNEL_MOVEMENTS = 'personnel_movements.view';
+    case CREATE_PERSONNEL_MOVEMENTS = 'personnel_movements.create';
+    case EDIT_PERSONNEL_MOVEMENTS = 'personnel_movements.edit';
+    case DELETE_PERSONNEL_MOVEMENTS = 'personnel_movements.delete';
+
+    // Treinamentos
+    case VIEW_TRAININGS = 'trainings.view';
+    case CREATE_TRAININGS = 'trainings.create';
+    case EDIT_TRAININGS = 'trainings.edit';
+    case DELETE_TRAININGS = 'trainings.delete';
+    case MANAGE_TRAINING_ATTENDANCE = 'trainings.manage_attendance';
+    case MANAGE_TRAINING_CONTENT = 'training_content.manage';
+
+    // Cursos de treinamento
+    case VIEW_TRAINING_COURSES = 'training_courses.view';
+    case CREATE_TRAINING_COURSES = 'training_courses.create';
+    case EDIT_TRAINING_COURSES = 'training_courses.edit';
+    case DELETE_TRAINING_COURSES = 'training_courses.delete';
+
+    // Quizzes de treinamento
+    case MANAGE_TRAINING_QUIZZES = 'training_quizzes.manage';
+
+    // Avaliacao de experiencia
+    case VIEW_EXPERIENCE_TRACKER = 'experience_tracker.view';
+    case MANAGE_EXPERIENCE_TRACKER = 'experience_tracker.manage';
+    case FILL_EXPERIENCE_EVALUATION = 'experience_tracker.fill';
+
     public function label(): string
     {
         return match ($this) {
@@ -187,10 +215,10 @@ enum Permission: string
             self::EDIT_CHECKLISTS => 'Editar checklists',
             self::DELETE_CHECKLISTS => 'Deletar checklists',
 
-            self::VIEW_MEDICAL_CERTIFICATES => 'Visualizar atestados medicos',
-            self::CREATE_MEDICAL_CERTIFICATES => 'Criar atestados medicos',
-            self::EDIT_MEDICAL_CERTIFICATES => 'Editar atestados medicos',
-            self::DELETE_MEDICAL_CERTIFICATES => 'Deletar atestados medicos',
+            self::VIEW_MEDICAL_CERTIFICATES => 'Visualizar atestados médicos',
+            self::CREATE_MEDICAL_CERTIFICATES => 'Criar atestados médicos',
+            self::EDIT_MEDICAL_CERTIFICATES => 'Editar atestados médicos',
+            self::DELETE_MEDICAL_CERTIFICATES => 'Deletar atestados médicos',
 
             self::VIEW_ABSENCES => 'Visualizar faltas',
             self::CREATE_ABSENCES => 'Registrar faltas',
@@ -226,6 +254,26 @@ enum Permission: string
             self::COUNT_STOCK_AUDITS => 'Realizar contagem de estoque',
             self::RECONCILE_STOCK_AUDITS => 'Conciliar auditorias de estoque',
             self::MANAGE_STOCK_AUDIT_CONFIG => 'Gerenciar config. de auditoria',
+
+            self::VIEW_PERSONNEL_MOVEMENTS => 'Visualizar movimentações de pessoal',
+            self::CREATE_PERSONNEL_MOVEMENTS => 'Criar movimentações de pessoal',
+            self::EDIT_PERSONNEL_MOVEMENTS => 'Editar movimentações de pessoal',
+            self::DELETE_PERSONNEL_MOVEMENTS => 'Deletar movimentações de pessoal',
+
+            self::VIEW_TRAININGS => 'Visualizar treinamentos',
+            self::CREATE_TRAININGS => 'Criar treinamentos',
+            self::EDIT_TRAININGS => 'Editar treinamentos',
+            self::DELETE_TRAININGS => 'Excluir treinamentos',
+            self::MANAGE_TRAINING_ATTENDANCE => 'Gerenciar presença em treinamentos',
+            self::MANAGE_TRAINING_CONTENT => 'Gerenciar conteúdos de treinamento',
+            self::VIEW_TRAINING_COURSES => 'Visualizar cursos de treinamento',
+            self::CREATE_TRAINING_COURSES => 'Criar cursos de treinamento',
+            self::EDIT_TRAINING_COURSES => 'Editar cursos de treinamento',
+            self::DELETE_TRAINING_COURSES => 'Excluir cursos de treinamento',
+            self::MANAGE_TRAINING_QUIZZES => 'Gerenciar quizzes de treinamento',
+            self::VIEW_EXPERIENCE_TRACKER => 'Visualizar avaliações de experiência',
+            self::MANAGE_EXPERIENCE_TRACKER => 'Gerenciar avaliações de experiência',
+            self::FILL_EXPERIENCE_EVALUATION => 'Preencher avaliações de experiência',
         };
     }
 
@@ -292,10 +340,10 @@ enum Permission: string
             self::EDIT_CHECKLISTS => 'Permite editar e responder checklists',
             self::DELETE_CHECKLISTS => 'Permite deletar checklists pendentes',
 
-            self::VIEW_MEDICAL_CERTIFICATES => 'Permite visualizar atestados medicos',
-            self::CREATE_MEDICAL_CERTIFICATES => 'Permite cadastrar novos atestados medicos',
-            self::EDIT_MEDICAL_CERTIFICATES => 'Permite editar atestados medicos',
-            self::DELETE_MEDICAL_CERTIFICATES => 'Permite excluir atestados medicos',
+            self::VIEW_MEDICAL_CERTIFICATES => 'Permite visualizar atestados médicos',
+            self::CREATE_MEDICAL_CERTIFICATES => 'Permite cadastrar novos atestados médicos',
+            self::EDIT_MEDICAL_CERTIFICATES => 'Permite editar atestados médicos',
+            self::DELETE_MEDICAL_CERTIFICATES => 'Permite excluir atestados médicos',
 
             self::VIEW_ABSENCES => 'Permite visualizar registros de faltas',
             self::CREATE_ABSENCES => 'Permite registrar novas faltas',
@@ -328,9 +376,29 @@ enum Permission: string
             self::EDIT_STOCK_AUDITS => 'Permite editar auditorias de estoque',
             self::DELETE_STOCK_AUDITS => 'Permite excluir auditorias de estoque',
             self::AUTHORIZE_STOCK_AUDITS => 'Permite autorizar o inicio de auditorias de estoque',
-            self::COUNT_STOCK_AUDITS => 'Permite realizar contagem fisica de estoque',
-            self::RECONCILE_STOCK_AUDITS => 'Permite conciliar divergencias em auditorias de estoque',
+            self::COUNT_STOCK_AUDITS => 'Permite realizar contagem física de estoque',
+            self::RECONCILE_STOCK_AUDITS => 'Permite conciliar divergências em auditorias de estoque',
             self::MANAGE_STOCK_AUDIT_CONFIG => 'Permite gerenciar ciclos e empresas auditoras',
+
+            self::VIEW_PERSONNEL_MOVEMENTS => 'Permite visualizar movimentações de pessoal',
+            self::CREATE_PERSONNEL_MOVEMENTS => 'Permite criar movimentações de pessoal (desligamento, promoção, transferência, reativação)',
+            self::EDIT_PERSONNEL_MOVEMENTS => 'Permite editar e transicionar movimentações de pessoal',
+            self::DELETE_PERSONNEL_MOVEMENTS => 'Permite excluir movimentações de pessoal',
+
+            self::VIEW_TRAININGS => 'Permite visualizar treinamentos e eventos de capacitação',
+            self::CREATE_TRAININGS => 'Permite criar novos treinamentos e eventos',
+            self::EDIT_TRAININGS => 'Permite editar treinamentos, transicionar status e gerar certificados',
+            self::DELETE_TRAININGS => 'Permite excluir treinamentos',
+            self::MANAGE_TRAINING_ATTENDANCE => 'Permite gerenciar presença e QR codes de treinamentos',
+            self::MANAGE_TRAINING_CONTENT => 'Permite criar, editar e excluir conteúdos de treinamento (videos, documentos, etc.)',
+            self::VIEW_TRAINING_COURSES => 'Permite visualizar cursos e trilhas de aprendizagem',
+            self::CREATE_TRAINING_COURSES => 'Permite criar cursos e trilhas de aprendizagem',
+            self::EDIT_TRAINING_COURSES => 'Permite editar cursos, gerenciar conteúdos e visibilidade',
+            self::DELETE_TRAINING_COURSES => 'Permite excluir cursos de treinamento',
+            self::MANAGE_TRAINING_QUIZZES => 'Permite criar, editar e excluir quizzes de treinamento',
+            self::VIEW_EXPERIENCE_TRACKER => 'Permite visualizar avaliações de período de experiência',
+            self::MANAGE_EXPERIENCE_TRACKER => 'Permite criar e gerenciar avaliações de período de experiência',
+            self::FILL_EXPERIENCE_EVALUATION => 'Permite preencher formulários de avaliação de período de experiência',
         };
     }
 

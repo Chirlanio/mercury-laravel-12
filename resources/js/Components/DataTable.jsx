@@ -26,6 +26,8 @@ export default function DataTable({
     selectable = false,
     selectedIds = [],
     onSelectionChange = null,
+    baseUrl = null,
+    onNavigate = null,
 }) {
     const [search, setSearch] = useState('');
     const [sortField, setSortField] = useState('');
@@ -58,6 +60,16 @@ export default function DataTable({
         setPerPage(data.per_page || 10);
     }, [data.per_page]);
 
+    const getBaseUrl = () => baseUrl || window.location.href;
+
+    const navigate = (url) => {
+        if (onNavigate) {
+            onNavigate(url);
+        } else {
+            router.visit(url, { preserveState: true, preserveScroll: true });
+        }
+    };
+
     const handleSort = (field) => {
         if (!field) return;
 
@@ -69,45 +81,35 @@ export default function DataTable({
         setSortField(field);
         setSortDirection(direction);
 
-        // Atualizar URL com parâmetros de ordenação
-        const currentUrl = new URL(window.location.href);
+        const currentUrl = new URL(getBaseUrl());
         currentUrl.searchParams.set('sort', field);
         currentUrl.searchParams.set('direction', direction);
 
-        router.visit(currentUrl.toString(), {
-            preserveState: true,
-            preserveScroll: true,
-        });
+        navigate(currentUrl.toString());
     };
 
     const handlePerPageChange = (newPerPage) => {
         setPerPage(newPerPage);
 
-        const currentUrl = new URL(window.location.href);
+        const currentUrl = new URL(getBaseUrl());
         currentUrl.searchParams.set('per_page', newPerPage);
-        currentUrl.searchParams.delete('page'); // Reset para primeira página
+        currentUrl.searchParams.delete('page');
 
-        router.visit(currentUrl.toString(), {
-            preserveState: true,
-            preserveScroll: true,
-        });
+        navigate(currentUrl.toString());
     };
 
     const handleSearch = (searchValue) => {
         setSearch(searchValue);
 
-        const currentUrl = new URL(window.location.href);
+        const currentUrl = new URL(getBaseUrl());
         if (searchValue) {
             currentUrl.searchParams.set('search', searchValue);
         } else {
             currentUrl.searchParams.delete('search');
         }
-        currentUrl.searchParams.delete('page'); // Reset para primeira página
+        currentUrl.searchParams.delete('page');
 
-        router.visit(currentUrl.toString(), {
-            preserveState: true,
-            preserveScroll: true,
-        });
+        navigate(currentUrl.toString());
     };
 
     const getSortIcon = (field) => {
@@ -253,11 +255,11 @@ export default function DataTable({
                                     // Manter todos os parâmetros da URL atual ao navegar entre páginas
                                     let url = link.url;
                                     if (url) {
-                                        const linkUrl = new URL(url);
-                                        const currentUrl = new URL(window.location.href);
+                                        const linkUrl = new URL(url, window.location.origin);
+                                        const currentBase = new URL(getBaseUrl());
 
-                                        // Preservar TODOS os parâmetros da URL atual que não estão no link
-                                        currentUrl.searchParams.forEach((value, param) => {
+                                        // Preservar TODOS os parâmetros da URL base que não estão no link
+                                        currentBase.searchParams.forEach((value, param) => {
                                             if (!linkUrl.searchParams.has(param)) {
                                                 linkUrl.searchParams.set(param, value);
                                             }
@@ -269,10 +271,7 @@ export default function DataTable({
                                     return (
                                         <button
                                             key={index}
-                                            onClick={() => router.visit(url, {
-                                                preserveState: true,
-                                                preserveScroll: true,
-                                            })}
+                                            onClick={() => navigate(url)}
                                             disabled={!link.url}
                                             className={`px-3 py-2 text-sm rounded-md transition-colors ${
                                                 link.active

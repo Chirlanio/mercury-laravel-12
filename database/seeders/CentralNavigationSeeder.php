@@ -3,10 +3,10 @@
 namespace Database\Seeders;
 
 use App\Models\CentralMenu;
+use App\Models\CentralMenuPageDefault;
 use App\Models\CentralModule;
 use App\Models\CentralPage;
 use App\Models\CentralPageGroup;
-use App\Models\CentralMenuPageDefault;
 use Illuminate\Database\Seeder;
 
 /**
@@ -137,6 +137,11 @@ class CentralNavigationSeeder extends Seeder
             '/store-goals' => 'store_goals',
             '/movements' => 'movements',
             '/vacations' => 'vacations',
+            '/personnel-movements' => 'personnel_movements',
+            '/trainings' => 'training',
+            '/my-trainings' => 'training',
+            '/training-reports' => 'training',
+            '/experience-tracker' => 'experience-tracker',
         ];
 
         $pages = [
@@ -175,6 +180,11 @@ class CentralNavigationSeeder extends Seeder
             ['route' => '/store-goals', 'page_name' => 'Metas de Loja', 'icon' => 'fas fa-bullseye'],
             ['route' => '/movements', 'page_name' => 'Movimentações', 'icon' => 'fas fa-arrows-alt'],
             ['route' => '/vacations', 'page_name' => 'Férias', 'icon' => 'fas fa-umbrella-beach'],
+            ['route' => '/personnel-movements', 'page_name' => 'Movimentação de Pessoal', 'icon' => 'fas fa-people-arrows'],
+            ['route' => '/trainings', 'page_name' => 'Treinamentos', 'icon' => 'fas fa-graduation-cap'],
+            ['route' => '/my-trainings', 'page_name' => 'Meus Treinamentos', 'icon' => 'fas fa-book-reader'],
+            ['route' => '/training-reports', 'page_name' => 'Relatórios de Treinamento', 'icon' => 'fas fa-chart-bar'],
+            ['route' => '/experience-tracker', 'page_name' => 'Avaliação de Experiência', 'icon' => 'fas fa-clipboard-check'],
             ['route' => '/config/stock-audit-cycles', 'page_name' => 'Ciclos de Auditoria', 'icon' => 'fas fa-cog'],
             ['route' => '/config/stock-audit-vendors', 'page_name' => 'Empresas Auditoras', 'icon' => 'fas fa-cog'],
             ['route' => '/logout', 'page_name' => 'Sair', 'icon' => 'fas fa-sign-out-alt', 'is_public' => true],
@@ -246,6 +256,11 @@ class CentralNavigationSeeder extends Seeder
             '/store-goals' => 'Comercial',
             '/movements' => 'Comercial',
             '/vacations' => 'RH',
+            '/personnel-movements' => 'RH',
+            '/trainings' => 'RH',
+            '/my-trainings' => 'RH',
+            '/training-reports' => 'RH',
+            '/experience-tracker' => 'RH',
             '/config/stock-audit-cycles' => 'Configurações',
             '/config/stock-audit-vendors' => 'Configurações',
             '/logout' => 'Sair',
@@ -262,9 +277,14 @@ class CentralNavigationSeeder extends Seeder
             '/checklists', '/medical-certificates', '/absences', '/overtime-records',
             '/user-sessions', '/work-shifts', '/work-schedules', '/activity-logs',
             '/store-goals', '/movements', '/vacations', '/stock-audits',
+            '/personnel-movements',
+            '/trainings',
+            '/my-trainings',
+            '/training-reports',
+            '/experience-tracker',
         ];
 
-        $userRoutes = ['/dashboard', '/logout'];
+        $userRoutes = ['/dashboard', '/logout', '/my-trainings', '/trainings'];
 
         // Cache IDs
         $menuIds = CentralMenu::whereNull('parent_id')->pluck('id', 'name')->toArray();
