@@ -1,6 +1,6 @@
 import { Head, router } from "@inertiajs/react";
 import { useState } from "react";
-import Modal from "@/Components/Modal";
+import useModalManager from "@/Hooks/useModalManager";
 import DataTable from "@/Components/DataTable";
 import Button from "@/Components/Button";
 import ActionButtons from "@/Components/ActionButtons";
@@ -8,101 +8,89 @@ import WorkShiftCreateModal from "@/Components/WorkShiftCreateModal";
 import WorkShiftViewModal from "@/Components/WorkShiftViewModal";
 import WorkShiftEditModal from "@/Components/WorkShiftEditModal";
 import WorkShiftExportModal from "@/Components/WorkShiftExportModal";
-import { DocumentArrowDownIcon, PlusIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import DeleteConfirmModal from "@/Components/Shared/DeleteConfirmModal";
+import StatusBadge from "@/Components/Shared/StatusBadge";
+import StatisticsGrid from "@/Components/Shared/StatisticsGrid";
+import {
+    DocumentArrowDownIcon,
+    PlusIcon,
+    XMarkIcon,
+    ClockIcon,
+    CalendarDaysIcon,
+    FunnelIcon,
+    SunIcon,
+    MoonIcon,
+    ArrowsRightLeftIcon,
+    UserGroupIcon,
+} from "@heroicons/react/24/outline";
 
-export default function Index({ auth, workShifts, employees, stores, types, filters }) {
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-    const [selectedWorkShift, setSelectedWorkShift] = useState(null);
-    const [workShiftToDelete, setWorkShiftToDelete] = useState(null);
+const TYPE_CONFIG_MAP = {
+    'Abertura': { variant: 'info', icon: SunIcon },
+    'Fechamento': { variant: 'warning', icon: MoonIcon },
+    'Integral': { variant: 'success', icon: ClockIcon },
+    'Compensar': { variant: 'danger', icon: ArrowsRightLeftIcon },
+};
 
-    const openCreateModal = () => {
-        setIsCreateModalOpen(true);
+export default function Index({ workShifts, stats, employees, stores, types, filters }) {
+    const { modals, selected, openModal, closeModal } = useModalManager(['view', 'create', 'edit', 'export', 'delete']);
+    const [processing, setProcessing] = useState(false);
+    
+    // Filter state
+    const [storeFilter, setStoreFilter] = useState(filters.store || '');
+    const [typeFilter, setTypeFilter] = useState(filters.type || '');
+    const [search, setSearch] = useState(filters.search || '');
+
+    const applyFilters = () => {
+        router.get('/work-shifts', {
+            store: storeFilter || undefined,
+            type: typeFilter || undefined,
+            search: search || undefined,
+        }, { preserveState: true, preserveScroll: true });
     };
 
-    const closeCreateModal = () => {
-        setIsCreateModalOpen(false);
+    const clearFilters = () => {
+        setStoreFilter('');
+        setTypeFilter('');
+        setSearch('');
+        router.get('/work-shifts', {}, { preserveState: true, preserveScroll: true });
     };
 
-    const handleWorkShiftCreated = () => {
-        router.reload();
-    };
-
-    const viewWorkShift = async (workShift) => {
+    const handleView = async (workShift) => {
         try {
             const response = await fetch(`/work-shifts/${workShift.id}`);
             const data = await response.json();
-            setSelectedWorkShift(data.workShift);
-            setIsViewModalOpen(true);
+            openModal('view', data.workShift);
         } catch (error) {
             console.error('Erro ao carregar dados da jornada:', error);
         }
     };
 
-    const closeViewModal = () => {
-        setIsViewModalOpen(false);
-        setSelectedWorkShift(null);
-    };
-
-    const editWorkShift = async (workShift) => {
+    const handleEdit = async (workShift) => {
         try {
             const response = await fetch(`/work-shifts/${workShift.id}/edit`);
             const data = await response.json();
-            setSelectedWorkShift(data.workShift);
-            setIsEditModalOpen(true);
+            openModal('edit', data.workShift);
         } catch (error) {
             console.error('Erro ao carregar dados da jornada para edição:', error);
         }
     };
 
     const handleEditFromView = async (workShift) => {
-        closeViewModal();
-        await editWorkShift(workShift);
+        closeModal('view');
+        await handleEdit(workShift);
     };
 
-    const closeEditModal = () => {
-        setIsEditModalOpen(false);
-        setSelectedWorkShift(null);
-    };
-
-    const handleWorkShiftUpdated = () => {
-        closeEditModal();
-        router.reload();
-    };
-
-    const openDeleteModal = (workShift) => {
-        setWorkShiftToDelete(workShift);
-        setIsDeleteModalOpen(true);
-    };
-
-    const closeDeleteModal = () => {
-        setIsDeleteModalOpen(false);
-        setWorkShiftToDelete(null);
-    };
-
-    const deleteWorkShift = () => {
-        if (!workShiftToDelete) return;
-
-        router.delete(`/work-shifts/${workShiftToDelete.id}`, {
+    const handleDelete = () => {
+        if (!selected) return;
+        setProcessing(true);
+        router.delete(`/work-shifts/${selected.id}`, {
             preserveScroll: true,
             onSuccess: () => {
-                closeDeleteModal();
+                closeModal('delete');
+                setProcessing(false);
             },
-            onError: (errors) => {
-                console.error('Erro ao excluir jornada:', errors);
-            }
+            onError: () => setProcessing(false),
         });
-    };
-
-    const openExportModal = () => {
-        setIsExportModalOpen(true);
-    };
-
-    const closeExportModal = () => {
-        setIsExportModalOpen(false);
     };
 
     const columns = [
@@ -110,42 +98,41 @@ export default function Index({ auth, workShifts, employees, stores, types, filt
             field: 'employee_name',
             label: 'Funcionário',
             sortable: true,
-            render: (workShift) => (
-                <span className="font-medium text-gray-900 dark:text-gray-100">
-                    {workShift.employee_short_name || workShift.employee_name}
-                </span>
+            render: (row) => (
+                <div className="flex flex-col">
+                    <span className="font-medium text-gray-900">{row.employee_short_name || row.employee_name}</span>
+                    <span className="text-[10px] text-gray-400 font-bold uppercase">{row.employee_name}</span>
+                </div>
             ),
         },
         {
             field: 'date',
             label: 'Data',
             sortable: true,
+            render: (row) => <span className="text-gray-600 font-medium">{row.date}</span>
         },
         {
-            field: 'start_time',
-            label: 'Hora Início',
-            sortable: true,
-        },
-        {
-            field: 'end_time',
-            label: 'Hora Término',
-            sortable: true,
+            field: 'period',
+            label: 'Horário',
+            sortable: false,
+            render: (row) => (
+                <div className="flex items-center gap-2">
+                    <span className="text-gray-900 font-bold">{row.start_time}</span>
+                    <span className="text-gray-300">—</span>
+                    <span className="text-gray-900 font-bold">{row.end_time}</span>
+                </div>
+            ),
         },
         {
             field: 'type_label',
             label: 'Tipo',
             sortable: false,
-            render: (workShift) => {
-                const colors = {
-                    'Abertura': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-                    'Fechamento': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-                    'Integral': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-                    'Compensar': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-                };
+            render: (row) => {
+                const config = TYPE_CONFIG_MAP[row.type_label] || { variant: 'gray', icon: ClockIcon };
                 return (
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${colors[workShift.type_label] || 'bg-gray-100 text-gray-800'}`}>
-                        {workShift.type_label}
-                    </span>
+                    <StatusBadge variant={config.variant} icon={config.icon} dot>
+                        {row.type_label}
+                    </StatusBadge>
                 );
             },
         },
@@ -153,16 +140,23 @@ export default function Index({ auth, workShifts, employees, stores, types, filt
             field: 'actions',
             label: 'Ações',
             sortable: false,
-            render: (workShift) => (
+            render: (row) => (
                 <ActionButtons
-                    onView={() => viewWorkShift(workShift)}
-                    onEdit={() => editWorkShift(workShift)}
-                    onDelete={() => openDeleteModal(workShift)}
+                    onView={() => handleView(row)}
+                    onEdit={() => handleEdit(row)}
+                    onDelete={() => openModal('delete', row)}
                 />
             ),
         },
     ];
 
+    const statsCards = [
+        { label: 'Total Registros', value: stats.total, color: 'gray', icon: UserGroupIcon },
+        { label: 'Abertura', value: stats.abertura, color: 'blue', icon: SunIcon },
+        { label: 'Integral', value: stats.integral, color: 'green', icon: ClockIcon },
+        { label: 'Fechamento', value: stats.fechamento, color: 'purple', icon: MoonIcon },
+        { label: 'Compensar', value: stats.compensar, color: 'red', icon: ArrowsRightLeftIcon },
+    ];
 
     return (
         <>
@@ -171,191 +165,153 @@ export default function Index({ auth, workShifts, employees, stores, types, filt
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
                     {/* Header */}
-                    <div className="mb-6">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <h1 className="text-3xl font-bold text-gray-900">
-                                    Controle de Jornada
-                                </h1>
-                                <p className="mt-1 text-sm text-gray-600">
-                                    Gerencie e visualize as jornadas de trabalho dos funcionários
-                                </p>
-                            </div>
-                            <div className="flex gap-3">
-                                <Button
-                                    variant="secondary"
-                                    onClick={openExportModal}
-                                    icon={DocumentArrowDownIcon}
-                                >
-                                    Exportar
-                                </Button>
-                                <Button
-                                    variant="primary"
-                                    onClick={openCreateModal}
-                                    icon={PlusIcon}
-                                >
-                                    Nova Jornada
-                                </Button>
-                            </div>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                                <CalendarDaysIcon className="h-8 w-8 text-indigo-600" />
+                                Controle de Jornada
+                            </h1>
+                            <p className="mt-1 text-sm text-gray-500">
+                                Gerencie e visualize as jornadas de trabalho dos funcionários.
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            <Button
+                                variant="secondary"
+                                onClick={() => openModal('export')}
+                                icon={DocumentArrowDownIcon}
+                            >
+                                Exportar
+                            </Button>
+                            <Button
+                                variant="primary"
+                                onClick={() => openModal('create')}
+                                icon={PlusIcon}
+                            >
+                                Nova Jornada
+                            </Button>
                         </div>
                     </div>
 
+                    {/* Statistics */}
+                    <StatisticsGrid cards={statsCards} />
+
                     {/* Filtros */}
-                    <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                            {/* Filtro de Loja */}
+                    <div className="bg-white shadow-sm border border-gray-200 rounded-xl p-5 mb-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div>
-                                <label htmlFor="store-filter" className="block text-sm font-medium text-gray-700 mb-2">
-                                    Filtrar por Loja
-                                </label>
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Funcionário</label>
+                                <div className="relative">
+                                    <FunnelIcon className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Pesquisar..."
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+                                        className="pl-9 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Loja</label>
                                 <select
-                                    id="store-filter"
-                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                    value={filters.store || ''}
-                                    onChange={(e) => {
-                                        const currentUrl = new URL(window.location);
-                                        if (e.target.value) {
-                                            currentUrl.searchParams.set('store', e.target.value);
-                                        } else {
-                                            currentUrl.searchParams.delete('store');
-                                        }
-                                        currentUrl.searchParams.delete('page');
-                                        router.visit(currentUrl.toString(), {
-                                            preserveState: true,
-                                            preserveScroll: true,
-                                        });
-                                    }}
+                                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                    value={storeFilter}
+                                    onChange={(e) => setStoreFilter(e.target.value)}
                                 >
                                     <option value="">Todas as lojas</option>
                                     {stores.map((store) => (
-                                        <option key={store.code} value={store.code}>
-                                            {store.name}
-                                        </option>
+                                        <option key={store.code} value={store.code}>{store.name}</option>
                                     ))}
                                 </select>
                             </div>
 
-                            {/* Filtro de Tipo */}
                             <div>
-                                <label htmlFor="type-filter" className="block text-sm font-medium text-gray-700 mb-2">
-                                    Filtrar por Tipo
-                                </label>
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Tipo</label>
                                 <select
-                                    id="type-filter"
-                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                    value={filters.type || ''}
-                                    onChange={(e) => {
-                                        const currentUrl = new URL(window.location);
-                                        if (e.target.value) {
-                                            currentUrl.searchParams.set('type', e.target.value);
-                                        } else {
-                                            currentUrl.searchParams.delete('type');
-                                        }
-                                        currentUrl.searchParams.delete('page');
-                                        router.visit(currentUrl.toString(), {
-                                            preserveState: true,
-                                            preserveScroll: true,
-                                        });
-                                    }}
+                                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                    value={typeFilter}
+                                    onChange={(e) => setTypeFilter(e.target.value)}
                                 >
                                     <option value="">Todos os tipos</option>
                                     {types.map((type) => (
-                                        <option key={type.value} value={type.value}>
-                                            {type.label}
-                                        </option>
+                                        <option key={type.value} value={type.value}>{type.label}</option>
                                     ))}
                                 </select>
                             </div>
 
-                            {/* Botão Limpar Filtros */}
-                            <div>
+                            <div className="flex items-end gap-2">
                                 <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    className="h-[42px] w-[150px]"
-                                    onClick={() => {
-                                        router.visit('/work-shifts', {
-                                            preserveState: true,
-                                            preserveScroll: true,
-                                        });
-                                    }}
-                                    disabled={!((filters.store && filters.store !== '') || (filters.type && filters.type !== ''))}
-                                    icon={XMarkIcon}
+                                    variant="primary"
+                                    onClick={applyFilters}
+                                    className="flex-1"
+                                    icon={FunnelIcon}
                                 >
-                                    Limpar Filtros
+                                    Filtrar
                                 </Button>
+                                {(storeFilter || typeFilter || search) && (
+                                    <Button
+                                        variant="light"
+                                        onClick={clearFilters}
+                                        icon={XMarkIcon}
+                                        iconOnly
+                                    />
+                                )}
                             </div>
                         </div>
                     </div>
 
                     {/* DataTable */}
-                    <DataTable
-                        data={workShifts}
-                        columns={columns}
-                        searchPlaceholder="Buscar por funcionário..."
-                        emptyMessage="Nenhuma jornada encontrada"
-                        perPageOptions={[15, 25, 50, 100]}
-                    />
+                    <div className="bg-white shadow-sm border border-gray-200 rounded-xl overflow-hidden">
+                        <DataTable
+                            data={workShifts}
+                            columns={columns}
+                            searchable={false}
+                            emptyMessage="Nenhuma jornada encontrada."
+                            onRowClick={handleView}
+                            perPageOptions={[15, 25, 50, 100]}
+                        />
+                    </div>
                 </div>
             </div>
 
-            {/* Modal de Cadastro */}
+            {/* Modals */}
             <WorkShiftCreateModal
-                isOpen={isCreateModalOpen}
-                onClose={closeCreateModal}
-                onSuccess={handleWorkShiftCreated}
+                show={modals.create}
+                onClose={() => closeModal('create')}
+                onSuccess={() => { closeModal('create'); router.reload(); }}
                 employees={employees}
             />
 
-            {/* Modal de Visualização */}
             <WorkShiftViewModal
-                isOpen={isViewModalOpen && selectedWorkShift !== null}
-                onClose={closeViewModal}
-                workShift={selectedWorkShift}
+                show={modals.view && selected !== null}
+                onClose={() => closeModal('view')}
+                workShift={selected}
                 onEdit={handleEditFromView}
             />
 
-            {/* Modal de Edição */}
             <WorkShiftEditModal
-                isOpen={isEditModalOpen && selectedWorkShift !== null}
-                onClose={closeEditModal}
-                onSuccess={handleWorkShiftUpdated}
-                workShift={selectedWorkShift}
+                show={modals.edit && selected !== null}
+                onClose={() => closeModal('edit')}
+                onSuccess={() => { closeModal('edit'); router.reload(); }}
+                workShift={selected}
                 employees={employees}
             />
 
-            {/* Modal de Confirmação de Exclusão */}
-            <Modal show={isDeleteModalOpen} onClose={closeDeleteModal}>
-                <div className="p-6">
-                    <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                        Confirmar Exclusão
-                    </h2>
-                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        Tem certeza que deseja excluir esta jornada? Esta ação não pode ser desfeita.
-                    </p>
-                    <div className="mt-6 flex justify-end gap-3">
-                        <Button
-                            type="button"
-                            onClick={closeDeleteModal}
-                            className="bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-                        >
-                            Cancelar
-                        </Button>
-                        <Button
-                            type="button"
-                            onClick={deleteWorkShift}
-                            className="bg-red-600 hover:bg-red-700"
-                        >
-                            Excluir
-                        </Button>
-                    </div>
-                </div>
-            </Modal>
+            <DeleteConfirmModal
+                show={modals.delete}
+                onClose={() => closeModal('delete')}
+                onConfirm={handleDelete}
+                itemType="jornada"
+                itemName={selected ? `de ${selected.employee_short_name || selected.employee_name} em ${selected.date}` : ''}
+                processing={processing}
+            />
 
-            {/* Modal de Exportação */}
             <WorkShiftExportModal
-                show={isExportModalOpen}
-                onClose={closeExportModal}
+                show={modals.export}
+                onClose={() => closeModal('export')}
                 employees={employees}
                 stores={stores}
                 types={types}

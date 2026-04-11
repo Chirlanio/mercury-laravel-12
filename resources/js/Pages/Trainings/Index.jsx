@@ -13,6 +13,7 @@ import {
     BookOpenIcon,
     ClipboardDocumentListIcon,
     QueueListIcon,
+    PlayIcon,
 } from '@heroicons/react/24/outline';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
@@ -31,6 +32,7 @@ import CourseDetailModal from '@/Components/Trainings/CourseDetailModal';
 import CourseFormModal from '@/Components/Trainings/CourseFormModal';
 import QuizDetailModal from '@/Components/Trainings/QuizDetailModal';
 import QuizFormModal from '@/Components/Trainings/QuizFormModal';
+import QuizGradeModal from '@/Components/Trainings/QuizGradeModal';
 import CourseContentsModal from '@/Components/Trainings/CourseContentsModal';
 
 const EVENT_STATUS_VARIANTS = {
@@ -80,7 +82,7 @@ export default function Index({ trainings, filters, statusOptions, statusCounts,
         'eventCreate', 'eventDetail', 'eventEdit',
         'contentCreate', 'contentDetail', 'contentEdit',
         'courseCreate', 'courseDetail', 'courseEdit', 'courseContents',
-        'quizCreate', 'quizDetail', 'quizEdit',
+        'quizCreate', 'quizDetail', 'quizEdit', 'quizGrade',
     ]);
 
     const [activeTab, setActiveTab] = useState('events');
@@ -323,7 +325,24 @@ export default function Index({ trainings, filters, statusOptions, statusCounts,
                     onView={() => openModal('quizDetail', row)}
                     onEdit={canManageQuiz ? () => openModal('quizEdit', row) : undefined}
                     onDelete={canManageQuiz ? () => handleDeleteQuiz(row) : undefined}
-                />
+                >
+                    {row.is_active && (
+                        <ActionButtons.Custom
+                            variant="primary"
+                            icon={PlayIcon}
+                            title="Responder Quiz"
+                            onClick={() => router.get(route('training-quizzes.take', row.id))}
+                        />
+                    )}
+                    {canManageQuiz && (
+                        <ActionButtons.Custom
+                            variant="outline"
+                            icon={ClipboardDocumentListIcon}
+                            title="Corrigir Respostas"
+                            onClick={() => openModal('quizGrade', row)}
+                        />
+                    )}
+                </ActionButtons>
             ),
         },
     ];
@@ -613,6 +632,8 @@ export default function Index({ trainings, filters, statusOptions, statusCounts,
                 onSuccess={() => { closeModal('courseCreate'); loadCourses(); }}
                 facilitators={coursesMeta.facilitators || facilitators || []}
                 subjects={coursesMeta.subjects || subjects || []}
+                stores={coursesMeta.stores || []}
+                templates={coursesMeta.templates || []}
             />
 
             {selected && modals.courseDetail && (
@@ -633,6 +654,8 @@ export default function Index({ trainings, filters, statusOptions, statusCounts,
                     courseId={selected.id}
                     facilitators={coursesMeta.facilitators || facilitators || []}
                     subjects={coursesMeta.subjects || subjects || []}
+                    stores={coursesMeta.stores || []}
+                    templates={coursesMeta.templates || []}
                 />
             )}
 
@@ -667,6 +690,15 @@ export default function Index({ trainings, filters, statusOptions, statusCounts,
                     show={modals.quizEdit}
                     onClose={() => closeModal('quizEdit')}
                     onSuccess={() => { closeModal('quizEdit'); loadQuizzes(); }}
+                    quizId={selected.id}
+                />
+            )}
+
+            {selected && modals.quizGrade && (
+                <QuizGradeModal
+                    show={modals.quizGrade}
+                    onClose={() => closeModal('quizGrade')}
+                    onSuccess={() => loadQuizzes()}
                     quizId={selected.id}
                 />
             )}

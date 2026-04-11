@@ -1,10 +1,15 @@
-# Checklist de Modernização de Módulos - Projeto Mercury
+# Checklist de Modernizacao de Modulos - Projeto Mercury
 
 **Data**: 2026-02-07
-**Total de Módulos**: 110
-**Módulos Modernos**: ~85 (77%)
-**Módulos Parciais**: ~7 (6%)
-**Módulos Legados**: ~18 (17%)
+**Total de Modulos**: 110
+**Modulos Modernos**: ~85 (77%)
+**Modulos Parciais**: ~7 (6%)
+**Modulos Legados**: ~18 (17%)
+
+> **ATENCAO: Este checklist refere-se a modernizacao dentro do Mercury v1 (PHP MVC).**
+> O projeto foi migrado para **Mercury Laravel (Laravel 12 + React 18 + Inertia.js 2)**.
+> Para o checklist de novos modulos no Mercury Laravel, consulte:
+> - [`docs/GUIA_IMPLEMENTACAO_MODULOS.md`](GUIA_IMPLEMENTACAO_MODULOS.md) secao 6 — Checklist de Novo Modulo
 
 ---
 

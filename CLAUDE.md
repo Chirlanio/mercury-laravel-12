@@ -40,7 +40,7 @@ For tests, use:
 C:\Users\MSDEV\php84\php.exe artisan test
 ```
 
-The `composer dev` command automatically uses WampServer PHP with all required extensions.
+The `composer dev` command automátically uses WampServer PHP with all required extensions.
 
 ### Linting
 
@@ -99,14 +99,33 @@ resources/js/
 │   ├── Employees/Index.jsx
 │   └── ...
 ├── Components/
-│   ├── DataTable.jsx            # Reusable table with sort/filter/paginate
-│   ├── Sidebar.jsx              # Module & role-aware navigation (menu from CentralMenuResolver)
-│   ├── Shared/                  # Modal, Button variants, Input, Checkbox, etc.
-│   └── Modals/                  # GenericFormModal, GenericDetailModal, module-specific modals
+│   ├── Button.jsx               # botão padrão (variants, sizes, icons, loading)
+│   ├── DataTable.jsx            # Tabela padrão com sort/filter/paginate
+│   ├── ActionButtons.jsx        # Botoes de ação para colunas de tabela (view/edit/delete/custom)
+│   ├── StandardModal.jsx         # Modal padrão com header, sections, footer, timeline (USAR ESTE)
+│   ├── Modal.jsx                # Modal base (uso interno do StandardModal apenas)
+│   ├── ConfirmDialog.jsx        # Dialogo de confirmação (usar via useConfirm)
+│   ├── ImageUpload.jsx          # Upload de imagem com drag-and-drop e preview
+│   ├── TextInput.jsx            # Input de texto padrão
+│   ├── InputLabel.jsx           # Label de formulário
+│   ├── InputError.jsx           # Mensagem de erro de campo
+│   ├── Checkbox.jsx             # Checkbox padrão
+│   ├── EmployeeAvatar.jsx       # Avatar com fallback de iniciais
+│   ├── Sidebar.jsx              # Navegação com menu do CentralMenuResolver
+│   └── Shared/                  # Componentes compartilhados obrigatórios
+│       ├── StatisticsGrid.jsx   # Grid de cards de KPIs (label, value, format, icon, onClick, active)
+│       ├── StatusBadge.jsx      # Badge de status com variantes de cor e ícone
+│       ├── FormSection.jsx      # Seção de formulário com titulo e grid responsivo
+│       ├── DeleteConfirmModal.jsx # Modal de confirmação de exclusão reutilizável
+│       ├── EmptyState.jsx       # Estado vazio com ícone, titulo e ação
+│       ├── LoadingSpinner.jsx   # Spinner de carregamento com tamanhos e cores
+│       └── SkeletonCard.jsx     # Skeleton de carregamento para cards
 └── Hooks/
-    ├── usePermissions.js        # Frontend permission checking (reads from backend-provided props)
-    ├── useTenant.js             # Tenant context: hasModule(), plan info, settings
-    └── useConfirm.jsx           # Confirmation dialog hook
+    ├── usePermissions.js        # Verificação de permissões (PERMISSIONS, hasPermission, hasRole)
+    ├── useTenant.js             # Contexto tenant: hasModule(), plan, settings
+    ├── useModalManager.js       # Gerenciamento de multiplos modais (openModal, closeModal, switchModal)
+    ├── useConfirm.jsx           # Confirmação com Promise (confirm, ConfirmDialogComponent)
+    └── useMasks.js              # Mascaras BR: maskMoney, maskCpf, maskCnpj, maskPhone, parseMoney
 ```
 
 **Key frontend patterns:**
@@ -116,6 +135,101 @@ resources/js/
 - `DataTable` is the standard list component with sorting, search, and pagination
 - Flash messages from Laravel are displayed as toasts via `react-toastify`
 - Inertia `router.visit()` / `router.post()` for navigation and form submissions (no Axios for page data)
+
+### Frontend Component Standards (OBRIGATÓRIO)
+
+**Todas as novas paginas e módulos DEVEM usar os componentes compartilhados listados abaixo.** Nao crie componentes específico para um único módulo quando ja existe um componente genérico reutilizável. O objetivo e manter o layout e a experiencia do usuário padronizados em toda a aplicação.
+
+#### Componentes Compartilhados (`Components/Shared/`)
+
+| Componente | Quando usar | Nunca fazer |
+|---|---|---|
+| `StatisticsGrid` | Cards de estatísticas/KPIs no topo de qualquer pagina de listagem. Aceita `cards[]` com `label`, `value`, `format` (currency/number/percentage), `icon` (Heroicon), `color`, `sub`, `variation`, `onClick`, `active`. Suporta estado de `loading` com skeleton automático. | Criar cards de estatísticas inline com HTML/Tailwind avulso ou componentes específico por módulo (ex: `SaleStatisticsCards`, `XyzStats`). |
+| `StatusBadge` | Exibir status, tipo ou qualquer label categorizado com cor. Variantes: success, warning, danger, info, purple, indigo, teal, orange, gray. Aceita `icon` e `dot`. | Criar badges manuais com `<span className="bg-green-100 text-green-800...">`. |
+| `FormSection` | Agrupar campos de formulário com titulo e grid responsivo. Props: `title`, `cols` (1-4). | Criar `<div>` com titulo e grid manual para agrupar campos. |
+| `EmptyState` | Tela vazia quando nao ha dados. Props: `title`, `description`, `icon` (Heroicon), `action` (botão), `compact` (para uso dentro de tabelas). | Criar mensagens "Nenhum registro" com HTML avulso. |
+| `LoadingSpinner` | Estado de carregamento. Props: `size` (sm/md/lg/xl), `color`, `label`, `fullPage`. | Criar spinners manuais com animações CSS. |
+| `SkeletonCard` | Placeholder de carregamento para cards. Props: `lines`, `hasHeader`. | Criar skeletons com divs e `animate-pulse` avulsos. |
+| `DeleteConfirmModal` | Confirmação de exclusão com detalhes do item. Props: `show`, `onClose`, `onConfirm`, `itemType`, `itemName`, `details[]` ({label,value}), `warningMessage`, `confirmLabel`, `processing`. padrão: `const [deleteTarget, setDeleteTarget] = useState(null)` + `<DeleteConfirmModal show={deleteTarget !== null} .../>`. | Criar modais de delete manuais, usar `window.confirm()`, ou duplicar `DeleteConfirm` inline nos módulos. |
+
+#### Componentes Core (`Components/`)
+
+| Componente | Quando usar | Nunca fazer |
+|---|---|---|
+| `Button` | Todo botão da aplicação. Variantes: primary, secondary, success, warning, danger, info, light, dark, outline. Tamanhos: xs, sm, md, lg, xl. Suporta `icon`, `loading`, `iconOnly`. | Criar `<button className="bg-indigo-600...">` com estilos manuais. |
+| `DataTable` | Toda listagem de dados com busca, ordenação e paginação. | Criar tabelas HTML manuais com `<table>`. |
+| `ActionButtons` | Coluna de acoes em tabelas. Aceita `onView`, `onEdit`, `onDelete` e `ActionButtons.Custom` para acoes extras. | Criar grupos de botoes de ação com HTML avulso nas colunas de tabela. |
+| `StandardModal` | Modal padrão para todos os módulos. Header colorido, body scrollavel, footer fixo, loading/error states. Sub-componentes: `StandardModal.Section` (card com titulo), `StandardModal.Field` (label+valor), `StandardModal.InfoCard` (métrica em destaque), `StandardModal.MiniField` (campo compacto), `StandardModal.Footer` (botoes padrão com processing), `StandardModal.Highlight` (bloco de destaque), `StandardModal.Timeline` (histórico de status). Props: `show`, `onClose`, `title`, `subtitle`, `headerColor`, `headerIcon`, `headerBadges`, `headerActions`, `maxWidth`, `loading`, `errorMessage`, `footer`, `onSubmit` (transforma body em form). | Usar o `Modal` base diretamente ou criar modais com HTML/CSS manual. O `Modal` base so deve ser usado internamente pelo `StandardModal`. |
+| `ConfirmDialog` | Confirmação de acoes destrutivas. Tipos: warning, danger, info, success. **Usar via hook `useConfirm()`**. | Usar `window.confirm()` ou criar diálogos manuais. |
+| `TextInput` / `InputLabel` / `InputError` / `Checkbox` | Campos de formulário. | Criar `<input>` com estilos manuais. |
+| `ImageUpload` | Upload de imagem com drag-and-drop, preview, validação. | Criar inputs de upload com `<input type="file">` manual. |
+| `EmployeeAvatar` / `UserAvatar` | Exibição de avatar com fallback de iniciais e cor automática. Tamanhos: xs a 3xl. | Criar avatars com `<img>` e fallbacks manuais. |
+
+#### Hooks obrigatórios (`Hooks/`)
+
+| Hook | Quando usar | Nunca fazer |
+|---|---|---|
+| `usePermissions()` | Verificar permissões do usuário. Métodos: `hasPermission()`, `hasAnyPermission()`, `hasRole()`. Constante `PERMISSIONS` com 50+ slugs. | Hardcodar verificações de role ou ler `auth.user.role` diretamente. |
+| `useTenant()` | Verificar módulos ativos do tenant. Método: `hasModule(slug)`. | Verificar módulos com logica manual ou condições hardcoded. |
+| `useModalManager(names[])` | Gerenciar multiplos modais numa pagina. Retorna `modals`, `selected`, `openModal()`, `closeModal()`, `switchModal()`. | Criar multiplos `useState` para controlar visibilidade de modais. |
+| `useConfirm()` | Confirmação com Promise. Retorna `confirm(config)` + `ConfirmDialogComponent`. | Usar `window.confirm()`. |
+| `useMasks` | Mascaras brasileiras: `maskMoney`, `maskCpf`, `maskCnpj`, `maskPhone`, `parseMoney`. | Criar funções de formatação avulsas ou usar libs externas de mascara. |
+
+#### Estrutura padrão de uma Pagina de Listagem
+
+Toda nova pagina de módulo **deve** seguir esta estrutura:
+
+```jsx
+import { Head, router } from '@inertiajs/react';
+import { PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
+import useModalManager from '@/Hooks/useModalManager';
+import Button from '@/Components/Button';
+import ActionButtons from '@/Components/ActionButtons';
+import DataTable from '@/Components/DataTable';
+import StandardModal from '@/Components/StandardModal';
+import StatusBadge from '@/Components/Shared/StatusBadge';
+import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
+
+export default function Index({ items, filters, stats }) {
+    const { hasPermission } = usePermissions();
+    const { modals, selected, openModal, closeModal } = useModalManager(['create', 'detail', 'edit']);
+
+    return (
+        <>
+            <Head title="módulo" />
+            <div className="py-12">
+                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+                    {/* 1. Header com titulo + botoes de ação */}
+                    {/* 2. StatisticsGrid com cards de KPIs */}
+                    {/* 3. Filtros em bg-white shadow-sm rounded-lg p-4 mb-6 */}
+                    {/* 4. DataTable com colunas, ActionButtons, StatusBadge */}
+                </div>
+            </div>
+
+            {/* 5. Modais — SEMPRE usar StandardModal */}
+            <StandardModal show={modals.create} onClose={() => closeModal('create')}
+                title="Novo Item" headerColor="bg-indigo-600"
+                onSubmit={handleSubmit}
+                footer={<StandardModal.Footer onCancel={() => closeModal('create')}
+                    onSubmit="submit" submitLabel="Salvar" processing={processing} />}>
+                <StandardModal.Section title="Dados Gerais">
+                    {/* campos do formulário */}
+                </StandardModal.Section>
+            </StandardModal>
+
+            <StandardModal show={modals.detail} onClose={() => closeModal('detail')}
+                title="Detalhes" headerColor="bg-gray-700">
+                <StandardModal.Section title="Informações">
+                    <div className="grid grid-cols-2 gap-4">
+                        <StandardModal.Field label="Campo" value={selected?.campo} />
+                    </div>
+                </StandardModal.Section>
+            </StandardModal>
+        </>
+    );
+}
+```
 
 ### Database
 

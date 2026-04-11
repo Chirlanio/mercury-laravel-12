@@ -1,5 +1,13 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
+import {
+    BanknotesIcon, CurrencyDollarIcon, ChartBarSquareIcon, BuildingStorefrontIcon,
+    ChevronDownIcon,
+} from '@heroicons/react/24/outline';
+
+const formatCurrency = (value) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
 
 export default function StatisticsCards({ month, year, storeId }) {
     const [stats, setStats] = useState(null);
@@ -17,79 +25,52 @@ export default function StatisticsCards({ month, year, storeId }) {
             .finally(() => setLoading(false));
     }, [month, year, storeId]);
 
-    const formatCurrency = (value) => {
-        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
-    };
-
-    if (loading) {
-        return (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                {[...Array(4)].map((_, i) => (
-                    <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 animate-pulse">
-                        <div className="h-3 bg-gray-200 rounded w-20 mb-3"></div>
-                        <div className="h-6 bg-gray-200 rounded w-28"></div>
-                    </div>
-                ))}
-            </div>
-        );
-    }
-
-    if (!stats) return null;
-
-    const cards = [
+    const cards = stats ? [
         {
             label: 'Meta Total',
-            value: formatCurrency(stats.total_goal_amount),
-            sub: stats.goal_variation !== null ? (
-                <span className={stats.goal_variation >= 0 ? 'text-emerald-600' : 'text-red-600'}>
-                    {stats.goal_variation >= 0 ? '▲' : '▼'} {Math.abs(stats.goal_variation)}% vs mês anterior
-                </span>
-            ) : null,
-            color: 'text-indigo-600',
+            value: stats.total_goal_amount,
+            format: 'currency',
+            icon: BanknotesIcon,
+            color: 'indigo',
+            variation: stats.goal_variation,
         },
         {
             label: 'Vendas Realizadas',
-            value: formatCurrency(stats.total_sales),
-            color: 'text-emerald-600',
+            value: stats.total_sales,
+            format: 'currency',
+            icon: CurrencyDollarIcon,
+            color: 'green',
         },
         {
             label: 'Atingimento Geral',
-            value: `${stats.achievement_pct}%`,
+            value: stats.achievement_pct,
+            format: 'percentage',
+            icon: ChartBarSquareIcon,
+            color: stats.achievement_pct >= 100 ? 'green' : stats.achievement_pct >= 80 ? 'yellow' : 'red',
             sub: `${stats.stores_above_goal} lojas atingiram a meta`,
-            color: stats.achievement_pct >= 100 ? 'text-emerald-600' : stats.achievement_pct >= 80 ? 'text-amber-600' : 'text-red-600',
         },
         {
             label: 'Cobertura',
             value: `${stats.stores_with_goals}/${stats.active_stores}`,
+            icon: BuildingStorefrontIcon,
+            color: 'blue',
             sub: `${stats.coverage_pct}% das lojas com meta`,
-            color: 'text-blue-600',
         },
-    ];
+    ] : [];
 
     return (
         <div className="mb-6">
-            {/* Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                {cards.map((card, i) => (
-                    <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{card.label}</p>
-                        <p className={`mt-1 text-xl font-bold ${card.color}`}>{card.value}</p>
-                        {card.sub && <p className="text-xs text-gray-500 mt-0.5">{card.sub}</p>}
-                    </div>
-                ))}
-            </div>
+            <StatisticsGrid cards={cards} loading={loading} cols={4} />
 
             {/* Store Ranking (collapsible) */}
-            {stats.store_ranking && stats.store_ranking.length > 0 && (
+            {stats?.store_ranking?.length > 0 && (
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                     <button
                         onClick={() => setShowRanking(!showRanking)}
                         className="w-full px-4 py-3 flex items-center justify-between text-sm font-medium text-gray-700 hover:bg-gray-50"
                     >
                         <span>Ranking por Loja ({stats.store_ranking.length} lojas)</span>
-                        <svg className={`w-4 h-4 text-gray-400 transition-transform ${showRanking ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
+                        <ChevronDownIcon className={`w-4 h-4 text-gray-400 transition-transform ${showRanking ? 'rotate-180' : ''}`} />
                     </button>
                     {showRanking && (
                         <div className="border-t overflow-x-auto">
@@ -121,7 +102,7 @@ export default function StatisticsCards({ month, year, storeId }) {
                                                     <div
                                                         className={`h-2 rounded-full ${s.achievement_pct >= 100 ? 'bg-emerald-500' : s.achievement_pct >= 80 ? 'bg-amber-500' : 'bg-red-500'}`}
                                                         style={{ width: `${Math.min(100, s.achievement_pct)}%` }}
-                                                    ></div>
+                                                    />
                                                 </div>
                                             </td>
                                         </tr>

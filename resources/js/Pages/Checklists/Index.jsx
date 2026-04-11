@@ -1,51 +1,39 @@
-import PageHeader from '@/Components/PageHeader';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
+import useModalManager from '@/Hooks/useModalManager';
 import DataTable from '@/Components/DataTable';
+import ActionButtons from '@/Components/ActionButtons';
 import ChecklistCreateModal from '@/Components/Modals/ChecklistCreateModal';
 import ChecklistViewModal from '@/Components/Modals/ChecklistViewModal';
 import ChecklistEditModal from '@/Components/Modals/ChecklistEditModal';
-import ConfirmDialog from '@/Components/ConfirmDialog';
+import StatusBadge from '@/Components/Shared/StatusBadge';
+import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
+import DeleteConfirmModal from '@/Components/Shared/DeleteConfirmModal';
+import Button from '@/Components/Button';
 import {
     PlusIcon,
     MagnifyingGlassIcon,
     ClipboardDocumentCheckIcon,
-    EyeIcon,
-    PencilSquareIcon,
-    TrashIcon,
     FunnelIcon,
     XMarkIcon,
+    CheckCircleIcon,
+    ClockIcon,
+    ArrowPathIcon,
+    ChartBarIcon,
 } from '@heroicons/react/24/outline';
-
-const STATUS_CONFIG = {
-    pending: { label: 'Pendente', bg: 'bg-yellow-100', text: 'text-yellow-800' },
-    in_progress: { label: 'Em Andamento', bg: 'bg-blue-100', text: 'text-blue-800' },
-    completed: { label: 'Concluído', bg: 'bg-green-100', text: 'text-green-800' },
-};
-
-const PERFORMANCE_COLORS = {
-    green: 'bg-green-100 text-green-800',
-    blue: 'bg-blue-100 text-blue-800',
-    yellow: 'bg-yellow-100 text-yellow-800',
-    red: 'bg-red-100 text-red-800',
-};
 
 export default function Index({ checklists, stats, stores = [], filters = {} }) {
     const { hasPermission } = usePermissions();
-    const [isCreateOpen, setIsCreateOpen] = useState(false);
-    const [isViewOpen, setIsViewOpen] = useState(false);
-    const [isEditOpen, setIsEditOpen] = useState(false);
-    const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-    const [selectedChecklist, setSelectedChecklist] = useState(null);
-    const [deleteError, setDeleteError] = useState(null);
-
+    const { modals, selected, openModal, closeModal } = useModalManager(['create', 'view', 'edit', 'delete']);
+    
     // Filter state
     const [search, setSearch] = useState(filters.search || '');
     const [statusFilter, setStatusFilter] = useState(filters.status || '');
     const [storeFilter, setStoreFilter] = useState(filters.store_id || '');
     const [dateFrom, setDateFrom] = useState(filters.date_from || '');
     const [dateTo, setDateTo] = useState(filters.date_to || '');
+    const [processing, setProcessing] = useState(false);
 
     const applyFilters = () => {
         router.get('/checklists', {
@@ -68,32 +56,17 @@ export default function Index({ checklists, stats, stores = [], filters = {} }) 
 
     const hasActiveFilters = search || statusFilter || storeFilter || dateFrom || dateTo;
 
-    const handleView = (checklist) => {
-        setSelectedChecklist(checklist);
-        setIsViewOpen(true);
-    };
-
-    const handleEdit = (checklist) => {
-        setSelectedChecklist(checklist);
-        setIsEditOpen(true);
-    };
-
-    const handleDeleteConfirm = (checklist) => {
-        setSelectedChecklist(checklist);
-        setDeleteError(null);
-        setIsDeleteOpen(true);
-    };
-
     const handleDelete = () => {
-        if (!selectedChecklist) return;
-        router.delete(`/checklists/${selectedChecklist.id}`, {
+        if (!selected) return;
+        setProcessing(true);
+        router.delete(`/checklists/${selected.id}`, {
             preserveScroll: true,
             onSuccess: () => {
-                setIsDeleteOpen(false);
-                setSelectedChecklist(null);
+                closeModal('delete');
+                setProcessing(false);
             },
-            onError: (errors) => {
-                setDeleteError(errors.general || 'Erro ao excluir checklist.');
+            onError: () => {
+                setProcessing(false);
             },
         });
     };
@@ -121,11 +94,16 @@ export default function Index({ checklists, stats, stores = [], filters = {} }) 
             field: 'status',
             sortable: true,
             render: (row) => {
-                const config = STATUS_CONFIG[row.status] || STATUS_CONFIG.pending;
+                const statusMap = {
+                    pending: { label: 'Pendente', variant: 'warning', icon: ClockIcon },
+                    in_progress: { label: 'Em Andamento', variant: 'info', icon: ArrowPathIcon },
+                    completed: { label: 'Concluído', variant: 'success', icon: CheckCircleIcon },
+                };
+                const config = statusMap[row.status] || statusMap.pending;
                 return (
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
+                    <StatusBadge variant={config.variant} icon={config.icon}>
                         {config.label}
-                    </span>
+                    </StatusBadge>
                 );
             },
         },
@@ -137,14 +115,14 @@ export default function Index({ checklists, stats, stores = [], filters = {} }) 
                 const { answered, total } = row.progress || { answered: 0, total: 0 };
                 const pct = total > 0 ? Math.round((answered / total) * 100) : 0;
                 return (
-                    <div className="flex items-center gap-2">
-                        <div className="w-20 bg-gray-200 rounded-full h-2">
+                    <div className="flex items-center gap-2 min-w-[120px]">
+                        <div className="flex-1 bg-gray-200 rounded-full h-1.5">
                             <div
-                                className="bg-indigo-600 h-2 rounded-full transition-all"
+                                className="bg-indigo-600 h-1.5 rounded-full transition-all"
                                 style={{ width: `${pct}%` }}
                             />
                         </div>
-                        <span className="text-xs text-gray-600">{answered}/{total}</span>
+                        <span className="text-[10px] font-medium text-gray-500 whitespace-nowrap">{answered}/{total}</span>
                     </div>
                 );
             },
@@ -157,12 +135,17 @@ export default function Index({ checklists, stats, stores = [], filters = {} }) 
                 if (row.score_percentage === null || row.score_percentage === undefined) {
                     return <span className="text-gray-400">-</span>;
                 }
-                const perf = row.performance;
-                const colorClass = perf ? PERFORMANCE_COLORS[perf.color] || '' : '';
+                const variants = {
+                    green: 'success',
+                    blue: 'info',
+                    yellow: 'warning',
+                    red: 'danger',
+                };
+                const variant = row.performance ? variants[row.performance.color] : 'gray';
                 return (
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>
+                    <StatusBadge variant={variant}>
                         {Number(row.score_percentage).toFixed(1)}%
-                    </span>
+                    </StatusBadge>
                 );
             },
         },
@@ -170,94 +153,78 @@ export default function Index({ checklists, stats, stores = [], filters = {} }) 
             label: 'Data',
             field: 'created_at',
             sortable: true,
-            render: (row) => row.created_at,
+            render: (row) => <span className="text-gray-600 text-sm">{row.created_at}</span>,
         },
         {
             label: 'Ações',
             field: 'actions',
             sortable: false,
             render: (row) => (
-                <div className="flex items-center gap-1">
-                    <button
-                        onClick={(e) => { e.stopPropagation(); handleView(row); }}
-                        className="p-1 text-gray-500 hover:text-indigo-600 rounded"
-                        title="Visualizar"
-                    >
-                        <EyeIcon className="h-4 w-4" />
-                    </button>
-                    {hasPermission(PERMISSIONS.EDIT_CHECKLISTS) && row.status !== 'completed' && (
-                        <button
-                            onClick={(e) => { e.stopPropagation(); handleEdit(row); }}
-                            className="p-1 text-gray-500 hover:text-blue-600 rounded"
-                            title="Responder"
-                        >
-                            <PencilSquareIcon className="h-4 w-4" />
-                        </button>
-                    )}
-                    {hasPermission(PERMISSIONS.DELETE_CHECKLISTS) && row.status === 'pending' && (
-                        <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteConfirm(row); }}
-                            className="p-1 text-gray-500 hover:text-red-600 rounded"
-                            title="Excluir"
-                        >
-                            <TrashIcon className="h-4 w-4" />
-                        </button>
-                    )}
-                </div>
+                <ActionButtons
+                    onView={() => openModal('view', row)}
+                    onEdit={hasPermission(PERMISSIONS.EDIT_CHECKLISTS) && row.status !== 'completed' ? () => openModal('edit', row) : undefined}
+                    onDelete={hasPermission(PERMISSIONS.DELETE_CHECKLISTS) && row.status === 'pending' ? () => openModal('delete', row) : undefined}
+                />
             ),
         },
     ];
 
+    const statsCards = [
+        { label: 'Total', value: stats.total, color: 'gray', icon: ClipboardDocumentCheckIcon },
+        { label: 'Pendentes', value: stats.pending, color: 'yellow', icon: ClockIcon },
+        { label: 'Em Andamento', value: stats.in_progress, color: 'blue', icon: ArrowPathIcon },
+        { label: 'Concluídos', value: stats.completed, color: 'green', icon: CheckCircleIcon },
+        { label: 'Conformidade Média', value: stats.avg_score, format: 'percentage', color: 'indigo', icon: ChartBarIcon },
+    ];
+
     return (
         <>
-            <Head title="Checklists" />
-            <PageHeader>
-                <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800 flex items-center gap-2">
-                        <ClipboardDocumentCheckIcon className="h-6 w-6" />
-                        Checklists de Qualidade
-                    </h2>
-                    {hasPermission(PERMISSIONS.CREATE_CHECKLISTS) && (
-                        <button
-                            onClick={() => setIsCreateOpen(true)}
-                            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition"
-                        >
-                            <PlusIcon className="h-4 w-4 mr-2" />
-                            Novo Checklist
-                        </button>
-                    )}
-                </div>
-            </PageHeader>
-
-            <div className="py-6">
-                <div className="mx-auto max-w-full px-4 sm:px-6 lg:px-8">
-                    {/* Statistics Cards */}
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-                        <StatCard label="Total" value={stats.total} color="gray" />
-                        <StatCard label="Pendentes" value={stats.pending} color="yellow" />
-                        <StatCard label="Em Andamento" value={stats.in_progress} color="blue" />
-                        <StatCard label="Concluídos" value={stats.completed} color="green" />
-                        <StatCard label="Média Conformidade" value={`${stats.avg_score}%`} color="indigo" />
+            <Head title="Checklists de Qualidade" />
+            
+            <div className="py-12">
+                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+                    {/* Header */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                        <div>
+                            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                                <ClipboardDocumentCheckIcon className="h-8 w-8 text-indigo-600" />
+                                Checklists de Qualidade
+                            </h2>
+                            <p className="mt-1 text-sm text-gray-500">
+                                Gestão e acompanhamento de auditorias de qualidade nas lojas.
+                            </p>
+                        </div>
+                        {hasPermission(PERMISSIONS.CREATE_CHECKLISTS) && (
+                            <Button 
+                                onClick={() => openModal('create')}
+                                icon={PlusIcon}
+                            >
+                                Novo Checklist
+                            </Button>
+                        )}
                     </div>
 
+                    {/* Statistics */}
+                    <StatisticsGrid cards={statsCards} />
+
                     {/* Filters */}
-                    <div className="bg-white shadow rounded-lg p-4 mb-6">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                    <div className="bg-white shadow-sm border border-gray-200 rounded-xl p-5 mb-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
                             <div className="relative">
-                                <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                                <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                                 <input
                                     type="text"
                                     placeholder="Buscar loja..."
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
-                                    className="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                    className="pl-9 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                                 />
                             </div>
                             <select
                                 value={statusFilter}
                                 onChange={(e) => setStatusFilter(e.target.value)}
-                                className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                className="rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                             >
                                 <option value="">Todos os Status</option>
                                 <option value="pending">Pendente</option>
@@ -268,11 +235,11 @@ export default function Index({ checklists, stats, stores = [], filters = {} }) 
                                 <select
                                     value={storeFilter}
                                     onChange={(e) => setStoreFilter(e.target.value)}
-                                    className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                    className="rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                                 >
                                     <option value="">Todas as Lojas</option>
                                     {stores.map((store) => (
-                                        <option key={store.id} value={store.id}>{store.name}</option>
+                                        <option key={store.id} value={store.id}>{store.code} - {store.name}</option>
                                     ))}
                                 </select>
                             )}
@@ -280,45 +247,43 @@ export default function Index({ checklists, stats, stores = [], filters = {} }) 
                                 type="date"
                                 value={dateFrom}
                                 onChange={(e) => setDateFrom(e.target.value)}
-                                className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                placeholder="Data início"
+                                className="rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                             />
                             <input
                                 type="date"
                                 value={dateTo}
                                 onChange={(e) => setDateTo(e.target.value)}
-                                className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                placeholder="Data fim"
+                                className="rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                             />
                             <div className="flex gap-2">
-                                <button
+                                <Button
+                                    variant="primary"
                                     onClick={applyFilters}
-                                    className="inline-flex items-center px-3 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700 transition"
+                                    className="flex-1"
+                                    icon={FunnelIcon}
                                 >
-                                    <FunnelIcon className="h-4 w-4 mr-1" />
                                     Filtrar
-                                </button>
+                                </Button>
                                 {hasActiveFilters && (
-                                    <button
+                                    <Button
+                                        variant="light"
                                         onClick={clearFilters}
-                                        className="inline-flex items-center px-3 py-2 bg-gray-200 text-gray-700 text-sm rounded-md hover:bg-gray-300 transition"
-                                    >
-                                        <XMarkIcon className="h-4 w-4 mr-1" />
-                                        Limpar
-                                    </button>
+                                        icon={XMarkIcon}
+                                        iconOnly
+                                    />
                                 )}
                             </div>
                         </div>
                     </div>
 
                     {/* Data Table */}
-                    <div className="bg-white shadow rounded-lg overflow-hidden">
+                    <div className="bg-white shadow-sm border border-gray-200 rounded-xl overflow-hidden">
                         <DataTable
                             data={checklists}
                             columns={columns}
                             searchable={false}
-                            emptyMessage="Nenhum checklist encontrado"
-                            onRowClick={handleView}
+                            emptyMessage="Nenhum checklist encontrado."
+                            onRowClick={(row) => openModal('view', row)}
                         />
                     </div>
                 </div>
@@ -326,62 +291,48 @@ export default function Index({ checklists, stats, stores = [], filters = {} }) 
 
             {/* Modals */}
             <ChecklistCreateModal
-                show={isCreateOpen}
-                onClose={() => setIsCreateOpen(false)}
+                show={modals.create}
+                onClose={() => closeModal('create')}
                 stores={stores}
                 onSuccess={() => {
-                    setIsCreateOpen(false);
+                    closeModal('create');
                     router.reload();
                 }}
             />
 
-            {selectedChecklist && (
+            {selected && (
                 <>
                     <ChecklistViewModal
-                        show={isViewOpen}
-                        onClose={() => { setIsViewOpen(false); setSelectedChecklist(null); }}
-                        checklistId={selectedChecklist.id}
+                        show={modals.view}
+                        onClose={() => closeModal('view')}
+                        checklistId={selected.id}
                     />
 
                     <ChecklistEditModal
-                        show={isEditOpen}
-                        onClose={() => { setIsEditOpen(false); setSelectedChecklist(null); }}
-                        checklistId={selectedChecklist.id}
+                        show={modals.edit}
+                        onClose={() => closeModal('edit')}
+                        checklistId={selected.id}
                         onSuccess={() => {
-                            setIsEditOpen(false);
-                            setSelectedChecklist(null);
+                            closeModal('edit');
                             router.reload();
                         }}
                     />
+
+                    <DeleteConfirmModal
+                        show={modals.delete}
+                        onClose={() => closeModal('delete')}
+                        onConfirm={handleDelete}
+                        itemType="Checklist"
+                        itemName={`da loja ${selected.store?.name}`}
+                        warningMessage="Apenas checklists pendentes podem ser excluídos. Esta ação é irreversível."
+                        processing={processing}
+                        details={[
+                            { label: 'Data', value: selected.created_at },
+                            { label: 'Aplicador', value: selected.applicator?.name },
+                        ]}
+                    />
                 </>
             )}
-
-            <ConfirmDialog
-                show={isDeleteOpen}
-                onClose={() => setIsDeleteOpen(false)}
-                onConfirm={handleDelete}
-                title="Excluir Checklist"
-                message={deleteError || "Tem certeza que deseja excluir este checklist? Esta ação não pode ser desfeita."}
-                confirmText="Excluir"
-                type="danger"
-            />
         </>
-    );
-}
-
-function StatCard({ label, value, color }) {
-    const colorClasses = {
-        gray: 'bg-gray-50 border-gray-200',
-        yellow: 'bg-yellow-50 border-yellow-200',
-        blue: 'bg-blue-50 border-blue-200',
-        green: 'bg-green-50 border-green-200',
-        indigo: 'bg-indigo-50 border-indigo-200',
-    };
-
-    return (
-        <div className={`rounded-lg border p-4 ${colorClasses[color] || colorClasses.gray}`}>
-            <p className="text-sm text-gray-600">{label}</p>
-            <p className="text-2xl font-bold text-gray-900">{value}</p>
-        </div>
     );
 }

@@ -67,7 +67,18 @@
       "Bash(vendor/bin/pint app/Http/Controllers/OrderPaymentController.php app/Exports/OrderPaymentExport.php)",
       "Bash(vendor/bin/pint app/Models/Holiday.php app/Models/Vacation.php app/Models/VacationPeriod.php app/Models/VacationLog.php app/Models/VacationAlertLog.php app/Services/VacationCalculationService.php app/Services/VacationValidatorService.php app/Services/VacationTransitionService.php app/Services/VacationPeriodGeneratorService.php app/Http/Controllers/VacationController.php app/Enums/Permission.php app/Enums/Role.php)",
       "Bash(vendor/bin/pint app/Models/StockAudit*.php app/Services/StockAudit*.php app/Http/Controllers/StockAuditController.php app/Http/Controllers/Config/StockAuditCycleController.php app/Http/Controllers/Config/StockAuditVendorController.php app/Exports/StockAuditExport.php app/Imports/StockAuditCountImport.php --test)",
-      "Bash(vendor/bin/pint app/Models/StockAudit*.php app/Services/StockAudit*.php app/Http/Controllers/StockAuditController.php app/Http/Controllers/Config/StockAuditCycleController.php app/Http/Controllers/Config/StockAuditVendorController.php app/Exports/StockAuditExport.php app/Imports/StockAuditCountImport.php)"
+      "Bash(vendor/bin/pint app/Models/StockAudit*.php app/Services/StockAudit*.php app/Http/Controllers/StockAuditController.php app/Http/Controllers/Config/StockAuditCycleController.php app/Http/Controllers/Config/StockAuditVendorController.php app/Exports/StockAuditExport.php app/Imports/StockAuditCountImport.php)",
+      "Bash(C:/Users/MSDEV/php84/php.exe:*)",
+      "Bash(xargs -I {} basename {})",
+      "Bash(awk '{print $NF}')",
+      "Bash(vendor/bin/pint --dirty)",
+      "Bash(vendor/bin/pint:*)",
+      "Bash(composer require:*)",
+      "Bash(cmd //c \"dir public\\\\\\\\storage /AL\")",
+      "Bash(git status:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useForm, router } from '@inertiajs/react';
 import Modal from '@/Components/Modal';
 import Button from '@/Components/Button';
+import { maskPhone, maskCpf, maskCnpj, maskMoney } from '@/Hooks/useMasks';
 
 /**
  * Modal Genérico para Formulários (Criar e Editar)
@@ -58,11 +59,17 @@ export default function GenericFormModal({
             const updatedData = {};
             sections.forEach(section => {
                 section.fields.forEach(field => {
-                    if (field.formatValue && initialData[field.name]) {
-                        updatedData[field.name] = field.formatValue(initialData[field.name]);
+                    let value = initialData[field.name];
+                    if (field.formatValue && value) {
+                        value = field.formatValue(value);
                     } else {
-                        updatedData[field.name] = initialData[field.name] || field.defaultValue || (field.type === 'checkbox' ? false : '');
+                        value = value || field.defaultValue || (field.type === 'checkbox' ? false : '');
                     }
+                    // Aplicar máscara ao carregar para exibição
+                    if (field.mask && masks[field.mask] && value) {
+                        value = masks[field.mask](String(value));
+                    }
+                    updatedData[field.name] = value;
                 });
             });
             setData(updatedData);
@@ -72,8 +79,18 @@ export default function GenericFormModal({
     const handleSubmit = (e) => {
         e.preventDefault();
 
+        // Remover máscaras dos campos antes de enviar
+        const cleanData = { ...data };
+        sections.forEach(section => {
+            section.fields?.forEach(field => {
+                if (field.mask && cleanData[field.name]) {
+                    cleanData[field.name] = String(cleanData[field.name]).replace(/\D/g, '');
+                }
+            });
+        });
+
         // Transformar dados se necessário
-        const submitData = transformData ? transformData(data) : data;
+        const submitData = transformData ? transformData(cleanData) : cleanData;
 
         // Se for edição, adicionar _method se necessário
         if (mode === 'edit' && submitMethod.toLowerCase() === 'put') {
@@ -102,7 +119,12 @@ export default function GenericFormModal({
         onClose();
     };
 
+    const masks = { phone: maskPhone, cpf: maskCpf, cnpj: maskCnpj, money: maskMoney };
+
     const handleFieldChange = (fieldName, value, field) => {
+        if (field.mask && masks[field.mask]) {
+            value = masks[field.mask](value);
+        }
         if (field.onChange) {
             value = field.onChange(value, data);
         }
@@ -245,9 +267,9 @@ export default function GenericFormModal({
                             </h4>
                         )}
 
-                        <div className={`grid grid-cols-1 ${section.columns || 'md:grid-cols-2 lg:grid-cols-3'} gap-4`}>
+                        <div className={`grid ${section.columns || 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'} gap-4`}>
                             {section.fields.map((field, fieldIndex) => (
-                                <div key={fieldIndex} className={field.fullWidth ? 'col-span-full' : ''}>
+                                <div key={fieldIndex} className={field.fullWidth ? 'col-span-full' : (field.colSpan || '')}>
                                     {field.type !== 'checkbox' && field.label && (
                                         <label htmlFor={field.name} className="block text-sm font-medium text-gray-700 mb-1">
                                             {field.label} {field.required && <span className="text-red-600">*</span>}

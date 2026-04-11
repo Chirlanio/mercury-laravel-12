@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react';
-import Modal from '@/Components/Modal';
+import StandardModal from '@/Components/StandardModal';
+import FormSection from '@/Components/Shared/FormSection';
+import InputLabel from '@/Components/InputLabel';
+import InputError from '@/Components/InputError';
+import TextInput from '@/Components/TextInput';
+import Button from '@/Components/Button';
+import { PencilSquareIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 export default function ProductEditModal({ show, onClose, productId, onSaved }) {
     const [product, setProduct] = useState(null);
@@ -40,54 +46,39 @@ export default function ProductEditModal({ show, onClose, productId, onSaved }) 
 
     const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
+    const handleSubmit = () => {
         setSaving(true);
         setErrors({});
 
         fetch(`/products/${productId}`, {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken(),
-            },
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken() },
             body: JSON.stringify(form),
         })
             .then(res => {
                 if (!res.ok) return res.json().then(d => Promise.reject(d));
                 return res.json();
             })
-            .then(() => {
-                onSaved && onSaved();
-                onClose();
-            })
-            .catch(err => {
-                if (err.errors) setErrors(err.errors);
-                setSaving(false);
-            });
+            .then(() => { onSaved?.(); onClose(); })
+            .catch(err => { if (err.errors) setErrors(err.errors); setSaving(false); });
     };
 
+    const setField = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
+
     const handleVariantUpdate = (variantId, field, value) => {
-        setVariants(prev => prev.map(v =>
-            v.id === variantId ? { ...v, [field]: value } : v
-        ));
+        setVariants(prev => prev.map(v => v.id === variantId ? { ...v, [field]: value } : v));
     };
 
     const saveVariant = (variant) => {
         fetch(`/products/${productId}/variants/${variant.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken() },
-            body: JSON.stringify({
-                barcode: variant.barcode,
-                size_cigam_code: variant.size_cigam_code,
-                is_active: variant.is_active,
-            }),
+            body: JSON.stringify({ barcode: variant.barcode, size_cigam_code: variant.size_cigam_code, is_active: variant.is_active }),
         }).then(res => res.json());
     };
 
     const addVariant = () => {
         if (!newVariant.size_cigam_code && !newVariant.barcode) return;
-
         fetch(`/products/${productId}/variants`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken() },
@@ -109,90 +100,86 @@ export default function ProductEditModal({ show, onClose, productId, onSaved }) 
         })
             .then(res => res.json())
             .then(data => {
-                if (data.variant) {
-                    setVariants(prev => prev.map(v =>
-                        v.id === data.variant.id ? data.variant : v
-                    ));
-                }
+                if (data.variant) setVariants(prev => prev.map(v => v.id === data.variant.id ? data.variant : v));
             });
     };
 
-    const setField = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
-
     return (
-        <Modal show={show} onClose={onClose} maxWidth="5xl" title="Editar Produto">
-            {loading ? (
-                <div className="flex justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                </div>
-            ) : product ? (
-                <form onSubmit={handleSubmit} className="space-y-6">
+        <StandardModal
+            show={show}
+            onClose={onClose}
+            title="Editar Produto"
+            subtitle={product?.reference}
+            headerColor="bg-yellow-600"
+            headerIcon={<PencilSquareIcon className="h-5 w-5" />}
+            loading={loading}
+            maxWidth="5xl"
+            onSubmit={handleSubmit}
+            footer={product && (
+                <StandardModal.Footer
+                    onCancel={onClose}
+                    onSubmit="submit"
+                    submitLabel="Salvar Produto"
+                    submitColor="bg-yellow-600 hover:bg-yellow-700"
+                    processing={saving}
+                />
+            )}
+        >
+            {product && (
+                <>
                     {/* Sync Lock Warning */}
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                        <ExclamationTriangleIcon className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
                         <p className="text-sm text-amber-800">
                             Editar este produto irá bloqueá-lo para atualizações automáticas do CIGAM.
                         </p>
                     </div>
 
-                    {/* Read-only fields */}
-                    <div className="grid grid-cols-2 gap-4">
+                    {/* Campos somente leitura */}
+                    <FormSection title="Identificação" cols={2}>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Referência</label>
-                            <input type="text" value={product.reference} disabled
-                                className="mt-1 w-full border-gray-300 rounded-md bg-gray-100 text-gray-500 text-sm" />
+                            <InputLabel value="Referência" />
+                            <TextInput className="mt-1 w-full bg-gray-100 text-gray-500" value={product.reference} disabled />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Fornecedor</label>
-                            <input type="text" value={product.supplier_codigo_for || '-'} disabled
-                                className="mt-1 w-full border-gray-300 rounded-md bg-gray-100 text-gray-500 text-sm" />
+                            <InputLabel value="Fornecedor" />
+                            <TextInput className="mt-1 w-full bg-gray-100 text-gray-500" value={product.supplier_codigo_for || '-'} disabled />
                         </div>
-                    </div>
+                    </FormSection>
 
-                    {/* Editable fields */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Descrição *</label>
-                        <input type="text" value={form.description} onChange={e => setField('description', e.target.value)}
-                            className={`mt-1 w-full border-gray-300 rounded-md text-sm ${errors.description ? 'border-red-500' : ''}`} />
-                        {errors.description && <p className="mt-1 text-xs text-red-600">{errors.description[0]}</p>}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Preço Venda</label>
-                            <input type="number" step="0.01" value={form.sale_price} onChange={e => setField('sale_price', e.target.value)}
-                                className="mt-1 w-full border-gray-300 rounded-md text-sm" />
+                    {/* Campos editáveis */}
+                    <FormSection title="Dados do Produto" cols={2}>
+                        <div className="col-span-full">
+                            <InputLabel value="Descrição *" />
+                            <TextInput className="mt-1 w-full" value={form.description} onChange={e => setField('description', e.target.value)} />
+                            <InputError message={errors.description?.[0]} className="mt-1" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Preço Custo</label>
-                            <input type="number" step="0.01" value={form.cost_price} onChange={e => setField('cost_price', e.target.value)}
-                                className="mt-1 w-full border-gray-300 rounded-md text-sm" />
+                            <InputLabel value="Preço Venda" />
+                            <TextInput type="number" step="0.01" className="mt-1 w-full" value={form.sale_price} onChange={e => setField('sale_price', e.target.value)} />
                         </div>
-                    </div>
+                        <div>
+                            <InputLabel value="Preço Custo" />
+                            <TextInput type="number" step="0.01" className="mt-1 w-full" value={form.cost_price} onChange={e => setField('cost_price', e.target.value)} />
+                        </div>
+                    </FormSection>
 
-                    {/* Dropdowns */}
+                    {/* Classificação */}
                     {options && (
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            <SelectField label="Marca" value={form.brand_cigam_code} onChange={v => setField('brand_cigam_code', v)}
-                                options={options.brands} />
-                            <SelectField label="Estação" value={form.collection_cigam_code} onChange={v => setField('collection_cigam_code', v)}
-                                options={options.collections} />
-                            <SelectField label="Coleção" value={form.subcollection_cigam_code} onChange={v => setField('subcollection_cigam_code', v)}
-                                options={options.subcollections} />
-                            <SelectField label="Tipo" value={form.category_cigam_code} onChange={v => setField('category_cigam_code', v)}
-                                options={options.categories} />
-                            <SelectField label="Cor" value={form.color_cigam_code} onChange={v => setField('color_cigam_code', v)}
-                                options={options.colors} />
-                            <SelectField label="Material" value={form.material_cigam_code} onChange={v => setField('material_cigam_code', v)}
-                                options={options.materials} />
-                            <SelectField label="Grupo" value={form.article_complement_cigam_code} onChange={v => setField('article_complement_cigam_code', v)}
-                                options={options.article_complements} />
-                        </div>
+                        <FormSection title="Classificação" cols={3}>
+                            <CigamSelect label="Marca" value={form.brand_cigam_code} onChange={v => setField('brand_cigam_code', v)} options={options.brands} />
+                            <CigamSelect label="Estação" value={form.collection_cigam_code} onChange={v => setField('collection_cigam_code', v)} options={options.collections} />
+                            <CigamSelect label="Coleção" value={form.subcollection_cigam_code} onChange={v => setField('subcollection_cigam_code', v)} options={options.subcollections} />
+                            <CigamSelect label="Tipo" value={form.category_cigam_code} onChange={v => setField('category_cigam_code', v)} options={options.categories} />
+                            <CigamSelect label="Cor" value={form.color_cigam_code} onChange={v => setField('color_cigam_code', v)} options={options.colors} />
+                            <CigamSelect label="Material" value={form.material_cigam_code} onChange={v => setField('material_cigam_code', v)} options={options.materials} />
+                            <CigamSelect label="Grupo" value={form.article_complement_cigam_code} onChange={v => setField('article_complement_cigam_code', v)} options={options.article_complements} />
+                        </FormSection>
                     )}
 
-                    {/* Variants */}
-                    <div>
-                        <h4 className="text-sm font-semibold text-gray-900 mb-2">Variantes</h4>
-                        <div className="border rounded-lg overflow-hidden">
+                    {/* Variantes */}
+                    <StandardModal.Section title="Variantes">
+                        <div className="overflow-x-auto -mx-4 -mb-4">
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
                                     <tr>
@@ -219,22 +206,17 @@ export default function ProductEditModal({ show, onClose, productId, onSaved }) 
                                                 <input type="text" value={v.barcode || ''} onChange={e => handleVariantUpdate(v.id, 'barcode', e.target.value)}
                                                     className="w-full border-gray-300 rounded text-xs font-mono" />
                                             </td>
-                                            <td className="px-3 py-2 text-xs font-mono text-gray-600">
-                                                {v.aux_reference || '-'}
-                                            </td>
+                                            <td className="px-3 py-2 text-xs font-mono text-gray-600">{v.aux_reference || '-'}</td>
                                             <td className="px-3 py-2">
                                                 <input type="checkbox" checked={v.is_active !== false} onChange={e => handleVariantUpdate(v.id, 'is_active', e.target.checked)}
                                                     className="rounded border-gray-300 text-indigo-600" />
                                             </td>
                                             <td className="px-3 py-2 space-x-1">
-                                                <button type="button" onClick={() => saveVariant(v)}
-                                                    className="text-xs text-indigo-600 hover:text-indigo-800">Salvar</button>
-                                                <button type="button" onClick={() => generateEan(v.id)}
-                                                    className="text-xs text-green-600 hover:text-green-800">EAN</button>
+                                                <Button variant="info" size="xs" onClick={() => saveVariant(v)}>Salvar</Button>
+                                                <Button variant="success" size="xs" onClick={() => generateEan(v.id)}>EAN</Button>
                                             </td>
                                         </tr>
                                     ))}
-                                    {/* Add new variant row */}
                                     <tr className="bg-gray-50">
                                         <td className="px-3 py-2">
                                             {options && (
@@ -249,41 +231,28 @@ export default function ProductEditModal({ show, onClose, productId, onSaved }) 
                                             <input type="text" value={newVariant.barcode} onChange={e => setNewVariant(prev => ({ ...prev, barcode: e.target.value }))}
                                                 placeholder="Código barras" className="w-full border-gray-300 rounded text-xs" />
                                         </td>
-                                        <td className="px-3 py-2"></td>
-                                        <td className="px-3 py-2"></td>
+                                        <td className="px-3 py-2" />
+                                        <td className="px-3 py-2" />
                                         <td className="px-3 py-2">
-                                            <button type="button" onClick={addVariant}
-                                                className="text-xs text-white bg-indigo-600 px-2 py-1 rounded hover:bg-indigo-700">Adicionar</button>
+                                            <Button variant="primary" size="xs" onClick={addVariant}>Adicionar</Button>
                                         </td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
-                    </div>
-
-                    {/* Submit */}
-                    <div className="flex justify-end gap-3 pt-4 border-t">
-                        <button type="button" onClick={onClose}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
-                            Cancelar
-                        </button>
-                        <button type="submit" disabled={saving}
-                            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50">
-                            {saving ? 'Salvando...' : 'Salvar Produto'}
-                        </button>
-                    </div>
-                </form>
-            ) : null}
-        </Modal>
+                    </StandardModal.Section>
+                </>
+            )}
+        </StandardModal>
     );
 }
 
-function SelectField({ label, value, onChange, options }) {
+function CigamSelect({ label, value, onChange, options }) {
     return (
         <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+            <InputLabel value={label} />
             <select value={value || ''} onChange={e => onChange(e.target.value)}
-                className="w-full border-gray-300 rounded-md text-sm">
+                className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
                 <option value="">-</option>
                 {options?.map(opt => <option key={opt.cigam_code} value={opt.cigam_code}>{opt.name}</option>)}
             </select>

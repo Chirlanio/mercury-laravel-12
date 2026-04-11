@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\WorkShiftsExport;
 use App\Models\Employee;
 use App\Models\Store;
 use App\Models\WorkShift;
-use App\Exports\WorkShiftsExport;
 use Barryvdh\DomPDF\Facade\Pdf as PDF;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -30,7 +30,7 @@ class WorkShiftController extends Controller
         if ($search) {
             $query->whereHas('employee', function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('short_name', 'like', "%{$search}%");
+                    ->orWhere('short_name', 'like', "%{$search}%");
             });
         }
 
@@ -51,14 +51,23 @@ class WorkShiftController extends Controller
             if ($sortField === 'employee_name') {
                 // Ordenar pelo nome do funcionário através do relacionamento
                 $query->join('employees', 'work_shifts.employee_id', '=', 'employees.id')
-                      ->orderBy('employees.name', $sortDirection)
-                      ->select('work_shifts.*');
+                    ->orderBy('employees.name', $sortDirection)
+                    ->select('work_shifts.*');
             } else {
                 $query->orderBy($sortField, $sortDirection);
             }
         }
 
         $workShifts = $query->paginate($perPage);
+
+        // Estatísticas para o StatisticsGrid
+        $stats = [
+            'total' => WorkShift::count(),
+            'abertura' => WorkShift::where('type', 'abertura')->count(),
+            'fechamento' => WorkShift::where('type', 'fechamento')->count(),
+            'integral' => WorkShift::where('type', 'integral')->count(),
+            'compensar' => WorkShift::where('type', 'compensar')->count(),
+        ];
 
         $employees = Employee::where('status_id', 2)
             ->orderBy('name')
@@ -89,6 +98,7 @@ class WorkShiftController extends Controller
 
         return Inertia::render('WorkShifts/Index', [
             'workShifts' => $transformedData,
+            'stats' => $stats,
             'employees' => $employees,
             'stores' => $stores,
             'types' => $types,
@@ -149,7 +159,7 @@ class WorkShiftController extends Controller
                 'end_time' => $workShift->end_time,
                 'type' => $workShift->type,
                 'type_label' => ucfirst($workShift->type),
-            ]
+            ],
         ]);
     }
 
@@ -166,7 +176,7 @@ class WorkShiftController extends Controller
                 'start_time' => substr($workShift->start_time, 0, 5), // Remove os segundos HH:mm:ss -> HH:mm
                 'end_time' => substr($workShift->end_time, 0, 5), // Remove os segundos HH:mm:ss -> HH:mm
                 'type' => $workShift->type,
-            ]
+            ],
         ]);
     }
 
@@ -224,7 +234,7 @@ class WorkShiftController extends Controller
             'end_date' => $request->get('end_date'),
         ];
 
-        $fileName = 'jornadas_trabalho_' . date('Y-m-d_His') . '.xlsx';
+        $fileName = 'jornadas_trabalho_'.date('Y-m-d_His').'.xlsx';
 
         return (new WorkShiftsExport($filters))->download($fileName);
     }
@@ -286,23 +296,23 @@ class WorkShiftController extends Controller
             $adjustedMinutes = $isCompensation ? -$durationMinutes : $durationMinutes;
 
             // Inicializar loja se não existir
-            if (!isset($storeData[$storeId])) {
+            if (! isset($storeData[$storeId])) {
                 $storeData[$storeId] = [
                     'name' => $storeName,
                     'code' => $storeId,
                     'total_minutes' => 0,
                     'total_shifts' => 0,
-                    'employees' => []
+                    'employees' => [],
                 ];
             }
 
             // Inicializar funcionário se não existir
-            if (!isset($storeData[$storeId]['employees'][$employeeId])) {
+            if (! isset($storeData[$storeId]['employees'][$employeeId])) {
                 $storeData[$storeId]['employees'][$employeeId] = [
                     'name' => $employeeName,
                     'total_minutes' => 0,
                     'total_shifts' => 0,
-                    'shifts' => []
+                    'shifts' => [],
                 ];
             }
 
@@ -349,7 +359,7 @@ class WorkShiftController extends Controller
             ],
             'summary' => [
                 'total_stores' => count($storeData),
-                'total_employees' => array_sum(array_map(fn($store) => count($store['employees']), $storeData)),
+                'total_employees' => array_sum(array_map(fn ($store) => count($store['employees']), $storeData)),
                 'total_shifts' => $workShifts->count(),
                 'total_hours' => $this->formatMinutesToHours($totalHours),
             ],
@@ -359,7 +369,7 @@ class WorkShiftController extends Controller
         $pdf = PDF::loadView('pdf.work-shifts-summary', $data);
         $pdf->setPaper('A4', 'portrait');
 
-        return $pdf->download('resumo_jornadas_trabalho_' . now()->format('Y-m-d') . '.pdf');
+        return $pdf->download('resumo_jornadas_trabalho_'.now()->format('Y-m-d').'.pdf');
     }
 
     /**
@@ -372,6 +382,7 @@ class WorkShiftController extends Controller
         $hours = floor($absMinutes / 60);
         $mins = $absMinutes % 60;
         $formatted = sprintf('%02d:%02d', $hours, $mins);
-        return $isNegative ? '-' . $formatted : $formatted;
+
+        return $isNegative ? '-'.$formatted : $formatted;
     }
 }

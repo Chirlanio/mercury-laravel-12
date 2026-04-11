@@ -23,6 +23,7 @@
     },
     "dependencies": {
         "@heroicons/react": "^2.2.0",
+        "qrcode.react": "^4.2.0",
         "react-toastify": "^11.0.5",
         "recharts": "^3.8.1"
     }

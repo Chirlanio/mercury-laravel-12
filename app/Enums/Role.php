@@ -139,6 +139,13 @@ enum Role: string
                 Permission::VIEW_EXPERIENCE_TRACKER->value,
                 Permission::MANAGE_EXPERIENCE_TRACKER->value,
                 Permission::FILL_EXPERIENCE_EVALUATION->value,
+
+                // Entregas e rotas (todas)
+                Permission::VIEW_DELIVERIES->value,
+                Permission::CREATE_DELIVERIES->value,
+                Permission::EDIT_DELIVERIES->value,
+                Permission::DELETE_DELIVERIES->value,
+                Permission::MANAGE_ROUTES->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -242,6 +249,13 @@ enum Role: string
                 Permission::VIEW_EXPERIENCE_TRACKER->value,
                 Permission::MANAGE_EXPERIENCE_TRACKER->value,
                 Permission::FILL_EXPERIENCE_EVALUATION->value,
+
+                // Entregas e rotas (todas)
+                Permission::VIEW_DELIVERIES->value,
+                Permission::CREATE_DELIVERIES->value,
+                Permission::EDIT_DELIVERIES->value,
+                Permission::DELETE_DELIVERIES->value,
+                Permission::MANAGE_ROUTES->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -288,6 +302,9 @@ enum Role: string
                 // Avaliacao de experiencia (view + fill)
                 Permission::VIEW_EXPERIENCE_TRACKER->value,
                 Permission::FILL_EXPERIENCE_EVALUATION->value,
+                // Entregas (view + gerenciar rotas)
+                Permission::VIEW_DELIVERIES->value,
+                Permission::MANAGE_ROUTES->value,
             ],
             self::USER => [
                 // Apenas próprio perfil
@@ -300,6 +317,8 @@ enum Role: string
                 // Treinamentos (view)
                 Permission::VIEW_TRAININGS->value,
                 Permission::VIEW_TRAINING_COURSES->value,
+                // Entregas (view)
+                Permission::VIEW_DELIVERIES->value,
             ],
         };
     }

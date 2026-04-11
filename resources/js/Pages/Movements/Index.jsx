@@ -1,19 +1,21 @@
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
+import useModalManager from '@/Hooks/useModalManager';
 import Button from '@/Components/Button';
+import StatusBadge from '@/Components/Shared/StatusBadge';
 import StatisticsCards from '@/Components/Movements/StatisticsCards';
 import SyncModal from '@/Components/Movements/SyncModal';
 import SyncLogsModal from '@/Components/Movements/SyncLogsModal';
 import ViewModal from '@/Components/Movements/ViewModal';
+import {
+    ArrowPathIcon, ClockIcon, MagnifyingGlassIcon, XMarkIcon,
+} from '@heroicons/react/24/outline';
 
-export default function Index({ auth, movements, stores, movementTypes, filters, cigamAvailable, cigamUnavailableReason }) {
+export default function Index({ movements, stores, movementTypes, filters, cigamAvailable, cigamUnavailableReason }) {
     const { hasPermission } = usePermissions();
     const canSync = hasPermission(PERMISSIONS.SYNC_MOVEMENTS);
-
-    const [isSyncOpen, setIsSyncOpen] = useState(false);
-    const [isSyncLogsOpen, setIsSyncLogsOpen] = useState(false);
-    const [selectedMovement, setSelectedMovement] = useState(null);
+    const { modals, selected, openModal, closeModal } = useModalManager(['sync', 'syncLogs', 'view']);
 
     const [localFilters, setLocalFilters] = useState({
         date_start: filters.date_start || '',
@@ -53,23 +55,23 @@ export default function Index({ auth, movements, stores, movementTypes, filters,
                         </div>
                         <div className="flex gap-2">
                             {canSync && (
-                                <Button variant="outline" onClick={() => setIsSyncLogsOpen(true)}>
-                                    Histórico
-                                </Button>
-                            )}
-                            {canSync && (
-                                <Button variant="primary" onClick={() => setIsSyncOpen(true)}>
-                                    Sincronizar
-                                </Button>
+                                <>
+                                    <Button variant="outline" onClick={() => openModal('syncLogs')} icon={ClockIcon}>
+                                        Histórico
+                                    </Button>
+                                    <Button variant="primary" onClick={() => openModal('sync')} icon={ArrowPathIcon}>
+                                        Sincronizar
+                                    </Button>
+                                </>
                             )}
                         </div>
                     </div>
 
-                    {/* Statistics */}
+                    {/* Estatísticas */}
                     <StatisticsCards date={localFilters.date_start} />
 
-                    {/* Filters */}
-                    <div className="bg-white rounded-lg shadow p-4 mb-6">
+                    {/* Filtros */}
+                    <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                             <div>
                                 <label className="block text-xs text-gray-500 mb-1">Data Início</label>
@@ -110,14 +112,14 @@ export default function Index({ auth, movements, stores, movementTypes, filters,
                                     className="w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                             </div>
                             <div className="flex items-end gap-2">
-                                <Button variant="primary" size="sm" onClick={applyFilters}>Filtrar</Button>
-                                <Button variant="outline" size="sm" onClick={clearFilters}>Limpar</Button>
+                                <Button variant="primary" size="sm" onClick={applyFilters} icon={MagnifyingGlassIcon}>Filtrar</Button>
+                                <Button variant="outline" size="sm" onClick={clearFilters} icon={XMarkIcon}>Limpar</Button>
                             </div>
                         </div>
                     </div>
 
-                    {/* Table */}
-                    <div className="bg-white rounded-lg shadow overflow-hidden">
+                    {/* Tabela */}
+                    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
@@ -135,8 +137,8 @@ export default function Index({ auth, movements, stores, movementTypes, filters,
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                    {movements.data && movements.data.length > 0 ? movements.data.map((m) => (
-                                        <tr key={m.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedMovement(m)}>
+                                    {movements.data?.length > 0 ? movements.data.map((m) => (
+                                        <tr key={m.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openModal('view', m)}>
                                             <td className="px-3 py-2 text-sm text-gray-900 whitespace-nowrap">{m.movement_date}</td>
                                             <td className="px-3 py-2 text-sm text-gray-500 whitespace-nowrap">{m.movement_time}</td>
                                             <td className="px-3 py-2 text-sm text-gray-900 whitespace-nowrap">{m.store_code}</td>
@@ -149,11 +151,9 @@ export default function Index({ auth, movements, stores, movementTypes, filters,
                                             </td>
                                             <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">{m.movement_type}</td>
                                             <td className="px-3 py-2 text-center">
-                                                <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
-                                                    m.entry_exit === 'E' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                                                }`}>
+                                                <StatusBadge variant={m.entry_exit === 'E' ? 'emerald' : 'warning'} size="sm">
                                                     {m.entry_exit === 'E' ? 'Entrada' : 'Saída'}
-                                                </span>
+                                                </StatusBadge>
                                             </td>
                                         </tr>
                                     )) : (
@@ -170,7 +170,7 @@ export default function Index({ auth, movements, stores, movementTypes, filters,
                             </table>
                         </div>
 
-                        {/* Pagination */}
+                        {/* Paginação */}
                         {movements.last_page > 1 && (
                             <div className="px-4 py-3 bg-gray-50 border-t flex items-center justify-between">
                                 <p className="text-sm text-gray-500">
@@ -178,13 +178,10 @@ export default function Index({ auth, movements, stores, movementTypes, filters,
                                 </p>
                                 <div className="flex gap-1">
                                     {movements.links.filter(l => l.url).map((link, i) => (
-                                        <button
-                                            key={i}
+                                        <button key={i}
                                             onClick={() => router.get(link.url, {}, { preserveState: true, preserveScroll: true })}
                                             className={`px-3 py-1 text-sm rounded ${
-                                                link.active
-                                                    ? 'bg-indigo-600 text-white'
-                                                    : 'bg-white text-gray-700 hover:bg-gray-100 border'
+                                                link.active ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100 border'
                                             }`}
                                             dangerouslySetInnerHTML={{ __html: link.label }}
                                         />
@@ -196,28 +193,26 @@ export default function Index({ auth, movements, stores, movementTypes, filters,
                 </div>
             </div>
 
-            {/* Modals */}
+            {/* Modais */}
             <SyncModal
-                isOpen={isSyncOpen}
+                show={modals.sync}
                 onClose={(shouldRefresh) => {
-                    setIsSyncOpen(false);
-                    if (shouldRefresh) {
-                        router.reload({ preserveScroll: true });
-                    }
+                    closeModal('sync');
+                    if (shouldRefresh) router.reload({ preserveScroll: true });
                 }}
                 cigamAvailable={cigamAvailable}
                 cigamUnavailableReason={cigamUnavailableReason}
             />
 
             <SyncLogsModal
-                isOpen={isSyncLogsOpen}
-                onClose={() => setIsSyncLogsOpen(false)}
+                show={modals.syncLogs}
+                onClose={() => closeModal('syncLogs')}
             />
 
             <ViewModal
-                isOpen={!!selectedMovement}
-                onClose={() => setSelectedMovement(null)}
-                movement={selectedMovement}
+                show={modals.view && selected !== null}
+                onClose={() => closeModal('view')}
+                movement={selected}
             />
         </>
     );

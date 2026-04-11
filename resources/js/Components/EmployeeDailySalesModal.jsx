@@ -1,16 +1,11 @@
 import { useState, useEffect } from 'react';
-import { router } from '@inertiajs/react';
-import Modal from '@/Components/Modal';
-import Button from '@/Components/Button';
+import StandardModal from '@/Components/StandardModal';
 import ActionButtons from '@/Components/ActionButtons';
+import StatusBadge from '@/Components/Shared/StatusBadge';
 import { formatDate } from '@/Utils/dateHelpers';
 
-const formatCurrency = (value) => {
-    return new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-    }).format(value);
-};
+const formatCurrency = (value) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
 const monthNames = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -24,7 +19,6 @@ export default function EmployeeDailySalesModal({
     storeId,
     month,
     year,
-    stores = [],
     onEditSale,
     onDeleteSale,
 }) {
@@ -49,14 +43,13 @@ export default function EmployeeDailySalesModal({
             const params = new URLSearchParams({
                 employee_id: employeeId,
                 store_id: storeId,
-                month: month,
-                year: year,
+                month,
+                year,
             });
             const response = await fetch(`/sales/employee-daily?${params}`);
             if (!response.ok) throw new Error('Erro ao carregar dados');
-            const json = await response.json();
-            setData(json);
-        } catch (err) {
+            setData(await response.json());
+        } catch {
             setError('Erro ao carregar vendas diárias. Tente novamente.');
         } finally {
             setLoading(false);
@@ -74,37 +67,32 @@ export default function EmployeeDailySalesModal({
         }
     };
 
-    const handleDelete = (sale) => {
-        if (!onDeleteSale) return;
-        onDeleteSale(sale);
-    };
-
-    const title = data
-        ? `Vendas Diárias — ${data.employee.short_name}`
-        : 'Vendas Diárias';
+    const headerBadges = [];
+    if (data?.store) {
+        headerBadges.push({ text: data.store.name, className: 'bg-white/20 text-white' });
+    }
+    if (month && year) {
+        headerBadges.push({ text: `${monthNames[(month || 1) - 1]}/${year}`, className: 'bg-white/20 text-white' });
+    }
 
     return (
-        <Modal show={isOpen} onClose={onClose} title={title} maxWidth="4xl">
-            <div className="p-6">
-                {loading && <LoadingSkeleton />}
-
-                {error && (
-                    <div className="p-4 bg-red-50 border border-red-200 rounded-md">
-                        <p className="text-sm text-red-600">{error}</p>
-                    </div>
-                )}
-
-                {data && !loading && (
-                    <>
-                        {/* Header info */}
-                        <div className="flex items-center gap-4 mb-4 text-sm text-gray-600">
-                            <span>Loja: <strong className="text-gray-900">{data.store.name}</strong></span>
-                            <span className="text-gray-300">|</span>
-                            <span>{monthNames[(month || 1) - 1]}/{year}</span>
-                        </div>
-
-                        {/* Daily sales table */}
-                        <div className="overflow-x-auto border rounded-lg">
+        <StandardModal
+            show={isOpen}
+            onClose={onClose}
+            title={data?.employee?.short_name ? `Vendas Diárias — ${data.employee.short_name}` : 'Vendas Diárias'}
+            headerColor="bg-gray-700"
+            headerBadges={headerBadges}
+            loading={loading}
+            errorMessage={error}
+            footer={data && (
+                <StandardModal.Footer onCancel={onClose} cancelLabel="Fechar" />
+            )}
+        >
+            {data && (
+                <>
+                    {/* Tabela de vendas diárias */}
+                    <StandardModal.Section title="Detalhamento Diário">
+                        <div className="overflow-x-auto -mx-4 -mb-4">
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
                                     <tr>
@@ -131,9 +119,7 @@ export default function EmployeeDailySalesModal({
                                                 <td className="px-4 py-2 text-sm text-gray-900">{formatDate(sale.date_sales)}</td>
                                                 <td className="px-4 py-2 text-sm">
                                                     {sale.is_ecommerce ? (
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
-                                                            E-Commerce
-                                                        </span>
+                                                        <StatusBadge variant="purple">E-Commerce</StatusBadge>
                                                     ) : (
                                                         <span className="text-gray-700">{sale.store_name}</span>
                                                     )}
@@ -141,19 +127,15 @@ export default function EmployeeDailySalesModal({
                                                 <td className="px-4 py-2 text-center text-sm text-gray-700">{sale.qtde_total}</td>
                                                 <td className="px-4 py-2 text-right text-sm font-medium text-gray-900">{formatCurrency(sale.total_sales)}</td>
                                                 <td className="px-4 py-2 text-center">
-                                                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
-                                                        sale.source === 'cigam'
-                                                            ? 'bg-blue-100 text-blue-800'
-                                                            : 'bg-gray-100 text-gray-800'
-                                                    }`}>
+                                                    <StatusBadge variant={sale.source === 'cigam' ? 'info' : 'gray'}>
                                                         {sale.source === 'cigam' ? 'CIGAM' : 'Manual'}
-                                                    </span>
+                                                    </StatusBadge>
                                                 </td>
                                                 {(onEditSale || onDeleteSale) && (
                                                     <td className="px-4 py-2 text-center">
                                                         <ActionButtons
                                                             onEdit={onEditSale ? () => handleEdit(sale) : null}
-                                                            onDelete={onDeleteSale ? () => handleDelete(sale) : null}
+                                                            onDelete={onDeleteSale ? () => onDeleteSale(sale) : null}
                                                         />
                                                     </td>
                                                 )}
@@ -163,9 +145,11 @@ export default function EmployeeDailySalesModal({
                                 </tbody>
                             </table>
                         </div>
+                    </StandardModal.Section>
 
-                        {/* Totals */}
-                        <div className="mt-4 bg-gray-50 rounded-lg p-4 space-y-1">
+                    {/* Totais */}
+                    <StandardModal.Section title="Resumo">
+                        <div className="space-y-1.5">
                             {data.totals.store_total > 0 && (
                                 <div className="flex justify-between text-sm">
                                     <span className="text-gray-600">Loja Física:</span>
@@ -182,46 +166,16 @@ export default function EmployeeDailySalesModal({
                                     </span>
                                 </div>
                             )}
-                            <div className="flex justify-between text-sm font-bold pt-1 border-t border-gray-200">
+                            <div className="flex justify-between text-sm font-bold pt-1.5 border-t border-gray-200">
                                 <span className="text-gray-900">Total:</span>
                                 <span className="text-gray-900">
                                     {formatCurrency(data.totals.total)} ({data.totals.total_qtde} peças)
                                 </span>
                             </div>
                         </div>
-                    </>
-                )}
-
-                <div className="flex justify-end mt-4 pt-4 border-t">
-                    <Button variant="secondary" onClick={onClose}>
-                        Fechar
-                    </Button>
-                </div>
-            </div>
-        </Modal>
-    );
-}
-
-function LoadingSkeleton() {
-    return (
-        <div className="animate-pulse space-y-4">
-            <div className="flex gap-4">
-                <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/6"></div>
-            </div>
-            <div className="border rounded-lg overflow-hidden">
-                <div className="bg-gray-100 h-10"></div>
-                {[...Array(5)].map((_, i) => (
-                    <div key={i} className="flex gap-4 p-3 border-b">
-                        <div className="h-4 bg-gray-200 rounded w-1/6"></div>
-                        <div className="h-4 bg-gray-200 rounded w-1/5"></div>
-                        <div className="h-4 bg-gray-200 rounded w-1/12"></div>
-                        <div className="h-4 bg-gray-200 rounded w-1/6"></div>
-                        <div className="h-4 bg-gray-200 rounded w-1/12"></div>
-                    </div>
-                ))}
-            </div>
-            <div className="bg-gray-100 rounded-lg h-20"></div>
-        </div>
+                    </StandardModal.Section>
+                </>
+            )}
+        </StandardModal>
     );
 }

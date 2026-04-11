@@ -30,6 +30,8 @@ export default function Modal({
         '5xl': 'sm:max-w-5xl',
         '6xl': 'sm:max-w-6xl',
         '7xl': 'sm:max-w-7xl',
+        '8xl': 'sm:max-w-8xl',
+        '9xl': 'sm:max-w-9xl',
         'full': 'sm:max-w-full',
         '85vw': 'w-[85vw]',
     }[maxWidth];

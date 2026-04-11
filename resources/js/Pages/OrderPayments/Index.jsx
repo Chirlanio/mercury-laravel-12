@@ -3,12 +3,16 @@ import {
     PlusIcon, XMarkIcon, MagnifyingGlassIcon, Squares2X2Icon, TableCellsIcon,
     ArrowRightIcon, ArrowLeftIcon, BookmarkIcon, DocumentCheckIcon,
     ExclamationTriangleIcon, ChartBarIcon, ArrowDownTrayIcon,
+    ClipboardDocumentListIcon, ArrowPathIcon, ClockIcon, CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import { useState, useMemo } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
+import useModalManager from '@/Hooks/useModalManager';
 import { maskMoney, parseMoney, maskCpfCnpj, maskPhone, handleMasked } from '@/Hooks/useMasks';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
+import StatusBadge from '@/Components/Shared/StatusBadge';
+import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import DashboardCharts from '@/Components/OrderPayments/DashboardCharts';
 import DetailModal from '@/Components/OrderPayments/DetailModal';
 import StandardModal from '@/Components/StandardModal';
@@ -18,6 +22,27 @@ const STATUS_COLORS = {
     doing:   { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300', header: 'bg-blue-600' },
     waiting: { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-300', header: 'bg-yellow-500' },
     done:    { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-300', header: 'bg-green-600' },
+};
+
+const STATUS_VARIANT_MAP = {
+    backlog: 'gray',
+    doing: 'info',
+    waiting: 'warning',
+    done: 'success',
+};
+
+const STATUS_ICON_MAP = {
+    backlog: ClipboardDocumentListIcon,
+    doing: ArrowPathIcon,
+    waiting: ClockIcon,
+    done: CheckCircleIcon,
+};
+
+const STATUS_COLOR_MAP = {
+    backlog: 'gray',
+    doing: 'blue',
+    waiting: 'yellow',
+    done: 'green',
 };
 
 const fmtCurrency = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
@@ -36,15 +61,12 @@ export default function Index({
     const canCreate = hasPermission(PERMISSIONS.CREATE_ORDER_PAYMENTS);
     const canEdit = hasPermission(PERMISSIONS.EDIT_ORDER_PAYMENTS);
 
+    const { modals, selected, openModal, closeModal } = useModalManager(['create', 'transition', 'dashboard']);
     const [search, setSearch] = useState(filters.search || '');
     const [statusFilter, setStatusFilter] = useState(filters.status || '');
     const [storeFilter, setStoreFilter] = useState(filters.store_id || '');
     const [viewMode, setViewMode] = useState('kanban');
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [showTransitionModal, setShowTransitionModal] = useState(false);
-    const [transitionData, setTransitionData] = useState(null);
     const [transitionError, setTransitionError] = useState('');
-    const [showDashboard, setShowDashboard] = useState(false);
     const [detailOrderId, setDetailOrderId] = useState(null);
 
     const applyFilters = () => {
@@ -54,10 +76,18 @@ export default function Index({
     };
 
     const openTransitionModal = (order, newSt) => {
-        setTransitionData({ order, newStatus: newSt });
         setTransitionError('');
-        setShowTransitionModal(true);
+        openModal('transition', { order, newStatus: newSt });
     };
+
+    const statisticsCards = Object.entries(kanbanData).map(([status, data]) => ({
+        label: data.label,
+        value: data.count,
+        format: 'number',
+        icon: STATUS_ICON_MAP[status],
+        color: STATUS_COLOR_MAP[status] || 'gray',
+        sub: fmtCurrency(data.total),
+    }));
 
     // ======== RENDER ========
     return (
@@ -82,20 +112,29 @@ export default function Index({
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => setShowDashboard(true)}
+                                    onClick={() => openModal('dashboard')}
                                     icon={ChartBarIcon}
                                     iconOnly
                                     title="Dashboard"
                                 />
-                                <a href={route('order-payments.export', { search: search || undefined, status: statusFilter || undefined, store_id: storeFilter || undefined })}
-                                    className="inline-flex items-center px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
-                                    title="Exportar Excel">
-                                    <ArrowDownTrayIcon className="h-4 w-4" />
-                                </a>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                        window.location.href = route('order-payments.export', {
+                                            search: search || undefined,
+                                            status: statusFilter || undefined,
+                                            store_id: storeFilter || undefined,
+                                        });
+                                    }}
+                                    icon={ArrowDownTrayIcon}
+                                    iconOnly
+                                    title="Exportar Excel"
+                                />
                                 {canCreate && (
                                     <Button
                                         variant="primary"
-                                        onClick={() => setShowCreateModal(true)}
+                                        onClick={() => openModal('create')}
                                         icon={PlusIcon}
                                     >
                                         Nova Ordem
@@ -105,8 +144,8 @@ export default function Index({
                         </div>
                     </div>
 
-                    {/* KPI */}
-                    <KpiCards kanbanData={kanbanData} />
+                    {/* Estatísticas */}
+                    <StatisticsGrid cards={statisticsCards} cols={4} />
 
                     {/* Filters */}
                     <Filters search={search} setSearch={setSearch} statusFilter={statusFilter}
@@ -129,19 +168,19 @@ export default function Index({
             </div>
 
             {/* Create Modal */}
-            {showCreateModal && (
-                <CreateModal selects={selects} onClose={() => setShowCreateModal(false)} />
+            {modals.create && (
+                <CreateModal selects={selects} onClose={() => closeModal('create')} />
             )}
 
             {/* Transition Modal */}
-            {showTransitionModal && transitionData && (
-                <TransitionModal data={transitionData} statusOptions={statusOptions}
+            {modals.transition && selected && (
+                <TransitionModal data={selected} statusOptions={statusOptions}
                     selects={selects} error={transitionError} setError={setTransitionError}
-                    onClose={() => setShowTransitionModal(false)} />
+                    onClose={() => closeModal('transition')} />
             )}
 
             {/* Dashboard Charts */}
-            <DashboardCharts show={showDashboard} onClose={() => setShowDashboard(false)}
+            <DashboardCharts show={modals.dashboard} onClose={() => closeModal('dashboard')}
                 statisticsUrl={route('order-payments.statistics')}
                 dashboardUrl={route('order-payments.dashboard')} />
 
@@ -667,7 +706,7 @@ function TableView({ payments, canEdit, statusOptions, onTransition, onDetail })
                             <td className="px-4 py-3 text-sm font-medium text-gray-900">{p.formatted_total}</td>
                             <td className="px-4 py-3 text-sm"><span className={p.is_overdue ? 'text-red-600 font-medium' : 'text-gray-500'}>{p.date_payment || '-'}</span></td>
                             <td className="px-4 py-3 text-sm text-gray-500 font-mono">{p.number_nf || '-'}</td>
-                            <td className="px-4 py-3"><span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[p.status]?.bg} ${STATUS_COLORS[p.status]?.text}`}>{p.status_label}</span></td>
+                            <td className="px-4 py-3"><StatusBadge variant={STATUS_VARIANT_MAP[p.status] || 'gray'}>{p.status_label}</StatusBadge></td>
                             <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                 <ActionButtons
                                     onView={() => onDetail(p.id)}
@@ -707,24 +746,6 @@ function TableView({ payments, canEdit, statusOptions, onTransition, onDetail })
 // ============================================================
 // SHARED COMPONENTS
 // ============================================================
-function KpiCards({ kanbanData }) {
-    return (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {Object.entries(kanbanData).map(([status, data]) => (
-                <div key={status} className={`rounded-lg p-4 ${STATUS_COLORS[status]?.bg} border ${STATUS_COLORS[status]?.border}`}>
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <p className={`text-xs font-medium uppercase ${STATUS_COLORS[status]?.text}`}>{data.label}</p>
-                            <p className={`text-2xl font-bold mt-1 ${STATUS_COLORS[status]?.text}`}>{data.count}</p>
-                        </div>
-                        <p className={`text-sm font-semibold ${STATUS_COLORS[status]?.text}`}>{fmtCurrency(data.total)}</p>
-                    </div>
-                </div>
-            ))}
-        </div>
-    );
-}
-
 function Filters({ search, setSearch, statusFilter, setStatusFilter, storeFilter, setStoreFilter, statusOptions, stores, onApply }) {
     return (
         <div className="bg-white shadow rounded-lg p-4 mb-6">
@@ -745,7 +766,7 @@ function Filters({ search, setSearch, statusFilter, setStatusFilter, storeFilter
                     <option value="">Todas as Lojas</option>
                     {stores.map(s => <option key={s.id} value={s.id}>{s.code} - {s.name}</option>)}
                 </select>
-                <button onClick={onApply} className="inline-flex justify-center items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700">Filtrar</button>
+                <Button variant="primary" onClick={onApply} icon={MagnifyingGlassIcon}>Filtrar</Button>
             </div>
         </div>
     );

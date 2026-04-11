@@ -11,14 +11,26 @@ class TrainingQuizResponse extends Model
 
     protected $fillable = [
         'attempt_id', 'question_id', 'selected_options',
-        'is_correct', 'points_earned',
+        'response_text', 'feedback', 'is_correct', 'points_earned',
+        'graded_by_user_id', 'graded_at',
     ];
 
     protected $casts = [
         'selected_options' => 'array',
         'is_correct' => 'boolean',
         'points_earned' => 'integer',
+        'graded_at' => 'datetime',
     ];
+
+    public function gradedBy(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'graded_by_user_id');
+    }
+
+    public function getIsPendingGradeAttribute(): bool
+    {
+        return $this->question?->question_type === 'open_text' && $this->graded_at === null;
+    }
 
     // Relationships
 

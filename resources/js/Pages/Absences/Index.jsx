@@ -1,83 +1,98 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
+import useModalManager from '@/Hooks/useModalManager';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
+import StatusBadge from '@/Components/Shared/StatusBadge';
+import DeleteConfirmModal from '@/Components/Shared/DeleteConfirmModal';
+import StandardModal from '@/Components/StandardModal';
+import FormSection from '@/Components/Shared/FormSection';
+import InputLabel from '@/Components/InputLabel';
+import InputError from '@/Components/InputError';
+import TextInput from '@/Components/TextInput';
+import Checkbox from '@/Components/Checkbox';
 import { formatDateTime } from '@/Utils/dateHelpers';
-import { PlusIcon } from '@heroicons/react/24/outline';
+import {
+    PlusIcon, MagnifyingGlassIcon, XMarkIcon, PencilSquareIcon, DocumentTextIcon,
+} from '@heroicons/react/24/outline';
 
-export default function Index({ auth, absences, employees = [], filters = {}, typeOptions = [] }) {
+export default function Index({ absences, employees = [], filters = {}, typeOptions = [] }) {
     const { hasPermission } = usePermissions();
     const canCreate = hasPermission(PERMISSIONS.CREATE_ABSENCES);
     const canEdit = hasPermission(PERMISSIONS.EDIT_ABSENCES);
     const canDelete = hasPermission(PERMISSIONS.DELETE_ABSENCES);
 
+    const { modals, selected, openModal, closeModal } = useModalManager(['create', 'edit', 'view']);
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [deleting, setDeleting] = useState(false);
+
     const [search, setSearch] = useState(filters.search || '');
     const [employeeFilter, setEmployeeFilter] = useState(filters.employee_id || '');
     const [typeFilter, setTypeFilter] = useState(filters.type || '');
     const [justifiedFilter, setJustifiedFilter] = useState(filters.justified || '');
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [editing, setEditing] = useState(null);
-    const [viewing, setViewing] = useState(null);
-    const [deleting, setDeleting] = useState(null);
 
     const applyFilters = () => {
         router.get(route('absences.index'), {
-            search: search || undefined,
-            employee_id: employeeFilter || undefined,
-            type: typeFilter || undefined,
-            justified: justifiedFilter || undefined,
+            search: search || undefined, employee_id: employeeFilter || undefined,
+            type: typeFilter || undefined, justified: justifiedFilter || undefined,
         }, { preserveState: true });
     };
 
+    const clearFilters = () => {
+        setSearch(''); setEmployeeFilter(''); setTypeFilter(''); setJustifiedFilter('');
+        router.get(route('absences.index'), {}, { preserveState: true });
+    };
+
+    const hasActiveFilters = search || employeeFilter || typeFilter || justifiedFilter;
+
     const openEdit = (item) => {
-        fetch(route('absences.show', item.id))
-            .then(r => r.json())
-            .then(data => setEditing(data));
+        fetch(route('absences.show', item.id)).then(r => r.json()).then(data => openModal('edit', data));
     };
 
     const openView = (item) => {
-        fetch(route('absences.show', item.id))
-            .then(r => r.json())
-            .then(data => setViewing(data));
+        fetch(route('absences.show', item.id)).then(r => r.json()).then(data => openModal('view', data));
     };
 
-    const handleDelete = () => {
-        if (!deleting) return;
-        router.delete(route('absences.destroy', deleting.id), { onSuccess: () => setDeleting(null) });
+    const handleConfirmDelete = () => {
+        if (!deleteTarget) return;
+        setDeleting(true);
+        router.delete(route('absences.destroy', deleteTarget.id), {
+            onSuccess: () => { setDeleteTarget(null); setDeleting(false); },
+            onError: () => setDeleting(false),
+        });
     };
-
-    const justifiedBadge = (val) => val
-        ? <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Justificada</span>
-        : <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Injustificada</span>;
 
     return (
         <>
             <Head title="Controle de Faltas" />
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+                    {/* Header */}
                     <div className="mb-6 flex justify-between items-center">
                         <div>
                             <h1 className="text-3xl font-bold text-gray-900">Controle de Faltas</h1>
-                            <p className="mt-1 text-sm text-gray-600">Registre e acompanhe faltas dos funcionarios</p>
+                            <p className="mt-1 text-sm text-gray-600">Registre e acompanhe faltas dos funcionários</p>
                         </div>
                         {canCreate && (
-                            <Button variant="primary" onClick={() => setShowCreateModal(true)}
-                                icon={PlusIcon}>Registrar Falta</Button>
+                            <Button variant="primary" onClick={() => openModal('create')} icon={PlusIcon}>
+                                Registrar Falta
+                            </Button>
                         )}
                     </div>
 
-                    {/* Filters */}
+                    {/* Filtros */}
                     <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
                         <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
-                                <input type="text" placeholder="Nome..." value={search} onChange={e => setSearch(e.target.value)}
+                                <input type="text" placeholder="Nome..." value={search}
+                                    onChange={e => setSearch(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && applyFilters()}
                                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Funcionario</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Funcionário</label>
                                 <select value={employeeFilter} onChange={e => setEmployeeFilter(e.target.value)}
                                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                                     <option value="">Todos</option>
@@ -101,18 +116,17 @@ export default function Index({ auth, absences, employees = [], filters = {}, ty
                                     <option value="no">Injustificadas</option>
                                 </select>
                             </div>
-                            <div>
-                                <Button variant="primary" onClick={applyFilters}>Filtrar</Button>
-                            </div>
+                            <Button variant="primary" size="sm" onClick={applyFilters} icon={MagnifyingGlassIcon}>Filtrar</Button>
+                            <Button variant="outline" size="sm" onClick={clearFilters} disabled={!hasActiveFilters} icon={XMarkIcon}>Limpar</Button>
                         </div>
                     </div>
 
-                    {/* Table */}
+                    {/* Tabela */}
                     <div className="bg-white shadow-sm rounded-lg overflow-hidden">
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>
-                                    {['Funcionario', 'Data', 'Tipo', 'Justificativa', 'Motivo', 'Acoes'].map(h => (
+                                    {['Funcionário', 'Data', 'Tipo', 'Justificativa', 'Motivo', 'Ações'].map(h => (
                                         <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>
                                     ))}
                                 </tr>
@@ -123,13 +137,17 @@ export default function Index({ auth, absences, employees = [], filters = {}, ty
                                         <td className="px-4 py-3 text-sm font-medium text-gray-900">{a.employee_name}</td>
                                         <td className="px-4 py-3 text-sm text-gray-500">{a.absence_date}</td>
                                         <td className="px-4 py-3 text-sm text-gray-500">{a.type_label}</td>
-                                        <td className="px-4 py-3">{justifiedBadge(a.is_justified)}</td>
+                                        <td className="px-4 py-3">
+                                            <StatusBadge variant={a.is_justified ? 'success' : 'danger'}>
+                                                {a.is_justified ? 'Justificada' : 'Injustificada'}
+                                            </StatusBadge>
+                                        </td>
                                         <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">{a.reason || '-'}</td>
                                         <td className="px-4 py-3">
                                             <ActionButtons
                                                 onView={() => openView(a)}
                                                 onEdit={canEdit ? () => openEdit(a) : null}
-                                                onDelete={canDelete ? () => setDeleting(a) : null}
+                                                onDelete={canDelete ? () => setDeleteTarget(a) : null}
                                             />
                                         </td>
                                     </tr>
@@ -138,20 +156,51 @@ export default function Index({ auth, absences, employees = [], filters = {}, ty
                                 )}
                             </tbody>
                         </table>
-                        {absences.last_page > 1 && <Pagination links={absences.links} from={absences.from} to={absences.to} total={absences.total} />}
+                        {absences.last_page > 1 && (
+                            <div className="px-4 py-3 border-t flex justify-between items-center">
+                                <span className="text-sm text-gray-700">{absences.from} a {absences.to} de {absences.total}</span>
+                                <div className="flex space-x-1">
+                                    {absences.links.map((link, i) => (
+                                        <button key={i} onClick={() => link.url && router.get(link.url)} disabled={!link.url}
+                                            className={`px-3 py-1 text-sm rounded ${link.active ? 'bg-indigo-600 text-white' : link.url ? 'bg-white text-gray-700 hover:bg-gray-50 border' : 'bg-gray-100 text-gray-400'}`}
+                                            dangerouslySetInnerHTML={{ __html: link.label }} />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
-                    {showCreateModal && <FormModal employees={employees} typeOptions={typeOptions} onClose={() => setShowCreateModal(false)} />}
-                    {editing && <FormModal absence={editing} employees={employees} typeOptions={typeOptions} onClose={() => setEditing(null)} />}
-                    {viewing && <ViewModal absence={viewing} onClose={() => setViewing(null)} />}
-                    {deleting && <DeleteConfirm label={`falta de ${deleting.employee_name} em ${deleting.absence_date}`} onConfirm={handleDelete} onCancel={() => setDeleting(null)} />}
+                    {/* Modal Criar/Editar */}
+                    <AbsenceFormModal show={modals.create} employees={employees} typeOptions={typeOptions}
+                        onClose={() => closeModal('create')} />
+                    <AbsenceFormModal show={modals.edit && selected !== null} absence={selected}
+                        employees={employees} typeOptions={typeOptions} onClose={() => closeModal('edit')} />
+
+                    {/* Modal Visualizar */}
+                    {modals.view && selected && (
+                        <AbsenceViewModal absence={selected} onClose={() => closeModal('view')} />
+                    )}
+
+                    {/* Delete Confirm */}
+                    <DeleteConfirmModal
+                        show={deleteTarget !== null}
+                        onClose={() => setDeleteTarget(null)}
+                        onConfirm={handleConfirmDelete}
+                        itemType="falta"
+                        itemName={deleteTarget?.employee_name}
+                        details={[
+                            { label: 'Data', value: deleteTarget?.absence_date },
+                            { label: 'Tipo', value: deleteTarget?.type_label },
+                        ]}
+                        processing={deleting}
+                    />
                 </div>
             </div>
         </>
     );
 }
 
-function FormModal({ absence = null, employees, typeOptions, onClose }) {
+function AbsenceFormModal({ show, absence = null, employees, typeOptions, onClose }) {
     const isEdit = !!absence;
     const form = useForm({
         employee_id: absence?.employee_id || '',
@@ -162,139 +211,117 @@ function FormModal({ absence = null, employees, typeOptions, onClose }) {
         notes: absence?.notes || '',
     });
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (isEdit) {
-            form.put(route('absences.update', absence.id), { onSuccess: onClose });
-        } else {
-            form.post(route('absences.store'), { onSuccess: onClose });
-        }
+    const handleSubmit = () => {
+        if (isEdit) form.put(route('absences.update', absence.id), { onSuccess: onClose });
+        else form.post(route('absences.store'), { onSuccess: onClose });
     };
 
     return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
-                <div className={`${isEdit ? 'bg-indigo-600' : 'bg-green-600'} text-white px-6 py-4 rounded-t-lg flex justify-between items-center`}>
-                    <h3 className="text-lg font-semibold">{isEdit ? 'Editar Falta' : 'Registrar Falta'}</h3>
-                    <button onClick={onClose} className="text-white hover:opacity-80 text-2xl leading-none">&times;</button>
+        <StandardModal show={show} onClose={onClose}
+            title={isEdit ? 'Editar Falta' : 'Registrar Falta'}
+            headerColor={isEdit ? 'bg-yellow-600' : 'bg-indigo-600'}
+            headerIcon={isEdit ? <PencilSquareIcon className="h-5 w-5" /> : <PlusIcon className="h-5 w-5" />}
+            onSubmit={handleSubmit}
+            footer={
+                <StandardModal.Footer onCancel={onClose} onSubmit="submit"
+                    submitLabel={isEdit ? 'Salvar' : 'Registrar'}
+                    submitColor={isEdit ? 'bg-yellow-600 hover:bg-yellow-700' : undefined}
+                    processing={form.processing} />
+            }>
+
+            <FormSection title="Funcionário e Data" cols={2}>
+                <div>
+                    <InputLabel value="Funcionário *" />
+                    <select value={form.data.employee_id} onChange={e => form.setData('employee_id', e.target.value)} required
+                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        <option value="">Selecione...</option>
+                        {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                    </select>
+                    <InputError message={form.errors.employee_id} className="mt-1" />
                 </div>
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Funcionario *</label>
-                            <select value={form.data.employee_id} onChange={e => form.setData('employee_id', e.target.value)} required
-                                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                                <option value="">Selecione...</option>
-                                {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                            </select>
-                            {form.errors.employee_id && <p className="mt-1 text-xs text-red-600">{form.errors.employee_id}</p>}
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Data *</label>
-                            <input type="date" value={form.data.absence_date} onChange={e => form.setData('absence_date', e.target.value)} required
-                                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
-                            {form.errors.absence_date && <p className="mt-1 text-xs text-red-600">{form.errors.absence_date}</p>}
-                        </div>
+                <div>
+                    <InputLabel value="Data *" />
+                    <TextInput type="date" className="mt-1 w-full" value={form.data.absence_date}
+                        onChange={e => form.setData('absence_date', e.target.value)} required />
+                    <InputError message={form.errors.absence_date} className="mt-1" />
+                </div>
+            </FormSection>
+
+            <FormSection title="Classificação" cols={2}>
+                <div>
+                    <InputLabel value="Tipo *" />
+                    <select value={form.data.type} onChange={e => form.setData('type', e.target.value)} required
+                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        {typeOptions.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </select>
+                </div>
+                <div className="flex items-end pb-1">
+                    <div className="flex items-center gap-2">
+                        <Checkbox checked={form.data.is_justified}
+                            onChange={e => form.setData('is_justified', e.target.checked)} />
+                        <span className="text-sm text-gray-700">Falta justificada</span>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
-                            <select value={form.data.type} onChange={e => form.setData('type', e.target.value)} required
-                                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                                {typeOptions.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                            </select>
-                        </div>
-                        <div className="flex items-end pb-2">
-                            <label className="flex items-center">
-                                <input type="checkbox" checked={form.data.is_justified} onChange={e => form.setData('is_justified', e.target.checked)}
-                                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
-                                <span className="ml-2 text-sm text-gray-700">Falta justificada</span>
-                            </label>
-                        </div>
-                    </div>
+                </div>
+                <div className="col-span-full">
+                    <InputLabel value="Motivo" />
+                    <TextInput className="mt-1 w-full" value={form.data.reason}
+                        onChange={e => form.setData('reason', e.target.value)} placeholder="Motivo da falta" />
+                </div>
+            </FormSection>
+
+            <FormSection title="Observações" cols={1}>
+                <div>
+                    <textarea value={form.data.notes} onChange={e => form.setData('notes', e.target.value)} rows="2"
+                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+                </div>
+            </FormSection>
+        </StandardModal>
+    );
+}
+
+function AbsenceViewModal({ absence, onClose }) {
+    const headerBadges = [
+        {
+            text: absence.is_justified ? 'Justificada' : 'Injustificada',
+            className: absence.is_justified ? 'bg-emerald-500/20 text-white' : 'bg-red-500/20 text-white',
+        },
+    ];
+
+    return (
+        <StandardModal show={true} onClose={onClose} title="Detalhes da Falta"
+            subtitle={absence.employee_name}
+            headerColor="bg-gray-700" headerIcon={<DocumentTextIcon className="h-5 w-5" />}
+            headerBadges={headerBadges}
+            footer={<StandardModal.Footer onCancel={onClose} cancelLabel="Fechar" />}>
+
+            <StandardModal.Section title="Informações da Falta">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <StandardModal.Field label="Funcionário" value={absence.employee_name} />
+                    <StandardModal.Field label="Data" value={absence.absence_date_formatted} />
+                    <StandardModal.Field label="Tipo" value={absence.type_label} />
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Motivo</label>
-                        <input type="text" value={form.data.reason} onChange={e => form.setData('reason', e.target.value)} placeholder="Motivo da falta"
-                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Justificativa</p>
+                        <div className="mt-0.5">
+                            <StatusBadge variant={absence.is_justified ? 'success' : 'danger'}>
+                                {absence.is_justified ? 'Justificada' : 'Injustificada'}
+                            </StatusBadge>
+                        </div>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Observacoes</label>
-                        <textarea value={form.data.notes} onChange={e => form.setData('notes', e.target.value)} rows="2"
-                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
-                    </div>
-                    <div className="flex justify-end space-x-3 pt-4 border-t">
-                        <Button variant="outline" onClick={onClose}>Cancelar</Button>
-                        <Button type="submit" variant={isEdit ? 'primary' : 'success'} loading={form.processing}>
-                            {isEdit ? 'Salvar' : 'Registrar'}
-                        </Button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-}
-
-function ViewModal({ absence, onClose }) {
-    return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
-                <div className="bg-blue-600 text-white px-6 py-4 rounded-t-lg flex justify-between items-center">
-                    <h3 className="text-lg font-semibold">Detalhes da Falta</h3>
-                    <button onClick={onClose} className="text-white hover:opacity-80 text-2xl leading-none">&times;</button>
+                    <StandardModal.Field label="Motivo" value={absence.reason} />
+                    <StandardModal.Field label="Atestado Vinculado"
+                        value={absence.medical_certificate_id ? `#${absence.medical_certificate_id}` : null} mono />
                 </div>
-                <div className="p-6 space-y-4">
-                    <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-2 gap-4">
-                        <Detail label="Funcionario" value={absence.employee_name} />
-                        <Detail label="Data" value={absence.absence_date_formatted} />
-                        <Detail label="Tipo" value={absence.type_label} />
-                        <Detail label="Justificativa" value={absence.is_justified ? 'Justificada' : 'Injustificada'} />
-                        <Detail label="Motivo" value={absence.reason} />
-                        <Detail label="Atestado vinculado" value={absence.medical_certificate_id ? `#${absence.medical_certificate_id}` : '-'} />
-                    </div>
-                    {absence.notes && <div className="bg-gray-50 rounded-lg p-4"><Detail label="Observacoes" value={absence.notes} /></div>}
-                    <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-2 gap-4">
-                        <Detail label="Registrado por" value={absence.created_by} />
-                        <Detail label="Registrado em" value={formatDateTime(absence.created_at)} />
-                    </div>
-                    <div className="flex justify-end pt-4 border-t">
-                        <Button variant="outline" onClick={onClose}>Fechar</Button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
+            </StandardModal.Section>
 
-function Detail({ label, value }) {
-    return (<div><p className="text-xs font-medium text-gray-500 uppercase mb-1">{label}</p><p className="text-sm text-gray-900">{value || '-'}</p></div>);
-}
+            {absence.notes && (
+                <StandardModal.Section title="Observações">
+                    <p className="text-sm text-gray-900 whitespace-pre-line">{absence.notes}</p>
+                </StandardModal.Section>
+            )}
 
-function Pagination({ links, from, to, total }) {
-    return (
-        <div className="px-4 py-3 border-t flex justify-between items-center">
-            <span className="text-sm text-gray-700">{from} a {to} de {total}</span>
-            <div className="flex space-x-1">
-                {links.map((link, i) => (
-                    <button key={i} onClick={() => link.url && router.get(link.url)} disabled={!link.url}
-                        className={`px-3 py-1 text-sm rounded ${link.active ? 'bg-indigo-600 text-white' : link.url ? 'bg-white text-gray-700 hover:bg-gray-50 border' : 'bg-gray-100 text-gray-400'}`}
-                        dangerouslySetInnerHTML={{ __html: link.label }} />
-                ))}
+            <div className="flex justify-between text-xs text-gray-400 pt-2">
+                <span>Registrado por {absence.created_by || '-'} em {formatDateTime(absence.created_at)}</span>
             </div>
-        </div>
-    );
-}
-
-function DeleteConfirm({ label, onConfirm, onCancel }) {
-    return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Confirmar Exclusao</h3>
-                <p className="text-sm text-gray-600 mb-4">Deseja excluir a {label}? Esta acao nao pode ser desfeita.</p>
-                <div className="flex justify-end space-x-3">
-                    <Button variant="outline" onClick={onCancel}>Cancelar</Button>
-                    <Button variant="danger" onClick={onConfirm}>Excluir</Button>
-                </div>
-            </div>
-        </div>
+        </StandardModal>
     );
 }

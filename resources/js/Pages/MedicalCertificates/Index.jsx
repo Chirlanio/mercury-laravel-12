@@ -1,81 +1,99 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
+import useModalManager from '@/Hooks/useModalManager';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
+import StatusBadge from '@/Components/Shared/StatusBadge';
+import DeleteConfirmModal from '@/Components/Shared/DeleteConfirmModal';
+import StandardModal from '@/Components/StandardModal';
+import FormSection from '@/Components/Shared/FormSection';
+import InputLabel from '@/Components/InputLabel';
+import InputError from '@/Components/InputError';
+import TextInput from '@/Components/TextInput';
 import { formatDateTime } from '@/Utils/dateHelpers';
-import { PlusIcon } from '@heroicons/react/24/outline';
+import {
+    PlusIcon, MagnifyingGlassIcon, XMarkIcon, PencilSquareIcon, DocumentTextIcon,
+} from '@heroicons/react/24/outline';
 
-export default function Index({ auth, certificates, employees = [], filters = {} }) {
+export default function Index({ certificates, employees = [], filters = {} }) {
     const { hasPermission } = usePermissions();
     const canCreate = hasPermission(PERMISSIONS.CREATE_MEDICAL_CERTIFICATES);
     const canEdit = hasPermission(PERMISSIONS.EDIT_MEDICAL_CERTIFICATES);
     const canDelete = hasPermission(PERMISSIONS.DELETE_MEDICAL_CERTIFICATES);
 
+    const { modals, selected, openModal, closeModal } = useModalManager(['create', 'edit', 'view']);
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [deleting, setDeleting] = useState(false);
+
     const [search, setSearch] = useState(filters.search || '');
     const [employeeFilter, setEmployeeFilter] = useState(filters.employee_id || '');
     const [statusFilter, setStatusFilter] = useState(filters.status || '');
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [editing, setEditing] = useState(null);
-    const [viewing, setViewing] = useState(null);
-    const [deleting, setDeleting] = useState(null);
 
     const applyFilters = () => {
         router.get(route('medical-certificates.index'), {
-            search: search || undefined,
-            employee_id: employeeFilter || undefined,
-            status: statusFilter || undefined,
+            search: search || undefined, employee_id: employeeFilter || undefined, status: statusFilter || undefined,
         }, { preserveState: true });
     };
+
+    const clearFilters = () => {
+        setSearch(''); setEmployeeFilter(''); setStatusFilter('');
+        router.get(route('medical-certificates.index'), {}, { preserveState: true });
+    };
+
+    const hasActiveFilters = search || employeeFilter || statusFilter;
 
     const openEdit = (item) => {
         fetch(route('medical-certificates.show', item.id))
             .then(r => r.json())
-            .then(data => setEditing(data));
+            .then(data => openModal('edit', data));
     };
 
     const openView = (item) => {
         fetch(route('medical-certificates.show', item.id))
             .then(r => r.json())
-            .then(data => setViewing(data));
+            .then(data => openModal('view', data));
     };
 
-    const handleDelete = () => {
-        if (!deleting) return;
-        router.delete(route('medical-certificates.destroy', deleting.id), {
-            onSuccess: () => setDeleting(null),
+    const handleConfirmDelete = () => {
+        if (!deleteTarget) return;
+        setDeleting(true);
+        router.delete(route('medical-certificates.destroy', deleteTarget.id), {
+            onSuccess: () => { setDeleteTarget(null); setDeleting(false); },
+            onError: () => setDeleting(false),
         });
     };
 
     return (
         <>
-            <Head title="Atestados Medicos" />
+            <Head title="Atestados Médicos" />
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
                     {/* Header */}
                     <div className="mb-6 flex justify-between items-center">
                         <div>
-                            <h1 className="text-3xl font-bold text-gray-900">Atestados Medicos</h1>
-                            <p className="mt-1 text-sm text-gray-600">Gerencie atestados medicos dos funcionarios</p>
+                            <h1 className="text-3xl font-bold text-gray-900">Atestados Médicos</h1>
+                            <p className="mt-1 text-sm text-gray-600">Gerencie atestados médicos dos funcionários</p>
                         </div>
                         {canCreate && (
-                            <Button variant="primary" onClick={() => setShowCreateModal(true)}
-                                icon={PlusIcon}>Novo Atestado</Button>
+                            <Button variant="primary" onClick={() => openModal('create')} icon={PlusIcon}>
+                                Novo Atestado
+                            </Button>
                         )}
                     </div>
 
-                    {/* Filters */}
+                    {/* Filtros */}
                     <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
                         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
-                                <input type="text" placeholder="Nome, CID, medico..." value={search}
+                                <input type="text" placeholder="Nome, CID, médico..." value={search}
                                     onChange={e => setSearch(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && applyFilters()}
                                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Funcionario</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Funcionário</label>
                                 <select value={employeeFilter} onChange={e => setEmployeeFilter(e.target.value)}
                                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                                     <option value="">Todos</option>
@@ -83,7 +101,7 @@ export default function Index({ auth, certificates, employees = [], filters = {}
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Situacao</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Situação</label>
                                 <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
                                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                                     <option value="">Todos</option>
@@ -91,18 +109,17 @@ export default function Index({ auth, certificates, employees = [], filters = {}
                                     <option value="expired">Expirado</option>
                                 </select>
                             </div>
-                            <div>
-                                <Button variant="primary" onClick={applyFilters}>Filtrar</Button>
-                            </div>
+                            <Button variant="primary" size="sm" onClick={applyFilters} icon={MagnifyingGlassIcon}>Filtrar</Button>
+                            <Button variant="outline" size="sm" onClick={clearFilters} disabled={!hasActiveFilters} icon={XMarkIcon}>Limpar</Button>
                         </div>
                     </div>
 
-                    {/* Table */}
+                    {/* Tabela */}
                     <div className="bg-white shadow-sm rounded-lg overflow-hidden">
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>
-                                    {['Funcionario', 'Periodo', 'Dias', 'CID', 'Medico', 'Status', 'Acoes'].map(h => (
+                                    {['Funcionário', 'Período', 'Dias', 'CID', 'Médico', 'Status', 'Ações'].map(h => (
                                         <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>
                                     ))}
                                 </tr>
@@ -116,15 +133,15 @@ export default function Index({ auth, certificates, employees = [], filters = {}
                                         <td className="px-4 py-3 text-sm text-gray-500 font-mono">{c.cid_code || '-'}</td>
                                         <td className="px-4 py-3 text-sm text-gray-500">{c.doctor_name || '-'}</td>
                                         <td className="px-4 py-3">
-                                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${c.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                            <StatusBadge variant={c.is_active ? 'success' : 'gray'}>
                                                 {c.is_active ? 'Vigente' : 'Expirado'}
-                                            </span>
+                                            </StatusBadge>
                                         </td>
                                         <td className="px-4 py-3">
                                             <ActionButtons
                                                 onView={() => openView(c)}
                                                 onEdit={canEdit ? () => openEdit(c) : null}
-                                                onDelete={canDelete ? () => setDeleting(c) : null}
+                                                onDelete={canDelete ? () => setDeleteTarget(c) : null}
                                             />
                                         </td>
                                     </tr>
@@ -133,20 +150,58 @@ export default function Index({ auth, certificates, employees = [], filters = {}
                                 )}
                             </tbody>
                         </table>
-                        {certificates.last_page > 1 && <Pagination links={certificates.links} from={certificates.from} to={certificates.to} total={certificates.total} />}
+                        {certificates.last_page > 1 && (
+                            <div className="px-4 py-3 border-t flex justify-between items-center">
+                                <span className="text-sm text-gray-700">{certificates.from} a {certificates.to} de {certificates.total}</span>
+                                <div className="flex space-x-1">
+                                    {certificates.links.map((link, i) => (
+                                        <button key={i} onClick={() => link.url && router.get(link.url)} disabled={!link.url}
+                                            className={`px-3 py-1 text-sm rounded ${link.active ? 'bg-indigo-600 text-white' : link.url ? 'bg-white text-gray-700 hover:bg-gray-50 border' : 'bg-gray-100 text-gray-400'}`}
+                                            dangerouslySetInnerHTML={{ __html: link.label }} />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
-                    {showCreateModal && <FormModal employees={employees} onClose={() => setShowCreateModal(false)} />}
-                    {editing && <FormModal certificate={editing} employees={employees} onClose={() => setEditing(null)} />}
-                    {viewing && <ViewModal certificate={viewing} onClose={() => setViewing(null)} />}
-                    {deleting && <DeleteConfirm item={deleting} label={`atestado de ${deleting.employee_name}`} onConfirm={handleDelete} onCancel={() => setDeleting(null)} />}
+                    {/* Modal Criar/Editar */}
+                    <CertificateFormModal
+                        show={modals.create}
+                        employees={employees}
+                        onClose={() => closeModal('create')}
+                    />
+                    <CertificateFormModal
+                        show={modals.edit && selected !== null}
+                        certificate={selected}
+                        employees={employees}
+                        onClose={() => closeModal('edit')}
+                    />
+
+                    {/* Modal Visualizar */}
+                    {modals.view && selected && (
+                        <CertificateViewModal certificate={selected} onClose={() => closeModal('view')} />
+                    )}
+
+                    {/* Delete Confirm */}
+                    <DeleteConfirmModal
+                        show={deleteTarget !== null}
+                        onClose={() => setDeleteTarget(null)}
+                        onConfirm={handleConfirmDelete}
+                        itemType="atestado"
+                        itemName={deleteTarget?.employee_name}
+                        details={[
+                            { label: 'Período', value: deleteTarget ? `${deleteTarget.start_date} - ${deleteTarget.end_date}` : null },
+                            { label: 'CID', value: deleteTarget?.cid_code },
+                        ]}
+                        processing={deleting}
+                    />
                 </div>
             </div>
         </>
     );
 }
 
-function FormModal({ certificate = null, employees, onClose }) {
+function CertificateFormModal({ show, certificate = null, employees, onClose }) {
     const isEdit = !!certificate;
     const form = useForm({
         employee_id: certificate?.employee_id || '',
@@ -159,167 +214,126 @@ function FormModal({ certificate = null, employees, onClose }) {
         notes: certificate?.notes || '',
     });
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (isEdit) {
-            form.put(route('medical-certificates.update', certificate.id), { onSuccess: onClose });
-        } else {
-            form.post(route('medical-certificates.store'), { onSuccess: onClose });
-        }
+    const handleSubmit = () => {
+        if (isEdit) form.put(route('medical-certificates.update', certificate.id), { onSuccess: onClose });
+        else form.post(route('medical-certificates.store'), { onSuccess: onClose });
     };
 
     return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col">
-                <div className={`${isEdit ? 'bg-indigo-600' : 'bg-green-600'} text-white px-6 py-4 rounded-t-lg flex justify-between items-center shrink-0`}>
-                    <h3 className="text-lg font-semibold">{isEdit ? 'Editar Atestado' : 'Novo Atestado Médico'}</h3>
-                    <button onClick={onClose} className="text-white hover:opacity-80 text-2xl leading-none">&times;</button>
+        <StandardModal show={show} onClose={onClose}
+            title={isEdit ? 'Editar Atestado' : 'Novo Atestado Médico'}
+            headerColor={isEdit ? 'bg-yellow-600' : 'bg-indigo-600'}
+            headerIcon={isEdit ? <PencilSquareIcon className="h-5 w-5" /> : <PlusIcon className="h-5 w-5" />}
+            onSubmit={handleSubmit}
+            footer={
+                <StandardModal.Footer onCancel={onClose} onSubmit="submit"
+                    submitLabel={isEdit ? 'Salvar Alterações' : 'Cadastrar Atestado'}
+                    submitColor={isEdit ? 'bg-yellow-600 hover:bg-yellow-700' : undefined}
+                    processing={form.processing} />
+            }>
+
+            <FormSection title="Funcionário e Período" cols={2}>
+                <div className="col-span-full sm:col-span-1">
+                    <InputLabel value="Funcionário *" />
+                    <select value={form.data.employee_id} onChange={e => form.setData('employee_id', e.target.value)} required
+                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        <option value="">Selecione...</option>
+                        {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                    </select>
+                    <InputError message={form.errors.employee_id} className="mt-1" />
                 </div>
-                <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-                <div className="p-6 space-y-4 overflow-y-auto flex-1">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Funcionario *</label>
-                            <select value={form.data.employee_id} onChange={e => form.setData('employee_id', e.target.value)} required
-                                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                                <option value="">Selecione...</option>
-                                {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                            </select>
-                            {form.errors.employee_id && <p className="mt-1 text-xs text-red-600">{form.errors.employee_id}</p>}
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Data Inicio *</label>
-                            <input type="date" value={form.data.start_date} onChange={e => form.setData('start_date', e.target.value)} required
-                                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
-                            {form.errors.start_date && <p className="mt-1 text-xs text-red-600">{form.errors.start_date}</p>}
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Data Fim *</label>
-                            <input type="date" value={form.data.end_date} onChange={e => form.setData('end_date', e.target.value)} required
-                                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
-                            {form.errors.end_date && <p className="mt-1 text-xs text-red-600">{form.errors.end_date}</p>}
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">CID</label>
-                            <input type="text" value={form.data.cid_code} onChange={e => form.setData('cid_code', e.target.value)} placeholder="Ex: J11"
-                                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Descricao CID</label>
-                            <input type="text" value={form.data.cid_description} onChange={e => form.setData('cid_description', e.target.value)} placeholder="Descricao do CID"
-                                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Medico</label>
-                            <input type="text" value={form.data.doctor_name} onChange={e => form.setData('doctor_name', e.target.value)} placeholder="Nome do medico"
-                                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">CRM</label>
-                            <input type="text" value={form.data.doctor_crm} onChange={e => form.setData('doctor_crm', e.target.value)} placeholder="CRM do medico"
-                                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
-                        </div>
-                    </div>
+                <div />
+                <div>
+                    <InputLabel value="Data Início *" />
+                    <TextInput type="date" className="mt-1 w-full" value={form.data.start_date}
+                        onChange={e => form.setData('start_date', e.target.value)} required />
+                    <InputError message={form.errors.start_date} className="mt-1" />
+                </div>
+                <div>
+                    <InputLabel value="Data Fim *" />
+                    <TextInput type="date" className="mt-1 w-full" value={form.data.end_date}
+                        onChange={e => form.setData('end_date', e.target.value)} required />
+                    <InputError message={form.errors.end_date} className="mt-1" />
+                </div>
+            </FormSection>
+
+            <FormSection title="Diagnóstico" cols={2}>
+                <div>
+                    <InputLabel value="CID" />
+                    <TextInput className="mt-1 w-full" value={form.data.cid_code}
+                        onChange={e => form.setData('cid_code', e.target.value)} placeholder="Ex: J11" />
+                </div>
+                <div>
+                    <InputLabel value="Descrição CID" />
+                    <TextInput className="mt-1 w-full" value={form.data.cid_description}
+                        onChange={e => form.setData('cid_description', e.target.value)} placeholder="Descrição do CID" />
+                </div>
+            </FormSection>
+
+            <FormSection title="Médico" cols={2}>
+                <div>
+                    <InputLabel value="Nome do Médico" />
+                    <TextInput className="mt-1 w-full" value={form.data.doctor_name}
+                        onChange={e => form.setData('doctor_name', e.target.value)} placeholder="Nome do médico" />
+                </div>
+                <div>
+                    <InputLabel value="CRM" />
+                    <TextInput className="mt-1 w-full" value={form.data.doctor_crm}
+                        onChange={e => form.setData('doctor_crm', e.target.value)} placeholder="CRM do médico" />
+                </div>
+            </FormSection>
+
+            <FormSection title="Observações" cols={1}>
+                <div>
+                    <textarea value={form.data.notes} onChange={e => form.setData('notes', e.target.value)} rows="3"
+                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+                </div>
+            </FormSection>
+        </StandardModal>
+    );
+}
+
+function CertificateViewModal({ certificate, onClose }) {
+    const headerBadges = [
+        { text: certificate.is_active ? 'Vigente' : 'Expirado', className: certificate.is_active ? 'bg-emerald-500/20 text-white' : 'bg-white/20 text-white' },
+    ];
+
+    return (
+        <StandardModal show={true} onClose={onClose} title="Detalhes do Atestado"
+            subtitle={certificate.employee_name}
+            headerColor="bg-gray-700" headerIcon={<DocumentTextIcon className="h-5 w-5" />}
+            headerBadges={headerBadges}
+            footer={<StandardModal.Footer onCancel={onClose} cancelLabel="Fechar" />}>
+
+            <StandardModal.Section title="Informações do Atestado">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <StandardModal.Field label="Funcionário" value={certificate.employee_name} />
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Observacoes</label>
-                        <textarea value={form.data.notes} onChange={e => form.setData('notes', e.target.value)} rows="3"
-                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
-                    </div>
-                    </div>
-                    <div className="flex justify-end space-x-3 px-6 py-4 border-t bg-gray-50 rounded-b-lg shrink-0">
-                        <Button variant="outline" onClick={onClose}>Cancelar</Button>
-                        <Button type="submit" variant={isEdit ? 'primary' : 'success'} loading={form.processing}>
-                            {isEdit ? 'Salvar Alterações' : 'Cadastrar Atestado'}
-                        </Button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-}
-
-function ViewModal({ certificate, onClose }) {
-    return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4">
-                <div className="bg-blue-600 text-white px-6 py-4 rounded-t-lg flex justify-between items-center">
-                    <h3 className="text-lg font-semibold">Detalhes do Atestado</h3>
-                    <button onClick={onClose} className="text-white hover:opacity-80 text-2xl leading-none">&times;</button>
-                </div>
-                <div className="p-6 space-y-4">
-                    <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-2 gap-4">
-                        <Detail label="Funcionario" value={certificate.employee_name} />
-                        <Detail label="Status" value={
-                            <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${certificate.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Status</p>
+                        <div className="mt-0.5">
+                            <StatusBadge variant={certificate.is_active ? 'success' : 'gray'}>
                                 {certificate.is_active ? 'Vigente' : 'Expirado'}
-                            </span>
-                        } />
-                        <Detail label="Inicio" value={certificate.start_date_formatted} />
-                        <Detail label="Fim" value={certificate.end_date_formatted} />
-                        <Detail label="Dias" value={certificate.days} />
-                        <Detail label="CID" value={certificate.cid_code ? `${certificate.cid_code} - ${certificate.cid_description || ''}` : '-'} />
-                        <Detail label="Medico" value={certificate.doctor_name} />
-                        <Detail label="CRM" value={certificate.doctor_crm} />
-                    </div>
-                    {certificate.notes && (
-                        <div className="bg-gray-50 rounded-lg p-4">
-                            <Detail label="Observacoes" value={certificate.notes} />
+                            </StatusBadge>
                         </div>
-                    )}
-                    <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-2 gap-4">
-                        <Detail label="Cadastrado por" value={certificate.created_by} />
-                        <Detail label="Cadastrado em" value={formatDateTime(certificate.created_at)} />
                     </div>
-                    <div className="flex justify-end pt-4 border-t">
-                        <Button variant="outline" onClick={onClose}>Fechar</Button>
-                    </div>
+                    <StandardModal.Field label="Dias" value={certificate.days} />
+                    <StandardModal.Field label="Início" value={certificate.start_date_formatted} />
+                    <StandardModal.Field label="Fim" value={certificate.end_date_formatted} />
+                    <StandardModal.Field label="CID" value={certificate.cid_code ? `${certificate.cid_code} - ${certificate.cid_description || ''}` : null} mono />
+                    <StandardModal.Field label="Médico" value={certificate.doctor_name} />
+                    <StandardModal.Field label="CRM" value={certificate.doctor_crm} mono />
                 </div>
-            </div>
-        </div>
-    );
-}
+            </StandardModal.Section>
 
-function Detail({ label, value }) {
-    return (
-        <div>
-            <p className="text-xs font-medium text-gray-500 uppercase mb-1">{label}</p>
-            <p className="text-sm text-gray-900">{value || '-'}</p>
-        </div>
-    );
-}
+            {certificate.notes && (
+                <StandardModal.Section title="Observações">
+                    <p className="text-sm text-gray-900 whitespace-pre-line">{certificate.notes}</p>
+                </StandardModal.Section>
+            )}
 
-function Pagination({ links, from, to, total }) {
-    return (
-        <div className="px-4 py-3 border-t flex justify-between items-center">
-            <span className="text-sm text-gray-700">{from} a {to} de {total}</span>
-            <div className="flex space-x-1">
-                {links.map((link, i) => (
-                    <button key={i} onClick={() => link.url && router.get(link.url)} disabled={!link.url}
-                        className={`px-3 py-1 text-sm rounded ${link.active ? 'bg-indigo-600 text-white' : link.url ? 'bg-white text-gray-700 hover:bg-gray-50 border' : 'bg-gray-100 text-gray-400'}`}
-                        dangerouslySetInnerHTML={{ __html: link.label }} />
-                ))}
+            <div className="flex justify-between text-xs text-gray-400 pt-2">
+                <span>Cadastrado por {certificate.created_by || '-'} em {formatDateTime(certificate.created_at)}</span>
             </div>
-        </div>
-    );
-}
-
-function DeleteConfirm({ item, label, onConfirm, onCancel }) {
-    return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Confirmar Exclusao</h3>
-                <p className="text-sm text-gray-600 mb-4">Deseja excluir o {label}? Esta acao nao pode ser desfeita.</p>
-                <div className="flex justify-end space-x-3">
-                    <Button variant="outline" onClick={onCancel}>Cancelar</Button>
-                    <Button variant="danger" onClick={onConfirm}>Excluir</Button>
-                </div>
-            </div>
-        </div>
+        </StandardModal>
     );
 }

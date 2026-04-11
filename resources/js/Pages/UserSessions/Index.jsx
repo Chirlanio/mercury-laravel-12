@@ -1,7 +1,10 @@
-import PageHeader from '@/Components/PageHeader';
 import { Head, router } from '@inertiajs/react';
-import { WifiIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
+import Button from '@/Components/Button';
+import StatusBadge from '@/Components/Shared/StatusBadge';
+import {
+    WifiIcon, MagnifyingGlassIcon, XMarkIcon,
+} from '@heroicons/react/24/outline';
 
 export default function Index({ sessions, stores = [], filters = {}, onlineCount = 0 }) {
     const [search, setSearch] = useState(filters.search || '');
@@ -14,64 +17,60 @@ export default function Index({ sessions, stores = [], filters = {}, onlineCount
         }, { preserveState: true });
     };
 
-    const handleKeyDown = (e) => {
-        if (e.key === 'Enter') applyFilters();
+    const clearFilters = () => {
+        setSearch(''); setStoreId('');
+        router.get(route('user-sessions.index'), {}, { preserveState: true });
     };
+
+    const hasActiveFilters = search || storeId;
 
     return (
         <>
             <Head title="Usuários Online" />
-            <PageHeader>
-                <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800">
-                        Usuários Online
-                    </h2>
-                    <div className="flex items-center space-x-2 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-                        <WifiIcon className="h-4 w-4" />
-                        <span>{onlineCount} online</span>
-                    </div>
-                </div>
-            </PageHeader>
 
-            <div className="py-6">
-                <div className="mx-auto max-w-full px-4 sm:px-6 lg:px-8">
+            <div className="py-12">
+                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+                    {/* Header */}
+                    <div className="mb-6">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h1 className="text-3xl font-bold text-gray-900">Usuários Online</h1>
+                                <p className="mt-1 text-sm text-gray-600">
+                                    Monitore sessões ativas dos usuários do sistema
+                                </p>
+                            </div>
+                            <StatusBadge variant="success" size="lg" icon={WifiIcon} dot>
+                                {onlineCount} online
+                            </StatusBadge>
+                        </div>
+                    </div>
+
                     {/* Filtros */}
-                    <div className="bg-white shadow rounded-lg p-4 mb-6">
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
                             <div className="relative">
                                 <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Buscar por nome ou email..."
-                                    value={search}
+                                <input type="text" placeholder="Buscar por nome ou email..." value={search}
                                     onChange={(e) => setSearch(e.target.value)}
-                                    onKeyDown={handleKeyDown}
-                                    className="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                />
+                                    onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+                                    className="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
                             </div>
-                            <select
-                                value={storeId}
-                                onChange={(e) => setStoreId(e.target.value)}
-                                className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                            >
+                            <select value={storeId} onChange={(e) => setStoreId(e.target.value)}
+                                className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                                 <option value="">Todas as Lojas</option>
-                                {stores.map((store) => (
-                                    <option key={store.id} value={store.id}>
-                                        {store.code} - {store.name}
-                                    </option>
-                                ))}
+                                {stores.map((s) => <option key={s.id} value={s.id}>{s.code} - {s.name}</option>)}
                             </select>
-                            <button
-                                onClick={applyFilters}
-                                className="inline-flex justify-center items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700"
-                            >
+                            <Button variant="primary" size="sm" onClick={applyFilters} icon={MagnifyingGlassIcon}>
                                 Filtrar
-                            </button>
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={clearFilters} disabled={!hasActiveFilters} icon={XMarkIcon}>
+                                Limpar
+                            </Button>
                         </div>
                     </div>
 
                     {/* Tabela */}
-                    <div className="bg-white shadow rounded-lg overflow-hidden">
+                    <div className="bg-white shadow-sm rounded-lg overflow-hidden">
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>
@@ -84,7 +83,7 @@ export default function Index({ sessions, stores = [], filters = {}, onlineCount
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {sessions.data && sessions.data.length > 0 ? (
+                                {sessions.data?.length > 0 ? (
                                     sessions.data.map((session) => (
                                         <tr key={session.id} className="hover:bg-gray-50">
                                             <td className="px-6 py-4 whitespace-nowrap">
@@ -111,16 +110,12 @@ export default function Index({ sessions, stores = [], filters = {}, onlineCount
                                                 {session.last_activity_at}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                                    session.idle_status === 'active'
-                                                        ? 'bg-green-100 text-green-800'
-                                                        : 'bg-yellow-100 text-yellow-800'
-                                                }`}>
-                                                    <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-                                                        session.idle_status === 'active' ? 'bg-green-400' : 'bg-yellow-400'
-                                                    }`} />
+                                                <StatusBadge
+                                                    variant={session.idle_status === 'active' ? 'success' : 'warning'}
+                                                    dot
+                                                >
                                                     {session.idle_status === 'active' ? 'Ativo' : 'Inativo'}
-                                                </span>
+                                                </StatusBadge>
                                             </td>
                                         </tr>
                                     ))

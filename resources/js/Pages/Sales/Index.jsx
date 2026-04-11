@@ -1,6 +1,7 @@
 import { Head, router } from "@inertiajs/react";
 import { useState } from "react";
-import Modal from "@/Components/Modal";
+import { usePermissions, PERMISSIONS } from "@/Hooks/usePermissions";
+import useModalManager from "@/Hooks/useModalManager";
 import Button from "@/Components/Button";
 import SaleStatisticsCards from "@/Components/SaleStatisticsCards";
 import SaleCreateModal from "@/Components/SaleCreateModal";
@@ -8,21 +9,21 @@ import SaleEditModal from "@/Components/SaleEditModal";
 import SaleBulkDeleteModal from "@/Components/SaleBulkDeleteModal";
 import SalesHierarchyTable from "@/Components/SalesHierarchyTable";
 import EmployeeDailySalesModal from "@/Components/EmployeeDailySalesModal";
+import DeleteConfirmModal from "@/Components/Shared/DeleteConfirmModal";
 import { formatDate } from '@/Utils/dateHelpers';
+import {
+    PlusIcon,
+    XMarkIcon,
+    ArrowPathIcon,
+    TrashIcon,
+} from "@heroicons/react/24/outline";
 
-export default function Index({ auth, salesByStore, grandTotals, stores, filters, lastMovementDate, lastSalesRefresh }) {
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+export default function Index({ salesByStore, grandTotals, stores, filters, lastMovementDate }) {
+    const { hasPermission } = usePermissions();
+    const { modals, selected, openModal, closeModal } = useModalManager(['create', 'edit', 'bulkDelete', 'daily']);
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [deleting, setDeleting] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const [selectedSale, setSelectedSale] = useState(null);
-    const [saleToDelete, setSaleToDelete] = useState(null);
-    const [deleteError, setDeleteError] = useState(null);
-
-    // Employee daily sales modal state
-    const [isDailyModalOpen, setIsDailyModalOpen] = useState(false);
-    const [dailyModalParams, setDailyModalParams] = useState({ employeeId: null, storeId: null });
 
     const currentMonth = filters.month || new Date().getMonth() + 1;
     const currentYear = filters.year || new Date().getFullYear();
@@ -61,47 +62,36 @@ export default function Index({ auth, salesByStore, grandTotals, stores, filters
     };
 
     const handleCreated = () => {
-        setIsCreateModalOpen(false);
+        closeModal('create');
         router.reload();
     };
 
     const handleEmployeeClick = (employeeId, storeId) => {
-        setDailyModalParams({ employeeId, storeId });
-        setIsDailyModalOpen(true);
+        openModal('daily', { employeeId, storeId });
     };
 
     const handleEditSale = (sale) => {
-        setIsDailyModalOpen(false);
-        setSelectedSale(sale);
-        setIsEditModalOpen(true);
+        closeModal('daily');
+        openModal('edit', sale);
     };
 
     const handleDeleteSaleFromDaily = (sale) => {
-        setIsDailyModalOpen(false);
-        setSaleToDelete(sale);
-        setDeleteError(null);
-        setIsDeleteModalOpen(true);
+        closeModal('daily');
+        setDeleteTarget(sale);
     };
 
     const handleUpdated = () => {
-        setIsEditModalOpen(false);
-        setSelectedSale(null);
+        closeModal('edit');
         router.reload();
     };
 
-    const deleteSale = () => {
-        if (!saleToDelete) return;
-
-        router.delete(`/sales/${saleToDelete.id}`, {
+    const handleConfirmDelete = () => {
+        if (!deleteTarget) return;
+        setDeleting(true);
+        router.delete(`/sales/${deleteTarget.id}`, {
             preserveScroll: true,
-            onSuccess: () => {
-                setIsDeleteModalOpen(false);
-                setSaleToDelete(null);
-                setDeleteError(null);
-            },
-            onError: (errors) => {
-                setDeleteError(errors.general || 'Erro ao excluir venda.');
-            },
+            onSuccess: () => { setDeleteTarget(null); setDeleting(false); },
+            onError: () => setDeleting(false),
         });
     };
 
@@ -133,9 +123,7 @@ export default function Index({ auth, salesByStore, grandTotals, stores, filters
                     <div className="mb-6">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-3xl font-bold text-gray-900">
-                                    Vendas
-                                </h1>
+                                <h1 className="text-3xl font-bold text-gray-900">Vendas</h1>
                                 <p className="mt-1 text-sm text-gray-600">
                                     Gerencie registros de vendas por loja e funcionário
                                     {lastMovementDate && (
@@ -146,52 +134,47 @@ export default function Index({ auth, salesByStore, grandTotals, stores, filters
                                 </p>
                             </div>
                             <div className="flex gap-2">
-                                <Button
-                                    variant="info"
-                                    onClick={handleRefreshFromMovements}
-                                    disabled={isRefreshing}
-                                    icon={({ className }) => (
-                                        <svg className={`${className} ${isRefreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                        </svg>
-                                    )}
-                                >
-                                    {isRefreshing ? 'Atualizando...' : 'Atualizar Vendas'}
-                                </Button>
-                                <Button
-                                    variant="danger"
-                                    onClick={() => setIsBulkDeleteModalOpen(true)}
-                                    icon={({ className }) => (
-                                        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                    )}
-                                >
-                                    Excluir Período
-                                </Button>
-                                <Button
-                                    variant="primary"
-                                    onClick={() => setIsCreateModalOpen(true)}
-                                    icon={({ className }) => (
-                                        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                        </svg>
-                                    )}
-                                >
-                                    Nova Venda
-                                </Button>
+                                {hasPermission(PERMISSIONS.CREATE_SALES) && (
+                                    <Button
+                                        variant="info"
+                                        onClick={handleRefreshFromMovements}
+                                        disabled={isRefreshing}
+                                        loading={isRefreshing}
+                                        icon={ArrowPathIcon}
+                                    >
+                                        {isRefreshing ? 'Atualizando...' : 'Atualizar Vendas'}
+                                    </Button>
+                                )}
+                                {hasPermission(PERMISSIONS.DELETE_SALES) && (
+                                    <Button
+                                        variant="danger"
+                                        onClick={() => openModal('bulkDelete')}
+                                        icon={TrashIcon}
+                                    >
+                                        Excluir Período
+                                    </Button>
+                                )}
+                                {hasPermission(PERMISSIONS.CREATE_SALES) && (
+                                    <Button
+                                        variant="primary"
+                                        onClick={() => openModal('create')}
+                                        icon={PlusIcon}
+                                    >
+                                        Nova Venda
+                                    </Button>
+                                )}
                             </div>
                         </div>
                     </div>
 
-                    {/* Stats Cards */}
+                    {/* Estatísticas */}
                     <SaleStatisticsCards
                         month={currentMonth}
                         year={currentYear}
                         storeId={filters.store_id}
                     />
 
-                    {/* Filters */}
+                    {/* Filtros */}
                     <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                             <div>
@@ -238,11 +221,7 @@ export default function Index({ auth, salesByStore, grandTotals, stores, filters
                                     className="h-[42px] w-[150px]"
                                     onClick={clearFilters}
                                     disabled={!filters.store_id && !filters.search}
-                                    icon={({ className }) => (
-                                        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    )}
+                                    icon={XMarkIcon}
                                 >
                                     Limpar Filtros
                                 </Button>
@@ -250,7 +229,7 @@ export default function Index({ auth, salesByStore, grandTotals, stores, filters
                         </div>
                     </div>
 
-                    {/* Hierarchy Table */}
+                    {/* Tabela Hierárquica */}
                     <SalesHierarchyTable
                         salesByStore={salesByStore}
                         grandTotals={grandTotals}
@@ -262,18 +241,18 @@ export default function Index({ auth, salesByStore, grandTotals, stores, filters
 
             {/* Modal de Cadastro */}
             <SaleCreateModal
-                isOpen={isCreateModalOpen}
-                onClose={() => setIsCreateModalOpen(false)}
+                show={modals.create}
+                onClose={() => closeModal('create')}
                 onSuccess={handleCreated}
                 stores={stores}
             />
 
             {/* Modal de Vendas Diárias */}
             <EmployeeDailySalesModal
-                isOpen={isDailyModalOpen}
-                onClose={() => { setIsDailyModalOpen(false); setDailyModalParams({ employeeId: null, storeId: null }); }}
-                employeeId={dailyModalParams.employeeId}
-                storeId={dailyModalParams.storeId}
+                isOpen={modals.daily}
+                onClose={() => closeModal('daily')}
+                employeeId={selected?.employeeId}
+                storeId={selected?.storeId}
                 month={currentMonth}
                 year={currentYear}
                 stores={stores}
@@ -283,53 +262,34 @@ export default function Index({ auth, salesByStore, grandTotals, stores, filters
 
             {/* Modal de Edição */}
             <SaleEditModal
-                isOpen={isEditModalOpen && selectedSale !== null}
-                onClose={() => { setIsEditModalOpen(false); setSelectedSale(null); }}
+                show={modals.edit && selected !== null}
+                onClose={() => closeModal('edit')}
                 onSuccess={handleUpdated}
-                sale={selectedSale}
+                sale={selected}
                 stores={stores}
             />
 
             {/* Modal de Exclusão em Lote */}
             <SaleBulkDeleteModal
-                isOpen={isBulkDeleteModalOpen}
-                onClose={() => setIsBulkDeleteModalOpen(false)}
-                onSuccess={() => { setIsBulkDeleteModalOpen(false); router.reload(); }}
+                isOpen={modals.bulkDelete}
+                onClose={() => closeModal('bulkDelete')}
+                onSuccess={() => { closeModal('bulkDelete'); router.reload(); }}
                 stores={stores}
             />
 
-            {/* Modal de Confirmação de Exclusão Individual */}
-            <Modal show={isDeleteModalOpen} onClose={() => { setIsDeleteModalOpen(false); setSaleToDelete(null); setDeleteError(null); }}>
-                <div className="p-6">
-                    <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                        Confirmar Exclusão
-                    </h2>
-                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        Tem certeza que deseja excluir esta venda de <strong>{saleToDelete?.employee_name || saleToDelete?.store_name}</strong> em <strong>{formatDate(saleToDelete?.date_sales)}</strong>? Esta ação não pode ser desfeita.
-                    </p>
-                    {deleteError && (
-                        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
-                            <p className="text-sm text-red-600">{deleteError}</p>
-                        </div>
-                    )}
-                    <div className="mt-6 flex justify-end gap-3">
-                        <Button
-                            type="button"
-                            onClick={() => { setIsDeleteModalOpen(false); setSaleToDelete(null); setDeleteError(null); }}
-                            className="bg-gray-200 text-gray-800 hover:bg-gray-300"
-                        >
-                            Cancelar
-                        </Button>
-                        <Button
-                            type="button"
-                            onClick={deleteSale}
-                            className="bg-red-600 hover:bg-red-700"
-                        >
-                            Excluir
-                        </Button>
-                    </div>
-                </div>
-            </Modal>
+            {/* Confirmação de Exclusão Individual */}
+            <DeleteConfirmModal
+                show={deleteTarget !== null}
+                onClose={() => setDeleteTarget(null)}
+                onConfirm={handleConfirmDelete}
+                itemType="venda"
+                itemName={deleteTarget?.employee_name || deleteTarget?.store_name}
+                details={[
+                    { label: 'Data', value: formatDate(deleteTarget?.date_sales) },
+                    { label: 'Valor', value: deleteTarget?.total_sales ? `R$ ${deleteTarget.total_sales}` : null },
+                ]}
+                processing={deleting}
+            />
         </>
     );
 }

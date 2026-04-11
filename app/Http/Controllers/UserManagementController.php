@@ -3,15 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Enums\Role;
-use App\Enums\Permission;
-use App\Models\User;
-use App\Models\Store;
 use App\Models\ActivityLog;
+use App\Models\Store;
+use App\Models\User;
 use App\Rules\ValidImageRule;
 use App\Services\TenantRoleService;
-
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules;
@@ -27,17 +27,18 @@ class UserManagementController extends Controller
     {
         $perPage = $request->get('per_page', 10);
         $search = $request->get('search');
+        $roleFilter = $request->get('role');
         $sortField = $request->get('sort', 'name');
         $sortDirection = $request->get('direction', 'asc');
 
         // Validar campos de ordenação permitidos
         $allowedSortFields = ['name', 'email', 'role', 'created_at'];
-        if (!in_array($sortField, $allowedSortFields)) {
+        if (! in_array($sortField, $allowedSortFields)) {
             $sortField = 'name';
         }
 
         // Validar direção da ordenação
-        if (!in_array($sortDirection, ['asc', 'desc'])) {
+        if (! in_array($sortDirection, ['asc', 'desc'])) {
             $sortDirection = 'asc';
         }
 
@@ -47,8 +48,13 @@ class UserManagementController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%");
             });
+        }
+
+        // Aplicar filtro de role
+        if ($roleFilter && in_array($roleFilter, array_column(Role::cases(), 'value'))) {
+            $query->where('role', $roleFilter);
         }
 
         // Aplicar ordenação
@@ -59,7 +65,11 @@ class UserManagementController extends Controller
         // Buscar lojas ativas
         $stores = Store::active()->orderBy('name')->get(['code', 'name'])->values();
 
+        // Estatísticas de usuários
+        $stats = $this->getUserStats();
+
         return Inertia::render('UserManagement/Index', [
+            'stats' => $stats,
             'users' => $users->through(function ($user) {
                 return [
                     'id' => $user->id,
@@ -80,11 +90,34 @@ class UserManagementController extends Controller
             'stores' => $stores,
             'filters' => [
                 'search' => $search,
+                'role' => $roleFilter,
                 'sort' => $sortField,
                 'direction' => $sortDirection,
                 'per_page' => $perPage,
             ],
         ]);
+    }
+
+    private function getUserStats(): array
+    {
+        $total = User::count();
+        $roleCounts = User::select('role', DB::raw('count(*) as count'))
+            ->groupBy('role')
+            ->pluck('count', 'role')
+            ->toArray();
+
+        $verified = User::whereNotNull('email_verified_at')->count();
+        $newThisMonth = User::where('created_at', '>=', Carbon::now()->startOfMonth())->count();
+
+        return [
+            'total' => $total,
+            'admins' => ($roleCounts[Role::SUPER_ADMIN->value] ?? 0) + ($roleCounts[Role::ADMIN->value] ?? 0),
+            'support' => $roleCounts[Role::SUPPORT->value] ?? 0,
+            'users' => $roleCounts[Role::USER->value] ?? 0,
+            'verified' => $verified,
+            'unverified' => $total - $verified,
+            'new_this_month' => $newThisMonth,
+        ];
     }
 
     public function create()
@@ -102,7 +135,7 @@ class UserManagementController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'username' => 'nullable|string|max:220|unique:users',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            'role' => 'required|string|in:' . $this->roleService->getAllowedRoleValues(),
+            'role' => 'required|string|in:'.$this->roleService->getAllowedRoleValues(),
             'avatar' => ['nullable', ValidImageRule::avatar()],
             'store_id' => 'required|string|exists:stores,code',
             'status_id' => 'nullable|integer',
@@ -124,11 +157,11 @@ class UserManagementController extends Controller
         if ($request->hasFile('avatar')) {
             try {
                 $image = $request->file('avatar');
-                $imageName = time() . '.' . $image->getClientOriginalExtension();
+                $imageName = time().'.'.$image->getClientOriginalExtension();
                 $image->storeAs('avatars', $imageName, 'public');
                 $userData['avatar'] = $imageName;
             } catch (Exception $e) {
-                return back()->withErrors(['avatar' => 'Erro no upload da imagem: ' . $e->getMessage()]);
+                return back()->withErrors(['avatar' => 'Erro no upload da imagem: '.$e->getMessage()]);
             }
         }
 
@@ -185,16 +218,16 @@ class UserManagementController extends Controller
         $currentUser = auth()->user();
 
         // Verificar se pode editar este usuário
-        if (!$currentUser->canEditUser($user)) {
+        if (! $currentUser->canEditUser($user)) {
             abort(403, 'Você não tem permissão para editar este usuário.');
         }
 
         $validatedData = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'nickname' => 'nullable|string|max:220',
-            'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . $user->id,
-            'username' => 'nullable|string|max:220|unique:users,username,' . $user->id,
-            'role' => 'sometimes|required|string|in:' . $this->roleService->getAllowedRoleValues(),
+            'email' => 'sometimes|required|string|email|max:255|unique:users,email,'.$user->id,
+            'username' => 'nullable|string|max:220|unique:users,username,'.$user->id,
+            'role' => 'sometimes|required|string|in:'.$this->roleService->getAllowedRoleValues(),
             'avatar' => ['nullable', ValidImageRule::avatar()],
             'remove_avatar' => 'boolean',
             'store_id' => 'required|string|exists:stores,code',
@@ -227,9 +260,9 @@ class UserManagementController extends Controller
         if (isset($validatedData['role'])) {
             $newRole = Role::from($validatedData['role']);
 
-            if (!$currentUser->canManageRole($newRole) || !$currentUser->canManageRole($user->role)) {
+            if (! $currentUser->canManageRole($newRole) || ! $currentUser->canManageRole($user->role)) {
                 return back()->withErrors([
-                    'role' => 'Você não pode alterar o nível de acesso deste usuário.'
+                    'role' => 'Você não pode alterar o nível de acesso deste usuário.',
                 ]);
             }
             $updateData['role'] = $newRole;
@@ -238,13 +271,13 @@ class UserManagementController extends Controller
         // Remover avatar se solicitado
         if ($request->boolean('remove_avatar') && $user->avatar) {
             try {
-                $imagePath = storage_path('app/public/avatars/' . $user->avatar);
+                $imagePath = storage_path('app/public/avatars/'.$user->avatar);
                 if (file_exists($imagePath)) {
                     unlink($imagePath);
                 }
                 $updateData['avatar'] = null;
             } catch (Exception $e) {
-                return back()->withErrors(['avatar' => 'Erro ao remover a imagem: ' . $e->getMessage()]);
+                return back()->withErrors(['avatar' => 'Erro ao remover a imagem: '.$e->getMessage()]);
             }
         }
 
@@ -253,44 +286,42 @@ class UserManagementController extends Controller
             try {
                 // Remover imagem antiga se existir
                 if ($user->avatar) {
-                    $oldImagePath = storage_path('app/public/avatars/' . $user->avatar);
+                    $oldImagePath = storage_path('app/public/avatars/'.$user->avatar);
                     if (file_exists($oldImagePath)) {
                         unlink($oldImagePath);
                     }
                 }
 
                 $image = $request->file('avatar');
-                $imageName = time() . '.' . $image->getClientOriginalExtension();
+                $imageName = time().'.'.$image->getClientOriginalExtension();
                 $image->storeAs('avatars', $imageName, 'public');
                 $updateData['avatar'] = $imageName;
             } catch (Exception $e) {
-                return back()->withErrors(['avatar' => 'Erro no upload da imagem: ' . $e->getMessage()]);
+                return back()->withErrors(['avatar' => 'Erro no upload da imagem: '.$e->getMessage()]);
             }
         }
 
-        if (!empty($updateData)) {
+        if (! empty($updateData)) {
             $user->update($updateData);
         }
 
         return redirect()->route('users.index')->with('success', 'Usuário atualizado com sucesso!');
     }
 
-
-
     public function destroy(User $user)
     {
         $currentUser = auth()->user();
 
         // Verificar se pode deletar este usuário
-        if (!$currentUser->canEditUser($user) || $user->id === $currentUser->id) {
+        if (! $currentUser->canEditUser($user) || $user->id === $currentUser->id) {
             return back()->withErrors([
-                'delete' => 'Você não pode deletar este usuário.'
+                'delete' => 'Você não pode deletar este usuário.',
             ]);
         }
 
         // Remove avatar antes de deletar o usuário
         if ($user->avatar) {
-            $imagePath = storage_path('app/public/avatars/' . $user->avatar);
+            $imagePath = storage_path('app/public/avatars/'.$user->avatar);
             if (file_exists($imagePath)) {
                 unlink($imagePath);
             }
@@ -306,15 +337,15 @@ class UserManagementController extends Controller
         $currentUser = auth()->user();
 
         $request->validate([
-            'role' => 'required|string|in:' . $this->roleService->getAllowedRoleValues(),
+            'role' => 'required|string|in:'.$this->roleService->getAllowedRoleValues(),
         ]);
 
         $newRole = Role::from($request->role);
 
         // Verificar se pode alterar o role
-        if (!$currentUser->canManageRole($newRole) || !$currentUser->canManageRole($user->role)) {
+        if (! $currentUser->canManageRole($newRole) || ! $currentUser->canManageRole($user->role)) {
             return back()->withErrors([
-                'role' => 'Você não pode alterar o nível de acesso deste usuário.'
+                'role' => 'Você não pode alterar o nível de acesso deste usuário.',
             ]);
         }
 
@@ -331,12 +362,12 @@ class UserManagementController extends Controller
         $currentUser = auth()->user();
 
         // Verificar se pode editar este usuário
-        if (!$currentUser->canEditUser($user)) {
+        if (! $currentUser->canEditUser($user)) {
             abort(403, 'Você não tem permissão para editar este usuário.');
         }
 
         if ($user->avatar) {
-            $imagePath = storage_path('app/public/avatars/' . $user->avatar);
+            $imagePath = storage_path('app/public/avatars/'.$user->avatar);
             if (file_exists($imagePath)) {
                 unlink($imagePath);
             }

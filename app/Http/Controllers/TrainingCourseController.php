@@ -66,6 +66,8 @@ class TrainingCourseController extends Controller
             'visibilityOptions' => TrainingCourse::VISIBILITY_LABELS,
             'facilitators' => TrainingFacilitator::active()->orderBy('name')->get(['id', 'name', 'external']),
             'subjects' => TrainingSubject::active()->orderBy('name')->get(['id', 'name']),
+            'stores' => \App\Models\Store::orderBy('name')->get(['id', 'name', 'code']),
+            'templates' => \App\Models\CertificateTemplate::active()->orderBy('name')->get(['id', 'name', 'is_default']),
         ]);
     }
 
@@ -81,10 +83,16 @@ class TrainingCourseController extends Controller
             'certificate_on_completion' => 'boolean',
             'certificate_template_id' => 'nullable|exists:certificate_templates,id',
             'estimated_duration_minutes' => 'nullable|integer|min:1',
+            'thumbnail' => 'nullable|image|max:5120',
         ]);
 
+        unset($validated['thumbnail']);
         $validated['status'] = TrainingCourse::STATUS_DRAFT;
         $validated['created_by_user_id'] = auth()->id();
+
+        if ($request->hasFile('thumbnail')) {
+            $validated['thumbnail_path'] = $request->file('thumbnail')->store('training-courses/thumbnails', 'public');
+        }
 
         $course = TrainingCourse::create($validated);
 
@@ -106,6 +114,7 @@ class TrainingCourseController extends Controller
 
         return response()->json([
             'course' => $this->formatCourseDetail($trainingCourse),
+            'templates' => \App\Models\CertificateTemplate::active()->orderBy('name')->get(['id', 'name', 'is_default']),
         ]);
     }
 
@@ -121,9 +130,18 @@ class TrainingCourseController extends Controller
             'certificate_on_completion' => 'boolean',
             'certificate_template_id' => 'nullable|exists:certificate_templates,id',
             'estimated_duration_minutes' => 'nullable|integer|min:1',
+            'thumbnail' => 'nullable|image|max:5120',
         ]);
 
+        unset($validated['thumbnail']);
         $validated['updated_by_user_id'] = auth()->id();
+
+        if ($request->hasFile('thumbnail')) {
+            if ($trainingCourse->thumbnail_path) {
+                Storage::disk('public')->delete($trainingCourse->thumbnail_path);
+            }
+            $validated['thumbnail_path'] = $request->file('thumbnail')->store('training-courses/thumbnails', 'public');
+        }
 
         $trainingCourse->update($validated);
 
@@ -469,8 +487,16 @@ class TrainingCourseController extends Controller
     }
 
     // ==========================================
-    // Reports
+    // Reports & Export
     // ==========================================
+
+    public function exportReport(Request $request)
+    {
+        $type = $request->get('type', 'overview');
+
+        return (new \App\Exports\TrainingReportExport($type))
+            ->download('relatorio_treinamentos_'.$type.'_'.now()->format('Y-m-d').'.xlsx');
+    }
 
     public function reports(Request $request)
     {
@@ -634,8 +660,29 @@ class TrainingCourseController extends Controller
 
     private function reportByStore(Request $request): array
     {
-        // Simplified: group enrollments by employee store
-        return [];
+        return TrainingCourseEnrollment::join('users', 'users.id', '=', 'training_course_enrollments.user_id')
+            ->leftJoin('stores', 'stores.code', '=', 'users.store_id')
+            ->selectRaw(
+                'users.store_id as store_code,
+                 COALESCE(stores.name, CASE WHEN users.store_id IS NULL THEN ? ELSE users.store_id END) as store_name,
+                 COUNT(DISTINCT users.id) as employees_trained,
+                 COUNT(*) as total_enrollments,
+                 SUM(CASE WHEN training_course_enrollments.status = ? THEN 1 ELSE 0 END) as completions',
+                ['Sem loja', TrainingCourseEnrollment::STATUS_COMPLETED]
+            )
+            ->groupBy('users.store_id', 'stores.name')
+            ->get()
+            ->map(fn ($row) => [
+                'store_code' => $row->store_code ?? '-',
+                'store_name' => $row->store_name,
+                'employees_trained' => (int) $row->employees_trained,
+                'total_enrollments' => (int) $row->total_enrollments,
+                'completions' => (int) $row->completions,
+                'completion_rate' => $row->total_enrollments > 0
+                    ? round(($row->completions / $row->total_enrollments) * 100, 1)
+                    : 0,
+            ])
+            ->toArray();
     }
 
     private function reportByCourse(Request $request): array

@@ -2,14 +2,32 @@ import { Head, router, useForm } from '@inertiajs/react';
 import {
     PlusIcon, XMarkIcon, ArrowRightIcon,
     CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, ClockIcon,
-    ArrowPathIcon, PaperAirplaneIcon, PlayIcon, FlagIcon,
+    ArrowPathIcon, PaperAirplaneIcon, PlayIcon, FlagIcon, CalendarDaysIcon,
 } from '@heroicons/react/24/outline';
 import { useState, useEffect, useMemo } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
+import useModalManager from '@/Hooks/useModalManager';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import DataTable from '@/Components/DataTable';
+import StatusBadge from '@/Components/Shared/StatusBadge';
+import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import StandardModal from '@/Components/StandardModal';
+
+const STATUS_VARIANT = {
+    draft: 'gray', pending_manager: 'warning', approved_manager: 'info',
+    approved_rh: 'indigo', in_progress: 'success', completed: 'emerald',
+    cancelled: 'danger', rejected_manager: 'orange', rejected_rh: 'danger',
+};
+
+const STATUS_ICON = {
+    pending_manager: ClockIcon, approved_rh: CheckCircleIcon,
+    in_progress: PlayIcon, completed: FlagIcon,
+};
+
+const STATUS_COLOR = {
+    pending_manager: 'yellow', approved_rh: 'indigo', in_progress: 'green', completed: 'green',
+};
 
 const STATUS_STYLES = {
     draft:            { bg: 'bg-gray-100',   text: 'text-gray-800',   dot: 'bg-gray-400' },
@@ -32,11 +50,7 @@ export default function Index({
     const canApproveManager = hasPermission(PERMISSIONS.APPROVE_VACATIONS_MANAGER);
     const canApproveRH = hasPermission(PERMISSIONS.APPROVE_VACATIONS_RH);
 
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [showDetailModal, setShowDetailModal] = useState(false);
-    const [detailId, setDetailId] = useState(null);
-    const [showTransitionModal, setShowTransitionModal] = useState(false);
-    const [transitionData, setTransitionData] = useState(null);
+    const { modals, selected, openModal, closeModal } = useModalManager(['create', 'detail', 'transition']);
 
     const applyFilter = (key, value) => {
         const currentUrl = new URL(window.location);
@@ -55,7 +69,7 @@ export default function Index({
 
     const hasActiveFilters = filters.status || filters.store_id;
 
-    const openDetail = (id) => { setDetailId(id); setShowDetailModal(true); };
+    const openDetail = (v) => openModal('detail', v);
 
     const columns = [
         {
@@ -110,13 +124,10 @@ export default function Index({
             label: 'Status',
             sortable: true,
             render: (v) => (
-                <>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[v.status]?.bg} ${STATUS_STYLES[v.status]?.text}`}>
-                        <span className={`h-1.5 w-1.5 rounded-full mr-1.5 ${STATUS_STYLES[v.status]?.dot}`} />
-                        {v.status_label}
-                    </span>
-                    {v.is_retroactive && <span className="ml-1 text-xs text-purple-600 font-medium">(Retroativa)</span>}
-                </>
+                <div className="flex items-center gap-1">
+                    <StatusBadge variant={STATUS_VARIANT[v.status] || 'gray'} dot>{v.status_label}</StatusBadge>
+                    {v.is_retroactive && <StatusBadge variant="purple" size="sm">Retroativa</StatusBadge>}
+                </div>
             ),
         },
         {
@@ -129,34 +140,34 @@ export default function Index({
             field: 'actions',
             label: 'Ações',
             render: (v) => (
-                <ActionButtons onView={() => openDetail(v.id)}>
+                <ActionButtons onView={() => openDetail(v)}>
                     {canEdit && v.status === 'draft' && (
                         <ActionButtons.Custom variant="info" icon={PaperAirplaneIcon} title="Enviar para Gestor"
-                            onClick={() => { setTransitionData({ vacation: v, newStatus: 'pending_manager' }); setShowTransitionModal(true); }} />
+                            onClick={() => openModal('transition', { vacation: v, newStatus: 'pending_manager' })} />
                     )}
                     {canApproveManager && v.status === 'pending_manager' && (
                         <>
                             <ActionButtons.Custom variant="success" icon={CheckCircleIcon} title="Aprovar (Gestor)"
-                                onClick={() => { setTransitionData({ vacation: v, newStatus: 'approved_manager' }); setShowTransitionModal(true); }} />
+                                onClick={() => openModal('transition', { vacation: v, newStatus: 'approved_manager' })} />
                             <ActionButtons.Custom variant="danger" icon={XCircleIcon} title="Rejeitar (Gestor)"
-                                onClick={() => { setTransitionData({ vacation: v, newStatus: 'rejected_manager' }); setShowTransitionModal(true); }} />
+                                onClick={() => openModal('transition', { vacation: v, newStatus: 'rejected_manager' })} />
                         </>
                     )}
                     {canApproveRH && v.status === 'approved_manager' && (
                         <>
                             <ActionButtons.Custom variant="success" icon={CheckCircleIcon} title="Aprovar (RH)"
-                                onClick={() => { setTransitionData({ vacation: v, newStatus: 'approved_rh' }); setShowTransitionModal(true); }} />
+                                onClick={() => openModal('transition', { vacation: v, newStatus: 'approved_rh' })} />
                             <ActionButtons.Custom variant="danger" icon={XCircleIcon} title="Rejeitar (RH)"
-                                onClick={() => { setTransitionData({ vacation: v, newStatus: 'rejected_rh' }); setShowTransitionModal(true); }} />
+                                onClick={() => openModal('transition', { vacation: v, newStatus: 'rejected_rh' })} />
                         </>
                     )}
                     {canEdit && v.status === 'approved_rh' && (
                         <ActionButtons.Custom variant="success" icon={PlayIcon} title="Iniciar Gozo"
-                            onClick={() => { setTransitionData({ vacation: v, newStatus: 'in_progress' }); setShowTransitionModal(true); }} />
+                            onClick={() => openModal('transition', { vacation: v, newStatus: 'in_progress' })} />
                     )}
                     {canEdit && v.status === 'in_progress' && (
                         <ActionButtons.Custom variant="success" icon={FlagIcon} title="Finalizar"
-                            onClick={() => { setTransitionData({ vacation: v, newStatus: 'completed' }); setShowTransitionModal(true); }} />
+                            onClick={() => openModal('transition', { vacation: v, newStatus: 'completed' })} />
                     )}
                 </ActionButtons>
             ),
@@ -181,30 +192,23 @@ export default function Index({
                                 </p>
                             </div>
                             {canCreate && (
-                                <Button
-                                    variant="primary"
-                                    onClick={() => setShowCreateModal(true)}
-                                    icon={PlusIcon}
-                                >
+                                <Button variant="primary" onClick={() => openModal('create')} icon={PlusIcon}>
                                     Nova Solicitação
                                 </Button>
                             )}
                         </div>
                     </div>
 
-                    {/* Stats Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                        {['pending_manager', 'approved_rh', 'in_progress', 'completed'].map(status => {
-                            const data = statusCounts[status] || { label: status, count: 0 };
-                            const style = STATUS_STYLES[status] || {};
-                            return (
-                                <div key={status} className="bg-white shadow-sm rounded-lg p-4">
-                                    <div className="text-sm font-medium text-gray-500">{data.label}</div>
-                                    <div className={`text-2xl font-bold ${style.text || 'text-gray-900'}`}>{data.count}</div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                    {/* Estatísticas */}
+                    <StatisticsGrid cols={4} cards={
+                        ['pending_manager', 'approved_rh', 'in_progress', 'completed'].map(status => {
+                            const d = statusCounts[status] || { label: status, count: 0 };
+                            return {
+                                label: d.label, value: d.count, format: 'number',
+                                icon: STATUS_ICON[status], color: STATUS_COLOR[status] || 'gray',
+                            };
+                        })
+                    } />
 
                     {/* Filtros */}
                     <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
@@ -252,28 +256,28 @@ export default function Index({
                         columns={columns}
                         searchPlaceholder="Buscar funcionário..."
                         emptyMessage="Nenhuma solicitação de férias encontrada"
-                        onRowClick={(v) => openDetail(v.id)}
+                        onRowClick={(v) => openDetail(v)}
                         perPageOptions={[15, 25, 50]}
                     />
                 </div>
             </div>
 
             {/* Create Modal */}
-            {showCreateModal && (
-                <CreateModal selects={selects} onClose={() => setShowCreateModal(false)} />
+            {modals.create && (
+                <CreateModal selects={selects} onClose={() => closeModal('create')} />
             )}
 
             {/* Detail Modal */}
-            {showDetailModal && detailId && (
-                <DetailModal vacationId={detailId} canEdit={canEdit}
-                    onClose={() => { setShowDetailModal(false); setDetailId(null); }}
-                    onTransition={(v, ns) => { setShowDetailModal(false); setTransitionData({ vacation: v, newStatus: ns }); setShowTransitionModal(true); }} />
+            {modals.detail && selected && (
+                <DetailModal vacationId={selected.id} canEdit={canEdit}
+                    onClose={() => closeModal('detail')}
+                    onTransition={(v, ns) => { closeModal('detail', false); openModal('transition', { vacation: v, newStatus: ns }); }} />
             )}
 
             {/* Transition Modal */}
-            {showTransitionModal && transitionData && (
-                <TransitionModal data={transitionData} statusOptions={statusOptions}
-                    onClose={() => { setShowTransitionModal(false); setTransitionData(null); }} />
+            {modals.transition && selected && (
+                <TransitionModal data={selected} statusOptions={statusOptions}
+                    onClose={() => { closeModal('transition'); router.reload(); }} />
             )}
         </>
     );
@@ -663,14 +667,14 @@ function DetailModal({ vacationId, canEdit, onClose, onTransition }) {
     const available = v ? (nextTransitions[v.status] || []) : [];
 
     const transitionLabels = {
-        pending_manager: { label: 'Enviar para Gestor', color: 'bg-yellow-500 hover:bg-yellow-600' },
-        approved_manager: { label: 'Aprovar (Gestor)', color: 'bg-blue-600 hover:bg-blue-700' },
-        approved_rh: { label: 'Aprovar (RH)', color: 'bg-indigo-600 hover:bg-indigo-700' },
-        in_progress: { label: 'Iniciar Gozo', color: 'bg-green-600 hover:bg-green-700' },
-        completed: { label: 'Finalizar', color: 'bg-emerald-600 hover:bg-emerald-700' },
-        rejected_manager: { label: 'Rejeitar (Gestor)', color: 'bg-orange-500 hover:bg-orange-600' },
-        rejected_rh: { label: 'Rejeitar (RH)', color: 'bg-red-500 hover:bg-red-600' },
-        cancelled: { label: 'Cancelar', color: 'bg-red-600 hover:bg-red-700' },
+        pending_manager: { label: 'Enviar para Gestor', variant: 'warning', icon: PaperAirplaneIcon },
+        approved_manager: { label: 'Aprovar (Gestor)', variant: 'info', icon: CheckCircleIcon },
+        approved_rh: { label: 'Aprovar (RH)', variant: 'primary', icon: CheckCircleIcon },
+        in_progress: { label: 'Iniciar Gozo', variant: 'success', icon: PlayIcon },
+        completed: { label: 'Finalizar', variant: 'success', icon: FlagIcon },
+        rejected_manager: { label: 'Rejeitar (Gestor)', variant: 'warning', icon: XCircleIcon },
+        rejected_rh: { label: 'Rejeitar (RH)', variant: 'danger', icon: XCircleIcon },
+        cancelled: { label: 'Cancelar', variant: 'danger', icon: XCircleIcon },
     };
 
     const badges = [];
@@ -693,21 +697,25 @@ function DetailModal({ vacationId, canEdit, onClose, onTransition }) {
                     {available.map(ns => {
                         const t = transitionLabels[ns] || {};
                         return (
-                            <button key={ns} onClick={() => onTransition(v, ns)}
-                                className={`px-4 py-2 text-sm font-medium text-white rounded-lg ${t.color}`}>
+                            <Button key={ns} variant={t.variant || 'primary'} size="sm"
+                                icon={t.icon} onClick={() => onTransition(v, ns)}>
                                 {t.label}
-                            </button>
+                            </Button>
                         );
                     })}
                     {!['completed', 'cancelled', 'rejected_manager', 'rejected_rh'].includes(v.status) && (
-                        <button onClick={() => onTransition(v, 'cancelled')}
-                            className="ml-auto px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100">
-                            Cancelar Férias
-                        </button>
+                        <>
+                            <div className="flex-1" />
+                            <Button variant="danger" size="sm" icon={XCircleIcon}
+                                onClick={() => onTransition(v, 'cancelled')}>
+                                Cancelar Férias
+                            </Button>
+                        </>
                     )}
                 </StandardModal.Footer>
             ) : undefined}
         >
+                            {v && (<>
                                 {/* Resumo */}
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                                     <StandardModal.InfoCard label="Início" value={v.date_start} icon={<CalendarDaysIcon className="h-4 w-4" />} />
@@ -769,7 +777,7 @@ function DetailModal({ vacationId, canEdit, onClose, onTransition }) {
                                         </div>
                                     </div>
                                 )}
-
+                            </>)}
         </StandardModal>
     );
 }

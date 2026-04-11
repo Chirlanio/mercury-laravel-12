@@ -3,9 +3,16 @@
 **Versao:** 1.0
 **Data:** 22 de Marco de 2026
 
+> **ATENCAO: Este documento descreve a arquitetura do Mercury v1 (PHP MVC + Bootstrap).**
+> O projeto foi migrado para **Laravel 12 + React 18 + Inertia.js 2**.
+> Para a arquitetura atual, consulte:
+> - [`CLAUDE.md`](../CLAUDE.md) — Arquitetura completa do Mercury Laravel
+> - [`docs/PADRONIZACAO.md`](PADRONIZACAO.md) — Padroes de codificacao v3
+> - [`docs/GUIA_IMPLEMENTACAO_MODULOS.md`](GUIA_IMPLEMENTACAO_MODULOS.md) — Guia de implementacao v3
+
 ---
 
-## 1. Visao Geral
+## 1. Visao Geral (v1 — LEGADO)
 
 O Mercury e um sistema MVC em PHP 8.0+ para gestao empresarial do Grupo Meia Sola.
 

@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { useState, useEffect, useRef } from 'react';
 import {
     ClockIcon,
@@ -64,7 +64,7 @@ export default function TakeQuiz({ quiz }) {
         return `${m}:${s.toString().padStart(2, '0')}`;
     };
 
-    // Select option
+    // Select option (for objective questions)
     const selectOption = (questionId, optionId, questionType) => {
         setAnswers(prev => {
             const current = prev[questionId] || [];
@@ -78,12 +78,19 @@ export default function TakeQuiz({ quiz }) {
         });
     };
 
+    // Text answer (for open_text questions)
+    const [textAnswers, setTextAnswers] = useState({});
+    const setTextAnswer = (questionId, text) => {
+        setTextAnswers(prev => ({ ...prev, [questionId]: text }));
+    };
+
     // Submit
     const handleSubmit = () => {
         setLoading(true);
         const formattedAnswers = questions.map(q => ({
             question_id: q.id,
-            selected_options: answers[q.id] || [],
+            selected_options: q.question_type === 'open_text' ? [] : (answers[q.id] || []),
+            response_text: q.question_type === 'open_text' ? (textAnswers[q.id] || '') : null,
         }));
 
         fetch(route('training-quiz-attempts.submit', attemptId), {
@@ -112,7 +119,11 @@ export default function TakeQuiz({ quiz }) {
     };
 
     const currentQ = questions[currentIndex];
-    const answeredCount = Object.values(answers).filter(a => a.length > 0).length;
+    const answeredCount = questions.filter(q =>
+        q.question_type === 'open_text'
+            ? (textAnswers[q.id] || '').trim().length > 0
+            : (answers[q.id] || []).length > 0
+    ).length;
 
     // Result screen
     if (result) {
@@ -137,16 +148,28 @@ export default function TakeQuiz({ quiz }) {
                             <div className="mt-8 space-y-4">
                                 <h2 className="text-lg font-semibold">Revisão</h2>
                                 {review.responses.map((r, i) => (
-                                    <div key={i} className={`p-4 rounded-lg border ${r.is_correct ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+                                    <div key={i} className={`p-4 rounded-lg border ${
+                                        r.question_type === 'open_text' ? 'border-amber-200 bg-amber-50' :
+                                        r.is_correct ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
+                                    }`}>
                                         <p className="text-sm font-medium mb-2">{i + 1}. {r.question_text}</p>
-                                        {r.options?.map(o => (
-                                            <div key={o.id} className={`text-xs px-2 py-1 rounded mb-1 ${
-                                                o.is_correct ? 'bg-green-100 text-green-700' :
-                                                r.selected_options.includes(o.id) ? 'bg-red-100 text-red-700' : 'text-gray-500'
-                                            }`}>
-                                                {o.is_correct ? '✓' : r.selected_options.includes(o.id) ? '✗' : '○'} {o.option_text}
+                                        {r.question_type === 'open_text' ? (
+                                            <div>
+                                                <p className="text-xs text-gray-600 bg-white p-2 rounded border border-amber-200">
+                                                    {r.response_text || <span className="italic text-gray-400">Sem resposta</span>}
+                                                </p>
+                                                <p className="text-xs text-amber-600 mt-1 italic">Avaliação pendente pelo instrutor.</p>
                                             </div>
-                                        ))}
+                                        ) : (
+                                            r.options?.map(o => (
+                                                <div key={o.id} className={`text-xs px-2 py-1 rounded mb-1 ${
+                                                    o.is_correct ? 'bg-green-100 text-green-700' :
+                                                    r.selected_options?.includes(o.id) ? 'bg-red-100 text-red-700' : 'text-gray-500'
+                                                }`}>
+                                                    {o.is_correct ? '✓' : r.selected_options?.includes(o.id) ? '✗' : '○'} {o.option_text}
+                                                </div>
+                                            ))
+                                        )}
                                         {r.explanation && <p className="text-xs text-gray-500 mt-2 italic">{r.explanation}</p>}
                                     </div>
                                 ))}
@@ -154,7 +177,7 @@ export default function TakeQuiz({ quiz }) {
                         )}
 
                         <div className="mt-6 text-center">
-                            <Button variant="primary" onClick={() => window.history.back()}>Voltar</Button>
+                            <Button variant="primary" onClick={() => router.get(route('trainings.index'))}>Voltar</Button>
                         </div>
                     </div>
                 </div>
@@ -172,13 +195,18 @@ export default function TakeQuiz({ quiz }) {
                         <h1 className="text-2xl font-bold mb-4">{quiz.title}</h1>
                         {quiz.description && <p className="text-gray-600 mb-6">{quiz.description}</p>}
                         <div className="grid grid-cols-2 gap-4 mb-6 text-sm text-gray-500">
-                            <div>Nota minima: <strong>{quiz.passing_score}%</strong></div>
+                            <div>Nota mínima: <strong>{quiz.passing_score}%</strong></div>
                             <div>Tempo: <strong>{quiz.time_limit_minutes ? `${quiz.time_limit_minutes} min` : 'Sem limite'}</strong></div>
                         </div>
                         {error && <p className="text-red-500 mb-4">{error}</p>}
-                        <Button variant="primary" size="lg" onClick={startQuiz} loading={loading}>
-                            Iniciar Quiz
-                        </Button>
+                        <div className="flex items-center justify-center gap-4">
+                            <Button variant="outline" size="lg" onClick={() => router.get(route('trainings.index'))}>
+                                Voltar
+                            </Button>
+                            <Button variant="primary" size="lg" onClick={startQuiz} loading={loading}>
+                                Iniciar Quiz
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </>
@@ -193,7 +221,13 @@ export default function TakeQuiz({ quiz }) {
                 <div className="max-w-3xl mx-auto px-4">
                     {/* Header */}
                     <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-lg font-semibold">{quiz.title}</h2>
+                        <div className="flex items-center gap-3">
+                            <button onClick={() => router.get(route('trainings.index'))}
+                                className="text-sm text-indigo-600 hover:text-indigo-800">
+                                <ArrowLeftIcon className="w-4 h-4" />
+                            </button>
+                            <h2 className="text-lg font-semibold">{quiz.title}</h2>
+                        </div>
                         <div className="flex items-center gap-4">
                             <span className="text-sm text-gray-500">{answeredCount}/{questions.length} respondidas</span>
                             {timeLeft !== null && (
@@ -219,20 +253,35 @@ export default function TakeQuiz({ quiz }) {
                             </div>
                             <p className="text-lg font-medium text-gray-900 mb-6">{currentQ.question_text}</p>
 
-                            <div className="space-y-3">
-                                {currentQ.options.map(o => {
-                                    const selected = (answers[currentQ.id] || []).includes(o.id);
-                                    return (
-                                        <button key={o.id} type="button"
-                                            className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-colors text-sm ${
-                                                selected ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                            onClick={() => selectOption(currentQ.id, o.id, currentQ.question_type)}>
-                                            {o.option_text}
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            {currentQ.question_type === 'open_text' ? (
+                                <div>
+                                    <textarea
+                                        className="w-full rounded-lg border-2 border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 text-sm p-4"
+                                        rows={6}
+                                        placeholder="Escreva sua resposta aqui..."
+                                        value={textAnswers[currentQ.id] || ''}
+                                        onChange={e => setTextAnswer(currentQ.id, e.target.value)}
+                                    />
+                                    <p className="text-xs text-gray-400 mt-1">
+                                        {(textAnswers[currentQ.id] || '').length} caracteres
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {currentQ.options.map(o => {
+                                        const selected = (answers[currentQ.id] || []).includes(o.id);
+                                        return (
+                                            <button key={o.id} type="button"
+                                                className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-colors text-sm ${
+                                                    selected ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 hover:border-gray-300'
+                                                }`}
+                                                onClick={() => selectOption(currentQ.id, o.id, currentQ.question_type)}>
+                                                {o.option_text}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -246,16 +295,21 @@ export default function TakeQuiz({ quiz }) {
 
                         {/* Question dots */}
                         <div className="flex items-center gap-1">
-                            {questions.map((q, i) => (
-                                <button key={q.id} type="button"
-                                    className={`w-6 h-6 rounded-full text-xs ${
-                                        i === currentIndex ? 'bg-indigo-600 text-white' :
-                                        (answers[q.id]?.length > 0) ? 'bg-green-200 text-green-700' : 'bg-gray-200 text-gray-500'
-                                    }`}
-                                    onClick={() => setCurrentIndex(i)}>
-                                    {i + 1}
-                                </button>
-                            ))}
+                            {questions.map((q, i) => {
+                                const isAnswered = q.question_type === 'open_text'
+                                    ? (textAnswers[q.id] || '').trim().length > 0
+                                    : (answers[q.id]?.length > 0);
+                                return (
+                                    <button key={q.id} type="button"
+                                        className={`w-6 h-6 rounded-full text-xs ${
+                                            i === currentIndex ? 'bg-indigo-600 text-white' :
+                                            isAnswered ? 'bg-green-200 text-green-700' : 'bg-gray-200 text-gray-500'
+                                        }`}
+                                        onClick={() => setCurrentIndex(i)}>
+                                        {i + 1}
+                                    </button>
+                                );
+                            })}
                         </div>
 
                         {currentIndex < questions.length - 1 ? (

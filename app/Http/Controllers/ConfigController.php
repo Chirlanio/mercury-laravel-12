@@ -134,6 +134,14 @@ abstract class ConfigController extends Controller
     }
 
     /**
+     * Grid de colunas do formulário (ex: 'md:grid-cols-2')
+     */
+    protected function formColumns(): ?string
+    {
+        return null;
+    }
+
+    /**
      * Index - Listagem com busca, ordenacao e paginacao
      */
     public function index(Request $request)
@@ -196,6 +204,7 @@ abstract class ConfigController extends Controller
                 'formFields' => $this->formFields(),
                 'routeName' => $this->routeName(),
                 'modalMaxWidth' => $this->modalMaxWidth(),
+                'formColumns' => $this->formColumns(),
             ],
             'filters' => [
                 'search' => $search,

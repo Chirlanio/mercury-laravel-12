@@ -76,6 +76,15 @@ class StockAuditController extends Controller
         ]);
     }
 
+    public function createOptions()
+    {
+        return response()->json([
+            'vendors' => \App\Models\StockAuditVendor::orderBy('name')->get(['id', 'name']),
+            'audit_cycles' => \App\Models\StockAuditCycle::orderBy('name')->get(['id', 'name']),
+            'employees' => \App\Models\Employee::active()->orderBy('name')->get(['id', 'name']),
+        ]);
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([

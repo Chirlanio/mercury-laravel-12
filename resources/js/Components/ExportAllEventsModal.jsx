@@ -1,6 +1,14 @@
 import { useState } from 'react';
-import Modal from './Modal';
-import Button from './Button';
+import StandardModal from '@/Components/StandardModal';
+import Button from '@/Components/Button';
+import {
+    DocumentArrowDownIcon,
+    CalendarDaysIcon,
+    BuildingStorefrontIcon,
+    ClipboardDocumentListIcon,
+    CheckCircleIcon,
+    XMarkIcon,
+} from '@heroicons/react/24/outline';
 
 export default function ExportAllEventsModal({ show, onClose, eventTypes, stores }) {
     const [filters, setFilters] = useState({
@@ -94,16 +102,9 @@ export default function ExportAllEventsModal({ show, onClose, eventTypes, stores
             document.body.removeChild(link);
 
             // Reset and close
-            setFilters({
-                event_type_ids: [],
-                store_ids: [],
-                start_date: '',
-                end_date: '',
-            });
-            onClose();
+            handleClose();
         } catch (error) {
             console.error('Erro ao exportar eventos:', error);
-            alert('Erro ao exportar eventos. Tente novamente.');
         } finally {
             setIsExporting(false);
         }
@@ -120,184 +121,134 @@ export default function ExportAllEventsModal({ show, onClose, eventTypes, stores
     };
 
     return (
-        <Modal show={show} onClose={handleClose} maxWidth="3xl">
-            <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-900">
-                            Exportar Eventos de Todos os Funcionários
-                        </h2>
-                        <p className="text-sm text-gray-600 mt-1">
-                            Gere um relatório consolidado de eventos
-                        </p>
-                    </div>
-                    <button
-                        onClick={handleClose}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-
-                <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Event Types Selection */}
-                        <div>
-                            <div className="flex justify-between items-center mb-3">
-                                <label className="block text-sm font-medium text-gray-700">
-                                    Tipos de Eventos
-                                </label>
-                                <div className="flex space-x-2">
-                                    <button
-                                        type="button"
-                                        onClick={handleSelectAllEventTypes}
-                                        className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-                                    >
-                                        Todos
-                                    </button>
-                                    <span className="text-gray-400">|</span>
-                                    <button
-                                        type="button"
-                                        onClick={handleDeselectAllEventTypes}
-                                        className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-                                    >
-                                        Limpar
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="space-y-2 max-h-40 overflow-y-auto border rounded-lg p-2">
-                                {eventTypes.map((type) => (
-                                    <label
-                                        key={type.id}
-                                        className="flex items-center p-2 hover:bg-gray-50 cursor-pointer transition-colors rounded"
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={filters.event_type_ids.includes(type.id)}
-                                            onChange={() => handleEventTypeToggle(type.id)}
-                                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                                        />
-                                        <span className="ml-3 text-sm font-medium text-gray-900">
-                                            {type.name}
-                                        </span>
-                                    </label>
-                                ))}
-                            </div>
-                            <p className="mt-2 text-xs text-gray-500">
-                                Sem seleção = todos os tipos
-                            </p>
+        <StandardModal
+            show={show}
+            onClose={handleClose}
+            title="Exportar Eventos Consolidado"
+            subtitle="Gere um relatório de eventos de todos os funcionários"
+            headerColor="bg-green-600"
+            headerIcon={<DocumentArrowDownIcon className="h-6 w-6" />}
+            maxWidth="4xl"
+            footer={
+                <StandardModal.Footer
+                    onCancel={handleClose}
+                    onSubmit={handleExport}
+                    submitLabel={isExporting ? 'Exportando...' : 'Exportar PDF'}
+                    submitIcon={DocumentArrowDownIcon}
+                    processing={isExporting}
+                />
+            }
+        >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Event Types Selection */}
+                <StandardModal.Section 
+                    title="Tipos de Eventos" 
+                    icon={<ClipboardDocumentListIcon className="h-4 w-4" />}
+                    actions={
+                        <div className="flex gap-2">
+                            <button onClick={handleSelectAllEventTypes} className="text-[10px] font-bold text-indigo-600 uppercase hover:underline">Todos</button>
+                            <span className="text-gray-300">|</span>
+                            <button onClick={handleDeselectAllEventTypes} className="text-[10px] font-bold text-indigo-600 uppercase hover:underline">Limpar</button>
                         </div>
-
-                        {/* Stores Selection */}
-                        <div>
-                            <div className="flex justify-between items-center mb-3">
-                                <label className="block text-sm font-medium text-gray-700">
-                                    Lojas
-                                </label>
-                                <div className="flex space-x-2">
-                                    <button
-                                        type="button"
-                                        onClick={handleSelectAllStores}
-                                        className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-                                    >
-                                        Todas
-                                    </button>
-                                    <span className="text-gray-400">|</span>
-                                    <button
-                                        type="button"
-                                        onClick={handleDeselectAllStores}
-                                        className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-                                    >
-                                        Limpar
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="space-y-2 max-h-40 overflow-y-auto border rounded-lg p-2">
-                                {stores.map((store) => (
-                                    <label
-                                        key={store.id}
-                                        className="flex items-center p-2 hover:bg-gray-50 cursor-pointer transition-colors rounded"
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={filters.store_ids.includes(store.id)}
-                                            onChange={() => handleStoreToggle(store.id)}
-                                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                                        />
-                                        <span className="ml-3 text-sm font-medium text-gray-900">
-                                            {store.name}
-                                        </span>
-                                    </label>
-                                ))}
-                            </div>
-                            <p className="mt-2 text-xs text-gray-500">
-                                Sem seleção = todas as lojas
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Date Range */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-3">
-                            Período
-                        </label>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label htmlFor="start_date" className="block text-xs text-gray-600 mb-1">
-                                    Data Inicial
-                                </label>
+                    }
+                >
+                    <div className="space-y-1 max-h-48 overflow-y-auto border border-gray-100 rounded-lg p-2 bg-gray-50/50">
+                        {eventTypes.map((type) => (
+                            <label
+                                key={type.id}
+                                className={`flex items-center p-2 hover:bg-white cursor-pointer transition-colors rounded-md border ${filters.event_type_ids.includes(type.id) ? 'bg-white border-indigo-200 shadow-sm' : 'border-transparent'}`}
+                            >
                                 <input
-                                    type="date"
-                                    id="start_date"
-                                    value={filters.start_date}
-                                    onChange={(e) => setFilters({ ...filters, start_date: e.target.value })}
-                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                                    type="checkbox"
+                                    checked={filters.event_type_ids.includes(type.id)}
+                                    onChange={() => handleEventTypeToggle(type.id)}
+                                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                                 />
-                            </div>
-                            <div>
-                                <label htmlFor="end_date" className="block text-xs text-gray-600 mb-1">
-                                    Data Final
-                                </label>
-                                <input
-                                    type="date"
-                                    id="end_date"
-                                    value={filters.end_date}
-                                    onChange={(e) => setFilters({ ...filters, end_date: e.target.value })}
-                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                                />
-                            </div>
-                        </div>
-                        <p className="mt-2 text-xs text-gray-500">
-                            Sem datas = todos os períodos
-                        </p>
+                                <span className={`ml-3 text-sm font-medium ${filters.event_type_ids.includes(type.id) ? 'text-indigo-900' : 'text-gray-700'}`}>
+                                    {type.name}
+                                </span>
+                                {filters.event_type_ids.includes(type.id) && (
+                                    <CheckCircleIcon className="h-4 w-4 ml-auto text-indigo-500" />
+                                )}
+                            </label>
+                        ))}
                     </div>
+                    <p className="mt-2 text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                        Sem seleção = todos os tipos
+                    </p>
+                </StandardModal.Section>
 
-                    {/* Actions */}
-                    <div className="flex justify-end space-x-3 pt-4 border-t">
-                        <Button
-                            variant="outline"
-                            onClick={handleClose}
-                            disabled={isExporting}
-                        >
-                            Cancelar
-                        </Button>
-                        <Button
-                            variant="primary"
-                            onClick={handleExport}
-                            disabled={isExporting}
-                            icon={({ className }) => (
-                                <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                            )}
-                        >
-                            {isExporting ? 'Exportando...' : 'Exportar PDF'}
-                        </Button>
+                {/* Stores Selection */}
+                <StandardModal.Section 
+                    title="Lojas" 
+                    icon={<BuildingStorefrontIcon className="h-4 w-4" />}
+                    actions={
+                        <div className="flex gap-2">
+                            <button onClick={handleSelectAllStores} className="text-[10px] font-bold text-indigo-600 uppercase hover:underline">Todas</button>
+                            <span className="text-gray-300">|</span>
+                            <button onClick={handleDeselectAllStores} className="text-[10px] font-bold text-indigo-600 uppercase hover:underline">Limpar</button>
+                        </div>
+                    }
+                >
+                    <div className="space-y-1 max-h-48 overflow-y-auto border border-gray-100 rounded-lg p-2 bg-gray-50/50">
+                        {stores.map((store) => (
+                            <label
+                                key={store.id}
+                                className={`flex items-center p-2 hover:bg-white cursor-pointer transition-colors rounded-md border ${filters.store_ids.includes(store.id) ? 'bg-white border-indigo-200 shadow-sm' : 'border-transparent'}`}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={filters.store_ids.includes(store.id)}
+                                    onChange={() => handleStoreToggle(store.id)}
+                                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                                />
+                                <span className={`ml-3 text-sm font-medium ${filters.store_ids.includes(store.id) ? 'text-indigo-900' : 'text-gray-700'}`}>
+                                    {store.code} - {store.name}
+                                </span>
+                                {filters.store_ids.includes(store.id) && (
+                                    <CheckCircleIcon className="h-4 w-4 ml-auto text-indigo-500" />
+                                )}
+                            </label>
+                        ))}
                     </div>
-                </div>
+                    <p className="mt-2 text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                        Sem seleção = todas as lojas
+                    </p>
+                </StandardModal.Section>
             </div>
-        </Modal>
+
+            {/* Date Range */}
+            <StandardModal.Section title="Período de Referência" icon={<CalendarDaysIcon className="h-4 w-4" />}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label htmlFor="start_date" className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                            Data Inicial
+                        </label>
+                        <input
+                            type="date"
+                            id="start_date"
+                            value={filters.start_date}
+                            onChange={(e) => setFilters({ ...filters, start_date: e.target.value })}
+                            className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="end_date" className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                            Data Final
+                        </label>
+                        <input
+                            type="date"
+                            id="end_date"
+                            value={filters.end_date}
+                            onChange={(e) => setFilters({ ...filters, end_date: e.target.value })}
+                            className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                        />
+                    </div>
+                </div>
+                <p className="mt-2 text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                    Sem datas = todos os períodos
+                </p>
+            </StandardModal.Section>
+        </StandardModal>
     );
 }

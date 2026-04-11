@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import {
     ArrowsRightLeftIcon, CubeIcon, ArchiveBoxIcon, CalculatorIcon,
 } from '@heroicons/react/24/outline';
@@ -24,75 +25,40 @@ export default function StatisticsCards({ filters = {} }) {
             .catch(() => setLoading(false));
     }, [filters.store_id, filters.status, filters.transfer_type]);
 
-    if (loading) {
-        return (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                {[...Array(4)].map((_, i) => (
-                    <div key={i} className="bg-white rounded-lg shadow p-4 animate-pulse">
-                        <div className="h-3 bg-gray-200 rounded w-20 mb-3" />
-                        <div className="h-8 bg-gray-200 rounded w-16 mb-2" />
-                        <div className="h-2 bg-gray-100 rounded w-28" />
-                    </div>
-                ))}
-            </div>
-        );
-    }
-
-    if (!stats) return null;
-
-    const cards = [
+    const cards = stats ? [
         {
             label: 'Total',
             value: stats.total_transfers,
-            subtitle: `${stats.pending} pendentes, ${stats.in_transit} em rota`,
+            format: 'number',
             icon: ArrowsRightLeftIcon,
-            color: 'text-indigo-600',
-            bg: 'bg-indigo-50',
+            color: 'indigo',
+            sub: `${stats.pending} pendentes, ${stats.in_transit} em rota`,
         },
         {
             label: 'Volumes',
             value: stats.total_volumes,
-            subtitle: 'Total movimentado',
+            format: 'number',
             icon: ArchiveBoxIcon,
-            color: 'text-blue-600',
-            bg: 'bg-blue-50',
+            color: 'blue',
+            sub: 'Total movimentado',
         },
         {
             label: 'Produtos',
             value: stats.total_products,
-            subtitle: 'Total de itens',
+            format: 'number',
             icon: CubeIcon,
-            color: 'text-emerald-600',
-            bg: 'bg-emerald-50',
+            color: 'green',
+            sub: 'Total de itens',
         },
         {
             label: 'Média',
             value: stats.avg_products,
-            subtitle: 'Produtos por transferência',
+            format: 'number',
             icon: CalculatorIcon,
-            color: 'text-amber-600',
-            bg: 'bg-amber-50',
+            color: 'yellow',
+            sub: 'Produtos por transferência',
         },
-    ];
+    ] : [];
 
-    return (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {cards.map((card) => (
-                <div key={card.label} className="bg-white rounded-lg shadow p-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{card.label}</p>
-                            <p className={`text-2xl font-bold mt-1 ${card.color}`}>
-                                {typeof card.value === 'number' ? card.value.toLocaleString('pt-BR') : card.value}
-                            </p>
-                            <p className="text-xs text-gray-400 mt-1">{card.subtitle}</p>
-                        </div>
-                        <div className={`${card.bg} p-2.5 rounded-lg`}>
-                            <card.icon className={`h-6 w-6 ${card.color}`} />
-                        </div>
-                    </div>
-                </div>
-            ))}
-        </div>
-    );
+    return <StatisticsGrid cards={cards} loading={loading} cols={4} />;
 }

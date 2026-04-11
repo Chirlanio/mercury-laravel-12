@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ClipboardDocumentListIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
+import { router } from '@inertiajs/react';
+import { ClipboardDocumentListIcon, CheckCircleIcon, XCircleIcon, PlayIcon } from '@heroicons/react/24/outline';
 import StandardModal from '@/Components/StandardModal';
 import StatusBadge from '@/Components/Shared/StatusBadge';
+import Button from '@/Components/Button';
 
 export default function QuizDetailModal({ show, onClose, quizId }) {
     const [quiz, setQuiz] = useState(null);
@@ -34,16 +36,27 @@ export default function QuizDetailModal({ show, onClose, quizId }) {
             ] : []}
             maxWidth="4xl"
             loading={loading}
-            footer={<StandardModal.Footer onCancel={onClose} cancelLabel="Fechar" />}
+            footer={
+                <StandardModal.Footer
+                    onCancel={onClose}
+                    cancelLabel="Fechar"
+                    extraButtons={quiz?.is_active ? [
+                        <Button key="take" variant="primary" size="sm" icon={PlayIcon}
+                            onClick={() => { onClose(); router.get(route('training-quizzes.take', quizId)); }}>
+                            Responder Quiz
+                        </Button>,
+                    ] : []}
+                />
+            }
         >
             {quiz && (
                 <>
-                    <StandardModal.Section title="Configuracao">
+                    <StandardModal.Section title="Configuração">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <StandardModal.Field label="Nota Minima" value={`${quiz.passing_score}%`} />
+                            <StandardModal.Field label="Nota Mínima" value={`${quiz.passing_score}%`} />
                             <StandardModal.Field label="Tentativas" value={quiz.max_attempts || 'Ilimitado'} />
                             <StandardModal.Field label="Tempo Limite" value={quiz.time_limit_minutes ? `${quiz.time_limit_minutes} min` : 'Sem limite'} />
-                            <StandardModal.Field label="Mostrar Respostas" value={quiz.show_answers ? 'Sim' : 'Nao'} />
+                            <StandardModal.Field label="Mostrar Respostas" value={quiz.show_answers ? 'Sim' : 'Não'} />
                         </div>
                         <div className="grid grid-cols-3 gap-4 mt-4">
                             <StandardModal.InfoCard label="Perguntas" value={quiz.question_count} />
@@ -53,11 +66,11 @@ export default function QuizDetailModal({ show, onClose, quizId }) {
                     </StandardModal.Section>
 
                     {stats && (
-                        <StandardModal.Section title="Estatisticas">
+                        <StandardModal.Section title="Estatísticas">
                             <div className="grid grid-cols-3 gap-4">
                                 <StandardModal.InfoCard label="Tentativas" value={stats.total} />
                                 <StandardModal.InfoCard label="Aprovados" value={stats.passed} sub={stats.total > 0 ? `${Math.round((stats.passed / stats.total) * 100)}%` : '0%'} />
-                                <StandardModal.InfoCard label="Media" value={`${stats.avg_score}%`} />
+                                <StandardModal.InfoCard label="Média" value={`${stats.avg_score}%`} />
                             </div>
                         </StandardModal.Section>
                     )}
@@ -73,12 +86,16 @@ export default function QuizDetailModal({ show, onClose, quizId }) {
                                         </div>
                                     </div>
                                     <div className="mt-2 space-y-1">
-                                        {q.options?.map(o => (
-                                            <div key={o.id} className={`flex items-center gap-2 text-xs px-2 py-1 rounded ${o.is_correct ? 'bg-green-50 text-green-700' : 'text-gray-600'}`}>
-                                                {o.is_correct ? <CheckCircleIcon className="w-3.5 h-3.5 text-green-500" /> : <XCircleIcon className="w-3.5 h-3.5 text-gray-300" />}
-                                                <span>{o.option_text}</span>
-                                            </div>
-                                        ))}
+                                        {q.question_type === 'open_text' ? (
+                                            <p className="text-xs text-amber-600 italic px-2 py-1">Resposta aberta — avaliação manual</p>
+                                        ) : (
+                                            q.options?.map(o => (
+                                                <div key={o.id} className={`flex items-center gap-2 text-xs px-2 py-1 rounded ${o.is_correct ? 'bg-green-50 text-green-700' : 'text-gray-600'}`}>
+                                                    {o.is_correct ? <CheckCircleIcon className="w-3.5 h-3.5 text-green-500" /> : <XCircleIcon className="w-3.5 h-3.5 text-gray-300" />}
+                                                    <span>{o.option_text}</span>
+                                                </div>
+                                            ))
+                                        )}
                                     </div>
                                 </div>
                             ))}

@@ -8,9 +8,30 @@ import Checkbox from '@/Components/Checkbox';
 import Button from '@/Components/Button';
 
 const QUESTION_TYPES = [
-    { value: 'single', label: 'Escolha Única' },
-    { value: 'multiple', label: 'Múltipla Escolha' },
-    { value: 'boolean', label: 'Verdadeiro/Falso' },
+    {
+        value: 'single',
+        label: 'Escolha Única',
+        description: 'O participante seleciona apenas UMA opção correta.',
+        correctHint: 'Marque a única resposta correta.',
+    },
+    {
+        value: 'multiple',
+        label: 'Múltipla Escolha',
+        description: 'O participante pode selecionar VÁRIAS opções corretas.',
+        correctHint: 'Marque todas as respostas corretas.',
+    },
+    {
+        value: 'boolean',
+        label: 'Verdadeiro/Falso',
+        description: 'O participante escolhe entre Verdadeiro ou Falso.',
+        correctHint: 'Marque qual é a resposta correta.',
+    },
+    {
+        value: 'open_text',
+        label: 'Resposta Aberta',
+        description: 'O participante escreve a resposta livremente. Avaliada manualmente.',
+        correctHint: 'Sem opções — o participante digita a resposta.',
+    },
 ];
 
 const emptyQuestion = () => ({
@@ -20,6 +41,11 @@ const emptyQuestion = () => ({
         { option_text: '', is_correct: false },
     ],
 });
+
+const booleanOptions = () => [
+    { option_text: 'Verdadeiro', is_correct: false },
+    { option_text: 'Falso', is_correct: false },
+];
 
 export default function QuizFormModal({ show, onClose, onSuccess, quizId = null }) {
     const isEditing = !!quizId;
@@ -101,6 +127,20 @@ export default function QuizFormModal({ show, onClose, onSuccess, quizId = null 
         setData(prev => {
             const questions = [...prev.questions];
             questions[qi] = { ...questions[qi], [field]: value };
+
+            if (field === 'question_type') {
+                if (value === 'boolean') {
+                    questions[qi].options = booleanOptions();
+                } else if (value === 'open_text') {
+                    questions[qi].options = [];
+                } else if (prev.questions[qi].question_type === 'boolean' || prev.questions[qi].question_type === 'open_text') {
+                    questions[qi].options = [
+                        { option_text: '', is_correct: false },
+                        { option_text: '', is_correct: false },
+                    ];
+                }
+            }
+
             return { ...prev, questions };
         });
     };
@@ -189,57 +229,130 @@ export default function QuizFormModal({ show, onClose, onSuccess, quizId = null 
                 </div>
             </StandardModal.Section>
 
+            {/* Legenda dos tipos */}
+            <StandardModal.Section title="Tipos de Pergunta">
+                <div className="grid grid-cols-2 gap-3">
+                    {QUESTION_TYPES.map(t => (
+                        <div key={t.value} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                            <div className="text-xs font-semibold text-gray-700 mb-1">{t.label}</div>
+                            <p className="text-xs text-gray-500">{t.description}</p>
+                        </div>
+                    ))}
+                </div>
+            </StandardModal.Section>
+
             {/* Questions Builder */}
             <StandardModal.Section title={`Perguntas (${data.questions.length})`}>
                 <div className="space-y-6">
-                    {data.questions.map((q, qi) => (
-                        <div key={qi} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                            <div className="flex items-center justify-between mb-3">
-                                <span className="text-sm font-semibold text-gray-700">Pergunta {qi + 1}</span>
-                                <div className="flex items-center gap-2">
-                                    <select className="text-xs rounded-md border-gray-300 shadow-sm"
-                                        value={q.question_type} onChange={e => updateQuestion(qi, 'question_type', e.target.value)}>
-                                        {QUESTION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                                    </select>
-                                    <TextInput type="number" className="w-16 text-xs" value={q.points}
-                                        onChange={e => updateQuestion(qi, 'points', parseInt(e.target.value) || 1)} min={1} />
-                                    <span className="text-xs text-gray-500">pts</span>
-                                    {data.questions.length > 1 && (
-                                        <button type="button" onClick={() => removeQuestion(qi)}
-                                            className="text-red-500 hover:text-red-700">
-                                            <TrashIcon className="w-4 h-4" />
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
+                    {data.questions.map((q, qi) => {
+                        const typeInfo = QUESTION_TYPES.find(t => t.value === q.question_type);
+                        const isBoolean = q.question_type === 'boolean';
+                        const isOpenText = q.question_type === 'open_text';
+                        const hasCorrect = isOpenText || q.options.some(o => o.is_correct);
 
-                            <textarea className="w-full rounded-md border-gray-300 shadow-sm text-sm mb-3"
-                                rows={2} placeholder="Texto da pergunta..." value={q.question_text}
-                                onChange={e => updateQuestion(qi, 'question_text', e.target.value)} />
-
-                            <div className="space-y-2">
-                                {q.options.map((o, oi) => (
-                                    <div key={oi} className="flex items-center gap-2">
-                                        <Checkbox checked={o.is_correct}
-                                            onChange={e => updateOption(qi, oi, 'is_correct', e.target.checked)} />
-                                        <TextInput className="flex-1 text-sm" value={o.option_text}
-                                            onChange={e => updateOption(qi, oi, 'option_text', e.target.value)}
-                                            placeholder={`Opção ${oi + 1}`} />
-                                        {q.options.length > 2 && (
-                                            <button type="button" onClick={() => removeOption(qi, oi)}
-                                                className="text-red-400 hover:text-red-600">
-                                                <TrashIcon className="w-3.5 h-3.5" />
+                        return (
+                            <div key={qi} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                {/* Header */}
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="text-sm font-semibold text-gray-700">Pergunta {qi + 1}</span>
+                                    <div className="flex items-center gap-2">
+                                        <select className="text-xs rounded-md border-gray-300 shadow-sm"
+                                            value={q.question_type} onChange={e => updateQuestion(qi, 'question_type', e.target.value)}>
+                                            {QUESTION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                                        </select>
+                                        <TextInput type="number" className="w-16 text-xs" value={q.points}
+                                            onChange={e => updateQuestion(qi, 'points', parseInt(e.target.value) || 1)} min={1} />
+                                        <span className="text-xs text-gray-500">pts</span>
+                                        {data.questions.length > 1 && (
+                                            <button type="button" onClick={() => removeQuestion(qi)}
+                                                className="text-red-500 hover:text-red-700">
+                                                <TrashIcon className="w-4 h-4" />
                                             </button>
                                         )}
                                     </div>
-                                ))}
-                                <button type="button" onClick={() => addOption(qi)}
-                                    className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
-                                    <PlusIcon className="w-3.5 h-3.5" /> Adicionar opção
-                                </button>
+                                </div>
+
+                                {/* Texto da pergunta */}
+                                <textarea className="w-full rounded-md border-gray-300 shadow-sm text-sm mb-3"
+                                    rows={2} placeholder="Texto da pergunta..." value={q.question_text}
+                                    onChange={e => updateQuestion(qi, 'question_text', e.target.value)} />
+
+                                {/* Dica do tipo + indicador de resposta correta */}
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-xs text-indigo-600">{typeInfo?.correctHint}</p>
+                                    {!hasCorrect && (
+                                        <span className="text-xs text-red-500 font-medium">Nenhuma resposta correta marcada</span>
+                                    )}
+                                </div>
+
+                                {/* Opções ou preview de resposta aberta */}
+                                {isOpenText ? (
+                                    <div className="bg-white border border-dashed border-gray-300 rounded-md p-4 text-center">
+                                        <p className="text-xs text-gray-400 italic">O participante verá um campo de texto para escrever a resposta.</p>
+                                        <p className="text-xs text-amber-600 mt-1">A pontuação será atribuída manualmente após a avaliação.</p>
+                                    </div>
+                                ) : (
+                                <div className="space-y-2">
+                                    {q.options.map((o, oi) => (
+                                        <div key={oi} className={`flex items-center gap-2 p-2 rounded-md border transition-colors ${
+                                            o.is_correct
+                                                ? 'bg-green-50 border-green-300'
+                                                : 'bg-white border-gray-200'
+                                        }`}>
+                                            <button type="button"
+                                                onClick={() => updateOption(qi, oi, 'is_correct', !o.is_correct)}
+                                                className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                                                    o.is_correct
+                                                        ? 'bg-green-500 border-green-500 text-white'
+                                                        : 'border-gray-300 hover:border-green-400'
+                                                }`}
+                                                title={o.is_correct ? 'Resposta correta' : 'Marcar como correta'}
+                                            >
+                                                {o.is_correct && (
+                                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                    </svg>
+                                                )}
+                                            </button>
+                                            {isBoolean ? (
+                                                <span className={`flex-1 text-sm font-medium ${o.is_correct ? 'text-green-700' : 'text-gray-700'}`}>
+                                                    {o.option_text}
+                                                </span>
+                                            ) : (
+                                                <TextInput className="flex-1 text-sm" value={o.option_text}
+                                                    onChange={e => updateOption(qi, oi, 'option_text', e.target.value)}
+                                                    placeholder={`Opção ${oi + 1}`} />
+                                            )}
+                                            {o.is_correct && (
+                                                <span className="text-xs font-medium text-green-600 flex-shrink-0">Correta</span>
+                                            )}
+                                            {!isBoolean && q.options.length > 2 && (
+                                                <button type="button" onClick={() => removeOption(qi, oi)}
+                                                    className="text-red-400 hover:text-red-600 flex-shrink-0">
+                                                    <TrashIcon className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {!isBoolean && (
+                                        <button type="button" onClick={() => addOption(qi)}
+                                            className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 mt-1">
+                                            <PlusIcon className="w-3.5 h-3.5" /> Adicionar opção
+                                        </button>
+                                    )}
+                                </div>
+                                )}
+
+                                {/* Explicação (exibida após responder, se show_answers ativo) */}
+                                <div className="mt-3">
+                                    <InputLabel value="Explicação (opcional)" />
+                                    <textarea className="mt-1 w-full rounded-md border-gray-300 shadow-sm text-xs"
+                                        rows={2} placeholder="Explique por que esta é a resposta correta. Exibida ao participante após responder (se 'Mostrar respostas' estiver ativo)."
+                                        value={q.explanation} onChange={e => updateQuestion(qi, 'explanation', e.target.value)} />
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
                 <div className="mt-4">
                     <Button variant="outline" size="sm" icon={PlusIcon} onClick={addQuestion}>

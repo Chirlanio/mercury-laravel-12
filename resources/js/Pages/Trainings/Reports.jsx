@@ -6,6 +6,7 @@ import {
     UserGroupIcon,
     BuildingStorefrontIcon,
     BookOpenIcon,
+    ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import Button from '@/Components/Button';
@@ -13,6 +14,7 @@ import Button from '@/Components/Button';
 const REPORT_TYPES = [
     { key: 'overview', label: 'Visão Geral', icon: ChartBarIcon },
     { key: 'by-course', label: 'Por Curso', icon: BookOpenIcon },
+    { key: 'by-store', label: 'Por Loja', icon: BuildingStorefrontIcon },
     { key: 'by-employee', label: 'Por Funcionário', icon: UserGroupIcon },
 ];
 
@@ -29,7 +31,9 @@ export default function Reports() {
         if (dateFrom) params.append('date_from', dateFrom);
         if (dateTo) params.append('date_to', dateTo);
 
-        fetch(`${route('training-reports.index')}?${params}`)
+        fetch(`${route('training-reports.index')}?${params}`, {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        })
             .then(res => res.json())
             .then(result => {
                 setData(result);
@@ -56,7 +60,14 @@ export default function Reports() {
             <Head title="Relatórios de Treinamento" />
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    <h1 className="text-2xl font-bold text-gray-900 mb-6">Relatórios de Treinamento</h1>
+                    <div className="flex items-center justify-between mb-6">
+                        <h1 className="text-2xl font-bold text-gray-900">Relatórios de Treinamento</h1>
+                        <a href={route('training-reports.export', { type: activeType })}>
+                            <Button variant="success" size="sm" icon={ArrowDownTrayIcon}>
+                                Exportar Excel
+                            </Button>
+                        </a>
+                    </div>
 
                     {/* Tabs */}
                     <div className="flex items-center gap-2 mb-6">
@@ -82,7 +93,7 @@ export default function Reports() {
                                     className="rounded-md border-gray-300 shadow-sm text-sm focus:border-indigo-500 focus:ring-indigo-500" />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Ate</label>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Até</label>
                                 <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
                                     className="rounded-md border-gray-300 shadow-sm text-sm focus:border-indigo-500 focus:ring-indigo-500" />
                             </div>
@@ -120,6 +131,40 @@ export default function Reports() {
                                             <td className="px-6 py-4 text-sm text-center font-medium">{row.completion_rate}%</td>
                                         </tr>
                                     ))}
+                                    {data.length === 0 && (
+                                        <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500">Nenhum dado encontrado.</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {/* By Store Table */}
+                    {activeType === 'by-store' && !loading && Array.isArray(data) && (
+                        <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loja</th>
+                                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Colaboradores</th>
+                                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Inscrições</th>
+                                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Conclusões</th>
+                                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Taxa</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                    {data.map((row, i) => (
+                                        <tr key={i}>
+                                            <td className="px-6 py-4 text-sm text-gray-900">{row.store_name}</td>
+                                            <td className="px-6 py-4 text-sm text-center text-gray-600">{row.employees_trained}</td>
+                                            <td className="px-6 py-4 text-sm text-center text-gray-600">{row.total_enrollments}</td>
+                                            <td className="px-6 py-4 text-sm text-center text-green-600 font-medium">{row.completions}</td>
+                                            <td className="px-6 py-4 text-sm text-center font-medium">{row.completion_rate}%</td>
+                                        </tr>
+                                    ))}
+                                    {data.length === 0 && (
+                                        <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500">Nenhum dado encontrado.</td></tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -144,6 +189,9 @@ export default function Reports() {
                                             <td className="px-6 py-4 text-sm text-center text-green-600 font-medium">{row.completions}</td>
                                         </tr>
                                     ))}
+                                    {data.length === 0 && (
+                                        <tr><td colSpan={3} className="px-6 py-12 text-center text-gray-500">Nenhum dado encontrado.</td></tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>

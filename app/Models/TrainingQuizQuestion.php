@@ -17,10 +17,13 @@ class TrainingQuizQuestion extends Model
 
     public const TYPE_BOOLEAN = 'boolean';
 
+    public const TYPE_OPEN_TEXT = 'open_text';
+
     public const TYPE_LABELS = [
-        self::TYPE_SINGLE => 'Escolha Unica',
-        self::TYPE_MULTIPLE => 'Multipla Escolha',
+        self::TYPE_SINGLE => 'Escolha Única',
+        self::TYPE_MULTIPLE => 'Múltipla Escolha',
         self::TYPE_BOOLEAN => 'Verdadeiro/Falso',
+        self::TYPE_OPEN_TEXT => 'Resposta Aberta',
     ];
 
     protected $fillable = [

@@ -1,45 +1,38 @@
 import { useState, useEffect } from 'react';
 import { router } from '@inertiajs/react';
-import Modal from '@/Components/Modal';
-import Button from '@/Components/Button';
 import axios from 'axios';
+import StandardModal from '@/Components/StandardModal';
+import FormSection from '@/Components/Shared/FormSection';
+import TextInput from '@/Components/TextInput';
+import InputLabel from '@/Components/InputLabel';
+import InputError from '@/Components/InputError';
 import { maskMoney, parseMoney } from '@/Hooks/useMasks';
+import { PlusIcon } from '@heroicons/react/24/outline';
 
-export default function SaleCreateModal({ isOpen, onClose, onSuccess, stores = [] }) {
+export default function SaleCreateModal({ show, onClose, onSuccess, stores = [] }) {
     const [form, setForm] = useState({
-        store_id: '',
-        employee_id: '',
-        date_sales: '',
-        total_sales: '',
-        qtde_total: '',
+        store_id: '', employee_id: '', date_sales: '', total_sales: '', qtde_total: '',
     });
     const [employees, setEmployees] = useState([]);
     const [errors, setErrors] = useState({});
     const [processing, setProcessing] = useState(false);
 
     useEffect(() => {
-        if (isOpen) {
+        if (show) {
             setForm({ store_id: '', employee_id: '', date_sales: '', total_sales: '', qtde_total: '' });
             setErrors({});
-            loadEmployees();
+            axios.get('/employees/list-json')
+                .then(res => setEmployees(res.data.employees || []))
+                .catch(() => setEmployees([]));
         }
-    }, [isOpen]);
-
-    const loadEmployees = () => {
-        axios.get('/employees/list-json')
-            .then(res => setEmployees(res.data.employees || []))
-            .catch(() => setEmployees([]));
-    };
+    }, [show]);
 
     const handleChange = (field, value) => {
         setForm(prev => ({ ...prev, [field]: value }));
         setErrors(prev => ({ ...prev, [field]: null }));
     };
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-
-        // Client-side validation
+    const handleSubmit = () => {
         const newErrors = {};
         if (!form.store_id) newErrors.store_id = 'Selecione uma loja.';
         if (!form.employee_id) newErrors.employee_id = 'Selecione um funcionário.';
@@ -61,97 +54,97 @@ export default function SaleCreateModal({ isOpen, onClose, onSuccess, stores = [
             qtde_total: parseInt(form.qtde_total),
         }, {
             preserveScroll: true,
-            onSuccess: () => {
-                setProcessing(false);
-                onSuccess();
-            },
-            onError: (errs) => {
-                setProcessing(false);
-                setErrors(errs);
-            },
+            onSuccess: () => { setProcessing(false); onSuccess(); },
+            onError: (errs) => { setProcessing(false); setErrors(errs); },
         });
     };
 
     return (
-        <Modal show={isOpen} onClose={onClose} title="Nova Venda" maxWidth="lg">
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <StandardModal
+            show={show}
+            onClose={onClose}
+            title="Nova Venda"
+            headerColor="bg-indigo-600"
+            headerIcon={<PlusIcon className="h-5 w-5" />}
+            maxWidth="lg"
+            onSubmit={handleSubmit}
+            footer={
+                <StandardModal.Footer
+                    onCancel={onClose}
+                    onSubmit="submit"
+                    submitLabel="Salvar"
+                    processing={processing}
+                />
+            }
+        >
+            <FormSection title="Dados da Venda" cols={2}>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Loja</label>
+                    <InputLabel value="Loja *" />
                     <select
                         value={form.store_id}
                         onChange={(e) => handleChange('store_id', e.target.value)}
-                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     >
                         <option value="">Selecione...</option>
                         {stores.map(s => (
                             <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                     </select>
-                    {errors.store_id && <p className="mt-1 text-sm text-red-600">{errors.store_id}</p>}
+                    <InputError message={errors.store_id} className="mt-1" />
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Funcionário</label>
+                    <InputLabel value="Funcionário *" />
                     <select
                         value={form.employee_id}
                         onChange={(e) => handleChange('employee_id', e.target.value)}
-                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     >
                         <option value="">Selecione...</option>
                         {employees.map(emp => (
                             <option key={emp.id} value={emp.id}>{emp.name}</option>
                         ))}
                     </select>
-                    {errors.employee_id && <p className="mt-1 text-sm text-red-600">{errors.employee_id}</p>}
+                    <InputError message={errors.employee_id} className="mt-1" />
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Data</label>
-                    <input
+                    <InputLabel value="Data *" />
+                    <TextInput
                         type="date"
+                        className="mt-1 w-full"
                         value={form.date_sales}
                         max={new Date().toISOString().split('T')[0]}
                         onChange={(e) => handleChange('date_sales', e.target.value)}
-                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     />
-                    {errors.date_sales && <p className="mt-1 text-sm text-red-600">{errors.date_sales}</p>}
+                    <InputError message={errors.date_sales} className="mt-1" />
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Valor (R$)</label>
-                    <input
-                        type="text"
+                    <InputLabel value="Valor (R$) *" />
+                    <TextInput
+                        className="mt-1 w-full"
                         inputMode="numeric"
                         value={form.total_sales}
                         onChange={(e) => handleChange('total_sales', maskMoney(e.target.value))}
                         placeholder="0,00"
-                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     />
-                    {errors.total_sales && <p className="mt-1 text-sm text-red-600">{errors.total_sales}</p>}
+                    <InputError message={errors.total_sales} className="mt-1" />
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Quantidade</label>
-                    <input
+                    <InputLabel value="Quantidade *" />
+                    <TextInput
                         type="number"
+                        className="mt-1 w-full"
                         min="1"
                         value={form.qtde_total}
                         onChange={(e) => handleChange('qtde_total', e.target.value)}
                         placeholder="0"
-                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     />
-                    {errors.qtde_total && <p className="mt-1 text-sm text-red-600">{errors.qtde_total}</p>}
+                    <InputError message={errors.qtde_total} className="mt-1" />
                 </div>
-
-                <div className="flex justify-end gap-3 pt-4">
-                    <Button type="button" variant="secondary" onClick={onClose}>
-                        Cancelar
-                    </Button>
-                    <Button type="submit" variant="primary" loading={processing}>
-                        Salvar
-                    </Button>
-                </div>
-            </form>
-        </Modal>
+            </FormSection>
+        </StandardModal>
     );
 }

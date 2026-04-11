@@ -145,6 +145,13 @@ export const PERMISSIONS = {
     VIEW_EXPERIENCE_TRACKER: 'experience_tracker.view',
     MANAGE_EXPERIENCE_TRACKER: 'experience_tracker.manage',
     FILL_EXPERIENCE_EVALUATION: 'experience_tracker.fill',
+
+    // Entregas e rotas
+    VIEW_DELIVERIES: 'deliveries.view',
+    CREATE_DELIVERIES: 'deliveries.create',
+    EDIT_DELIVERIES: 'deliveries.edit',
+    DELETE_DELIVERIES: 'deliveries.delete',
+    MANAGE_ROUTES: 'delivery_routes.manage',
 };
 
 export const ROLES = {

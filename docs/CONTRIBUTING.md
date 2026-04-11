@@ -1,7 +1,15 @@
-# Guia de Contribuição — Projeto Mercury
+# Guia de Contribuicao — Projeto Mercury
 
-**Versão:** 1.0
-**Última Atualização:** 22 de Março de 2026
+**Versao:** 1.1
+**Ultima Atualizacao:** Abril de 2026
+
+> **ATENCAO: Padroes de codificacao atualizados para Laravel 12 + React 18.**
+> Antes de implementar qualquer funcionalidade, consulte obrigatoriamente:
+> - [`CLAUDE.md`](../CLAUDE.md) — Arquitetura e componentes obrigatorios
+> - [`docs/PADRONIZACAO.md`](PADRONIZACAO.md) — Padroes de codificacao v3
+> - [`docs/GUIA_IMPLEMENTACAO_MODULOS.md`](GUIA_IMPLEMENTACAO_MODULOS.md) — Guia de implementacao v3
+>
+> Os padroes abaixo de nomenclatura (Models `Adms*`, Views PHP, JS jQuery) sao do **Mercury v1 (legado)** e NAO se aplicam ao Mercury Laravel.
 
 ---
 

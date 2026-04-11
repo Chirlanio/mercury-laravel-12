@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useForm, router } from '@inertiajs/react';
-import Modal from '@/Components/Modal';
-import Button from '@/Components/Button';
+import StandardModal from '@/Components/StandardModal';
+import TextInput from '@/Components/TextInput';
+import InputLabel from '@/Components/InputLabel';
+import InputError from '@/Components/InputError';
+import Checkbox from '@/Components/Checkbox';
+import { maskCpf } from '@/Hooks/useMasks';
+import { PencilSquareIcon } from '@heroicons/react/24/outline';
 
 export default function EmployeeEditModal({ show, onClose, onSuccess, employee, positions = [], stores = [], statuses = [], educationLevels = [] }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,16 +36,12 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
         { value: 'Senior', label: 'Sênior' },
     ];
 
-    // Preencher o formulário quando o funcionário for carregado
     useEffect(() => {
         if (employee && show) {
-            // Formatar CPF se vier sem máscara
-            const formattedCpf = employee.cpf ? formatCPF(employee.cpf) : '';
-
             setData({
                 name: employee.name || '',
                 short_name: employee.short_name || '',
-                cpf: formattedCpf,
+                cpf: employee.cpf ? maskCpf(employee.cpf) : '',
                 admission_date: employee.admission_date ? formatDateForInput(employee.admission_date) : '',
                 birth_date: employee.birth_date ? formatDateForInput(employee.birth_date) : '',
                 dismissal_date: employee.dismissal_date ? formatDateForInput(employee.dismissal_date) : '',
@@ -54,77 +55,53 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
                 status_id: employee.status_id ? String(employee.status_id) : '',
                 is_pcd: Boolean(employee.is_pcd),
                 is_apprentice: Boolean(employee.is_apprentice),
-                profile_image: null, // Imagem será tratada separadamente
+                profile_image: null,
             });
         }
     }, [employee, show]);
 
-
     const formatDateForInput = (dateString) => {
         if (!dateString) return '';
-
-        // Se a data estiver no formato DD/MM/YYYY, converter para YYYY-MM-DD
         if (dateString.includes('/')) {
             const [day, month, year] = dateString.split('/');
             return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
         }
-
-        // Se já estiver no formato correto ou for um objeto Date
-        return dateString.split('T')[0]; // Remove a parte do tempo se existir
+        return dateString.split('T')[0];
     };
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-
+    const handleSubmit = () => {
         if (!employee?.id) return;
 
-        // Preparar dados para envio - limpar CPF
         const cleanedData = {
             ...data,
-            cpf: data.cpf ? data.cpf.replace(/\D/g, '') : '', // Remove máscara do CPF
-            _method: 'PUT'
+            cpf: data.cpf ? data.cpf.replace(/\D/g, '') : '',
+            _method: 'PUT',
         };
 
-        // Verificar se há arquivo de imagem novo para upload
         const hasNewImage = cleanedData.profile_image instanceof File;
-
-        // Remover profile_image se não houver arquivo novo selecionado
         if (!hasNewImage) {
             delete cleanedData.profile_image;
         }
 
         setIsSubmitting(true);
 
-        // Usar router.post diretamente para melhor controle
-        // forceFormData garante que o request seja multipart/form-data quando há arquivo
         router.post(`/employees/${employee.id}`, cleanedData, {
             forceFormData: hasNewImage,
             preserveState: false,
             preserveScroll: false,
-            onBefore: () => {
-                console.log('onBefore - iniciando requisição');
-            },
-            onStart: () => {
-                console.log('onStart - requisição iniciada');
-            },
-            onSuccess: (page) => {
-                console.log('Update successful, closing modal', page);
+            onSuccess: () => {
                 setIsSubmitting(false);
                 reset();
                 clearErrors();
-                if (onSuccess) {
-                    onSuccess();
-                }
+                if (onSuccess) onSuccess();
             },
             onError: (errors) => {
-                console.error('Erro ao atualizar funcionário:', errors);
                 setIsSubmitting(false);
                 setError(errors);
             },
             onFinish: () => {
-                console.log('Requisição finalizada');
                 setIsSubmitting(false);
-            }
+            },
         });
     };
 
@@ -134,486 +111,340 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
         onClose();
     };
 
-    const formatCPF = (value) => {
-        if (!value) return '';
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
 
-        // Remove tudo que não é número
-        const cleanValue = value.replace(/\D/g, '');
-
-        // Aplica a máscara apenas se tiver 11 dígitos
-        if (cleanValue.length === 11) {
-            return cleanValue
-                .replace(/(\d{3})(\d)/, '$1.$2')
-                .replace(/(\d{3})(\d)/, '$1.$2')
-                .replace(/(\d{3})(\d{2})/, '$1-$2');
+        if (file.size > 5 * 1024 * 1024) {
+            setError('profile_image', 'O arquivo deve ter no máximo 5MB.');
+            e.target.value = '';
+            return;
         }
 
-        // Se tiver menos de 11 dígitos, aplica máscara parcial
-        if (cleanValue.length <= 11) {
-            return cleanValue
-                .replace(/(\d{3})(\d)/, '$1.$2')
-                .replace(/(\d{3})(\d)/, '$1.$2')
-                .replace(/(\d{3})(\d{1,2})/, '$1-$2');
-        }
-
-        // Se vier com mais de 11 dígitos, retorna apenas os primeiros 11 formatados
-        return cleanValue.substring(0, 11)
-            .replace(/(\d{3})(\d)/, '$1.$2')
-            .replace(/(\d{3})(\d)/, '$1.$2')
-            .replace(/(\d{3})(\d{2})/, '$1-$2');
-    };
-
-    const handleCPFChange = (e) => {
-        const formatted = formatCPF(e.target.value);
-        setData('cpf', formatted);
+        const img = new Image();
+        img.onload = () => {
+            URL.revokeObjectURL(img.src);
+            if (img.width < 50 || img.height < 50) {
+                setError('profile_image', `Imagem muito pequena (${img.width}x${img.height}). Mínimo: 50x50 pixels.`);
+                e.target.value = '';
+            } else if (img.width > 2000 || img.height > 2000) {
+                setError('profile_image', `Imagem muito grande (${img.width}x${img.height}). Máximo: 2000x2000 pixels.`);
+                e.target.value = '';
+            } else {
+                clearErrors('profile_image');
+                setData('profile_image', file);
+            }
+        };
+        img.onerror = () => {
+            URL.revokeObjectURL(img.src);
+            setError('profile_image', 'Arquivo não é uma imagem válida.');
+            e.target.value = '';
+        };
+        img.src = URL.createObjectURL(file);
     };
 
     return (
-        <Modal show={show} onClose={handleClose} title="Editar Funcionário" maxWidth="85vw">
-            {employee && <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Informações Pessoais */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                    <h4 className="text-sm font-medium text-gray-900 mb-4">
-                        Informações Pessoais
-                    </h4>
+        <StandardModal
+            show={show}
+            onClose={handleClose}
+            title="Editar Funcionário"
+            subtitle={employee?.name}
+            headerColor="bg-yellow-600"
+            headerIcon={<PencilSquareIcon className="h-5 w-5" />}
+            onSubmit={handleSubmit}
+            footer={
+                <StandardModal.Footer
+                    onCancel={handleClose}
+                    onSubmit="submit"
+                    submitLabel="Salvar Alterações"
+                    submitColor="bg-yellow-600 hover:bg-yellow-700"
+                    processing={isSubmitting}
+                />
+            }
+        >
+            {employee && (
+                <>
+                    <StandardModal.Section title="Informações Pessoais">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="md:col-span-2">
+                                <InputLabel htmlFor="edit-name" value="Nome Completo *" />
+                                <TextInput
+                                    id="edit-name"
+                                    className="mt-1 w-full"
+                                    value={data.name}
+                                    onChange={(e) => setData('name', e.target.value)}
+                                    required
+                                />
+                                <InputError message={errors.name} className="mt-1" />
+                            </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div>
-                            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                                Nome Completo *
-                            </label>
-                            <input
-                                type="text"
-                                id="name"
-                                value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.name ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
-                                required
-                            />
-                            {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
-                        </div>
+                            <div>
+                                <InputLabel htmlFor="edit-short_name" value="Nome Abreviado" />
+                                <TextInput
+                                    id="edit-short_name"
+                                    className="mt-1 w-full"
+                                    value={data.short_name}
+                                    onChange={(e) => setData('short_name', e.target.value)}
+                                />
+                                <InputError message={errors.short_name} className="mt-1" />
+                            </div>
 
-                        <div>
-                            <label htmlFor="short_name" className="block text-sm font-medium text-gray-700 mb-1">
-                                Nome Abreviado
-                            </label>
-                            <input
-                                type="text"
-                                id="short_name"
-                                value={data.short_name}
-                                onChange={(e) => setData('short_name', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.short_name ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
-                            />
-                            {errors.short_name && <p className="mt-1 text-sm text-red-600">{errors.short_name}</p>}
-                        </div>
+                            <div>
+                                <InputLabel htmlFor="edit-cpf" value="CPF *" />
+                                <TextInput
+                                    id="edit-cpf"
+                                    className="mt-1 w-full"
+                                    value={data.cpf}
+                                    onChange={(e) => setData('cpf', maskCpf(e.target.value))}
+                                    placeholder="000.000.000-00"
+                                    maxLength="14"
+                                    required
+                                />
+                                <InputError message={errors.cpf} className="mt-1" />
+                            </div>
 
-                        <div>
-                            <label htmlFor="cpf" className="block text-sm font-medium text-gray-700 mb-1">
-                                CPF *
-                            </label>
-                            <input
-                                type="text"
-                                id="cpf"
-                                value={data.cpf}
-                                onChange={handleCPFChange}
-                                placeholder="000.000.000-00"
-                                maxLength="14"
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.cpf ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
-                                required
-                            />
-                            {errors.cpf && <p className="mt-1 text-sm text-red-600">{errors.cpf}</p>}
-                        </div>
+                            <div>
+                                <InputLabel htmlFor="edit-birth_date" value="Data de Nascimento" />
+                                <TextInput
+                                    id="edit-birth_date"
+                                    type="date"
+                                    className="mt-1 w-full"
+                                    value={data.birth_date}
+                                    onChange={(e) => setData('birth_date', e.target.value)}
+                                />
+                                <InputError message={errors.birth_date} className="mt-1" />
+                            </div>
 
-                        <div>
-                            <label htmlFor="birth_date" className="block text-sm font-medium text-gray-700 mb-1">
-                                Data de Nascimento
-                            </label>
-                            <input
-                                type="date"
-                                id="birth_date"
-                                value={data.birth_date}
-                                onChange={(e) => setData('birth_date', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.birth_date ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
-                            />
-                            {errors.birth_date && <p className="mt-1 text-sm text-red-600">{errors.birth_date}</p>}
-                        </div>
-                    </div>
+                            <div>
+                                <InputLabel htmlFor="edit-gender_id" value="Gênero" />
+                                <select
+                                    id="edit-gender_id"
+                                    value={data.gender_id}
+                                    onChange={(e) => setData('gender_id', e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                >
+                                    <option value="">Selecione o gênero</option>
+                                    <option value="1">Masculino</option>
+                                    <option value="2">Feminino</option>
+                                    <option value="3">Outro</option>
+                                    <option value="4">Prefere não informar</option>
+                                </select>
+                                <InputError message={errors.gender_id} className="mt-1" />
+                            </div>
 
-                    <div>
-                        <label htmlFor="profile_image" className="block text-sm font-medium text-gray-700 mb-1">
-                            Foto do Perfil
-                        </label>
-                        <div className="flex items-center space-x-4">
-                            <input
-                                type="file"
-                                id="profile_image"
-                                accept="image/jpeg,image/png,image/jpg,image/gif"
-                                onChange={(e) => {
-                                    const file = e.target.files[0];
-                                    if (!file) return;
-
-                                    if (file.size > 5 * 1024 * 1024) {
-                                        setError('profile_image', 'O arquivo deve ter no máximo 5MB.');
-                                        e.target.value = '';
-                                        return;
-                                    }
-
-                                    const img = new Image();
-                                    img.onload = () => {
-                                        URL.revokeObjectURL(img.src);
-                                        if (img.width < 50 || img.height < 50) {
-                                            setError('profile_image', `Imagem muito pequena (${img.width}x${img.height}). Mínimo: 50x50 pixels.`);
-                                            e.target.value = '';
-                                        } else if (img.width > 2000 || img.height > 2000) {
-                                            setError('profile_image', `Imagem muito grande (${img.width}x${img.height}). Máximo: 2000x2000 pixels.`);
-                                            e.target.value = '';
-                                        } else {
-                                            clearErrors('profile_image');
-                                            setData('profile_image', file);
-                                        }
-                                    };
-                                    img.onerror = () => {
-                                        URL.revokeObjectURL(img.src);
-                                        setError('profile_image', 'Arquivo não é uma imagem válida.');
-                                        e.target.value = '';
-                                    };
-                                    img.src = URL.createObjectURL(file);
-                                }}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.profile_image ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
-                            />
-                            {data.profile_image ? (
-                                <div className="flex-shrink-0">
-                                    <img
-                                        src={URL.createObjectURL(data.profile_image)}
-                                        alt="Preview"
-                                        className="h-12 w-12 rounded-full object-cover border-2 border-gray-200"
+                            <div className="md:col-span-full">
+                                <InputLabel htmlFor="edit-profile_image" value="Foto do Perfil" />
+                                <div className="flex items-center space-x-4 mt-1">
+                                    <input
+                                        type="file"
+                                        id="edit-profile_image"
+                                        accept="image/jpeg,image/png,image/jpg,image/gif"
+                                        onChange={handleImageChange}
+                                        className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
                                     />
+                                    {data.profile_image ? (
+                                        <div className="flex-shrink-0">
+                                            <img
+                                                src={URL.createObjectURL(data.profile_image)}
+                                                alt="Preview"
+                                                className="h-10 w-10 rounded-full object-cover ring-2 ring-indigo-100"
+                                            />
+                                        </div>
+                                    ) : employee?.avatar_url && (
+                                        <div className="flex-shrink-0">
+                                            <img
+                                                src={employee.avatar_url}
+                                                alt="Foto atual"
+                                                className="h-10 w-10 rounded-full object-cover ring-2 ring-indigo-100"
+                                                onError={(e) => { e.target.style.display = 'none'; }}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
-                            ) : employee?.avatar_url && (
-                                <div className="flex-shrink-0">
-                                    <img
-                                        src={employee.avatar_url}
-                                        alt="Foto atual"
-                                        className="h-12 w-12 rounded-full object-cover border-2 border-gray-200"
-                                        onError={(e) => {
-                                            e.target.style.display = 'none';
-                                        }}
-                                    />
-                                </div>
-                            )}
+                                <InputError message={errors.profile_image} className="mt-1" />
+                            </div>
                         </div>
-                        {errors.profile_image && <p className="mt-1 text-sm text-red-600">{errors.profile_image}</p>}
-                        <p className="mt-1 text-xs text-gray-500">
-                            Formatos: JPEG, PNG, GIF. Máx: 5MB, 2000x2000px. Mín: 50x50px.
-                        </p>
-                    </div>
-                </div>
+                    </StandardModal.Section>
 
-                {/* Informações Profissionais */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                    <h4 className="text-sm font-medium text-gray-900 mb-4">
-                        Informações Profissionais
-                    </h4>
+                    <StandardModal.Section title="Informações Profissionais">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <InputLabel htmlFor="edit-admission_date" value="Data de Admissão *" />
+                                <TextInput
+                                    id="edit-admission_date"
+                                    type="date"
+                                    className="mt-1 w-full"
+                                    value={data.admission_date}
+                                    onChange={(e) => setData('admission_date', e.target.value)}
+                                    required
+                                />
+                                <InputError message={errors.admission_date} className="mt-1" />
+                            </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div>
-                            <label htmlFor="admission_date" className="block text-sm font-medium text-gray-700 mb-1">
-                                Data de Admissão *
-                            </label>
-                            <input
-                                type="date"
-                                id="admission_date"
-                                value={data.admission_date}
-                                onChange={(e) => setData('admission_date', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.admission_date ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
-                                required
-                            />
-                            {errors.admission_date && <p className="mt-1 text-sm text-red-600">{errors.admission_date}</p>}
+                            <div>
+                                <InputLabel htmlFor="edit-position_id" value="Cargo *" />
+                                <select
+                                    id="edit-position_id"
+                                    value={data.position_id}
+                                    onChange={(e) => setData('position_id', e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                    required
+                                >
+                                    <option value="">Selecione um cargo</option>
+                                    {positions.map((position) => (
+                                        <option key={position.id} value={position.id}>
+                                            {position.name} {position.level && `(${position.level})`}
+                                        </option>
+                                    ))}
+                                </select>
+                                <InputError message={errors.position_id} className="mt-1" />
+                            </div>
+
+                            <div>
+                                <InputLabel htmlFor="edit-level" value="Nível" />
+                                <select
+                                    id="edit-level"
+                                    value={data.level}
+                                    onChange={(e) => setData('level', e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                >
+                                    <option value="">Selecione um nível</option>
+                                    {levels.map((level) => (
+                                        <option key={level.value} value={level.value}>{level.label}</option>
+                                    ))}
+                                </select>
+                                <InputError message={errors.level} className="mt-1" />
+                            </div>
+
+                            <div>
+                                <InputLabel htmlFor="edit-store_id" value="Loja *" />
+                                <select
+                                    id="edit-store_id"
+                                    value={data.store_id}
+                                    onChange={(e) => setData('store_id', e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                    required
+                                >
+                                    <option value="">Selecione uma loja</option>
+                                    {stores.map((store) => (
+                                        <option key={store.id} value={store.code}>
+                                            {store.code} - {store.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <InputError message={errors.store_id} className="mt-1" />
+                            </div>
+
+                            <div>
+                                <InputLabel htmlFor="edit-site_coupon" value="Cupom Site" />
+                                <TextInput
+                                    id="edit-site_coupon"
+                                    className="mt-1 w-full"
+                                    value={data.site_coupon}
+                                    onChange={(e) => setData('site_coupon', e.target.value)}
+                                />
+                                <InputError message={errors.site_coupon} className="mt-1" />
+                            </div>
+
+                            <div>
+                                <InputLabel htmlFor="edit-status_id" value="Situação" />
+                                <select
+                                    id="edit-status_id"
+                                    value={data.status_id}
+                                    onChange={(e) => setData('status_id', e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                >
+                                    <option value="">Selecione a situação</option>
+                                    {statuses.map((status) => (
+                                        <option key={status.id} value={status.id}>{status.name}</option>
+                                    ))}
+                                </select>
+                                <InputError message={errors.status_id} className="mt-1" />
+                            </div>
+
+                            <div>
+                                <InputLabel htmlFor="edit-area_id" value="Área" />
+                                <select
+                                    id="edit-area_id"
+                                    value={data.area_id}
+                                    onChange={(e) => setData('area_id', e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                >
+                                    <option value="">Selecione a área</option>
+                                    <option value="1">Vendas</option>
+                                    <option value="2">Administrativo</option>
+                                    <option value="3">Logística</option>
+                                    <option value="4">Marketing</option>
+                                    <option value="5">TI</option>
+                                    <option value="6">Financeiro</option>
+                                    <option value="7">RH</option>
+                                    <option value="8">Operacional</option>
+                                    <option value="9">Comercial</option>
+                                    <option value="10">Segurança</option>
+                                    <option value="11">Limpeza</option>
+                                    <option value="12">Geral</option>
+                                    <option value="13">Produção</option>
+                                    <option value="14">Qualidade</option>
+                                    <option value="15">Compras</option>
+                                </select>
+                                <InputError message={errors.area_id} className="mt-1" />
+                            </div>
                         </div>
+                    </StandardModal.Section>
 
-                        <div>
-                            <label htmlFor="position_id" className="block text-sm font-medium text-gray-700 mb-1">
-                                Cargo *
-                            </label>
-                            <select
-                                id="position_id"
-                                value={data.position_id}
-                                onChange={(e) => setData('position_id', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.position_id ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
-                                required
-                            >
-                                <option value="">Selecione um cargo</option>
-                                {positions.map((position) => (
-                                    <option key={position.id} value={position.id}>
-                                        {position.name} {position.level && `(${position.level})`}
-                                    </option>
-                                ))}
-                            </select>
-                            {errors.position_id && <p className="mt-1 text-sm text-red-600">{errors.position_id}</p>}
-                        </div>
+                    <StandardModal.Section title="Outras Informações">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <InputLabel htmlFor="edit-education_level_id" value="Escolaridade" />
+                                <select
+                                    id="edit-education_level_id"
+                                    value={data.education_level_id}
+                                    onChange={(e) => setData('education_level_id', e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                >
+                                    <option value="">Selecione a escolaridade</option>
+                                    {educationLevels.map((level) => (
+                                        <option key={level.id} value={level.id}>{level.name}</option>
+                                    ))}
+                                </select>
+                                <InputError message={errors.education_level_id} className="mt-1" />
+                            </div>
 
-                        <div>
-                            <label htmlFor="level" className="block text-sm font-medium text-gray-700 mb-1">
-                                Nível
-                            </label>
-                            <select
-                                id="level"
-                                value={data.level}
-                                onChange={(e) => setData('level', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.level ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
-                            >
-                                <option value="">Selecione um nível</option>
-                                {levels.map((level) => (
-                                    <option key={level.value} value={level.value}>
-                                        {level.label}
-                                    </option>
-                                ))}
-                            </select>
-                            {errors.level && <p className="mt-1 text-sm text-red-600">{errors.level}</p>}
-                        </div>
-
-                        <div>
-                            <label htmlFor="store_id" className="block text-sm font-medium text-gray-700 mb-1">
-                                Loja *
-                            </label>
-                            <select
-                                id="store_id"
-                                value={data.store_id}
-                                onChange={(e) => setData('store_id', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.store_id ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
-                                required
-                            >
-                                <option value="">Selecione uma loja</option>
-                                {stores.map((store) => (
-                                    <option key={store.id} value={store.code}>
-                                        {store.code} - {store.name}
-                                    </option>
-                                ))}
-                            </select>
-                            {errors.store_id && <p className="mt-1 text-sm text-red-600">{errors.store_id}</p>}
-                        </div>
-
-                        <div>
-                            <label htmlFor="site_coupon" className="block text-sm font-medium text-gray-700 mb-1">
-                                Cupom Site
-                            </label>
-                            <input
-                                type="text"
-                                id="site_coupon"
-                                value={data.site_coupon}
-                                onChange={(e) => setData('site_coupon', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.site_coupon ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
-                            />
-                            {errors.site_coupon && <p className="mt-1 text-sm text-red-600">{errors.site_coupon}</p>}
-                        </div>
-
-                        <div>
-                            <label htmlFor="status_id" className="block text-sm font-medium text-gray-700 mb-1">
-                                Situação
-                            </label>
-                            <select
-                                id="status_id"
-                                value={data.status_id}
-                                onChange={(e) => setData('status_id', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.status_id ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
-                            >
-                                <option value="">Selecione a situação</option>
-                                {statuses.map((status) => (
-                                    <option key={status.id} value={status.id}>
-                                        {status.name}
-                                    </option>
-                                ))}
-                            </select>
-                            {errors.status_id && <p className="mt-1 text-sm text-red-600">{errors.status_id}</p>}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Informações Complementares */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                    <h4 className="text-sm font-medium text-gray-900 mb-4">
-                        Informações Complementares
-                    </h4>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div>
-                            <label htmlFor="dismissal_date" className="block text-sm font-medium text-gray-700 mb-1">
-                                Data de Demissão
-                            </label>
-                            <input
-                                type="date"
-                                id="dismissal_date"
-                                value={data.dismissal_date}
-                                onChange={(e) => setData('dismissal_date', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.dismissal_date ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
-                            />
-                            {errors.dismissal_date && <p className="mt-1 text-sm text-red-600">{errors.dismissal_date}</p>}
-                            <p className="mt-1 text-xs text-gray-500">
-                                Deixe em branco se o funcionário estiver ativo
-                            </p>
+                            <div>
+                                <InputLabel htmlFor="edit-dismissal_date" value="Data de Demissão" />
+                                <TextInput
+                                    id="edit-dismissal_date"
+                                    type="date"
+                                    className="mt-1 w-full"
+                                    value={data.dismissal_date}
+                                    onChange={(e) => setData('dismissal_date', e.target.value)}
+                                />
+                                <InputError message={errors.dismissal_date} className="mt-1" />
+                            </div>
                         </div>
 
-                        <div>
-                            <label htmlFor="education_level_id" className="block text-sm font-medium text-gray-700 mb-1">
-                                Escolaridade
-                            </label>
-                            <select
-                                id="education_level_id"
-                                value={data.education_level_id}
-                                onChange={(e) => setData('education_level_id', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.education_level_id ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
-                            >
-                                <option value="">Selecione a escolaridade</option>
-                                {educationLevels.map((level) => (
-                                    <option key={level.id} value={level.id}>
-                                        {level.name}
-                                    </option>
-                                ))}
-                            </select>
-                            {errors.education_level_id && <p className="mt-1 text-sm text-red-600">{errors.education_level_id}</p>}
+                        <div className="mt-4 flex gap-6">
+                            <div className="flex items-center gap-2">
+                                <Checkbox
+                                    id="edit-is_pcd"
+                                    checked={data.is_pcd}
+                                    onChange={(e) => setData('is_pcd', e.target.checked)}
+                                />
+                                <InputLabel htmlFor="edit-is_pcd" value="PcD" />
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <Checkbox
+                                    id="edit-is_apprentice"
+                                    checked={data.is_apprentice}
+                                    onChange={(e) => setData('is_apprentice', e.target.checked)}
+                                />
+                                <InputLabel htmlFor="edit-is_apprentice" value="Aprendiz" />
+                            </div>
                         </div>
-
-                        <div>
-                            <label htmlFor="gender_id" className="block text-sm font-medium text-gray-700 mb-1">
-                                Gênero
-                            </label>
-                            <select
-                                id="gender_id"
-                                value={data.gender_id}
-                                onChange={(e) => setData('gender_id', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.gender_id ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
-                            >
-                                <option value="">Selecione o gênero</option>
-                                <option value="1">Masculino</option>
-                                <option value="2">Feminino</option>
-                                <option value="3">Outro</option>
-                                <option value="4">Prefere não informar</option>
-                            </select>
-                            {errors.gender_id && <p className="mt-1 text-sm text-red-600">{errors.gender_id}</p>}
-                        </div>
-
-                        <div>
-                            <label htmlFor="area_id" className="block text-sm font-medium text-gray-700 mb-1">
-                                Área
-                            </label>
-                            <select
-                                id="area_id"
-                                value={data.area_id}
-                                onChange={(e) => setData('area_id', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.area_id ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
-                            >
-                                <option value="">Selecione a área</option>
-                                <option value="1">Vendas</option>
-                                <option value="2">Administrativo</option>
-                                <option value="3">Logística</option>
-                                <option value="4">Marketing</option>
-                                <option value="5">TI</option>
-                                <option value="6">Financeiro</option>
-                                <option value="7">RH</option>
-                                <option value="8">Operacional</option>
-                                <option value="9">Comercial</option>
-                                <option value="10">Segurança</option>
-                                <option value="11">Limpeza</option>
-                                <option value="12">Geral</option>
-                                <option value="13">Produção</option>
-                                <option value="14">Qualidade</option>
-                                <option value="15">Compras</option>
-                            </select>
-                            {errors.area_id && <p className="mt-1 text-sm text-red-600">{errors.area_id}</p>}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Características Especiais */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                    <h4 className="text-sm font-medium text-gray-900 mb-4">
-                        Características Especiais
-                    </h4>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div className="flex items-center">
-                            <input
-                                type="checkbox"
-                                id="is_pcd"
-                                checked={data.is_pcd}
-                                onChange={(e) => setData('is_pcd', e.target.checked)}
-                                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                            />
-                            <label htmlFor="is_pcd" className="ml-2 block text-sm text-gray-900">
-                                Pessoa com Deficiência (PcD)
-                            </label>
-                        </div>
-
-                        <div className="flex items-center">
-                            <input
-                                type="checkbox"
-                                id="is_apprentice"
-                                checked={data.is_apprentice}
-                                onChange={(e) => setData('is_apprentice', e.target.checked)}
-                                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                            />
-                            <label htmlFor="is_apprentice" className="ml-2 block text-sm text-gray-900">
-                                Aprendiz
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Ações */}
-                <div className="flex justify-end space-x-3 pt-4 border-t">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleClose}
-                        disabled={isSubmitting}
-                    >
-                        Cancelar
-                    </Button>
-
-                    <Button
-                        type="submit"
-                        variant="primary"
-                        loading={isSubmitting}
-                        icon={isSubmitting ? null : ({ className }) => (
-                            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                        )}
-                    >
-                        {isSubmitting ? 'Salvando...' : 'Salvar Alterações'}
-                    </Button>
-                </div>
-            </form>}
-        </Modal>
+                    </StandardModal.Section>
+                </>
+            )}
+        </StandardModal>
     );
 }

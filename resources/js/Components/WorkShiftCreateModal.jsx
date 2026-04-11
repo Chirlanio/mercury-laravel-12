@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { useForm, router } from '@inertiajs/react';
-import Modal from '@/Components/Modal';
-import Button from '@/Components/Button';
+import StandardModal from '@/Components/StandardModal';
+import InputLabel from '@/Components/InputLabel';
+import TextInput from '@/Components/TextInput';
+import InputError from '@/Components/InputError';
+import { CalendarDaysIcon } from '@heroicons/react/24/outline';
 
-export default function WorkShiftCreateModal({ isOpen, onClose, onSuccess, employees = [] }) {
+export default function WorkShiftCreateModal({ show, onClose, onSuccess, employees = [] }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { data, setData, errors, reset, clearErrors, setError } = useForm({
         employee_id: '',
@@ -20,8 +23,7 @@ export default function WorkShiftCreateModal({ isOpen, onClose, onSuccess, emplo
         { value: 'compensar', label: 'Compensar' },
     ];
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
+    const handleSubmit = () => {
         setIsSubmitting(true);
 
         router.post('/work-shifts', data, {
@@ -31,13 +33,9 @@ export default function WorkShiftCreateModal({ isOpen, onClose, onSuccess, emplo
                 setIsSubmitting(false);
                 reset();
                 clearErrors();
-                if (onSuccess) {
-                    onSuccess();
-                }
-                onClose();
+                if (onSuccess) onSuccess();
             },
             onError: (errors) => {
-                console.error('Erro ao criar jornada:', errors);
                 setIsSubmitting(false);
                 setError(errors);
             },
@@ -54,139 +52,104 @@ export default function WorkShiftCreateModal({ isOpen, onClose, onSuccess, emplo
     };
 
     return (
-        <Modal show={isOpen} onClose={handleClose} title="Cadastrar Jornada" maxWidth="85vw">
-            <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Informações da Jornada */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                    <h4 className="text-sm font-medium text-gray-900 mb-4">
-                        Informações da Jornada
-                    </h4>
+        <StandardModal
+            show={show}
+            onClose={handleClose}
+            title="Cadastrar Jornada"
+            subtitle="Criação de novo registro de turno"
+            headerColor="bg-indigo-600"
+            headerIcon={<CalendarDaysIcon className="h-6 w-6" />}
+            onSubmit={handleSubmit}
+            maxWidth="2xl"
+            footer={
+                <StandardModal.Footer
+                    onCancel={handleClose}
+                    onSubmit="submit"
+                    submitLabel="Cadastrar Jornada"
+                    processing={isSubmitting}
+                />
+            }
+        >
+            <StandardModal.Section title="Informações da Jornada">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                        <InputLabel htmlFor="create-employee_id" value="Funcionário *" />
+                        <select
+                            id="create-employee_id"
+                            value={data.employee_id}
+                            onChange={(e) => setData('employee_id', e.target.value)}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                            required
+                        >
+                            <option value="">Selecione um funcionário</option>
+                            {employees.map((employee) => (
+                                <option key={employee.id} value={employee.id}>
+                                    {employee.name}
+                                </option>
+                            ))}
+                        </select>
+                        <InputError message={errors.employee_id} className="mt-1" />
+                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div className="md:col-span-3 lg:col-span-2">
-                            <label htmlFor="employee_id" className="block text-sm font-medium text-gray-700 mb-1">
-                                Funcionário *
-                            </label>
-                            <select
-                                id="employee_id"
-                                value={data.employee_id}
-                                onChange={(e) => setData('employee_id', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.employee_id ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
-                                required
-                            >
-                                <option value="">Selecione um funcionário</option>
-                                {employees.map((employee) => (
-                                    <option key={employee.id} value={employee.id}>
-                                        {employee.name}
-                                    </option>
-                                ))}
-                            </select>
-                            {errors.employee_id && <p className="mt-1 text-sm text-red-600">{errors.employee_id}</p>}
-                        </div>
+                    <div>
+                        <InputLabel htmlFor="create-date" value="Data *" />
+                        <TextInput
+                            id="create-date"
+                            type="date"
+                            className="mt-1 w-full"
+                            value={data.date}
+                            onChange={(e) => setData('date', e.target.value)}
+                            required
+                        />
+                        <InputError message={errors.date} className="mt-1" />
+                    </div>
 
-                        <div>
-                            <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">
-                                Data *
-                            </label>
-                            <input
-                                type="date"
-                                id="date"
-                                value={data.date}
-                                onChange={(e) => setData('date', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.date ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
-                                required
-                            />
-                            {errors.date && <p className="mt-1 text-sm text-red-600">{errors.date}</p>}
-                        </div>
+                    <div>
+                        <InputLabel htmlFor="create-type" value="Tipo de Jornada *" />
+                        <select
+                            id="create-type"
+                            value={data.type}
+                            onChange={(e) => setData('type', e.target.value)}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                            required
+                        >
+                            <option value="">Selecione o tipo</option>
+                            {types.map((type) => (
+                                <option key={type.value} value={type.value}>
+                                    {type.label}
+                                </option>
+                            ))}
+                        </select>
+                        <InputError message={errors.type} className="mt-1" />
+                    </div>
 
-                        <div>
-                            <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
-                                Tipo de Jornada *
-                            </label>
-                            <select
-                                id="type"
-                                value={data.type}
-                                onChange={(e) => setData('type', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.type ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
-                                required
-                            >
-                                <option value="">Selecione o tipo</option>
-                                {types.map((type) => (
-                                    <option key={type.value} value={type.value}>
-                                        {type.label}
-                                    </option>
-                                ))}
-                            </select>
-                            {errors.type && <p className="mt-1 text-sm text-red-600">{errors.type}</p>}
-                        </div>
+                    <div>
+                        <InputLabel htmlFor="create-start_time" value="Hora de Início *" />
+                        <TextInput
+                            id="create-start_time"
+                            type="time"
+                            className="mt-1 w-full"
+                            value={data.start_time}
+                            onChange={(e) => setData('start_time', e.target.value)}
+                            required
+                        />
+                        <InputError message={errors.start_time} className="mt-1" />
+                    </div>
 
-                        <div>
-                            <label htmlFor="start_time" className="block text-sm font-medium text-gray-700 mb-1">
-                                Hora de Início *
-                            </label>
-                            <input
-                                type="time"
-                                id="start_time"
-                                value={data.start_time}
-                                onChange={(e) => setData('start_time', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.start_time ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
-                                required
-                            />
-                            {errors.start_time && <p className="mt-1 text-sm text-red-600">{errors.start_time}</p>}
-                        </div>
-
-                        <div>
-                            <label htmlFor="end_time" className="block text-sm font-medium text-gray-700 mb-1">
-                                Hora de Término *
-                            </label>
-                            <input
-                                type="time"
-                                id="end_time"
-                                value={data.end_time}
-                                onChange={(e) => setData('end_time', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.end_time ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
-                                required
-                            />
-                            {errors.end_time && <p className="mt-1 text-sm text-red-600">{errors.end_time}</p>}
-                        </div>
+                    <div>
+                        <InputLabel htmlFor="create-end_time" value="Hora de Término *" />
+                        <TextInput
+                            id="create-end_time"
+                            type="time"
+                            className="mt-1 w-full"
+                            value={data.end_time}
+                            onChange={(e) => setData('end_time', e.target.value)}
+                            required
+                        />
+                        <InputError message={errors.end_time} className="mt-1" />
                     </div>
                 </div>
-
-                {/* Ações */}
-                <div className="flex justify-end space-x-3 pt-4 border-t">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleClose}
-                        disabled={isSubmitting}
-                    >
-                        Cancelar
-                    </Button>
-
-                    <Button
-                        type="submit"
-                        variant="primary"
-                        loading={isSubmitting}
-                        icon={isSubmitting ? null : ({ className }) => (
-                            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                            </svg>
-                        )}
-                    >
-                        {isSubmitting ? 'Salvando...' : 'Cadastrar Jornada'}
-                    </Button>
-                </div>
-            </form>
-        </Modal>
+            </StandardModal.Section>
+        </StandardModal>
     );
 }

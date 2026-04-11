@@ -1,11 +1,13 @@
-import { Fragment, useState, useEffect } from 'react';
-import { Dialog, Transition } from '@headlessui/react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
+import StandardModal from '@/Components/StandardModal';
+import Button from '@/Components/Button';
 import {
-    XMarkIcon,
     ChevronDownIcon,
     ChevronUpIcon,
     CheckIcon,
+    ClipboardDocumentCheckIcon,
+    ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 
 const ANSWER_OPTIONS = [
@@ -117,197 +119,174 @@ export default function ChecklistEditModal({ show, onClose, checklistId, onSucce
 
     const checklist = data?.checklist;
     const stats = data?.statistics;
-    const progress = stats ? `${stats.answered}/${stats.total_questions}` : '';
+    const progressText = stats ? `${stats.answered}/${stats.total_questions}` : '';
+    const progressPct = stats ? (stats.answered / stats.total_questions) * 100 : 0;
 
     return (
-        <Transition appear show={show} as={Fragment}>
-            <Dialog as="div" className="relative z-50" onClose={handleClose}>
-                <Transition.Child
-                    as={Fragment}
-                    enter="ease-out duration-300"
-                    enterFrom="opacity-0"
-                    enterTo="opacity-100"
-                    leave="ease-in duration-200"
-                    leaveFrom="opacity-100"
-                    leaveTo="opacity-0"
-                >
-                    <div className="fixed inset-0 bg-black bg-opacity-25" />
-                </Transition.Child>
-
-                <div className="fixed inset-0 overflow-y-auto">
-                    <div className="flex min-h-full items-center justify-center p-4">
-                        <Transition.Child
-                            as={Fragment}
-                            enter="ease-out duration-300"
-                            enterFrom="opacity-0 scale-95"
-                            enterTo="opacity-100 scale-100"
-                            leave="ease-in duration-200"
-                            leaveFrom="opacity-100 scale-100"
-                            leaveTo="opacity-0 scale-95"
-                        >
-                            <Dialog.Panel className="w-full max-w-5xl transform overflow-hidden rounded-lg bg-white shadow-xl transition-all max-h-[90vh] flex flex-col">
-                                {/* Header */}
-                                <div className="flex items-center justify-between p-6 border-b">
-                                    <div>
-                                        <Dialog.Title className="text-lg font-semibold text-gray-900">
-                                            Responder Checklist
-                                        </Dialog.Title>
-                                        {checklist && (
-                                            <p className="text-sm text-gray-500 mt-1">
-                                                {checklist.store?.name} — Progresso: {progress}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <button onClick={handleClose} className="text-gray-400 hover:text-gray-600">
-                                        <XMarkIcon className="h-5 w-5" />
-                                    </button>
-                                </div>
-
-                                {/* Content */}
-                                <div className="flex-1 overflow-y-auto p-6">
-                                    {loading ? (
-                                        <div className="flex items-center justify-center py-12">
-                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
-                                        </div>
-                                    ) : data ? (
-                                        <div className="space-y-4">
-                                            {data.answers_by_area?.map((group, areaIndex) => (
-                                                <div key={areaIndex} className="border rounded-lg overflow-hidden">
-                                                    <button
-                                                        onClick={() => toggleArea(areaIndex)}
-                                                        className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition"
-                                                    >
-                                                        <span className="font-medium text-gray-900">{group.area?.name}</span>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-xs text-gray-500">
-                                                                {group.answers?.filter(a => answerForms[a.id]?.answer_status !== 'pending').length || 0}/{group.answers?.length || 0}
-                                                            </span>
-                                                            {expandedAreas[areaIndex]
-                                                                ? <ChevronUpIcon className="h-5 w-5 text-gray-500" />
-                                                                : <ChevronDownIcon className="h-5 w-5 text-gray-500" />
-                                                            }
-                                                        </div>
-                                                    </button>
-                                                    {expandedAreas[areaIndex] && (
-                                                        <div className="divide-y">
-                                                            {group.answers?.map((answer) => (
-                                                                <AnswerForm
-                                                                    key={answer.id}
-                                                                    answer={answer}
-                                                                    form={answerForms[answer.id] || {}}
-                                                                    employees={employees}
-                                                                    isSaving={saving[answer.id]}
-                                                                    isSaved={savedAnswers[answer.id]}
-                                                                    onFieldChange={(field, value) => updateFormField(answer.id, field, value)}
-                                                                    onSave={() => saveAnswer(answer.id)}
-                                                                />
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="text-center text-gray-500 py-12">Dados não encontrados.</p>
-                                    )}
-                                </div>
-
-                                {/* Footer */}
-                                <div className="flex justify-end gap-3 p-4 border-t">
-                                    <button
-                                        onClick={handleClose}
-                                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        onClick={handleDone}
-                                        className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition"
-                                    >
-                                        Concluir
-                                    </button>
-                                </div>
-                            </Dialog.Panel>
-                        </Transition.Child>
+        <StandardModal
+            show={show}
+            onClose={handleClose}
+            loading={loading}
+            title="Responder Checklist"
+            subtitle={checklist ? `${checklist.store?.name}` : ''}
+            headerColor="bg-blue-600"
+            headerIcon={<ClipboardDocumentCheckIcon className="h-6 w-6" />}
+            maxWidth="5xl"
+            headerActions={
+                <div className="flex items-center gap-3 bg-white/10 px-3 py-1.5 rounded-lg border border-white/20">
+                    <div className="text-right hidden sm:block">
+                        <p className="text-[10px] font-bold text-white/70 uppercase">Progresso</p>
+                        <p className="text-xs font-bold text-white">{progressText} perguntas</p>
+                    </div>
+                    <div className="w-20 bg-white/20 rounded-full h-2">
+                        <div 
+                            className="bg-white h-2 rounded-full transition-all duration-500" 
+                            style={{ width: `${progressPct}%` }}
+                        />
                     </div>
                 </div>
-            </Dialog>
-        </Transition>
+            }
+            footer={
+                <StandardModal.Footer onCancel={handleClose}>
+                    <Button variant="primary" onClick={handleDone}>
+                        Concluir e Salvar
+                    </Button>
+                </StandardModal.Footer>
+            }
+        >
+            {data && (
+                <div className="space-y-4">
+                    {data.answers_by_area?.map((group, areaIndex) => (
+                        <div key={areaIndex} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                            <button
+                                onClick={() => toggleArea(areaIndex)}
+                                className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <span className="font-bold text-gray-900">{group.area?.name}</span>
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700 uppercase">
+                                        {group.answers?.length || 0} Itens
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-xs font-semibold text-gray-500">
+                                        {group.answers?.filter(a => answerForms[a.id]?.answer_status !== 'pending').length || 0} de {group.answers?.length || 0} respondidos
+                                    </span>
+                                    {expandedAreas[areaIndex]
+                                        ? <ChevronUpIcon className="h-5 w-5 text-gray-400" />
+                                        : <ChevronDownIcon className="h-5 w-5 text-gray-400" />
+                                    }
+                                </div>
+                            </button>
+                            {expandedAreas[areaIndex] && (
+                                <div className="divide-y divide-gray-100 bg-white">
+                                    {group.answers?.map((answer) => (
+                                        <AnswerForm
+                                            key={answer.id}
+                                            answer={answer}
+                                            form={answerForms[answer.id] || {}}
+                                            employees={employees}
+                                            isSaving={saving[answer.id]}
+                                            isSaved={savedAnswers[answer.id]}
+                                            onFieldChange={(field, value) => updateFormField(answer.id, field, value)}
+                                            onSave={() => saveAnswer(answer.id)}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </StandardModal>
     );
 }
 
 function AnswerForm({ answer, form, employees, isSaving, isSaved, onFieldChange, onSave }) {
-    const showDetails = form.answer_status && form.answer_status !== 'pending';
+    const isAnswered = form.answer_status && form.answer_status !== 'pending';
 
     return (
-        <div className="p-4 space-y-3">
+        <div className={`p-5 transition-colors ${isSaved ? 'bg-green-50/30' : ''}`}>
             {/* Question */}
-            <div className="flex items-start justify-between gap-4">
-                <p className="text-sm text-gray-800 flex-1">
-                    {answer.question?.description}
-                    <span className="ml-1 text-xs text-gray-400">({answer.question?.points} pt{answer.question?.points !== 1 ? 's' : ''})</span>
-                </p>
-            </div>
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-800 leading-relaxed">
+                        {answer.question?.description}
+                    </p>
+                    <div className="mt-1 flex items-center gap-3">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                            Peso: {answer.question?.points} pt{answer.question?.points !== 1 ? 's' : ''}
+                        </span>
+                        {isSaved && (
+                            <span className="flex items-center text-[10px] font-bold text-green-600 uppercase">
+                                <CheckIcon className="h-3 w-3 mr-0.5" /> Salvo
+                            </span>
+                        )}
+                    </div>
+                </div>
 
-            {/* Status select + Save button */}
-            <div className="flex items-center gap-3">
-                <select
-                    value={form.answer_status || 'pending'}
-                    onChange={(e) => onFieldChange('answer_status', e.target.value)}
-                    className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                >
-                    {ANSWER_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                </select>
+                {/* Status select + Save button */}
+                <div className="flex items-center gap-2 self-start shrink-0">
+                    <select
+                        value={form.answer_status || 'pending'}
+                        onChange={(e) => onFieldChange('answer_status', e.target.value)}
+                        className={`text-xs font-bold rounded-lg border-gray-300 shadow-sm focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500 py-1.5 pr-8 pl-3 ${
+                            ANSWER_OPTIONS.find(o => o.value === form.answer_status)?.color || ''
+                        }`}
+                    >
+                        {ANSWER_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                    </select>
 
-                <button
-                    onClick={onSave}
-                    disabled={isSaving}
-                    className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md transition ${
-                        isSaved
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                    } disabled:opacity-50`}
-                >
-                    {isSaving ? (
-                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current mr-1" />
-                    ) : isSaved ? (
-                        <CheckIcon className="h-3 w-3 mr-1" />
-                    ) : null}
-                    {isSaving ? 'Salvando...' : isSaved ? 'Salvo' : 'Salvar'}
-                </button>
+                    <button
+                        onClick={onSave}
+                        disabled={isSaving}
+                        className={`inline-flex items-center justify-center min-w-[90px] px-3 py-2 text-xs font-bold rounded-lg transition shadow-sm ${
+                            isSaved
+                                ? 'bg-green-600 text-white hover:bg-green-700'
+                                : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                        } disabled:opacity-50`}
+                    >
+                        {isSaving ? (
+                            <ArrowPathIcon className="animate-spin h-3 w-3 mr-1.5" />
+                        ) : isSaved ? (
+                            <CheckIcon className="h-3 w-3 mr-1.5" />
+                        ) : null}
+                        {isSaving ? 'Salvando' : isSaved ? 'Salvo' : 'Salvar'}
+                    </button>
+                </div>
             </div>
 
             {/* Detail fields (shown when answer is not pending) */}
-            {showDetails && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-0 md:pl-4 border-l-2 border-gray-200 ml-0 md:ml-2">
+            {isAnswered && (
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 border-l-2 border-indigo-100">
                     <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Justificativa</label>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Justificativa</label>
                         <textarea
                             value={form.justification || ''}
                             onChange={(e) => onFieldChange('justification', e.target.value)}
                             rows={2}
-                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                            placeholder="Descreva a justificativa..."
+                            className="w-full rounded-lg border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm placeholder:text-gray-300"
+                            placeholder="Descreva o motivo desta avaliação..."
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Plano de Ação</label>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Plano de Ação</label>
                         <textarea
                             value={form.action_plan || ''}
                             onChange={(e) => onFieldChange('action_plan', e.target.value)}
                             rows={2}
-                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                            placeholder="Descreva o plano de ação..."
+                            className="w-full rounded-lg border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm placeholder:text-gray-300"
+                            placeholder="Quais ações serão tomadas?"
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Responsável</label>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Responsável</label>
                         <select
                             value={form.responsible_employee_id || ''}
                             onChange={(e) => onFieldChange('responsible_employee_id', e.target.value || null)}
-                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                            className="w-full rounded-lg border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
                         >
                             <option value="">Selecionar responsável...</option>
                             {employees.map((emp) => (
@@ -316,12 +295,12 @@ function AnswerForm({ answer, form, employees, isSaving, isSaved, onFieldChange,
                         </select>
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Prazo</label>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Prazo para Ajuste</label>
                         <input
                             type="date"
                             value={form.deadline_date || ''}
                             onChange={(e) => onFieldChange('deadline_date', e.target.value || null)}
-                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                            className="w-full rounded-lg border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
                         />
                     </div>
                 </div>

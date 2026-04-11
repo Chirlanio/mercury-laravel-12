@@ -1,136 +1,73 @@
 import { Head, router } from "@inertiajs/react";
 import { useState } from "react";
-import Modal from "@/Components/Modal";
+import { usePermissions, PERMISSIONS } from "@/Hooks/usePermissions";
+import useModalManager from "@/Hooks/useModalManager";
 import DataTable from "@/Components/DataTable";
 import Button from "@/Components/Button";
 import ActionButtons from "@/Components/ActionButtons";
+import StatusBadge from "@/Components/Shared/StatusBadge";
+import DeleteConfirmModal from "@/Components/Shared/DeleteConfirmModal";
 import StoreCreateModal from "@/Components/StoreCreateModal";
 import StoreEditModal from "@/Components/StoreEditModal";
 import StoreViewModal from "@/Components/StoreViewModal";
-import { PlusIcon, XMarkIcon, TrashIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
-export default function Index({ auth, stores, networks, statuses, managers, filters }) {
-    const [selectedStore, setSelectedStore] = useState(null);
-    const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [storeToDelete, setStoreToDelete] = useState(null);
+const NETWORK_VARIANT = {
+    1: 'pink', 2: 'purple', 3: 'amber', 4: 'info',
+    5: 'orange', 6: 'cyan', 7: 'gray', 8: 'rose',
+};
+
+export default function Index({ stores, networks, statuses, managers, filters }) {
+    const { hasPermission } = usePermissions();
+    const { modals, selected, openModal, closeModal, switchModal } = useModalManager(['create', 'view', 'edit']);
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [deleting, setDeleting] = useState(false);
 
     const viewStore = async (store) => {
         try {
             const response = await fetch(`/stores/${store.id}`, {
-                headers: {
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                }
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
             });
             const data = await response.json();
-            setSelectedStore(data.store);
-            setIsViewModalOpen(true);
+            openModal('view', data.store);
         } catch (error) {
             console.error('Erro ao carregar dados da loja:', error);
         }
     };
 
-    const closeViewModal = () => {
-        setIsViewModalOpen(false);
-        setSelectedStore(null);
+    const handleEditFromView = () => {
+        switchModal('view', 'edit');
     };
 
-    const openCreateModal = () => {
-        setIsCreateModalOpen(true);
-    };
-
-    const closeCreateModal = () => {
-        setIsCreateModalOpen(false);
-    };
-
-    const handleStoreCreated = () => {
+    const handleCreated = () => {
+        closeModal('create');
         router.reload();
     };
 
-    const editStore = (store) => {
-        setSelectedStore(store);
-        setIsEditModalOpen(true);
-    };
-
-    const handleEditFromModal = (store) => {
-        closeViewModal();
-        editStore(store);
-    };
-
-    const closeEditModal = () => {
-        setIsEditModalOpen(false);
-        setSelectedStore(null);
-    };
-
-    const handleStoreUpdated = () => {
-        closeEditModal();
+    const handleUpdated = () => {
+        closeModal('edit');
         router.reload();
     };
 
-    const openDeleteModal = (store) => {
-        setStoreToDelete(store);
-        setIsDeleteModalOpen(true);
-    };
-
-    const closeDeleteModal = () => {
-        setIsDeleteModalOpen(false);
-        setStoreToDelete(null);
-    };
-
-    const handleDeleteStore = () => {
-        if (!storeToDelete) return;
-
-        router.delete(`/stores/${storeToDelete.id}`, {
+    const handleConfirmDelete = () => {
+        if (!deleteTarget) return;
+        setDeleting(true);
+        router.delete(`/stores/${deleteTarget.id}`, {
             preserveState: true,
             preserveScroll: true,
-            onSuccess: () => {
-                closeDeleteModal();
-            },
-            onError: (errors) => {
-                console.error('Erro ao excluir loja:', errors);
-            }
+            onSuccess: () => { setDeleteTarget(null); setDeleting(false); },
+            onError: () => setDeleting(false),
         });
     };
 
-    const toggleStoreStatus = (store) => {
-        const route = store.is_active ? `/stores/${store.id}/deactivate` : `/stores/${store.id}/activate`;
-        router.post(route, {}, {
-            preserveState: true,
-            preserveScroll: true,
-            onSuccess: () => {
-                router.reload();
-            }
-        });
-    };
-
-    function getNetworkColor(networkId) {
-        const colors = {
-            1: 'bg-pink-100 text-pink-800',     // Arezzo
-            2: 'bg-purple-100 text-purple-800', // Anacapri
-            3: 'bg-amber-100 text-amber-800',   // Meia Sola
-            4: 'bg-blue-100 text-blue-800',     // Schutz
-            5: 'bg-orange-100 text-orange-800', // Outlet
-            6: 'bg-cyan-100 text-cyan-800',     // E-Commerce
-            7: 'bg-gray-100 text-gray-800',     // Operacional
-            8: 'bg-rose-100 text-rose-800',     // Arezzo Brizza
-        };
-        return colors[networkId] || 'bg-gray-100 text-gray-800';
-    }
-
-    // Column definitions
     const columns = [
         {
-            label: "Codigo",
+            label: "Código",
             field: "code",
             sortable: true,
             render: (store) => (
-                <span className="font-mono font-semibold text-blue-600">
-                    {store.code}
-                </span>
-            )
+                <span className="font-mono font-semibold text-blue-600">{store.code}</span>
+            ),
         },
         {
             label: "Loja",
@@ -138,71 +75,59 @@ export default function Index({ auth, stores, networks, statuses, managers, filt
             sortable: true,
             render: (store) => (
                 <div>
-                    <div className="text-sm font-medium text-gray-900">
-                        {store.name}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                        {store.company_name?.substring(0, 40)}...
-                    </div>
+                    <div className="text-sm font-medium text-gray-900">{store.name}</div>
+                    <div className="text-xs text-gray-500">{store.company_name?.substring(0, 40)}...</div>
                 </div>
-            )
+            ),
         },
         {
             label: "Rede",
             field: "network_id",
             sortable: true,
             render: (store) => (
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getNetworkColor(store.network_id)}`}>
+                <StatusBadge variant={NETWORK_VARIANT[store.network_id] || 'gray'}>
                     {store.network_name}
-                </span>
-            )
+                </StatusBadge>
+            ),
         },
         {
             label: "Gerente",
             field: "manager_name",
             sortable: false,
             render: (store) => (
-                <span className="text-sm text-gray-700">
-                    {store.manager_name || 'Nao informado'}
-                </span>
-            )
+                <span className="text-sm text-gray-700">{store.manager_name || 'Não informado'}</span>
+            ),
         },
         {
-            label: "Funcionarios",
+            label: "Funcionários",
             field: "employees_count",
             sortable: false,
             render: (store) => (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                    {store.employees_count} funcionarios
-                </span>
-            )
+                <StatusBadge variant="gray">{store.employees_count} funcionários</StatusBadge>
+            ),
         },
         {
             label: "Status",
             field: "is_active",
             sortable: false,
             render: (store) => (
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    store.is_active
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                }`}>
+                <StatusBadge variant={store.is_active ? 'success' : 'danger'}>
                     {store.is_active ? 'Ativa' : 'Inativa'}
-                </span>
-            )
+                </StatusBadge>
+            ),
         },
         {
-            label: "Acoes",
+            label: "Ações",
             field: "actions",
             sortable: false,
             render: (store) => (
                 <ActionButtons
                     onView={() => viewStore(store)}
-                    onEdit={() => editStore(store)}
-                    onDelete={() => openDeleteModal(store)}
+                    onEdit={hasPermission(PERMISSIONS.EDIT_USERS) ? () => openModal('edit', store) : undefined}
+                    onDelete={hasPermission(PERMISSIONS.DELETE_USERS) ? () => setDeleteTarget(store) : undefined}
                 />
-            )
-        }
+            ),
+        },
     ];
 
     return (
@@ -215,21 +140,17 @@ export default function Index({ auth, stores, networks, statuses, managers, filt
                     <div className="mb-6">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-3xl font-bold text-gray-900">
-                                    Lojas
-                                </h1>
+                                <h1 className="text-3xl font-bold text-gray-900">Lojas</h1>
                                 <p className="mt-1 text-sm text-gray-600">
-                                    Gerencie e visualize informacoes das lojas cadastradas
+                                    Gerencie e visualize informações das lojas cadastradas
                                 </p>
                             </div>
                             <div className="flex gap-3">
-                                <Button
-                                    variant="primary"
-                                    onClick={openCreateModal}
-                                    icon={PlusIcon}
-                                >
-                                    Nova Loja
-                                </Button>
+                                {hasPermission(PERMISSIONS.CREATE_USERS) && (
+                                    <Button variant="primary" onClick={() => openModal('create')} icon={PlusIcon}>
+                                        Nova Loja
+                                    </Button>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -237,7 +158,6 @@ export default function Index({ auth, stores, networks, statuses, managers, filt
                     {/* Filtros */}
                     <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                            {/* Filtro de Rede */}
                             <div>
                                 <label htmlFor="network-filter" className="block text-sm font-medium text-gray-700 mb-2">
                                     Filtrar por Rede
@@ -248,28 +168,19 @@ export default function Index({ auth, stores, networks, statuses, managers, filt
                                     value={filters?.network || ''}
                                     onChange={(e) => {
                                         const currentUrl = new URL(window.location);
-                                        if (e.target.value) {
-                                            currentUrl.searchParams.set('network', e.target.value);
-                                        } else {
-                                            currentUrl.searchParams.delete('network');
-                                        }
+                                        if (e.target.value) currentUrl.searchParams.set('network', e.target.value);
+                                        else currentUrl.searchParams.delete('network');
                                         currentUrl.searchParams.delete('page');
-                                        router.visit(currentUrl.toString(), {
-                                            preserveState: true,
-                                            preserveScroll: true,
-                                        });
+                                        router.visit(currentUrl.toString(), { preserveState: true, preserveScroll: true });
                                     }}
                                 >
                                     <option value="">Todas as redes</option>
                                     {networks?.map((network) => (
-                                        <option key={network.id} value={network.id}>
-                                            {network.name}
-                                        </option>
+                                        <option key={network.id} value={network.id}>{network.name}</option>
                                     ))}
                                 </select>
                             </div>
 
-                            {/* Filtro de Status */}
                             <div>
                                 <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-2">
                                     Filtrar por Status
@@ -280,39 +191,25 @@ export default function Index({ auth, stores, networks, statuses, managers, filt
                                     value={filters?.status || ''}
                                     onChange={(e) => {
                                         const currentUrl = new URL(window.location);
-                                        if (e.target.value) {
-                                            currentUrl.searchParams.set('status', e.target.value);
-                                        } else {
-                                            currentUrl.searchParams.delete('status');
-                                        }
+                                        if (e.target.value) currentUrl.searchParams.set('status', e.target.value);
+                                        else currentUrl.searchParams.delete('status');
                                         currentUrl.searchParams.delete('page');
-                                        router.visit(currentUrl.toString(), {
-                                            preserveState: true,
-                                            preserveScroll: true,
-                                        });
+                                        router.visit(currentUrl.toString(), { preserveState: true, preserveScroll: true });
                                     }}
                                 >
                                     <option value="">Todos os status</option>
                                     {statuses?.map((status) => (
-                                        <option key={status.id} value={status.id}>
-                                            {status.name}
-                                        </option>
+                                        <option key={status.id} value={status.id}>{status.name}</option>
                                     ))}
                                 </select>
                             </div>
 
-                            {/* Botao Limpar Filtros */}
                             <div>
                                 <Button
                                     variant="secondary"
                                     size="sm"
                                     className="h-[42px] w-[150px]"
-                                    onClick={() => {
-                                        router.visit('/stores', {
-                                            preserveState: true,
-                                            preserveScroll: true,
-                                        });
-                                    }}
+                                    onClick={() => router.visit('/stores', { preserveState: true, preserveScroll: true })}
                                     disabled={!filters?.network && !filters?.status}
                                     icon={XMarkIcon}
                                 >
@@ -326,7 +223,7 @@ export default function Index({ auth, stores, networks, statuses, managers, filt
                     <DataTable
                         data={stores}
                         columns={columns}
-                        searchPlaceholder="Pesquisar lojas por codigo, nome, CNPJ..."
+                        searchPlaceholder="Pesquisar lojas por código, nome, CNPJ..."
                         emptyMessage="Nenhuma loja encontrada"
                         onRowClick={viewStore}
                         perPageOptions={[15, 25, 50, 100]}
@@ -336,74 +233,44 @@ export default function Index({ auth, stores, networks, statuses, managers, filt
 
             {/* View Modal */}
             <StoreViewModal
-                isOpen={isViewModalOpen}
-                onClose={closeViewModal}
-                store={selectedStore}
-                onEdit={handleEditFromModal}
+                show={modals.view && selected !== null}
+                onClose={() => closeModal('view')}
+                store={selected}
+                onEdit={handleEditFromView}
             />
 
             {/* Create Modal */}
             <StoreCreateModal
-                isOpen={isCreateModalOpen}
-                onClose={closeCreateModal}
-                onSuccess={handleStoreCreated}
+                show={modals.create}
+                onClose={() => closeModal('create')}
+                onSuccess={handleCreated}
                 networks={networks}
                 managers={managers}
             />
 
             {/* Edit Modal */}
             <StoreEditModal
-                isOpen={isEditModalOpen}
-                onClose={closeEditModal}
-                onSuccess={handleStoreUpdated}
-                store={selectedStore}
+                show={modals.edit && selected !== null}
+                onClose={() => closeModal('edit')}
+                onSuccess={handleUpdated}
+                store={selected}
                 networks={networks}
                 managers={managers}
             />
 
-            {/* Delete Confirmation Modal */}
-            <Modal show={isDeleteModalOpen} onClose={closeDeleteModal} title="Confirmar Exclusao" maxWidth="85vw">
-                <div className="space-y-6">
-                    <div className="flex items-start space-x-4">
-                        <div className="flex-shrink-0">
-                            <ExclamationTriangleIcon className="h-12 w-12 text-red-600" />
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                Tem certeza que deseja excluir esta loja?
-                            </h3>
-                            {storeToDelete && (
-                                <div className="text-sm text-gray-600 space-y-1">
-                                    <p><strong>Codigo:</strong> {storeToDelete.code}</p>
-                                    <p><strong>Nome:</strong> {storeToDelete.name}</p>
-                                    <p><strong>Funcionarios:</strong> {storeToDelete.employees_count}</p>
-                                </div>
-                            )}
-                            <p className="mt-4 text-sm text-red-600 font-semibold">
-                                Esta acao nao pode ser desfeita. Todos os dados da loja serao permanentemente excluidos.
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end space-x-3 pt-4 border-t">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={closeDeleteModal}
-                        >
-                            Cancelar
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="danger"
-                            onClick={handleDeleteStore}
-                            icon={TrashIcon}
-                        >
-                            Excluir Loja
-                        </Button>
-                    </div>
-                </div>
-            </Modal>
+            {/* Delete Confirm Modal */}
+            <DeleteConfirmModal
+                show={deleteTarget !== null}
+                onClose={() => setDeleteTarget(null)}
+                onConfirm={handleConfirmDelete}
+                itemType="loja"
+                itemName={deleteTarget?.name}
+                details={[
+                    { label: 'Código', value: deleteTarget?.code },
+                    { label: 'Funcionários', value: deleteTarget?.employees_count?.toString() },
+                ]}
+                processing={deleting}
+            />
         </>
     );
 }

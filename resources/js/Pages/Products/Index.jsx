@@ -1,6 +1,11 @@
 import { Head, router } from "@inertiajs/react";
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
+import { usePermissions } from "@/Hooks/usePermissions";
+import useModalManager from "@/Hooks/useModalManager";
+import Button from "@/Components/Button";
+import StatusBadge from "@/Components/Shared/StatusBadge";
+import StatisticsGrid from "@/Components/Shared/StatisticsGrid";
 import ProductFilterBar from "@/Components/ProductFilterBar";
 import ProductDetailModal from "@/Components/ProductDetailModal";
 import ProductEditModal from "@/Components/ProductEditModal";
@@ -8,23 +13,21 @@ import ProductSyncModal from "@/Components/ProductSyncModal";
 import ProductSyncLogsModal from "@/Components/ProductSyncLogsModal";
 import ProductPriceImportModal from "@/Components/ProductPriceImportModal";
 import PrintLabelsModal from "@/Components/PrintLabelsModal";
-import { usePermissions } from "@/Hooks/usePermissions";
-import { LockClosedIcon } from "@heroicons/react/24/outline";
+import {
+    LockClosedIcon, CubeIcon, CheckCircleIcon, ArrowPathIcon,
+    TagIcon, ArrowDownTrayIcon, ClockIcon, PlusIcon,
+} from "@heroicons/react/24/outline";
 
-export default function Index({ auth, products, filters, stats, cigamAvailable, activeSyncLog }) {
+export default function Index({ products, filters, stats, cigamAvailable, activeSyncLog }) {
     const { canEditProducts, canSyncProducts } = usePermissions();
+    const { modals, openModal, closeModal } = useModalManager(['sync', 'syncLogs', 'priceImport', 'printLabels']);
 
     const [detailProductId, setDetailProductId] = useState(null);
     const [editProductId, setEditProductId] = useState(null);
-    const [isSyncOpen, setIsSyncOpen] = useState(false);
-    const [isSyncLogsOpen, setIsSyncLogsOpen] = useState(false);
-    const [isPriceImportOpen, setIsPriceImportOpen] = useState(false);
-    const [isPrintLabelsOpen, setIsPrintLabelsOpen] = useState(false);
 
     // Live sync progress polling
     const [liveSync, setLiveSync] = useState(activeSyncLog);
     const pollingRef = useRef(null);
-
     const pollCountRef = useRef(0);
 
     useEffect(() => {
@@ -35,12 +38,9 @@ export default function Index({ auth, products, filters, stats, cigamAvailable, 
                     const { data } = await axios.get(`/products/sync/status/${liveSync.id}`);
                     setLiveSync(data);
                     pollCountRef.current++;
-
-                    // Refresh stats every ~15s (every 5 polls)
                     if (pollCountRef.current % 5 === 0) {
                         router.reload({ only: ['stats'], preserveScroll: true });
                     }
-
                     if (data.status !== 'running') {
                         clearInterval(pollingRef.current);
                         pollingRef.current = null;
@@ -49,12 +49,9 @@ export default function Index({ auth, products, filters, stats, cigamAvailable, 
                 } catch {}
             }, 3000);
         }
-        return () => {
-            if (pollingRef.current) clearInterval(pollingRef.current);
-        };
+        return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
     }, [liveSync?.id, liveSync?.status]);
 
-    // Update liveSync when activeSyncLog prop changes
     useEffect(() => {
         if (activeSyncLog) setLiveSync(activeSyncLog);
     }, [activeSyncLog]);
@@ -83,8 +80,7 @@ export default function Index({ auth, products, filters, stats, cigamAvailable, 
 
     const handleSort = (field) => {
         const direction = filters.sort === field && filters.direction === 'asc' ? 'desc' : 'asc';
-        const params = { ...filters, sort: field, direction };
-        navigateWithFilters(params);
+        navigateWithFilters({ ...filters, sort: field, direction });
     };
 
     const handlePageChange = (url) => {
@@ -93,20 +89,17 @@ export default function Index({ auth, products, filters, stats, cigamAvailable, 
 
     const reload = () => {
         router.reload({ preserveScroll: true });
-        // If a sync just completed via modal, update liveSync
         if (liveSync?.status === 'running') {
             setLiveSync(prev => prev ? { ...prev, status: 'completed' } : null);
         }
     };
 
-    const SortIcon = ({ field }) => {
-        if (filters.sort !== field) return null;
-        return (
-            <span className="ml-1 text-indigo-500">
-                {filters.direction === 'asc' ? '↑' : '↓'}
-            </span>
-        );
-    };
+    const statisticsCards = [
+        { label: 'Total de Produtos', value: stats.total, format: 'number', icon: CubeIcon, color: 'indigo' },
+        { label: 'Produtos Ativos', value: stats.active, format: 'number', icon: CheckCircleIcon, color: 'green' },
+        { label: 'Sync Bloqueado', value: stats.sync_locked, format: 'number', icon: LockClosedIcon, color: 'yellow' },
+        { label: 'Última Sync', value: stats.last_sync ? new Date(stats.last_sync).toLocaleString('pt-BR') : 'Nunca', icon: ArrowPathIcon, color: 'blue' },
+    ];
 
     return (
         <>
@@ -121,48 +114,36 @@ export default function Index({ auth, products, filters, stats, cigamAvailable, 
                             <p className="mt-0.5 text-xs text-gray-500 sm:text-sm">Catálogo de produtos sincronizado do CIGAM</p>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                            <button
-                                onClick={() => setIsPrintLabelsOpen(true)}
-                                className="px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 sm:text-sm"
-                            >
+                            <Button variant="outline" size="sm" onClick={() => openModal('printLabels')} icon={TagIcon}>
                                 Etiquetas
-                            </button>
+                            </Button>
                             {canEditProducts() && (
-                                <button
-                                    onClick={() => setIsPriceImportOpen(true)}
-                                    className="px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 sm:text-sm"
-                                >
+                                <Button variant="outline" size="sm" onClick={() => openModal('priceImport')} icon={ArrowDownTrayIcon}>
                                     Importar Preços
-                                </button>
+                                </Button>
                             )}
                             {canSyncProducts() && (
                                 <>
-                                    <button
-                                        onClick={() => setIsSyncLogsOpen(true)}
-                                        className="px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 sm:text-sm"
-                                    >
+                                    <Button variant="outline" size="sm" onClick={() => openModal('syncLogs')} icon={ClockIcon}>
                                         Histórico
-                                    </button>
-                                    <button
-                                        onClick={() => setIsSyncOpen(true)}
+                                    </Button>
+                                    <Button
+                                        variant="primary"
+                                        size="sm"
+                                        onClick={() => openModal('sync')}
                                         disabled={!cigamAvailable}
-                                        className="px-3 py-2 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed sm:px-4 sm:text-sm"
+                                        icon={ArrowPathIcon}
                                     >
                                         Sincronizar
-                                    </button>
+                                    </Button>
                                 </>
                             )}
                         </div>
                     </div>
                 </div>
 
-                {/* Stats Cards */}
-                <div className="grid grid-cols-2 gap-3 mb-4 sm:grid-cols-4 sm:gap-4 sm:mb-6">
-                    <StatCard label="Total de Produtos" value={stats.total?.toLocaleString('pt-BR')} />
-                    <StatCard label="Produtos Ativos" value={stats.active?.toLocaleString('pt-BR')} color="text-green-600" />
-                    <StatCard label="Sync Bloqueado" value={stats.sync_locked?.toLocaleString('pt-BR')} color="text-amber-600" />
-                    <StatCard label="Última Sync" value={stats.last_sync ? new Date(stats.last_sync).toLocaleString('pt-BR') : 'Nunca'} small />
-                </div>
+                {/* Estatísticas */}
+                <StatisticsGrid cards={statisticsCards} cols={4} />
 
                 {/* CIGAM unavailable warning */}
                 {!cigamAvailable && canSyncProducts() && (
@@ -177,7 +158,7 @@ export default function Index({ auth, products, filters, stats, cigamAvailable, 
                 {liveSync && liveSync.status === 'running' && (
                     <div className="mb-3 bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between gap-3 sm:mb-4">
                         <div className="flex items-center gap-2 min-w-0 sm:gap-3">
-                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent flex-shrink-0"></div>
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent flex-shrink-0" />
                             <div className="min-w-0">
                                 <p className="text-xs text-blue-800 sm:text-sm">
                                     {liveSync.current_phase === 'lookups' && liveSync.lookup_current
@@ -195,12 +176,7 @@ export default function Index({ auth, products, filters, stats, cigamAvailable, 
                                 )}
                             </div>
                         </div>
-                        <button
-                            onClick={() => setIsSyncOpen(true)}
-                            className="flex-shrink-0 px-3 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-lg hover:bg-blue-200"
-                        >
-                            Ver
-                        </button>
+                        <Button variant="info" size="xs" onClick={() => openModal('sync')}>Ver</Button>
                     </div>
                 )}
 
@@ -246,11 +222,9 @@ export default function Index({ auth, products, filters, stats, cigamAvailable, 
                                             </div>
                                             <div className="flex items-center gap-1 flex-shrink-0">
                                                 {product.sync_locked && <LockClosedIcon className="h-3.5 w-3.5 text-amber-500" />}
-                                                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
-                                                    product.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                                }`}>
+                                                <StatusBadge variant={product.is_active ? 'success' : 'danger'} size="sm">
                                                     {product.is_active ? 'Ativo' : 'Inativo'}
-                                                </span>
+                                                </StatusBadge>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
@@ -284,34 +258,20 @@ export default function Index({ auth, products, filters, stats, cigamAvailable, 
                                             <tr key={product.id}
                                                 onClick={() => setDetailProductId(product.id)}
                                                 className="cursor-pointer hover:bg-gray-50 transition-colors">
-                                                <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">
-                                                    {product.reference}
-                                                </td>
-                                                <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">
-                                                    {product.description}
-                                                </td>
-                                                <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
-                                                    {product.brand?.name || '-'}
-                                                </td>
-                                                <td className="hidden lg:table-cell px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
-                                                    {product.collection?.name || '-'}
-                                                </td>
-                                                <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
-                                                    {product.category?.name || '-'}
-                                                </td>
+                                                <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{product.reference}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">{product.description}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{product.brand?.name || '-'}</td>
+                                                <td className="hidden lg:table-cell px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{product.collection?.name || '-'}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{product.category?.name || '-'}</td>
                                                 <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
                                                     {product.sale_price ? `R$ ${Number(product.sale_price).toFixed(2).replace('.', ',')}` : '-'}
                                                 </td>
-                                                <td className="hidden md:table-cell px-4 py-3 text-sm text-gray-600 text-center">
-                                                    {product.variants_count ?? 0}
-                                                </td>
+                                                <td className="hidden md:table-cell px-4 py-3 text-sm text-gray-600 text-center">{product.variants_count ?? 0}</td>
                                                 <td className="px-4 py-3 text-center whitespace-nowrap">
                                                     <div className="flex items-center justify-center gap-1">
-                                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                                            product.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                                        }`}>
+                                                        <StatusBadge variant={product.is_active ? 'success' : 'danger'}>
                                                             {product.is_active ? 'Ativo' : 'Inativo'}
-                                                        </span>
+                                                        </StatusBadge>
                                                         {product.sync_locked && (
                                                             <LockClosedIcon className="h-4 w-4 text-amber-500" title="Sync Bloqueado" />
                                                         )}
@@ -333,17 +293,12 @@ export default function Index({ auth, products, filters, stats, cigamAvailable, 
                             </div>
                             <div className="flex flex-wrap gap-1">
                                 {products.links.map((link, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => handlePageChange(link.url)}
-                                        disabled={!link.url}
+                                    <button key={i} onClick={() => handlePageChange(link.url)} disabled={!link.url}
                                         dangerouslySetInnerHTML={{ __html: link.label }}
                                         className={`px-2.5 py-1 text-xs rounded border sm:px-3 sm:text-sm ${
-                                            link.active
-                                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                                : link.url
-                                                    ? 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                                                    : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                                            link.active ? 'bg-indigo-600 text-white border-indigo-600'
+                                            : link.url ? 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                                            : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
                                         }`}
                                     />
                                 ))}
@@ -359,10 +314,7 @@ export default function Index({ auth, products, filters, stats, cigamAvailable, 
                 onClose={() => setDetailProductId(null)}
                 productId={detailProductId}
                 canEdit={canEditProducts()}
-                onEdit={(product) => {
-                    setDetailProductId(null);
-                    setEditProductId(product.id);
-                }}
+                onEdit={(product) => { setDetailProductId(null); setEditProductId(product.id); }}
             />
 
             <ProductEditModal
@@ -373,50 +325,37 @@ export default function Index({ auth, products, filters, stats, cigamAvailable, 
             />
 
             <ProductSyncModal
-                show={isSyncOpen}
-                onClose={() => setIsSyncOpen(false)}
+                show={modals.sync}
+                onClose={() => closeModal('sync')}
                 onCompleted={reload}
                 activeSyncLog={activeSyncLog}
             />
 
             <ProductSyncLogsModal
-                show={isSyncLogsOpen}
-                onClose={() => setIsSyncLogsOpen(false)}
+                show={modals.syncLogs}
+                onClose={() => closeModal('syncLogs')}
             />
 
             <ProductPriceImportModal
-                show={isPriceImportOpen}
-                onClose={() => setIsPriceImportOpen(false)}
+                show={modals.priceImport}
+                onClose={() => closeModal('priceImport')}
                 onCompleted={reload}
             />
 
             <PrintLabelsModal
-                show={isPrintLabelsOpen}
-                onClose={() => setIsPrintLabelsOpen(false)}
+                show={modals.printLabels}
+                onClose={() => closeModal('printLabels')}
             />
         </>
     );
 }
 
-function StatCard({ label, value, color = 'text-gray-900', small = false }) {
-    return (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
-            <div className="text-[10px] font-medium text-gray-500 sm:text-xs">{label}</div>
-            <div className={`mt-0.5 ${small ? 'text-xs sm:text-sm' : 'text-base sm:text-xl'} font-bold ${color}`}>{value}</div>
-        </div>
-    );
-}
-
 function Th({ field, label, sort, direction, onSort }) {
     return (
-        <th
-            className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700"
-            onClick={() => onSort(field)}
-        >
+        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700"
+            onClick={() => onSort(field)}>
             {label}
-            {sort === field && (
-                <span className="ml-1 text-indigo-500">{direction === 'asc' ? '↑' : '↓'}</span>
-            )}
+            {sort === field && <span className="ml-1 text-indigo-500">{direction === 'asc' ? '↑' : '↓'}</span>}
         </th>
     );
 }

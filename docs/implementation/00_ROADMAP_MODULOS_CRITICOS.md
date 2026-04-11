@@ -14,7 +14,7 @@
 | 1B | **Ferias** | CRITICO | CLT obrigatorio | Alto | 1 |
 | 1C | **Auditoria de Estoque** | CRITICO | Inventario | Alto | 1 |
 | 2A | **Movimentacao de Pessoal** | ALTO | Processo RH | Medio | 2 |
-| 2B | **Treinamentos** | MEDIO | Desenvolvimento RH | Medio | 2 |
+| 2B | **Treinamentos & Capacitacao** | MEDIO | Desenvolvimento RH | Alto | 2 |
 | 3A | **Delivery + Routing** | MEDIO | Operacoes | Medio | 3 |
 | 4A | **Chat + Helpdesk** | MENOR | Comunicacao | Alto | 4 |
 | -- | **Relatorios/Exportacoes** | MENOR | Transversal | Incremental | Continuo |
@@ -48,11 +48,11 @@ WebSocket (NOVO) ──── Chat + Helpdesk (4A)
 | Ferias | [02_FERIAS.md](02_FERIAS.md) |
 | Auditoria de Estoque | [03_AUDITORIA_ESTOQUE.md](03_AUDITORIA_ESTOQUE.md) |
 | Movimentacao de Pessoal | [04_MOVIMENTACAO_PESSOAL.md](04_MOVIMENTACAO_PESSOAL.md) |
-| Treinamentos | [05_TREINAMENTOS.md](05_TREINAMENTOS.md) |
+| Treinamentos & Capacitacao (5 submodulos) | [05_TREINAMENTOS.md](05_TREINAMENTOS.md) |
 | Delivery + Routing | [06_DELIVERY_ROUTING.md](06_DELIVERY_ROUTING.md) |
 | Chat + Helpdesk | [07_CHAT_HELPDESK.md](07_CHAT_HELPDESK.md) |
 
-## Estimativa Total: ~167 arquivos novos
+## Estimativa Total: ~263 arquivos novos (ajustado: Treinamentos expandido de ~24 para ~120)
 
 ---
 

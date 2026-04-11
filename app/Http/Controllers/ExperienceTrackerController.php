@@ -253,6 +253,64 @@ class ExperienceTrackerController extends Controller
         return response()->json($this->getDetailedStats());
     }
 
+    public function compliance()
+    {
+        $data = ExperienceEvaluation::with('store')
+            ->selectRaw(
+                'store_id, milestone,
+                 SUM(CASE WHEN manager_status = ? AND employee_status = ? THEN 1 ELSE 0 END) as completed,
+                 SUM(CASE WHEN milestone_date < CURDATE() AND (manager_status = ? OR employee_status = ?) THEN 1 ELSE 0 END) as overdue,
+                 COUNT(*) as total',
+                ['completed', 'completed', 'pending', 'pending']
+            )
+            ->groupBy('store_id', 'milestone')
+            ->get()
+            ->map(fn ($row) => [
+                'store_id' => $row->store_id,
+                'store_name' => $row->store?->name ?? $row->store_id,
+                'milestone' => $row->milestone,
+                'completed' => (int) $row->completed,
+                'overdue' => (int) $row->overdue,
+                'total' => (int) $row->total,
+                'fill_rate' => $row->total > 0 ? round(($row->completed / $row->total) * 100, 1) : 0,
+            ]);
+
+        return response()->json(['compliance' => $data]);
+    }
+
+    public function evolution()
+    {
+        // Funcionários que têm AMBAS as avaliações (45 + 90 dias)
+        $employees = ExperienceEvaluation::with(['employee', 'store', 'responses.question'])
+            ->fullyCompleted()
+            ->get()
+            ->groupBy('employee_id')
+            ->filter(fn ($evals) => $evals->where('milestone', '45')->isNotEmpty() && $evals->where('milestone', '90')->isNotEmpty())
+            ->map(function ($evals) {
+                $eval45 = $evals->firstWhere('milestone', '45');
+                $eval90 = $evals->firstWhere('milestone', '90');
+
+                $avgRating = fn ($eval) => $eval->responses
+                    ->whereNotNull('rating_value')
+                    ->avg('rating_value');
+
+                $avg45 = round($avgRating($eval45) ?? 0, 1);
+                $avg90 = round($avgRating($eval90) ?? 0, 1);
+
+                return [
+                    'employee_name' => $eval45->employee?->name ?? '-',
+                    'store_name' => $eval45->store?->name ?? '-',
+                    'avg_45' => $avg45,
+                    'avg_90' => $avg90,
+                    'variation' => $avg45 > 0 ? round($avg90 - $avg45, 1) : null,
+                    'recommendation' => $eval90->recommendation,
+                ];
+            })
+            ->values();
+
+        return response()->json(['evolution' => $employees]);
+    }
+
     // ==========================================
     // Private helpers
     // ==========================================

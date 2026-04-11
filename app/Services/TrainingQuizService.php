@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\TrainingQuiz;
 use App\Models\TrainingQuizAttempt;
+use App\Models\TrainingQuizQuestion;
 use App\Models\TrainingQuizResponse;
 use App\Models\User;
 
@@ -91,15 +92,34 @@ class TrainingQuizService
         $totalPoints = 0;
         $earnedPoints = 0;
 
+        $hasOpenText = false;
+
         foreach ($answers as $answer) {
             $questionId = $answer['question_id'];
-            $selectedOptionIds = $answer['selected_options'] ?? [];
-
             $question = $questions->get($questionId);
             if (! $question) {
                 continue;
             }
 
+            // Resposta aberta: pontuação pendente de avaliação manual
+            if ($question->question_type === TrainingQuizQuestion::TYPE_OPEN_TEXT) {
+                $hasOpenText = true;
+                $totalPoints += $question->points;
+
+                TrainingQuizResponse::create([
+                    'attempt_id' => $attempt->id,
+                    'question_id' => $questionId,
+                    'selected_options' => [],
+                    'response_text' => $answer['response_text'] ?? '',
+                    'is_correct' => false,
+                    'points_earned' => 0,
+                ]);
+
+                continue;
+            }
+
+            // Questões objetivas
+            $selectedOptionIds = $answer['selected_options'] ?? [];
             $correctIds = $question->correct_option_ids;
             sort($selectedOptionIds);
             sort($correctIds);
@@ -186,6 +206,7 @@ class TrainingQuizService
                     'points_earned' => $response->points_earned,
                     'points_possible' => $response->question->points,
                     'selected_options' => $response->selected_options,
+                    'response_text' => $response->response_text,
                 ];
 
                 // Only show correct answers if quiz allows it
@@ -201,5 +222,88 @@ class TrainingQuizService
                 return $data;
             }),
         ];
+    }
+
+    /**
+     * Grade an open_text response and recalculate attempt score.
+     */
+    public function gradeResponse(TrainingQuizResponse $response, int $pointsEarned, ?string $feedback, int $graderId): array
+    {
+        $question = $response->question;
+
+        if ($question->question_type !== TrainingQuizQuestion::TYPE_OPEN_TEXT) {
+            return ['success' => false, 'error' => 'Apenas respostas abertas podem ser corrigidas manualmente.'];
+        }
+
+        if ($pointsEarned > $question->points) {
+            return ['success' => false, 'error' => "Pontuação máxima para esta pergunta: {$question->points}."];
+        }
+
+        $response->update([
+            'points_earned' => $pointsEarned,
+            'is_correct' => $pointsEarned > 0,
+            'feedback' => $feedback,
+            'graded_by_user_id' => $graderId,
+            'graded_at' => now(),
+        ]);
+
+        // Recalculate attempt score
+        $attempt = $response->attempt;
+        $totalResponses = $attempt->responses()->with('question')->get();
+
+        $totalPoints = $totalResponses->sum(fn ($r) => $r->question->points);
+        $earnedPoints = $totalResponses->sum('points_earned');
+        $score = $totalPoints > 0 ? round(($earnedPoints / $totalPoints) * 100, 2) : 0;
+        $passed = $score >= $attempt->quiz->passing_score;
+
+        $attempt->update([
+            'score' => $score,
+            'earned_points' => $earnedPoints,
+            'total_points' => $totalPoints,
+            'passed' => $passed,
+        ]);
+
+        return [
+            'success' => true,
+            'score' => $score,
+            'passed' => $passed,
+            'earned_points' => $earnedPoints,
+            'total_points' => $totalPoints,
+        ];
+    }
+
+    /**
+     * Get attempts with pending open_text responses for a quiz.
+     */
+    public function getUngradedAttempts(int $quizId): array
+    {
+        $attempts = TrainingQuizAttempt::where('quiz_id', $quizId)
+            ->completed()
+            ->with(['user', 'responses' => function ($q) {
+                $q->with('question')
+                    ->whereHas('question', fn ($qq) => $qq->where('question_type', TrainingQuizQuestion::TYPE_OPEN_TEXT));
+            }])
+            ->get()
+            ->filter(fn ($a) => $a->responses->where('graded_at', null)->isNotEmpty());
+
+        return $attempts->map(fn ($a) => [
+            'attempt_id' => $a->id,
+            'user_name' => $a->user?->name ?? '-',
+            'attempt_number' => $a->attempt_number,
+            'score' => $a->score,
+            'passed' => $a->passed,
+            'completed_at' => $a->completed_at?->format('d/m/Y H:i'),
+            'pending_count' => $a->responses->where('graded_at', null)->count(),
+            'responses' => $a->responses->map(fn ($r) => [
+                'id' => $r->id,
+                'question_text' => $r->question->question_text,
+                'response_text' => $r->response_text,
+                'points_possible' => $r->question->points,
+                'points_earned' => $r->points_earned,
+                'feedback' => $r->feedback,
+                'graded' => $r->graded_at !== null,
+                'graded_at' => $r->graded_at?->format('d/m/Y H:i'),
+            ])->values(),
+        ])->values()->toArray();
     }
 }

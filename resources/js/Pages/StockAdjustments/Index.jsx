@@ -1,32 +1,34 @@
-import PageHeader from '@/Components/PageHeader';
 import { Head, router, useForm } from '@inertiajs/react';
-import { ClipboardDocumentCheckIcon, PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
+import useModalManager from '@/Hooks/useModalManager';
+import Button from '@/Components/Button';
+import StatusBadge from '@/Components/Shared/StatusBadge';
+import StandardModal from '@/Components/StandardModal';
+import FormSection from '@/Components/Shared/FormSection';
+import InputLabel from '@/Components/InputLabel';
+import TextInput from '@/Components/TextInput';
 import { formatDateTime } from '@/Utils/dateHelpers';
+import {
+    PlusIcon, MagnifyingGlassIcon, XMarkIcon, TrashIcon,
+} from '@heroicons/react/24/outline';
 
-const STATUS_COLORS = {
-    pending: 'bg-yellow-100 text-yellow-800',
-    under_analysis: 'bg-blue-100 text-blue-800',
-    awaiting_response: 'bg-orange-100 text-orange-800',
-    balance_transfer: 'bg-purple-100 text-purple-800',
-    adjusted: 'bg-green-100 text-green-800',
-    no_adjustment: 'bg-gray-100 text-gray-800',
-    cancelled: 'bg-red-100 text-red-800',
+const STATUS_VARIANT = {
+    pending: 'warning',
+    under_analysis: 'info',
+    awaiting_response: 'orange',
+    balance_transfer: 'purple',
+    adjusted: 'success',
+    no_adjustment: 'gray',
+    cancelled: 'danger',
 };
 
 export default function Index({ adjustments, stores = [], filters = {}, statusOptions = {} }) {
     const { hasPermission } = usePermissions();
+    const { modals, openModal, closeModal } = useModalManager(['create']);
     const [search, setSearch] = useState(filters.search || '');
     const [statusFilter, setStatusFilter] = useState(filters.status || '');
     const [storeFilter, setStoreFilter] = useState(filters.store_id || '');
-    const [showCreateModal, setShowCreateModal] = useState(false);
-
-    const createForm = useForm({
-        store_id: '',
-        observation: '',
-        items: [{ reference: '', size: '', is_adjustment: true }],
-    });
 
     const applyFilters = () => {
         router.get(route('stock-adjustments.index'), {
@@ -36,142 +38,100 @@ export default function Index({ adjustments, stores = [], filters = {}, statusOp
         }, { preserveState: true });
     };
 
-    const addItem = () => {
-        createForm.setData('items', [
-            ...createForm.data.items,
-            { reference: '', size: '', is_adjustment: true },
-        ]);
+    const clearFilters = () => {
+        setSearch(''); setStatusFilter(''); setStoreFilter('');
+        router.get(route('stock-adjustments.index'), {}, { preserveState: true });
     };
 
-    const removeItem = (index) => {
-        if (createForm.data.items.length <= 1) return;
-        createForm.setData('items', createForm.data.items.filter((_, i) => i !== index));
-    };
-
-    const updateItem = (index, field, value) => {
-        const items = [...createForm.data.items];
-        items[index] = { ...items[index], [field]: value };
-        createForm.setData('items', items);
-    };
-
-    const handleCreate = (e) => {
-        e.preventDefault();
-        createForm.post(route('stock-adjustments.store'), {
-            onSuccess: () => {
-                setShowCreateModal(false);
-                createForm.reset();
-            },
-        });
-    };
+    const hasActiveFilters = search || statusFilter || storeFilter;
 
     return (
         <>
             <Head title="Ajustes de Estoque" />
-            <PageHeader>
-                <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800">
-                        Ajustes de Estoque
-                    </h2>
-                    {hasPermission(PERMISSIONS.CREATE_ADJUSTMENTS) && (
-                        <button
-                            onClick={() => setShowCreateModal(true)}
-                            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700"
-                        >
-                            <PlusIcon className="h-4 w-4 mr-2" />
-                            Novo Ajuste
-                        </button>
-                    )}
-                </div>
-            </PageHeader>
 
-            <div className="py-6">
-                <div className="mx-auto max-w-full px-4 sm:px-6 lg:px-8">
+            <div className="py-12">
+                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+                    {/* Header */}
+                    <div className="mb-6">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h1 className="text-3xl font-bold text-gray-900">Ajustes de Estoque</h1>
+                                <p className="mt-1 text-sm text-gray-600">
+                                    Gerencie solicitações de ajuste de estoque das lojas
+                                </p>
+                            </div>
+                            {hasPermission(PERMISSIONS.CREATE_ADJUSTMENTS) && (
+                                <Button variant="primary" onClick={() => openModal('create')} icon={PlusIcon}>
+                                    Novo Ajuste
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+
                     {/* Filtros */}
-                    <div className="bg-white shadow rounded-lg p-4 mb-6">
-                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                    <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
                             <div className="relative">
                                 <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Buscar..."
-                                    value={search}
+                                <input type="text" placeholder="Buscar..." value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
-                                    className="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                />
+                                    className="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
                             </div>
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                                className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                            >
+                            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+                                className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                                 <option value="">Todos os Status</option>
                                 {Object.entries(statusOptions).map(([key, label]) => (
                                     <option key={key} value={key}>{label}</option>
                                 ))}
                             </select>
-                            <select
-                                value={storeFilter}
-                                onChange={(e) => setStoreFilter(e.target.value)}
-                                className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                            >
+                            <select value={storeFilter} onChange={(e) => setStoreFilter(e.target.value)}
+                                className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                                 <option value="">Todas as Lojas</option>
-                                {stores.map((store) => (
-                                    <option key={store.id} value={store.id}>
-                                        {store.code} - {store.name}
-                                    </option>
+                                {stores.map((s) => (
+                                    <option key={s.id} value={s.id}>{s.code} - {s.name}</option>
                                 ))}
                             </select>
-                            <button
-                                onClick={applyFilters}
-                                className="inline-flex justify-center items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700"
-                            >
-                                Filtrar
-                            </button>
+                            <div className="flex gap-2">
+                                <Button variant="primary" size="sm" onClick={applyFilters} icon={MagnifyingGlassIcon}>
+                                    Filtrar
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={clearFilters} disabled={!hasActiveFilters} icon={XMarkIcon}>
+                                    Limpar
+                                </Button>
+                            </div>
                         </div>
                     </div>
 
                     {/* Tabela */}
-                    <div className="bg-white shadow rounded-lg overflow-hidden">
+                    <div className="bg-white shadow-sm rounded-lg overflow-hidden">
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loja</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Colaborador</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Itens</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Criado por</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {adjustments.data && adjustments.data.length > 0 ? (
+                                {adjustments.data?.length > 0 ? (
                                     adjustments.data.map((adj) => (
                                         <tr key={adj.id} className="hover:bg-gray-50">
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                #{adj.id}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {adj.store?.name || '-'}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {adj.employee || '-'}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {adj.items_count} item(s)
-                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{adj.id}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{adj.store?.name || '-'}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{adj.employee || '-'}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{adj.items_count} item(s)</td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[adj.status] || 'bg-gray-100 text-gray-800'}`}>
+                                                <StatusBadge variant={STATUS_VARIANT[adj.status] || 'gray'}>
                                                     {adj.status_label}
-                                                </span>
+                                                </StatusBadge>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {adj.created_by || '-'}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {formatDateTime(adj.created_at)}
-                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{adj.created_by || '-'}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateTime(adj.created_at)}</td>
                                         </tr>
                                     ))
                                 ) : (
@@ -191,16 +151,11 @@ export default function Index({ adjustments, stores = [], filters = {}, statusOp
                                 </span>
                                 <div className="flex space-x-1">
                                     {adjustments.links.map((link, i) => (
-                                        <button
-                                            key={i}
-                                            onClick={() => link.url && router.get(link.url)}
-                                            disabled={!link.url}
+                                        <button key={i} onClick={() => link.url && router.get(link.url)} disabled={!link.url}
                                             className={`px-3 py-1 text-sm rounded ${
-                                                link.active
-                                                    ? 'bg-indigo-600 text-white'
-                                                    : link.url
-                                                    ? 'bg-white text-gray-700 hover:bg-gray-50 border'
-                                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                link.active ? 'bg-indigo-600 text-white'
+                                                : link.url ? 'bg-white text-gray-700 hover:bg-gray-50 border'
+                                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                             }`}
                                             dangerouslySetInnerHTML={{ __html: link.label }}
                                         />
@@ -209,107 +164,105 @@ export default function Index({ adjustments, stores = [], filters = {}, statusOp
                             </div>
                         )}
                     </div>
-
-                    {/* Modal Criar */}
-                    {showCreateModal && (
-                        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-                            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
-                                <div className="px-6 py-4 border-b shrink-0">
-                                    <h3 className="text-lg font-medium text-gray-900">Novo Ajuste de Estoque</h3>
-                                </div>
-                                <form onSubmit={handleCreate} className="flex flex-col flex-1 min-h-0">
-                                <div className="p-6 space-y-4 overflow-y-auto flex-1">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Loja *</label>
-                                        <select
-                                            value={createForm.data.store_id}
-                                            onChange={(e) => createForm.setData('store_id', e.target.value)}
-                                            className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                            required
-                                        >
-                                            <option value="">Selecione</option>
-                                            {stores.map((s) => (
-                                                <option key={s.id} value={s.id}>{s.code} - {s.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700">Observação</label>
-                                        <textarea
-                                            value={createForm.data.observation}
-                                            onChange={(e) => createForm.setData('observation', e.target.value)}
-                                            rows={2}
-                                            className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                        />
-                                    </div>
-
-                                    {/* Items */}
-                                    <div>
-                                        <div className="flex justify-between items-center mb-2">
-                                            <label className="block text-sm font-medium text-gray-700">Itens *</label>
-                                            <button
-                                                type="button"
-                                                onClick={addItem}
-                                                className="text-sm text-indigo-600 hover:text-indigo-800"
-                                            >
-                                                + Adicionar Item
-                                            </button>
-                                        </div>
-                                        <div className="space-y-2">
-                                            {createForm.data.items.map((item, index) => (
-                                                <div key={index} className="flex gap-2 items-start">
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Referência *"
-                                                        value={item.reference}
-                                                        onChange={(e) => updateItem(index, 'reference', e.target.value)}
-                                                        className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                                        required
-                                                    />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Tamanho"
-                                                        value={item.size}
-                                                        onChange={(e) => updateItem(index, 'size', e.target.value)}
-                                                        className="w-24 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                                    />
-                                                    {createForm.data.items.length > 1 && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeItem(index)}
-                                                            className="text-red-500 hover:text-red-700 px-2 py-2"
-                                                        >
-                                                            &times;
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    </div>
-                                    <div className="flex justify-end space-x-3 px-6 py-4 border-t bg-gray-50 rounded-b-lg shrink-0">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowCreateModal(false)}
-                                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-                                        >
-                                            Cancelar
-                                        </button>
-                                        <button
-                                            type="submit"
-                                            disabled={createForm.processing}
-                                            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50"
-                                        >
-                                            {createForm.processing ? 'Salvando...' : 'Criar Ajuste'}
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
+
+            {/* Modal Criar */}
+            {modals.create && (
+                <CreateModal
+                    stores={stores}
+                    onClose={() => closeModal('create')}
+                />
+            )}
         </>
+    );
+}
+
+function CreateModal({ stores, onClose }) {
+    const form = useForm({
+        store_id: '',
+        observation: '',
+        items: [{ reference: '', size: '', is_adjustment: true }],
+    });
+
+    const addItem = () => {
+        form.setData('items', [...form.data.items, { reference: '', size: '', is_adjustment: true }]);
+    };
+
+    const removeItem = (index) => {
+        if (form.data.items.length <= 1) return;
+        form.setData('items', form.data.items.filter((_, i) => i !== index));
+    };
+
+    const updateItem = (index, field, value) => {
+        const items = [...form.data.items];
+        items[index] = { ...items[index], [field]: value };
+        form.setData('items', items);
+    };
+
+    const handleSubmit = () => {
+        form.post(route('stock-adjustments.store'), {
+            onSuccess: () => { onClose(); form.reset(); },
+        });
+    };
+
+    return (
+        <StandardModal
+            show={true}
+            onClose={onClose}
+            title="Novo Ajuste de Estoque"
+            headerColor="bg-indigo-600"
+            headerIcon={<PlusIcon className="h-5 w-5" />}
+            maxWidth="2xl"
+            onSubmit={handleSubmit}
+            footer={
+                <StandardModal.Footer
+                    onCancel={onClose}
+                    onSubmit="submit"
+                    submitLabel="Criar Ajuste"
+                    processing={form.processing}
+                />
+            }
+        >
+            <FormSection title="Informações Gerais" cols={1}>
+                <div>
+                    <InputLabel value="Loja *" />
+                    <select value={form.data.store_id} onChange={(e) => form.setData('store_id', e.target.value)}
+                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required>
+                        <option value="">Selecione</option>
+                        {stores.map((s) => <option key={s.id} value={s.id}>{s.code} - {s.name}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <InputLabel value="Observação" />
+                    <textarea value={form.data.observation} onChange={(e) => form.setData('observation', e.target.value)}
+                        rows={2} className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+                </div>
+            </FormSection>
+
+            <StandardModal.Section title="Itens">
+                <div className="space-y-2">
+                    {form.data.items.map((item, index) => (
+                        <div key={index} className="flex gap-2 items-start">
+                            <TextInput placeholder="Referência *" value={item.reference} className="flex-1"
+                                onChange={(e) => updateItem(index, 'reference', e.target.value)} required />
+                            <TextInput placeholder="Tamanho" value={item.size} className="w-24"
+                                onChange={(e) => updateItem(index, 'size', e.target.value)} />
+                            {form.data.items.length > 1 && (
+                                <button type="button" onClick={() => removeItem(index)}
+                                    className="text-red-500 hover:text-red-700 p-2">
+                                    <TrashIcon className="h-4 w-4" />
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+                <div className="mt-3">
+                    <Button variant="outline" size="xs" onClick={addItem} icon={PlusIcon}>
+                        Adicionar Item
+                    </Button>
+                </div>
+            </StandardModal.Section>
+        </StandardModal>
     );
 }

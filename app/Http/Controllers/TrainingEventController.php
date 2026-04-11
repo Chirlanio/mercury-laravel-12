@@ -85,13 +85,20 @@ class TrainingEventController extends Controller
             'allow_late_attendance' => 'boolean',
             'attendance_grace_minutes' => 'integer|min:0|max:120',
             'evaluation_enabled' => 'boolean',
+            'banner_image' => 'nullable|image|max:5120',
         ]);
+
+        unset($validated['banner_image']);
 
         // Normalizar para H:i
         $validated['start_time'] = substr($validated['start_time'], 0, 5);
         $validated['end_time'] = substr($validated['end_time'], 0, 5);
         $validated['status'] = Training::STATUS_DRAFT;
         $validated['created_by_user_id'] = auth()->id();
+
+        if ($request->hasFile('banner_image')) {
+            $validated['image_path'] = $request->file('banner_image')->store('trainings/banners', 'public');
+        }
 
         $training = Training::create($validated);
 
@@ -154,7 +161,17 @@ class TrainingEventController extends Controller
             'allow_late_attendance' => 'boolean',
             'attendance_grace_minutes' => 'integer|min:0|max:120',
             'evaluation_enabled' => 'boolean',
+            'banner_image' => 'nullable|image|max:5120',
         ]);
+
+        unset($validated['banner_image']);
+
+        if ($request->hasFile('banner_image')) {
+            if ($training->image_path) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($training->image_path);
+            }
+            $validated['image_path'] = $request->file('banner_image')->store('trainings/banners', 'public');
+        }
 
         // Normalizar para H:i
         $validated['start_time'] = substr($validated['start_time'], 0, 5);

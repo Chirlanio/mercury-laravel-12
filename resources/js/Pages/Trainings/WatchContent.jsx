@@ -6,26 +6,49 @@ import {
     PlayCircleIcon,
     ChevronLeftIcon,
     ChevronRightIcon,
+    XMarkIcon,
 } from '@heroicons/react/24/outline';
 import Button from '@/Components/Button';
+
+function getVideoId(url) {
+    if (!url) return null;
+    const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    return ytMatch ? ytMatch[1] : null;
+}
 
 function getEmbedUrl(url) {
     if (!url) return '';
 
-    // YouTube: youtube.com/watch?v=ID, youtu.be/ID, youtube.com/embed/ID
-    const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-    if (ytMatch) {
-        return `https://www.youtube.com/embed/${ytMatch[1]}`;
-    }
+    const ytId = getVideoId(url);
+    if (ytId) return `https://www.youtube.com/embed/${ytId}`;
 
-    // Vimeo: vimeo.com/ID, player.vimeo.com/video/ID
     const vimeoMatch = url.match(/(?:vimeo\.com\/|player\.vimeo\.com\/video\/)(\d+)/);
-    if (vimeoMatch) {
-        return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
-    }
+    if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
 
-    // Fallback: retorna a URL original (pode já ser embed)
     return url;
+}
+
+// Load YouTube IFrame API once
+let ytApiLoaded = false;
+let ytApiReady = false;
+const ytApiCallbacks = [];
+
+function loadYouTubeApi() {
+    if (ytApiReady) return Promise.resolve();
+    if (ytApiLoaded) return new Promise(resolve => ytApiCallbacks.push(resolve));
+
+    ytApiLoaded = true;
+    return new Promise(resolve => {
+        ytApiCallbacks.push(resolve);
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(tag);
+        window.onYouTubeIframeAPIReady = () => {
+            ytApiReady = true;
+            ytApiCallbacks.forEach(cb => cb());
+            ytApiCallbacks.length = 0;
+        };
+    });
 }
 
 const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.content;
@@ -33,12 +56,16 @@ const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.conte
 export default function WatchContent({ course, content, progress, courseContents }) {
     const [currentProgress, setCurrentProgress] = useState(progress?.progress_percent || 0);
     const [completed, setCompleted] = useState(progress?.status === 'completed');
+    const [notification, setNotification] = useState(null);
     const videoRef = useRef(null);
     const saveTimerRef = useRef(null);
     const elapsedRef = useRef(0);
     const hasNativeMedia = ['video', 'audio'].includes(content.content_type) && content.file_url;
-    const isIframeMedia = content.content_type === 'video' && !content.file_url && content.external_url;
+    const youtubeVideoId = content.content_type === 'video' && !content.file_url && content.external_url ? getVideoId(content.external_url) : null;
+    const isIframeMedia = content.content_type === 'video' && !content.file_url && content.external_url && !youtubeVideoId;
     const isStaticContent = ['text', 'document', 'link'].includes(content.content_type);
+    const ytPlayerRef = useRef(null);
+    const ytContainerRef = useRef(null);
 
     // Local state for sidebar — updates when current content is completed
     const [localStatuses, setLocalStatuses] = useState(() => {
@@ -119,11 +146,64 @@ export default function WatchContent({ course, content, progress, courseContents
         };
     }, [hasNativeMedia, progress?.last_position_seconds, saveProgress]);
 
-    // Iframe video (YouTube/Vimeo): mark as started, rely on manual completion
+    // YouTube: tracking real via IFrame API
+    useEffect(() => {
+        if (!youtubeVideoId || completed) return;
+
+        let timer = null;
+
+        loadYouTubeApi().then(() => {
+            if (!ytContainerRef.current) return;
+
+            ytPlayerRef.current = new window.YT.Player(ytContainerRef.current, {
+                videoId: youtubeVideoId,
+                playerVars: { rel: 0, modestbranding: 1 },
+                events: {
+                    onReady: () => {
+                        // Resume from last position
+                        if (progress?.last_position_seconds) {
+                            ytPlayerRef.current.seekTo(progress.last_position_seconds, true);
+                        }
+                    },
+                },
+            });
+
+            // Poll progress every 3 seconds (YT API has no timeupdate event)
+            timer = setInterval(() => {
+                const player = ytPlayerRef.current;
+                if (!player || typeof player.getCurrentTime !== 'function') return;
+
+                const state = player.getPlayerState();
+                // 1 = playing
+                if (state !== 1) return;
+
+                const current = player.getCurrentTime();
+                const duration = player.getDuration();
+                if (!duration) return;
+
+                const percent = Math.round((current / duration) * 100);
+                setCurrentProgress(percent);
+
+                // Save every ~30s (every 10th poll)
+                if (Math.floor(current) % 30 < 3) {
+                    saveProgress(percent, Math.floor(current));
+                }
+            }, 3000);
+        });
+
+        return () => {
+            clearInterval(timer);
+            if (ytPlayerRef.current && typeof ytPlayerRef.current.destroy === 'function') {
+                ytPlayerRef.current.destroy();
+                ytPlayerRef.current = null;
+            }
+        };
+    }, [youtubeVideoId, completed]);
+
+    // Non-YouTube iframe (Vimeo, etc.): mark as started, rely on manual completion
     useEffect(() => {
         if (!isIframeMedia || completed) return;
 
-        // Mark as started after 5 seconds of viewing
         const startTimer = setTimeout(() => {
             if (currentProgress < 5) {
                 setCurrentProgress(5);
@@ -155,6 +235,11 @@ export default function WatchContent({ course, content, progress, courseContents
         return () => clearInterval(timer);
     }, [isStaticContent, completed, content.duration_seconds, saveProgress]);
 
+    const showNotification = (message, type = 'success') => {
+        setNotification({ message, type });
+        setTimeout(() => setNotification(null), 6000);
+    };
+
     const handleMarkComplete = () => {
         fetch(route('training-contents.complete', content.id), {
             method: 'POST',
@@ -169,9 +254,10 @@ export default function WatchContent({ course, content, progress, courseContents
             if (data.completed) {
                 setCompleted(true);
                 setCurrentProgress(100);
+                showNotification('Conteúdo marcado como concluído!');
             }
             if (data.course_completed) {
-                alert('Parabéns! Você concluiu o curso!');
+                showNotification('Parabéns! Você concluiu o curso! Seu certificado está sendo gerado.', 'celebration');
             }
         });
     };
@@ -188,6 +274,27 @@ export default function WatchContent({ course, content, progress, courseContents
     return (
         <>
             <Head title={content.title} />
+
+            {/* Notificação */}
+            {notification && (
+                <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+                    <div className={`flex items-center gap-3 px-6 py-4 rounded-xl shadow-lg ${
+                        notification.type === 'celebration'
+                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
+                            : 'bg-green-600 text-white'
+                    }`}>
+                        {notification.type === 'celebration' ? (
+                            <span className="text-2xl">&#127942;</span>
+                        ) : (
+                            <CheckCircleIcon className="w-6 h-6 flex-shrink-0" />
+                        )}
+                        <span className="text-sm font-medium">{notification.message}</span>
+                        <button onClick={() => setNotification(null)} className="ml-2 text-white/70 hover:text-white">
+                            <XMarkIcon className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+            )}
             <div className="py-6">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -217,7 +324,12 @@ export default function WatchContent({ course, content, progress, courseContents
                                 {content.content_type === 'video' && content.file_url && (
                                     <video ref={videoRef} controls className="w-full" src={content.file_url} />
                                 )}
-                                {content.content_type === 'video' && !content.file_url && content.external_url && (
+                                {youtubeVideoId && (
+                                    <div className="aspect-video">
+                                        <div ref={ytContainerRef} className="w-full h-full" />
+                                    </div>
+                                )}
+                                {isIframeMedia && (
                                     <div className="aspect-video">
                                         <iframe src={getEmbedUrl(content.external_url)}
                                             className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />

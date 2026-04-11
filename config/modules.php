@@ -193,10 +193,17 @@ return [
         'dependencies' => ['employees', 'stores'],
     ],
     'experience-tracker' => [
-        'name' => 'Avaliacao de Experiencia',
-        'description' => 'Acompanhamento do periodo de experiencia (45/90 dias).',
+        'name' => 'Avaliação de Experiência',
+        'description' => 'Acompanhamento do período de experiência (45/90 dias).',
         'routes' => ['experience-tracker.*'],
         'icon' => 'ClipboardDocumentCheckIcon',
         'dependencies' => ['employees', 'stores'],
+    ],
+    'delivery' => [
+        'name' => 'Entregas',
+        'description' => 'Gestão de entregas, rotas de motoristas e manifesto.',
+        'routes' => ['deliveries.*', 'delivery-routes.*', 'driver-dashboard.*'],
+        'icon' => 'TruckIcon',
+        'dependencies' => ['stores'],
     ],
 ];

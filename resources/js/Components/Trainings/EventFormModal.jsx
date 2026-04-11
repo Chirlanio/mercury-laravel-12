@@ -144,6 +144,7 @@ export default function EventFormModal({ show, onClose, onSuccess, trainingId = 
         const routeParams = isEditing ? trainingId : undefined;
 
         router[method](route(routeName, routeParams), data, {
+            forceFormData: !!data.banner_image,
             preserveScroll: true,
             onSuccess: () => {
                 setProcessing(false);
@@ -216,6 +217,13 @@ export default function EventFormModal({ show, onClose, onSuccess, trainingId = 
                             onChange={e => setField('description', e.target.value)}
                         />
                         <InputError message={errors.description} className="mt-1" />
+                    </div>
+                    <div>
+                        <InputLabel value="Banner (opcional)" />
+                        <input type="file" accept="image/*"
+                            className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                            onChange={e => setField('banner_image', e.target.files[0] || null)} />
+                        <InputError message={errors.banner_image} className="mt-1" />
                     </div>
                 </div>
             </StandardModal.Section>

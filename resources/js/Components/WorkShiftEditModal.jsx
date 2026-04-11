@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useForm, router } from '@inertiajs/react';
-import Modal from '@/Components/Modal';
-import Button from '@/Components/Button';
+import StandardModal from '@/Components/StandardModal';
+import InputLabel from '@/Components/InputLabel';
+import TextInput from '@/Components/TextInput';
+import InputError from '@/Components/InputError';
+import { PencilSquareIcon } from '@heroicons/react/24/outline';
 
-export default function WorkShiftEditModal({ isOpen, onClose, onSuccess, workShift, employees = [] }) {
+export default function WorkShiftEditModal({ show, onClose, onSuccess, workShift, employees = [] }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { data, setData, errors, reset, clearErrors, setError } = useForm({
         employee_id: '',
@@ -13,18 +16,26 @@ export default function WorkShiftEditModal({ isOpen, onClose, onSuccess, workShi
         type: '',
     });
 
-    // Atualizar form quando workShift mudar
     useEffect(() => {
-        if (workShift && isOpen) {
+        if (workShift && show) {
             setData({
                 employee_id: workShift.employee_id || '',
-                date: workShift.date || '',
+                date: formatDateForInput(workShift.date) || '',
                 start_time: workShift.start_time || '',
                 end_time: workShift.end_time || '',
                 type: workShift.type || '',
             });
         }
-    }, [workShift, isOpen]);
+    }, [workShift, show]);
+
+    const formatDateForInput = (dateString) => {
+        if (!dateString) return '';
+        if (dateString.includes('/')) {
+            const [day, month, year] = dateString.split('/');
+            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+        return dateString;
+    };
 
     const types = [
         { value: 'abertura', label: 'Abertura' },
@@ -33,8 +44,7 @@ export default function WorkShiftEditModal({ isOpen, onClose, onSuccess, workShi
         { value: 'compensar', label: 'Compensar' },
     ];
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
+    const handleSubmit = () => {
         setIsSubmitting(true);
 
         router.post(`/work-shifts/${workShift.id}`, {
@@ -47,13 +57,9 @@ export default function WorkShiftEditModal({ isOpen, onClose, onSuccess, workShi
                 setIsSubmitting(false);
                 reset();
                 clearErrors();
-                if (onSuccess) {
-                    onSuccess();
-                }
-                onClose();
+                if (onSuccess) onSuccess();
             },
             onError: (errors) => {
-                console.error('Erro ao atualizar jornada:', errors);
                 setIsSubmitting(false);
                 setError(errors);
             },
@@ -70,26 +76,35 @@ export default function WorkShiftEditModal({ isOpen, onClose, onSuccess, workShi
     };
 
     return (
-        <Modal show={isOpen} onClose={handleClose} title="Editar Jornada" maxWidth="85vw">
-            {workShift && <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Informações da Jornada */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                    <h4 className="text-sm font-medium text-gray-900 mb-4">
-                        Informações da Jornada
-                    </h4>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div className="md:col-span-3 lg:col-span-2">
-                            <label htmlFor="employee_id" className="block text-sm font-medium text-gray-700 mb-1">
-                                Funcionário *
-                            </label>
+        <StandardModal
+            show={show}
+            onClose={handleClose}
+            title="Editar Jornada"
+            subtitle={workShift?.employee_name}
+            headerColor="bg-yellow-600"
+            headerIcon={<PencilSquareIcon className="h-6 w-6" />}
+            onSubmit={handleSubmit}
+            maxWidth="2xl"
+            footer={
+                <StandardModal.Footer
+                    onCancel={handleClose}
+                    onSubmit="submit"
+                    submitLabel="Salvar Alterações"
+                    submitColor="bg-yellow-600 hover:bg-yellow-700"
+                    processing={isSubmitting}
+                />
+            }
+        >
+            {workShift && (
+                <StandardModal.Section title="Informações da Jornada">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                            <InputLabel htmlFor="edit-employee_id" value="Funcionário *" />
                             <select
-                                id="employee_id"
+                                id="edit-employee_id"
                                 value={data.employee_id}
                                 onChange={(e) => setData('employee_id', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.employee_id ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                                 required
                             >
                                 <option value="">Selecione um funcionário</option>
@@ -99,37 +114,29 @@ export default function WorkShiftEditModal({ isOpen, onClose, onSuccess, workShi
                                     </option>
                                 ))}
                             </select>
-                            {errors.employee_id && <p className="mt-1 text-sm text-red-600">{errors.employee_id}</p>}
+                            <InputError message={errors.employee_id} className="mt-1" />
                         </div>
 
                         <div>
-                            <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">
-                                Data *
-                            </label>
-                            <input
+                            <InputLabel htmlFor="edit-date" value="Data *" />
+                            <TextInput
+                                id="edit-date"
                                 type="date"
-                                id="date"
+                                className="mt-1 w-full"
                                 value={data.date}
                                 onChange={(e) => setData('date', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.date ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
                                 required
                             />
-                            {errors.date && <p className="mt-1 text-sm text-red-600">{errors.date}</p>}
+                            <InputError message={errors.date} className="mt-1" />
                         </div>
 
                         <div>
-                            <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
-                                Tipo de Jornada *
-                            </label>
+                            <InputLabel htmlFor="edit-type" value="Tipo de Jornada *" />
                             <select
-                                id="type"
+                                id="edit-type"
                                 value={data.type}
                                 onChange={(e) => setData('type', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.type ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                                 required
                             >
                                 <option value="">Selecione o tipo</option>
@@ -139,70 +146,37 @@ export default function WorkShiftEditModal({ isOpen, onClose, onSuccess, workShi
                                     </option>
                                 ))}
                             </select>
-                            {errors.type && <p className="mt-1 text-sm text-red-600">{errors.type}</p>}
+                            <InputError message={errors.type} className="mt-1" />
                         </div>
 
                         <div>
-                            <label htmlFor="start_time" className="block text-sm font-medium text-gray-700 mb-1">
-                                Hora de Início *
-                            </label>
-                            <input
+                            <InputLabel htmlFor="edit-start_time" value="Hora de Início *" />
+                            <TextInput
+                                id="edit-start_time"
                                 type="time"
-                                id="start_time"
+                                className="mt-1 w-full"
                                 value={data.start_time}
                                 onChange={(e) => setData('start_time', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.start_time ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
                                 required
                             />
-                            {errors.start_time && <p className="mt-1 text-sm text-red-600">{errors.start_time}</p>}
+                            <InputError message={errors.start_time} className="mt-1" />
                         </div>
 
                         <div>
-                            <label htmlFor="end_time" className="block text-sm font-medium text-gray-700 mb-1">
-                                Hora de Término *
-                            </label>
-                            <input
+                            <InputLabel htmlFor="edit-end_time" value="Hora de Término *" />
+                            <TextInput
+                                id="edit-end_time"
                                 type="time"
-                                id="end_time"
+                                className="mt-1 w-full"
                                 value={data.end_time}
                                 onChange={(e) => setData('end_time', e.target.value)}
-                                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                    errors.end_time ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
-                                }`}
                                 required
                             />
-                            {errors.end_time && <p className="mt-1 text-sm text-red-600">{errors.end_time}</p>}
+                            <InputError message={errors.end_time} className="mt-1" />
                         </div>
                     </div>
-                </div>
-
-                {/* Ações */}
-                <div className="flex justify-end space-x-3 pt-4 border-t">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleClose}
-                        disabled={isSubmitting}
-                    >
-                        Cancelar
-                    </Button>
-
-                    <Button
-                        type="submit"
-                        variant="primary"
-                        loading={isSubmitting}
-                        icon={isSubmitting ? null : ({ className }) => (
-                            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                        )}
-                    >
-                        {isSubmitting ? 'Salvando...' : 'Salvar Alterações'}
-                    </Button>
-                </div>
-            </form>}
-        </Modal>
+                </StandardModal.Section>
+            )}
+        </StandardModal>
     );
 }

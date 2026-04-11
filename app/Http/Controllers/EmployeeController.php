@@ -2,18 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Employee;
-use App\Models\EmployeeHistory;
+use App\Exports\EmployeesExport;
+use App\Jobs\SendExperienceNotificationJob;
 use App\Models\EducationLevel;
-use App\Models\EmployeeStatus;
+use App\Models\Employee;
 use App\Models\EmployeeEvent;
 use App\Models\EmployeeEventType;
+use App\Models\EmployeeHistory;
+use App\Models\EmployeeStatus;
 use App\Models\EmployeeWorkSchedule;
 use App\Models\EmploymentContract;
+use App\Models\ExperienceEvaluation;
+use App\Models\ExperienceNotification;
 use App\Models\Gender;
 use App\Models\Position;
 use App\Models\Store;
-use App\Exports\EmployeesExport;
 use App\Rules\ValidImageRule;
 use Barryvdh\DomPDF\Facade\Pdf as PDF;
 use Carbon\Carbon;
@@ -22,6 +25,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class EmployeeController extends Controller
@@ -40,14 +44,14 @@ class EmployeeController extends Controller
             ->select([
                 'id', 'name', 'short_name', 'profile_image',
                 'admission_date', 'dismissal_date', 'position_id', 'store_id',
-                'birth_date', 'level', 'status_id', 'is_pcd', 'is_apprentice'
+                'birth_date', 'level', 'status_id', 'is_pcd', 'is_apprentice',
             ]);
 
         // Aplicar busca se fornecida
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('short_name', 'like', "%{$search}%");
+                    ->orWhere('short_name', 'like', "%{$search}%");
             });
         }
 
@@ -68,6 +72,15 @@ class EmployeeController extends Controller
         }
 
         $employees = $query->paginate($perPage);
+
+        // Calculate statistics for the StatisticsGrid
+        $stats = [
+            'total' => Employee::count(),
+            'active' => Employee::where('status_id', 2)->count(),
+            'vacation' => Employee::where('status_id', 4)->count(),
+            'inactive' => Employee::where('status_id', 3)->count(),
+            'pcd' => Employee::where('is_pcd', true)->count(),
+        ];
 
         // Buscar dados para o modal de cadastro e filtros
         $positions = Position::active()->orderBy('name')->get(['id', 'name', 'level']);
@@ -93,6 +106,7 @@ class EmployeeController extends Controller
                     'is_apprentice' => $employee->is_apprentice,
                 ];
             }),
+            'stats' => $stats,
             'positions' => $positions,
             'stores' => $stores,
             'statuses' => $statuses,
@@ -166,7 +180,7 @@ class EmployeeController extends Controller
             // Processar upload de imagem se existir
             if ($request->hasFile('profile_image')) {
                 $image = $request->file('profile_image');
-                $imageName = time() . '.' . $image->getClientOriginalExtension();
+                $imageName = time().'.'.$image->getClientOriginalExtension();
                 $image->storeAs('employees', $imageName, 'public');
                 $data['profile_image'] = $imageName;
             }
@@ -182,10 +196,11 @@ class EmployeeController extends Controller
             $data['status_id'] = $data['status_id'] ?? 2;
 
             // Remover campos vazios (mas manter os que têm valores padrão)
-            $data = array_filter($data, function($value, $key) {
+            $data = array_filter($data, function ($value, $key) {
                 if (in_array($key, ['short_name', 'birth_date', 'position_id', 'store_id', 'education_level_id', 'gender_id', 'area_id', 'level', 'status_id'])) {
                     return true; // Manter campos obrigatórios mesmo se vazios
                 }
+
                 return $value !== null && $value !== '';
             }, ARRAY_FILTER_USE_BOTH);
 
@@ -202,11 +217,34 @@ class EmployeeController extends Controller
                 'is_active' => true,
             ]);
 
+            // Criar avaliações de experiência (45 e 90 dias) automaticamente
+            if ($employee->admission_date) {
+                $admissionDate = Carbon::parse($employee->admission_date);
+                $managerId = auth()->id();
+
+                foreach ([45, 90] as $milestone) {
+                    $evaluation = ExperienceEvaluation::create([
+                        'employee_id' => $employee->id,
+                        'manager_id' => $managerId,
+                        'store_id' => $employee->store_id,
+                        'milestone' => (string) $milestone,
+                        'date_admission' => $admissionDate,
+                        'milestone_date' => $admissionDate->copy()->addDays($milestone),
+                        'employee_token' => Str::random(64),
+                    ]);
+
+                    SendExperienceNotificationJob::dispatch(
+                        $evaluation->id,
+                        ExperienceNotification::TYPE_CREATED
+                    );
+                }
+            }
+
             return redirect()->route('employees.index')->with('success', 'Funcionário cadastrado com sucesso!');
 
         } catch (Exception $e) {
             return redirect()->back()->withErrors([
-                'general' => 'Erro ao cadastrar funcionário: ' . $e->getMessage()
+                'general' => 'Erro ao cadastrar funcionário: '.$e->getMessage(),
             ])->withInput();
         }
     }
@@ -237,7 +275,7 @@ class EmployeeController extends Controller
                 'education_level' => $employee->educationLevel?->description_name ?? 'Não informado',
                 'site_coupon' => $employee->site_coupon,
                 'store' => $employee->store?->display_name ?? $employee->store_id ?? 'Não informado',
-            ]
+            ],
         ]);
     }
 
@@ -259,15 +297,15 @@ class EmployeeController extends Controller
                 'level' => $employee->level,
                 'store_id' => $employee->store_id,
                 'site_coupon' => $employee->site_coupon,
-                'education_level_id' => $employee->education_level_id ? (string)$employee->education_level_id : '',
-                'gender_id' => $employee->gender_id ? (string)$employee->gender_id : '',
-                'area_id' => $employee->area_id ? (string)$employee->area_id : '',
-                'status_id' => $employee->status_id ? (string)$employee->status_id : '',
-                'is_pcd' => (bool)$employee->is_pcd,
-                'is_apprentice' => (bool)$employee->is_apprentice,
+                'education_level_id' => $employee->education_level_id ? (string) $employee->education_level_id : '',
+                'gender_id' => $employee->gender_id ? (string) $employee->gender_id : '',
+                'area_id' => $employee->area_id ? (string) $employee->area_id : '',
+                'status_id' => $employee->status_id ? (string) $employee->status_id : '',
+                'is_pcd' => (bool) $employee->is_pcd,
+                'is_apprentice' => (bool) $employee->is_apprentice,
                 'avatar_url' => $employee->avatar_url,
                 'profile_image' => $employee->profile_image, // Nome do arquivo da imagem
-            ]
+            ],
         ]);
     }
 
@@ -316,7 +354,7 @@ class EmployeeController extends Controller
 
         if ($existingEmployee) {
             return redirect()->back()->withErrors([
-                'cpf' => 'Este CPF já está cadastrado para outro funcionário.'
+                'cpf' => 'Este CPF já está cadastrado para outro funcionário.',
             ])->withInput();
         }
 
@@ -327,14 +365,14 @@ class EmployeeController extends Controller
             if ($request->hasFile('profile_image')) {
                 // Remover imagem antiga se existir
                 if ($employee->profile_image) {
-                    $oldImagePath = storage_path('app/public/employees/' . $employee->profile_image);
+                    $oldImagePath = storage_path('app/public/employees/'.$employee->profile_image);
                     if (file_exists($oldImagePath)) {
                         unlink($oldImagePath);
                     }
                 }
 
                 $image = $request->file('profile_image');
-                $imageName = time() . '.' . $image->getClientOriginalExtension();
+                $imageName = time().'.'.$image->getClientOriginalExtension();
                 $image->storeAs('employees', $imageName, 'public');
                 $data['profile_image'] = $imageName;
             }
@@ -372,7 +410,7 @@ class EmployeeController extends Controller
 
         } catch (Exception $e) {
             return redirect()->back()->withErrors([
-                'general' => 'Erro ao atualizar funcionário: ' . $e->getMessage()
+                'general' => 'Erro ao atualizar funcionário: '.$e->getMessage(),
             ])->withInput();
         }
     }
@@ -384,12 +422,12 @@ class EmployeeController extends Controller
 
             Log::info('Deleting employee', [
                 'id' => $employee->id,
-                'name' => $employee->name
+                'name' => $employee->name,
             ]);
 
             // Deletar imagem do perfil se existir
             if ($employee->profile_image) {
-                $imagePath = storage_path('app/public/employees/' . $employee->profile_image);
+                $imagePath = storage_path('app/public/employees/'.$employee->profile_image);
                 if (file_exists($imagePath)) {
                     unlink($imagePath);
                     Log::info('Profile image deleted', ['path' => $imagePath]);
@@ -405,11 +443,11 @@ class EmployeeController extends Controller
         } catch (\Exception $e) {
             Log::error('Error deleting employee', [
                 'id' => $id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return redirect()->back()->withErrors([
-                'general' => 'Erro ao excluir funcionário: ' . $e->getMessage()
+                'general' => 'Erro ao excluir funcionário: '.$e->getMessage(),
             ]);
         }
     }
@@ -468,7 +506,7 @@ class EmployeeController extends Controller
                 'end_date_formatted' => $contract->end_date ? $contract->end_date->format('d/m/Y') : null,
                 'is_active' => $contract->is_active,
                 'is_latest' => $isLatest,
-                'status_label' => $contract->is_active && $isLatest ? 'Atual' : (!$contract->is_active && $isLatest ? 'Último contrato' : 'Encerrado'),
+                'status_label' => $contract->is_active && $isLatest ? 'Atual' : (! $contract->is_active && $isLatest ? 'Último contrato' : 'Encerrado'),
                 'duration' => $contract->duration_text,
                 'date_range' => $contract->date_range,
                 'is_deletable' => $contract->id !== $oldestContractId,
@@ -521,7 +559,7 @@ class EmployeeController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'Erro de validação',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -542,7 +580,7 @@ class EmployeeController extends Controller
 
                 $previousContract->update([
                     'is_active' => false,
-                    'end_date' => $endDate
+                    'end_date' => $endDate,
                 ]);
             }
 
@@ -554,11 +592,11 @@ class EmployeeController extends Controller
                 'store_id' => $request->store_id,
                 'start_date' => $request->start_date,
                 'end_date' => $request->end_date ?? ($isDismissal ? $request->start_date : null),
-                'is_active' => !$isDismissal, // Se for demissão, já cria como inativo
+                'is_active' => ! $isDismissal, // Se for demissão, já cria como inativo
             ]);
 
             // Atualizar dados do funcionário com base no novo contrato (exceto demissão)
-            if (!$isDismissal) {
+            if (! $isDismissal) {
                 $updateData = [
                     'position_id' => $request->position_id,
                     'store_id' => $request->store_id,
@@ -608,21 +646,21 @@ class EmployeeController extends Controller
                     'end_date' => $contract->is_active ? 'Atual' : ($contract->end_date ? $contract->end_date->format('d/m/Y') : '-'),
                     'is_active' => $contract->is_active,
                     'is_latest' => $isLatest,
-                    'status_label' => $contract->is_active && $isLatest ? 'Atual' : (!$contract->is_active && $isLatest ? 'Último contrato' : 'Encerrado'),
+                    'status_label' => $contract->is_active && $isLatest ? 'Atual' : (! $contract->is_active && $isLatest ? 'Último contrato' : 'Encerrado'),
                     'duration' => $contract->duration_text,
                     'date_range' => $contract->date_range,
                     'created_at' => $contract->created_at->format('d/m/Y H:i'),
-                ]
+                ],
             ], 201);
 
         } catch (Exception $e) {
             Log::error('Error creating employment contract', [
                 'employee_id' => $id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return response()->json([
-                'message' => 'Erro ao criar contrato: ' . $e->getMessage()
+                'message' => 'Erro ao criar contrato: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -659,7 +697,7 @@ class EmployeeController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'Erro de validação',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -736,22 +774,22 @@ class EmployeeController extends Controller
                     'end_date' => $contract->is_active ? 'Atual' : ($contract->end_date ? $contract->end_date->format('d/m/Y') : '-'),
                     'is_active' => $contract->is_active,
                     'is_latest' => $isLatest,
-                    'status_label' => $contract->is_active && $isLatest ? 'Atual' : (!$contract->is_active && $isLatest ? 'Último contrato' : 'Encerrado'),
+                    'status_label' => $contract->is_active && $isLatest ? 'Atual' : (! $contract->is_active && $isLatest ? 'Último contrato' : 'Encerrado'),
                     'duration' => $contract->duration_text,
                     'date_range' => $contract->date_range,
                     'created_at' => $contract->created_at->format('d/m/Y H:i'),
-                ]
+                ],
             ], 200);
 
         } catch (Exception $e) {
             Log::error('Error updating employment contract', [
                 'contract_id' => $contractId,
                 'employee_id' => $employeeId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return response()->json([
-                'message' => 'Erro ao atualizar contrato: ' . $e->getMessage()
+                'message' => 'Erro ao atualizar contrato: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -773,13 +811,13 @@ class EmployeeController extends Controller
 
             if ($contract->id === $oldestContract->id) {
                 return response()->json([
-                    'message' => 'O contrato de admissão inicial não pode ser excluído.'
+                    'message' => 'O contrato de admissão inicial não pode ser excluído.',
                 ], 422);
             }
 
             Log::info('Deleting employment contract', [
                 'contract_id' => $contractId,
-                'employee_id' => $employeeId
+                'employee_id' => $employeeId,
             ]);
 
             // Verificar se é o último contrato ativo
@@ -839,7 +877,7 @@ class EmployeeController extends Controller
             $response = [
                 'message' => 'Contrato excluído com sucesso!',
                 'isLastActiveContract' => $isLastActiveContract,
-                'previousContract' => null
+                'previousContract' => null,
             ];
 
             // Se havia contrato anterior, retornar seus dados para possível reativação
@@ -858,11 +896,11 @@ class EmployeeController extends Controller
             Log::error('Error deleting employment contract', [
                 'contract_id' => $contractId,
                 'employee_id' => $employeeId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return response()->json([
-                'message' => 'Erro ao excluir contrato: ' . $e->getMessage()
+                'message' => 'Erro ao excluir contrato: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -891,7 +929,7 @@ class EmployeeController extends Controller
 
             Log::info('Reactivated employment contract', [
                 'contract_id' => $contractId,
-                'employee_id' => $employeeId
+                'employee_id' => $employeeId,
             ]);
 
             return response()->json([
@@ -900,18 +938,18 @@ class EmployeeController extends Controller
                     'id' => $contract->id,
                     'is_active' => $contract->is_active,
                     'end_date' => null,
-                ]
+                ],
             ], 200);
 
         } catch (Exception $e) {
             Log::error('Error reactivating employment contract', [
                 'contract_id' => $contractId,
                 'employee_id' => $employeeId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return response()->json([
-                'message' => 'Erro ao reativar contrato: ' . $e->getMessage()
+                'message' => 'Erro ao reativar contrato: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -940,6 +978,7 @@ class EmployeeController extends Controller
                     'created_by' => $assignment->createdBy?->name ?? 'Sistema',
                     'days' => $assignment->workSchedule->days->map(function ($day) use ($assignment) {
                         $override = $assignment->dayOverrides->firstWhere('day_of_week', $day->day_of_week);
+
                         return [
                             'day_of_week' => $day->day_of_week,
                             'day_name' => $day->day_name,
@@ -986,7 +1025,7 @@ class EmployeeController extends Controller
             'direction' => $request->get('direction', 'asc'),
         ];
 
-        $fileName = 'funcionarios_' . date('Y-m-d_His') . '.xlsx';
+        $fileName = 'funcionarios_'.date('Y-m-d_His').'.xlsx';
 
         return (new EmployeesExport($filters))->download($fileName);
     }
@@ -1017,7 +1056,7 @@ class EmployeeController extends Controller
                     'period' => $event->period,
                     'duration_in_days' => $event->duration_in_days,
                     'document_url' => $event->document_url,
-                    'has_document' => !is_null($event->document_path),
+                    'has_document' => ! is_null($event->document_path),
                     'notes' => $event->notes,
                     'created_by' => $event->creator ? $event->creator->name : 'Sistema',
                     'created_at' => $event->created_at?->format('d/m/Y H:i'),
@@ -1057,7 +1096,7 @@ class EmployeeController extends Controller
             $rules['start_date'] = 'required|date';
         }
 
-        if (!$isAtestado && $eventType->requires_date_range) {
+        if (! $isAtestado && $eventType->requires_date_range) {
             $rules['start_date'] = 'required|date';
             $rules['end_date'] = 'required|date|after_or_equal:start_date';
         }
@@ -1071,7 +1110,7 @@ class EmployeeController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'Erro de validação',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -1094,7 +1133,7 @@ class EmployeeController extends Controller
         // Upload do documento se fornecido
         if ($request->hasFile('document')) {
             $file = $request->file('document');
-            $filename = 'employee_' . $employeeId . '_event_' . time() . '.' . $file->getClientOriginalExtension();
+            $filename = 'employee_'.$employeeId.'_event_'.time().'.'.$file->getClientOriginalExtension();
             $path = $file->storeAs('employee_events', $filename, 'public');
             $data['document_path'] = $path;
         }
@@ -1147,7 +1186,7 @@ class EmployeeController extends Controller
             })
             ->where(function ($q) {
                 $q->where('end_date', '>=', now()->toDateString())
-                  ->orWhereNull('end_date');
+                    ->orWhereNull('end_date');
             })
             ->with('eventType')
             ->orderBy('start_date', 'desc')
@@ -1184,10 +1223,10 @@ class EmployeeController extends Controller
         if ($request->has('end_date') && $request->end_date) {
             $query->where(function ($q) use ($request) {
                 $q->where('end_date', '<=', $request->end_date)
-                  ->orWhere(function ($q2) use ($request) {
-                      $q2->whereNull('end_date')
-                         ->where('start_date', '<=', $request->end_date);
-                  });
+                    ->orWhere(function ($q2) use ($request) {
+                        $q2->whereNull('end_date')
+                            ->where('start_date', '<=', $request->end_date);
+                    });
             });
         }
 
@@ -1209,7 +1248,7 @@ class EmployeeController extends Controller
                     'end_date' => $event->end_date?->format('d/m/Y'),
                     'period' => $event->period,
                     'duration_in_days' => $event->duration_in_days,
-                    'has_document' => !is_null($event->document_path),
+                    'has_document' => ! is_null($event->document_path),
                     'notes' => $event->notes,
                     'created_by' => $event->creator ? $event->creator->name : 'Sistema',
                     'created_at' => $event->created_at?->format('d/m/Y H:i'),
@@ -1227,7 +1266,7 @@ class EmployeeController extends Controller
 
         $pdf = PDF::loadView('pdf.employee-events', $data);
 
-        return $pdf->download('eventos_' . str_replace(' ', '_', strtolower($employee->name)) . '_' . now()->format('Y-m-d') . '.pdf');
+        return $pdf->download('eventos_'.str_replace(' ', '_', strtolower($employee->name)).'_'.now()->format('Y-m-d').'.pdf');
     }
 
     public function exportAllEvents(Request $request)
@@ -1254,10 +1293,10 @@ class EmployeeController extends Controller
         if ($request->has('end_date') && $request->end_date) {
             $query->where(function ($q) use ($request) {
                 $q->where('end_date', '<=', $request->end_date)
-                  ->orWhere(function ($q2) use ($request) {
-                      $q2->whereNull('end_date')
-                         ->where('start_date', '<=', $request->end_date);
-                  });
+                    ->orWhere(function ($q2) use ($request) {
+                        $q2->whereNull('end_date')
+                            ->where('start_date', '<=', $request->end_date);
+                    });
             });
         }
 
@@ -1266,6 +1305,7 @@ class EmployeeController extends Controller
         // Agrupar eventos por funcionário
         $eventsByEmployee = $events->groupBy('employee_id')->map(function ($employeeEvents) {
             $employee = $employeeEvents->first()->employee;
+
             return [
                 'employee' => [
                     'name' => $employee->name,
@@ -1280,7 +1320,7 @@ class EmployeeController extends Controller
                         'end_date' => $event->end_date?->format('d/m/Y'),
                         'period' => $event->period,
                         'duration_in_days' => $event->duration_in_days,
-                        'has_document' => !is_null($event->document_path),
+                        'has_document' => ! is_null($event->document_path),
                         'notes' => $event->notes,
                         'created_by' => $event->creator ? $event->creator->name : 'Sistema',
                         'created_at' => $event->created_at?->format('d/m/Y H:i'),
@@ -1320,7 +1360,7 @@ class EmployeeController extends Controller
 
         $pdf = PDF::loadView('pdf.all-employee-events', $data);
 
-        return $pdf->download('eventos_todos_funcionarios_' . now()->format('Y-m-d') . '.pdf');
+        return $pdf->download('eventos_todos_funcionarios_'.now()->format('Y-m-d').'.pdf');
     }
 
     /**
@@ -1350,7 +1390,7 @@ class EmployeeController extends Controller
                 'store' => $contract->store?->name ?? $contract->store_id,
                 'date_range' => $contract->date_range,
                 'duration' => $contract->duration_text,
-                'status_label' => $contract->is_active && $isLatest ? 'Atual' : (!$contract->is_active && $isLatest ? 'Último contrato' : 'Encerrado'),
+                'status_label' => $contract->is_active && $isLatest ? 'Atual' : (! $contract->is_active && $isLatest ? 'Último contrato' : 'Encerrado'),
             ];
         });
 
@@ -1416,6 +1456,6 @@ class EmployeeController extends Controller
 
         $pdf = PDF::loadView('pdf.employee-report', $data);
 
-        return $pdf->download('relatorio_' . str_replace(' ', '_', strtolower($employee->name)) . '_' . now()->format('Y-m-d') . '.pdf');
+        return $pdf->download('relatorio_'.str_replace(' ', '_', strtolower($employee->name)).'_'.now()->format('Y-m-d').'.pdf');
     }
 }

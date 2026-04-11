@@ -152,6 +152,13 @@ enum Permission: string
     case MANAGE_EXPERIENCE_TRACKER = 'experience_tracker.manage';
     case FILL_EXPERIENCE_EVALUATION = 'experience_tracker.fill';
 
+    // Entregas e rotas
+    case VIEW_DELIVERIES = 'deliveries.view';
+    case CREATE_DELIVERIES = 'deliveries.create';
+    case EDIT_DELIVERIES = 'deliveries.edit';
+    case DELETE_DELIVERIES = 'deliveries.delete';
+    case MANAGE_ROUTES = 'delivery_routes.manage';
+
     public function label(): string
     {
         return match ($this) {
@@ -274,6 +281,11 @@ enum Permission: string
             self::VIEW_EXPERIENCE_TRACKER => 'Visualizar avaliações de experiência',
             self::MANAGE_EXPERIENCE_TRACKER => 'Gerenciar avaliações de experiência',
             self::FILL_EXPERIENCE_EVALUATION => 'Preencher avaliações de experiência',
+            self::VIEW_DELIVERIES => 'Visualizar entregas',
+            self::CREATE_DELIVERIES => 'Criar entregas',
+            self::EDIT_DELIVERIES => 'Editar entregas',
+            self::DELETE_DELIVERIES => 'Excluir entregas',
+            self::MANAGE_ROUTES => 'Gerenciar rotas de entrega',
         };
     }
 
@@ -399,6 +411,11 @@ enum Permission: string
             self::VIEW_EXPERIENCE_TRACKER => 'Permite visualizar avaliações de período de experiência',
             self::MANAGE_EXPERIENCE_TRACKER => 'Permite criar e gerenciar avaliações de período de experiência',
             self::FILL_EXPERIENCE_EVALUATION => 'Permite preencher formulários de avaliação de período de experiência',
+            self::VIEW_DELIVERIES => 'Permite visualizar entregas e rotas',
+            self::CREATE_DELIVERIES => 'Permite criar novas entregas',
+            self::EDIT_DELIVERIES => 'Permite editar entregas e transicionar status',
+            self::DELETE_DELIVERIES => 'Permite excluir entregas',
+            self::MANAGE_ROUTES => 'Permite criar, iniciar e gerenciar rotas de entrega',
         };
     }
 

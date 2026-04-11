@@ -68,7 +68,7 @@ class CentralRolePermissionSeeder extends Seeder
             }
 
             $permSlugs = $roleEnum->permissions();
-            $permIds = $permissions->only($permSlugs)->pluck('id')->toArray();
+            $permIds = $permissions->filter(fn ($p) => in_array($p->slug, $permSlugs))->pluck('id')->toArray();
 
             $role->permissions()->sync($permIds);
         }

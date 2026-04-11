@@ -44,6 +44,8 @@ use App\Http\Controllers\Config\TransferStatusController as ConfigTransferStatus
 use App\Http\Controllers\Config\TypeMovimentController as ConfigTypeMovimentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\DeliveryController;
+use App\Http\Controllers\DeliveryRouteController;
 use App\Http\Controllers\ExperienceTrackerController;
 use App\Http\Controllers\PublicCourseController;
 use App\Http\Controllers\IntegrationController;
@@ -491,8 +493,38 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/financeiro', fn () => Inertia::render('ComingSoon', ['title' => 'Financeiro']))->name('financeiro');
     Route::get('/ativo-fixo', fn () => Inertia::render('ComingSoon', ['title' => 'Ativo Fixo']))->name('ativo-fixo');
     Route::get('/comercial', fn () => redirect('/sales'))->name('comercial');
-    Route::get('/delivery', fn () => Inertia::render('ComingSoon', ['title' => 'Delivery']))->name('delivery');
-    Route::get('/rotas', fn () => Inertia::render('ComingSoon', ['title' => 'Rotas']))->name('rotas');
+    // Deliveries (Entregas)
+    Route::middleware(['tenant.module:delivery', 'permission:'.Permission::VIEW_DELIVERIES->value])->group(function () {
+        Route::get('/deliveries', [DeliveryController::class, 'index'])->name('deliveries.index');
+        Route::get('/deliveries/statistics', [DeliveryController::class, 'statistics'])->name('deliveries.statistics');
+        Route::get('/deliveries/{delivery}', [DeliveryController::class, 'show'])->name('deliveries.show');
+
+        Route::middleware('permission:'.Permission::CREATE_DELIVERIES->value)->group(function () {
+            Route::post('/deliveries', [DeliveryController::class, 'store'])->name('deliveries.store');
+        });
+
+        Route::middleware('permission:'.Permission::EDIT_DELIVERIES->value)->group(function () {
+            Route::put('/deliveries/{delivery}', [DeliveryController::class, 'update'])->name('deliveries.update');
+            Route::post('/deliveries/{delivery}/status', [DeliveryController::class, 'updateStatus'])->name('deliveries.status');
+        });
+
+        Route::middleware('permission:'.Permission::DELETE_DELIVERIES->value)->group(function () {
+            Route::delete('/deliveries/{delivery}', [DeliveryController::class, 'destroy'])->name('deliveries.destroy');
+        });
+
+        // Delivery Routes (Rotas de Entrega)
+        Route::get('/delivery-routes', [DeliveryRouteController::class, 'index'])->name('delivery-routes.index');
+        Route::get('/delivery-routes/{deliveryRoute}', [DeliveryRouteController::class, 'show'])->name('delivery-routes.show');
+        Route::get('/delivery-routes/{deliveryRoute}/print', [DeliveryRouteController::class, 'printManifest'])->name('delivery-routes.print');
+        Route::get('/driver-dashboard', [DeliveryRouteController::class, 'driverDashboard'])->name('driver-dashboard.index');
+
+        Route::middleware('permission:'.Permission::MANAGE_ROUTES->value)->group(function () {
+            Route::post('/delivery-routes', [DeliveryRouteController::class, 'store'])->name('delivery-routes.store');
+            Route::post('/delivery-routes/{deliveryRoute}/start', [DeliveryRouteController::class, 'startRoute'])->name('delivery-routes.start');
+            Route::post('/delivery-routes/{deliveryRoute}/items/{item}/complete', [DeliveryRouteController::class, 'completeItem'])->name('delivery-routes.complete-item');
+            Route::post('/delivery-routes/{deliveryRoute}/cancel', [DeliveryRouteController::class, 'cancel'])->name('delivery-routes.cancel');
+        });
+    });
 
     // ==========================================
     // User Sessions
@@ -840,6 +872,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/training-contents/{content}/complete', [TrainingCourseController::class, 'markComplete'])->name('training-contents.complete');
             Route::get('/training-contents/stream/{path}', [TrainingCourseController::class, 'streamFile'])->where('path', '.*')->name('training-contents.stream');
             Route::get('/training-reports', [TrainingCourseController::class, 'reports'])->name('training-reports.index');
+            Route::get('/training-reports/export', [TrainingCourseController::class, 'exportReport'])->name('training-reports.export');
         });
 
         Route::middleware('permission:'.Permission::CREATE_TRAINING_COURSES->value)->group(function () {
@@ -869,6 +902,8 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/training-quizzes', [TrainingQuizController::class, 'store'])->name('training-quizzes.store');
             Route::put('/training-quizzes/{trainingQuiz}', [TrainingQuizController::class, 'update'])->name('training-quizzes.update');
             Route::delete('/training-quizzes/{trainingQuiz}', [TrainingQuizController::class, 'destroy'])->name('training-quizzes.destroy');
+            Route::get('/training-quizzes/{trainingQuiz}/ungraded', [TrainingQuizController::class, 'ungradedResponses'])->name('training-quizzes.ungraded');
+            Route::put('/training-quiz-responses/{response}/grade', [TrainingQuizController::class, 'gradeResponse'])->name('training-quiz-responses.grade');
         });
     });
 
@@ -878,6 +913,8 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['tenant.module:experience-tracker', 'permission:'.Permission::VIEW_EXPERIENCE_TRACKER->value])->group(function () {
         Route::get('/experience-tracker', [ExperienceTrackerController::class, 'index'])->name('experience-tracker.index');
         Route::get('/experience-tracker/statistics', [ExperienceTrackerController::class, 'statistics'])->name('experience-tracker.statistics');
+        Route::get('/experience-tracker/compliance', [ExperienceTrackerController::class, 'compliance'])->name('experience-tracker.compliance');
+        Route::get('/experience-tracker/evolution', [ExperienceTrackerController::class, 'evolution'])->name('experience-tracker.evolution');
         Route::get('/experience-tracker/{experienceTracker}', [ExperienceTrackerController::class, 'show'])->name('experience-tracker.show');
 
         Route::middleware('permission:'.Permission::MANAGE_EXPERIENCE_TRACKER->value)->group(function () {

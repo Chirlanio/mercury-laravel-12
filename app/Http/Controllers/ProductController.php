@@ -382,13 +382,17 @@ class ProductController extends Controller
             'image' => 'required|image|mimes:jpeg,jpg,png,webp|max:2048',
         ]);
 
-        $imageService = app(ImageUploadService::class);
+        try {
+            $imageService = app(ImageUploadService::class);
 
-        $path = $imageService->uploadImage(
-            $request->file('image'),
-            'products',
-            $product->image
-        );
+            $path = $imageService->uploadImage(
+                $request->file('image'),
+                'products',
+                $product->image
+            );
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         $product->update([
             'image' => $path,

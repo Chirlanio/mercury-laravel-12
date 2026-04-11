@@ -1,15 +1,18 @@
-import { Fragment, useState, useEffect } from 'react';
-import { Dialog, Transition } from '@headlessui/react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { formatDateTime } from '@/Utils/dateHelpers';
+import StandardModal from '@/Components/StandardModal';
 import {
-    XMarkIcon,
     ChevronDownIcon,
     ChevronUpIcon,
     CheckCircleIcon,
     ExclamationTriangleIcon,
     MinusCircleIcon,
     ClockIcon,
+    ClipboardDocumentCheckIcon,
+    CalendarIcon,
+    BuildingStorefrontIcon,
+    UserIcon,
 } from '@heroicons/react/24/outline';
 
 const STATUS_LABELS = {
@@ -19,17 +22,17 @@ const STATUS_LABELS = {
 };
 
 const ANSWER_STATUS_CONFIG = {
-    pending: { label: 'Pendente', icon: ClockIcon, color: 'text-gray-500', bg: 'bg-gray-100' },
-    compliant: { label: 'Conforme', icon: CheckCircleIcon, color: 'text-green-600', bg: 'bg-green-100' },
-    partial: { label: 'Parcial', icon: ExclamationTriangleIcon, color: 'text-yellow-600', bg: 'bg-yellow-100' },
-    non_compliant: { label: 'Não Conforme', icon: MinusCircleIcon, color: 'text-red-600', bg: 'bg-red-100' },
+    pending: { label: 'Pendente', icon: ClockIcon, color: 'text-gray-500', bg: 'bg-gray-100', badge: 'gray' },
+    compliant: { label: 'Conforme', icon: CheckCircleIcon, color: 'text-green-600', bg: 'bg-green-100', badge: 'green' },
+    partial: { label: 'Parcial', icon: ExclamationTriangleIcon, color: 'text-yellow-600', bg: 'bg-yellow-100', badge: 'yellow' },
+    non_compliant: { label: 'Não Conforme', icon: MinusCircleIcon, color: 'text-red-600', bg: 'bg-red-100', badge: 'red' },
 };
 
-const PERFORMANCE_STYLES = {
-    green: 'bg-green-100 text-green-800 border-green-300',
-    blue: 'bg-blue-100 text-blue-800 border-blue-300',
-    yellow: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-    red: 'bg-red-100 text-red-800 border-red-300',
+const PERFORMANCE_BADGES = {
+    green: 'green',
+    blue: 'blue',
+    yellow: 'yellow',
+    red: 'red',
 };
 
 export default function ChecklistViewModal({ show, onClose, checklistId }) {
@@ -66,213 +69,169 @@ export default function ChecklistViewModal({ show, onClose, checklistId }) {
     const performance = stats?.performance;
 
     return (
-        <Transition appear show={show} as={Fragment}>
-            <Dialog as="div" className="relative z-50" onClose={handleClose}>
-                <Transition.Child
-                    as={Fragment}
-                    enter="ease-out duration-300"
-                    enterFrom="opacity-0"
-                    enterTo="opacity-100"
-                    leave="ease-in duration-200"
-                    leaveFrom="opacity-100"
-                    leaveTo="opacity-0"
-                >
-                    <div className="fixed inset-0 bg-black bg-opacity-25" />
-                </Transition.Child>
+        <StandardModal
+            show={show}
+            onClose={handleClose}
+            loading={loading}
+            title="Detalhes do Checklist"
+            subtitle={checklist ? `${checklist.store?.name} — ${STATUS_LABELS[checklist.status]}` : ''}
+            headerColor={checklist?.status === 'completed' ? 'bg-green-600' : 'bg-gray-800'}
+            headerIcon={<ClipboardDocumentCheckIcon className="h-6 w-6" />}
+            maxWidth="5xl"
+            headerBadges={performance ? [{ text: performance.label, className: `bg-white/20 text-white font-bold` }] : []}
+            footer={<StandardModal.Footer onCancel={handleClose} submitLabel="Fechar" onSubmit={handleClose} />}
+        >
+            {data && (
+                <div className="space-y-6">
+                    {/* General Info */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <StandardModal.InfoCard label="Loja" value={checklist?.store?.name} icon={<BuildingStorefrontIcon className="h-4 w-4" />} />
+                        <StandardModal.InfoCard label="Aplicador" value={checklist?.applicator?.name || '-'} icon={<UserIcon className="h-4 w-4" />} />
+                        <StandardModal.InfoCard label="Criado em" value={formatDateTime(checklist?.created_at)} icon={<CalendarIcon className="h-4 w-4" />} />
+                        <StandardModal.InfoCard 
+                            label="Conformidade" 
+                            value={stats ? `${stats.percentage}%` : '-'} 
+                            highlight 
+                            colorClass={performance ? `bg-${performance.color}-50` : 'bg-indigo-50'}
+                        />
+                    </div>
 
-                <div className="fixed inset-0 overflow-y-auto">
-                    <div className="flex min-h-full items-center justify-center p-4">
-                        <Transition.Child
-                            as={Fragment}
-                            enter="ease-out duration-300"
-                            enterFrom="opacity-0 scale-95"
-                            enterTo="opacity-100 scale-100"
-                            leave="ease-in duration-200"
-                            leaveFrom="opacity-100 scale-100"
-                            leaveTo="opacity-0 scale-95"
-                        >
-                            <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-lg bg-white shadow-xl transition-all max-h-[90vh] flex flex-col">
-                                {/* Header */}
-                                <div className="flex items-center justify-between p-6 border-b">
-                                    <Dialog.Title className="text-lg font-semibold text-gray-900">
-                                        Detalhes do Checklist
-                                    </Dialog.Title>
-                                    <button onClick={handleClose} className="text-gray-400 hover:text-gray-600">
-                                        <XMarkIcon className="h-5 w-5" />
-                                    </button>
+                    {/* Timeline/Dates */}
+                    <StandardModal.Section title="Datas de Execução" icon={<ClockIcon className="h-4 w-4" />}>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <StandardModal.Field label="Iniciado em" value={checklist?.started_at ? formatDateTime(checklist.started_at) : 'Não iniciado'} />
+                            <StandardModal.Field label="Concluído em" value={checklist?.completed_at ? formatDateTime(checklist.completed_at) : 'Em andamento'} />
+                        </div>
+                    </StandardModal.Section>
+
+                    {/* Statistics Overview */}
+                    {stats && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <StandardModal.Section title="Distribuição de Respostas" icon={<CheckCircleIcon className="h-4 w-4" />}>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                    <StandardModal.MiniField label="Conforme" value={stats.distribution?.compliant} />
+                                    <StandardModal.MiniField label="Parcial" value={stats.distribution?.partial} />
+                                    <StandardModal.MiniField label="Não Conforme" value={stats.distribution?.non_compliant} />
+                                    <StandardModal.MiniField label="Pendente" value={stats.distribution?.pending} />
                                 </div>
+                            </StandardModal.Section>
 
-                                {/* Content */}
-                                <div className="flex-1 overflow-y-auto p-6">
-                                    {loading ? (
-                                        <div className="flex items-center justify-center py-12">
-                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+                            <StandardModal.Section title="Pontuação" icon={<ClipboardDocumentCheckIcon className="h-4 w-4" />}>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-xs font-semibold text-gray-500 uppercase">
+                                        <span>Progresso</span>
+                                        <span>{stats.obtained_score} / {stats.max_score} pts</span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                        <div
+                                            className="bg-indigo-600 h-2.5 rounded-full transition-all"
+                                            style={{ width: `${Math.min(stats.percentage, 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            </StandardModal.Section>
+                        </div>
+                    )}
+
+                    {/* Per-Area Statistics Bar Chart-like view */}
+                    {stats?.by_area?.length > 0 && (
+                        <StandardModal.Section title="Desempenho por Área" icon={<ExclamationTriangleIcon className="h-4 w-4" />}>
+                            <div className="space-y-3">
+                                {stats.by_area.map((area) => (
+                                    <div key={area.area_id} className="flex items-center gap-4">
+                                        <span className="text-sm font-medium text-gray-700 w-48 truncate">{area.area_name}</span>
+                                        <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                                            <div
+                                                className={`h-2 rounded-full ${area.percentage >= 90 ? 'bg-green-500' : area.percentage >= 75 ? 'bg-blue-500' : area.percentage >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                                                style={{ width: `${Math.min(area.percentage, 100)}%` }}
+                                            />
                                         </div>
-                                    ) : data ? (
-                                        <div className="space-y-6">
-                                            {/* General Info */}
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                                <InfoField label="Loja" value={checklist?.store?.name} />
-                                                <InfoField label="Aplicador" value={checklist?.applicator?.name || '-'} />
-                                                <InfoField label="Status" value={STATUS_LABELS[checklist?.status] || checklist?.status} />
-                                                <InfoField label="Criado em" value={formatDateTime(checklist?.created_at)} />
-                                                {checklist?.started_at && <InfoField label="Iniciado em" value={formatDateTime(checklist.started_at)} />}
-                                                {checklist?.completed_at && <InfoField label="Concluído em" value={formatDateTime(checklist.completed_at)} />}
+                                        <span className="text-sm font-bold text-gray-900 w-12 text-right">
+                                            {area.percentage}%
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </StandardModal.Section>
+                    )}
+
+                    {/* Answers by Area */}
+                    <div className="space-y-4">
+                        <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider px-1">Detalhamento das Respostas</h3>
+                        {data.answers_by_area?.map((group, index) => (
+                            <div key={index} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                                <button
+                                    onClick={() => toggleArea(index)}
+                                    className="w-full flex items-center justify-between p-4 bg-white hover:bg-gray-50 transition"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                                            <ClipboardDocumentCheckIcon className="h-5 w-5 text-indigo-600" />
+                                        </div>
+                                        <span className="font-bold text-gray-900">{group.area?.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <div className="hidden sm:flex items-center gap-2">
+                                            <div className="w-24 bg-gray-200 rounded-full h-1.5">
+                                                <div 
+                                                    className="bg-indigo-600 h-1.5 rounded-full" 
+                                                    style={{ width: `${group.answers?.length > 0 ? (group.answers.filter(a => a.answer_status !== 'pending').length / group.answers.length) * 100 : 0}%` }}
+                                                />
                                             </div>
-
-                                            {/* Score Overview */}
-                                            {stats && (
-                                                <div className="bg-gray-50 rounded-lg p-4">
-                                                    <div className="flex items-center justify-between mb-3">
-                                                        <h3 className="font-medium text-gray-900">Resultado Geral</h3>
-                                                        {performance && (
-                                                            <span className={`px-3 py-1 rounded-full text-sm font-medium border ${PERFORMANCE_STYLES[performance.color] || ''}`}>
-                                                                {performance.label}
-                                                            </span>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Progress bar */}
-                                                    <div className="mb-3">
-                                                        <div className="flex justify-between text-sm text-gray-600 mb-1">
-                                                            <span>{stats.obtained_score} / {stats.max_score} pontos</span>
-                                                            <span className="font-medium">{stats.percentage}%</span>
+                                            <span className="text-xs text-gray-500 font-medium">
+                                                {group.answers?.filter(a => a.answer_status !== 'pending').length}/{group.answers?.length}
+                                            </span>
+                                        </div>
+                                        {expandedAreas[index]
+                                            ? <ChevronUpIcon className="h-5 w-5 text-gray-400" />
+                                            : <ChevronDownIcon className="h-5 w-5 text-gray-400" />
+                                        }
+                                    </div>
+                                </button>
+                                {expandedAreas[index] && (
+                                    <div className="divide-y border-t border-gray-100 bg-white">
+                                        {group.answers?.map((answer) => {
+                                            const config = ANSWER_STATUS_CONFIG[answer.answer_status] || ANSWER_STATUS_CONFIG.pending;
+                                            const Icon = config.icon;
+                                            return (
+                                                <div key={answer.id} className="p-4 hover:bg-gray-50/50 transition">
+                                                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                                                        <div className="flex-1">
+                                                            <p className="text-sm font-medium text-gray-800 leading-relaxed">{answer.question?.description}</p>
+                                                            <p className="text-[10px] text-gray-400 mt-1 uppercase font-semibold">Peso: {answer.question?.points} pt{answer.question?.points !== 1 ? 's' : ''}</p>
                                                         </div>
-                                                        <div className="w-full bg-gray-200 rounded-full h-3">
-                                                            <div
-                                                                className="bg-indigo-600 h-3 rounded-full transition-all"
-                                                                style={{ width: `${Math.min(stats.percentage, 100)}%` }}
-                                                            />
+                                                        <div className={`inline-flex items-center self-start gap-1.5 px-3 py-1 rounded-full text-xs font-bold ring-1 ring-inset ${config.bg} ${config.color} ring-current/20`}>
+                                                            <Icon className="h-3.5 w-3.5" />
+                                                            {config.label}
                                                         </div>
                                                     </div>
-
-                                                    {/* Distribution */}
-                                                    <div className="grid grid-cols-4 gap-2">
-                                                        <MiniStat label="Conforme" value={stats.distribution?.compliant} color="green" />
-                                                        <MiniStat label="Parcial" value={stats.distribution?.partial} color="yellow" />
-                                                        <MiniStat label="Não Conforme" value={stats.distribution?.non_compliant} color="red" />
-                                                        <MiniStat label="Pendente" value={stats.distribution?.pending} color="gray" />
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Per-Area Statistics */}
-                                            {stats?.by_area?.length > 0 && (
-                                                <div>
-                                                    <h3 className="font-medium text-gray-900 mb-3">Resultado por Área</h3>
-                                                    <div className="space-y-2">
-                                                        {stats.by_area.map((area) => (
-                                                            <div key={area.area_id} className="flex items-center gap-3">
-                                                                <span className="text-sm text-gray-700 w-40 truncate">{area.area_name}</span>
-                                                                <div className="flex-1 bg-gray-200 rounded-full h-2">
-                                                                    <div
-                                                                        className="bg-indigo-500 h-2 rounded-full"
-                                                                        style={{ width: `${Math.min(area.percentage, 100)}%` }}
-                                                                    />
-                                                                </div>
-                                                                <span className="text-sm font-medium text-gray-700 w-14 text-right">
-                                                                    {area.percentage}%
-                                                                </span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Answers by Area */}
-                                            {data.answers_by_area?.map((group, index) => (
-                                                <div key={index} className="border rounded-lg overflow-hidden">
-                                                    <button
-                                                        onClick={() => toggleArea(index)}
-                                                        className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition"
-                                                    >
-                                                        <span className="font-medium text-gray-900">{group.area?.name}</span>
-                                                        {expandedAreas[index]
-                                                            ? <ChevronUpIcon className="h-5 w-5 text-gray-500" />
-                                                            : <ChevronDownIcon className="h-5 w-5 text-gray-500" />
-                                                        }
-                                                    </button>
-                                                    {expandedAreas[index] && (
-                                                        <div className="divide-y">
-                                                            {group.answers?.map((answer) => {
-                                                                const config = ANSWER_STATUS_CONFIG[answer.answer_status] || ANSWER_STATUS_CONFIG.pending;
-                                                                const Icon = config.icon;
-                                                                return (
-                                                                    <div key={answer.id} className="p-4">
-                                                                        <div className="flex items-start justify-between gap-4">
-                                                                            <p className="text-sm text-gray-800 flex-1">{answer.question?.description}</p>
-                                                                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.color}`}>
-                                                                                <Icon className="h-3.5 w-3.5" />
-                                                                                {config.label}
-                                                                            </span>
-                                                                        </div>
-                                                                        {(answer.justification || answer.action_plan || answer.responsible_employee || answer.deadline_date) && (
-                                                                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-600">
-                                                                                {answer.justification && (
-                                                                                    <div><span className="font-medium">Justificativa:</span> {answer.justification}</div>
-                                                                                )}
-                                                                                {answer.action_plan && (
-                                                                                    <div><span className="font-medium">Plano de Ação:</span> {answer.action_plan}</div>
-                                                                                )}
-                                                                                {answer.responsible_employee && (
-                                                                                    <div><span className="font-medium">Responsável:</span> {answer.responsible_employee.name}</div>
-                                                                                )}
-                                                                                {answer.deadline_date && (
-                                                                                    <div><span className="font-medium">Prazo:</span> {new Date(answer.deadline_date).toLocaleDateString('pt-BR')}</div>
-                                                                                )}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            })}
+                                                    
+                                                    {(answer.justification || answer.action_plan || answer.responsible_employee || answer.deadline_date) && (
+                                                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                                            {answer.justification && (
+                                                                <StandardModal.MiniField label="Justificativa" value={answer.justification} />
+                                                            )}
+                                                            {answer.action_plan && (
+                                                                <StandardModal.MiniField label="Plano de Ação" value={answer.action_plan} />
+                                                            )}
+                                                            {answer.responsible_employee && (
+                                                                <StandardModal.MiniField label="Responsável" value={answer.responsible_employee.name} />
+                                                            )}
+                                                            {answer.deadline_date && (
+                                                                <StandardModal.MiniField label="Prazo" value={new Date(answer.deadline_date).toLocaleDateString('pt-BR')} />
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="text-center text-gray-500 py-12">Dados não encontrados.</p>
-                                    )}
-                                </div>
-
-                                {/* Footer */}
-                                <div className="flex justify-end p-4 border-t">
-                                    <button
-                                        onClick={handleClose}
-                                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition"
-                                    >
-                                        Fechar
-                                    </button>
-                                </div>
-                            </Dialog.Panel>
-                        </Transition.Child>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
                     </div>
                 </div>
-            </Dialog>
-        </Transition>
-    );
-}
-
-function InfoField({ label, value }) {
-    return (
-        <div>
-            <p className="text-xs text-gray-500">{label}</p>
-            <p className="text-sm font-medium text-gray-900">{value || '-'}</p>
-        </div>
-    );
-}
-
-function MiniStat({ label, value, color }) {
-    const colorMap = {
-        green: 'text-green-700',
-        yellow: 'text-yellow-700',
-        red: 'text-red-700',
-        gray: 'text-gray-700',
-    };
-    return (
-        <div className="text-center">
-            <p className={`text-lg font-bold ${colorMap[color] || 'text-gray-700'}`}>{value || 0}</p>
-            <p className="text-xs text-gray-500">{label}</p>
-        </div>
+            )}
+        </StandardModal>
     );
 }

@@ -6,6 +6,7 @@ use App\Models\TrainingQuiz;
 use App\Models\TrainingQuizAttempt;
 use App\Models\TrainingQuizOption;
 use App\Models\TrainingQuizQuestion;
+use App\Models\TrainingQuizResponse;
 use App\Services\TrainingQuizService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -51,10 +52,10 @@ class TrainingQuizController extends Controller
             'time_limit_minutes' => 'nullable|integer|min:1',
             'questions' => 'required|array|min:1',
             'questions.*.question_text' => 'required|string',
-            'questions.*.question_type' => 'required|string|in:single,multiple,boolean',
+            'questions.*.question_type' => 'required|string|in:single,multiple,boolean,open_text',
             'questions.*.points' => 'integer|min:1',
             'questions.*.explanation' => 'nullable|string',
-            'questions.*.options' => 'required|array|min:2',
+            'questions.*.options' => 'nullable|array',
             'questions.*.options.*.option_text' => 'required|string',
             'questions.*.options.*.is_correct' => 'boolean',
         ]);
@@ -107,10 +108,10 @@ class TrainingQuizController extends Controller
             'is_active' => 'boolean',
             'questions' => 'sometimes|array|min:1',
             'questions.*.question_text' => 'required|string',
-            'questions.*.question_type' => 'required|string|in:single,multiple,boolean',
+            'questions.*.question_type' => 'required|string|in:single,multiple,boolean,open_text',
             'questions.*.points' => 'integer|min:1',
             'questions.*.explanation' => 'nullable|string',
-            'questions.*.options' => 'required|array|min:2',
+            'questions.*.options' => 'nullable|array',
             'questions.*.options.*.option_text' => 'required|string',
             'questions.*.options.*.is_correct' => 'boolean',
         ]);
@@ -169,8 +170,9 @@ class TrainingQuizController extends Controller
         $validated = $request->validate([
             'answers' => 'required|array',
             'answers.*.question_id' => 'required|integer',
-            'answers.*.selected_options' => 'required|array',
+            'answers.*.selected_options' => 'nullable|array',
             'answers.*.selected_options.*' => 'integer',
+            'answers.*.response_text' => 'nullable|string|max:5000',
         ]);
 
         $result = $this->quizService->submitAttempt($attempt, $validated['answers']);
@@ -195,6 +197,39 @@ class TrainingQuizController extends Controller
         }
 
         return response()->json($review);
+    }
+
+    // ==========================================
+    // Grading (open_text responses)
+    // ==========================================
+
+    public function ungradedResponses(TrainingQuiz $trainingQuiz)
+    {
+        return response()->json([
+            'attempts' => $this->quizService->getUngradedAttempts($trainingQuiz->id),
+            'quiz_title' => $trainingQuiz->title,
+        ]);
+    }
+
+    public function gradeResponse(Request $request, TrainingQuizResponse $response)
+    {
+        $validated = $request->validate([
+            'points_earned' => 'required|integer|min:0',
+            'feedback' => 'nullable|string|max:2000',
+        ]);
+
+        $result = $this->quizService->gradeResponse(
+            $response,
+            $validated['points_earned'],
+            $validated['feedback'] ?? null,
+            auth()->id(),
+        );
+
+        if (! $result['success']) {
+            return response()->json(['error' => $result['error']], 422);
+        }
+
+        return response()->json($result);
     }
 
     // ==========================================
@@ -234,13 +269,16 @@ class TrainingQuizController extends Controller
                 'explanation' => $q['explanation'] ?? null,
             ]);
 
-            foreach ($q['options'] as $optIndex => $opt) {
-                TrainingQuizOption::create([
-                    'question_id' => $question->id,
-                    'option_text' => $opt['option_text'],
-                    'is_correct' => $opt['is_correct'] ?? false,
-                    'sort_order' => $optIndex,
-                ]);
+            // Perguntas abertas não têm opções
+            if (! empty($q['options'])) {
+                foreach ($q['options'] as $optIndex => $opt) {
+                    TrainingQuizOption::create([
+                        'question_id' => $question->id,
+                        'option_text' => $opt['option_text'],
+                        'is_correct' => $opt['is_correct'] ?? false,
+                        'sort_order' => $optIndex,
+                    ]);
+                }
             }
         }
     }
