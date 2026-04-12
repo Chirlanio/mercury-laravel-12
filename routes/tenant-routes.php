@@ -6,6 +6,9 @@
 use App\Enums\Permission;
 use App\Http\Controllers\AbsenceController;
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\ChatBroadcastController;
+use App\Http\Controllers\ChatController;
+use App\Http\Controllers\ChatGroupController;
 use App\Http\Controllers\Admin\EmailSettingsController;
 use App\Http\Controllers\ChecklistController;
 use App\Http\Controllers\ColorThemeController;
@@ -952,12 +955,55 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ==========================================
+    // Chat
+    // ==========================================
+    Route::middleware(['tenant.module:chat', 'permission:'.Permission::VIEW_CHAT->value])->group(function () {
+        Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
+        Route::get('/chat/conversations/{conversation}', [ChatController::class, 'show'])->name('chat.show');
+        Route::get('/chat/conversations/{conversation}/messages', [ChatController::class, 'loadMessages'])->name('chat.load-messages');
+        Route::get('/chat/search', [ChatController::class, 'search'])->name('chat.search');
+        Route::get('/chat/unread-counts', [ChatController::class, 'unreadCounts'])->name('chat.unread-counts');
+
+        // Broadcasts (view)
+        Route::get('/chat/broadcasts', [ChatBroadcastController::class, 'index'])->name('chat.broadcasts.index');
+        Route::post('/chat/broadcasts/{broadcast}/read', [ChatBroadcastController::class, 'markRead'])->name('chat.broadcasts.mark-read');
+
+        Route::middleware('permission:'.Permission::SEND_CHAT_MESSAGES->value)->group(function () {
+            Route::post('/chat/conversations/direct', [ChatController::class, 'createDirect'])->name('chat.create-direct');
+            Route::post('/chat/conversations/{conversation}/messages', [ChatController::class, 'sendMessage'])->name('chat.send-message');
+            Route::post('/chat/conversations/{conversation}/read', [ChatController::class, 'markRead'])->name('chat.mark-read');
+            Route::post('/chat/conversations/{conversation}/typing', [ChatController::class, 'typing'])->name('chat.typing');
+            Route::post('/chat/upload', [ChatController::class, 'uploadFile'])->name('chat.upload');
+        });
+
+        Route::middleware('permission:'.Permission::CREATE_CHAT_GROUPS->value)->group(function () {
+            Route::post('/chat/groups', [ChatGroupController::class, 'store'])->name('chat.groups.store');
+        });
+
+        Route::middleware('permission:'.Permission::MANAGE_CHAT_GROUPS->value)->group(function () {
+            Route::put('/chat/groups/{chatGroup}', [ChatGroupController::class, 'update'])->name('chat.groups.update');
+            Route::delete('/chat/groups/{chatGroup}', [ChatGroupController::class, 'destroy'])->name('chat.groups.destroy');
+            Route::post('/chat/groups/{chatGroup}/members', [ChatGroupController::class, 'addMember'])->name('chat.groups.add-member');
+            Route::delete('/chat/groups/{chatGroup}/members/{user}', [ChatGroupController::class, 'removeMember'])->name('chat.groups.remove-member');
+            Route::patch('/chat/groups/{chatGroup}/members/{user}/role', [ChatGroupController::class, 'updateMemberRole'])->name('chat.groups.update-role');
+        });
+
+        Route::middleware('permission:'.Permission::SEND_BROADCASTS->value)->group(function () {
+            Route::post('/chat/broadcasts', [ChatBroadcastController::class, 'store'])->name('chat.broadcasts.store');
+        });
+
+        Route::middleware('permission:'.Permission::MANAGE_BROADCASTS->value)->group(function () {
+            Route::put('/chat/broadcasts/{broadcast}', [ChatBroadcastController::class, 'update'])->name('chat.broadcasts.update');
+            Route::delete('/chat/broadcasts/{broadcast}', [ChatBroadcastController::class, 'destroy'])->name('chat.broadcasts.destroy');
+        });
+    });
+
+    // ==========================================
     // Placeholder Coming Soon
     // ==========================================
     Route::get('/ecommerce', fn () => Inertia::render('ComingSoon', ['title' => 'E-commerce']))->name('ecommerce');
     Route::get('/pessoas-cultura', fn () => Inertia::render('ComingSoon', ['title' => 'Pessoas & Cultura']))->name('pessoas-cultura');
     Route::get('/departamento-pessoal', fn () => Inertia::render('ComingSoon', ['title' => 'Departamento Pessoal']))->name('departamento-pessoal');
-    Route::get('/movidesk', fn () => Inertia::render('ComingSoon', ['title' => 'Movidesk']))->name('movidesk');
     Route::get('/biblioteca-processos', fn () => Inertia::render('ComingSoon', ['title' => 'Biblioteca de Processos']))->name('biblioteca-processos');
 });
 

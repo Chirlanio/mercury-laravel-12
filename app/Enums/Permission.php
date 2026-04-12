@@ -159,6 +159,22 @@ enum Permission: string
     case DELETE_DELIVERIES = 'deliveries.delete';
     case MANAGE_ROUTES = 'delivery_routes.manage';
 
+    // Chat
+    case VIEW_CHAT = 'chat.view';
+    case SEND_CHAT_MESSAGES = 'chat.send';
+    case CREATE_CHAT_GROUPS = 'chat.create_groups';
+    case MANAGE_CHAT_GROUPS = 'chat.manage_groups';
+    case SEND_BROADCASTS = 'chat.send_broadcasts';
+    case MANAGE_BROADCASTS = 'chat.manage_broadcasts';
+
+    // Helpdesk
+    case VIEW_HELPDESK = 'helpdesk.view';
+    case CREATE_TICKETS = 'helpdesk.create_tickets';
+    case MANAGE_TICKETS = 'helpdesk.manage_tickets';
+    case MANAGE_HD_DEPARTMENTS = 'helpdesk.manage_departments';
+    case VIEW_HD_REPORTS = 'helpdesk.view_reports';
+    case MANAGE_HD_PERMISSIONS = 'helpdesk.manage_permissions';
+
     public function label(): string
     {
         return match ($this) {
@@ -286,6 +302,20 @@ enum Permission: string
             self::EDIT_DELIVERIES => 'Editar entregas',
             self::DELETE_DELIVERIES => 'Excluir entregas',
             self::MANAGE_ROUTES => 'Gerenciar rotas de entrega',
+            // Chat
+            self::VIEW_CHAT => 'Visualizar chat',
+            self::SEND_CHAT_MESSAGES => 'Enviar mensagens',
+            self::CREATE_CHAT_GROUPS => 'Criar grupos de chat',
+            self::MANAGE_CHAT_GROUPS => 'Gerenciar grupos de chat',
+            self::SEND_BROADCASTS => 'Enviar comunicados',
+            self::MANAGE_BROADCASTS => 'Gerenciar comunicados',
+            // Helpdesk
+            self::VIEW_HELPDESK => 'Visualizar chamados',
+            self::CREATE_TICKETS => 'Criar chamados',
+            self::MANAGE_TICKETS => 'Gerenciar chamados',
+            self::MANAGE_HD_DEPARTMENTS => 'Gerenciar departamentos',
+            self::VIEW_HD_REPORTS => 'Visualizar relatórios',
+            self::MANAGE_HD_PERMISSIONS => 'Gerenciar permissões do helpdesk',
         };
     }
 
@@ -416,6 +446,20 @@ enum Permission: string
             self::EDIT_DELIVERIES => 'Permite editar entregas e transicionar status',
             self::DELETE_DELIVERIES => 'Permite excluir entregas',
             self::MANAGE_ROUTES => 'Permite criar, iniciar e gerenciar rotas de entrega',
+            // Chat
+            self::VIEW_CHAT => 'Permite acessar o módulo de chat',
+            self::SEND_CHAT_MESSAGES => 'Permite enviar mensagens diretas e em grupos',
+            self::CREATE_CHAT_GROUPS => 'Permite criar grupos de chat',
+            self::MANAGE_CHAT_GROUPS => 'Permite editar e gerenciar grupos de chat',
+            self::SEND_BROADCASTS => 'Permite enviar comunicados para a equipe',
+            self::MANAGE_BROADCASTS => 'Permite editar e excluir comunicados',
+            // Helpdesk
+            self::VIEW_HELPDESK => 'Permite visualizar chamados do helpdesk',
+            self::CREATE_TICKETS => 'Permite criar novos chamados',
+            self::MANAGE_TICKETS => 'Permite gerenciar, atribuir e transicionar chamados',
+            self::MANAGE_HD_DEPARTMENTS => 'Permite configurar departamentos e categorias',
+            self::VIEW_HD_REPORTS => 'Permite visualizar relatórios do helpdesk',
+            self::MANAGE_HD_PERMISSIONS => 'Permite gerenciar permissões de técnicos por departamento',
         };
     }
 

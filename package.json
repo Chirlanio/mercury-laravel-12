@@ -23,7 +23,9 @@
     },
     "dependencies": {
         "@heroicons/react": "^2.2.0",
+        "laravel-echo": "^2.3.4",
         "leaflet": "^1.9.4",
+        "pusher-js": "^8.5.0",
         "qrcode.react": "^4.2.0",
         "react-is": "^19.2.5",
         "react-leaflet": "^4.2.1",

@@ -152,6 +152,20 @@ export const PERMISSIONS = {
     EDIT_DELIVERIES: 'deliveries.edit',
     DELETE_DELIVERIES: 'deliveries.delete',
     MANAGE_ROUTES: 'delivery_routes.manage',
+    // Chat
+    VIEW_CHAT: 'chat.view',
+    SEND_CHAT_MESSAGES: 'chat.send',
+    CREATE_CHAT_GROUPS: 'chat.create_groups',
+    MANAGE_CHAT_GROUPS: 'chat.manage_groups',
+    SEND_BROADCASTS: 'chat.send_broadcasts',
+    MANAGE_BROADCASTS: 'chat.manage_broadcasts',
+    // Helpdesk
+    VIEW_HELPDESK: 'helpdesk.view',
+    CREATE_TICKETS: 'helpdesk.create_tickets',
+    MANAGE_TICKETS: 'helpdesk.manage_tickets',
+    MANAGE_HD_DEPARTMENTS: 'helpdesk.manage_departments',
+    VIEW_HD_REPORTS: 'helpdesk.view_reports',
+    MANAGE_HD_PERMISSIONS: 'helpdesk.manage_permissions',
 };
 
 export const ROLES = {

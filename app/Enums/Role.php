@@ -148,6 +148,20 @@ enum Role: string
                 Permission::EDIT_DELIVERIES->value,
                 Permission::DELETE_DELIVERIES->value,
                 Permission::MANAGE_ROUTES->value,
+                // Chat (todas)
+                Permission::VIEW_CHAT->value,
+                Permission::SEND_CHAT_MESSAGES->value,
+                Permission::CREATE_CHAT_GROUPS->value,
+                Permission::MANAGE_CHAT_GROUPS->value,
+                Permission::SEND_BROADCASTS->value,
+                Permission::MANAGE_BROADCASTS->value,
+                // Helpdesk (todas)
+                Permission::VIEW_HELPDESK->value,
+                Permission::CREATE_TICKETS->value,
+                Permission::MANAGE_TICKETS->value,
+                Permission::MANAGE_HD_DEPARTMENTS->value,
+                Permission::VIEW_HD_REPORTS->value,
+                Permission::MANAGE_HD_PERMISSIONS->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -258,6 +272,20 @@ enum Role: string
                 Permission::EDIT_DELIVERIES->value,
                 Permission::DELETE_DELIVERIES->value,
                 Permission::MANAGE_ROUTES->value,
+                // Chat (todas)
+                Permission::VIEW_CHAT->value,
+                Permission::SEND_CHAT_MESSAGES->value,
+                Permission::CREATE_CHAT_GROUPS->value,
+                Permission::MANAGE_CHAT_GROUPS->value,
+                Permission::SEND_BROADCASTS->value,
+                Permission::MANAGE_BROADCASTS->value,
+                // Helpdesk (todas)
+                Permission::VIEW_HELPDESK->value,
+                Permission::CREATE_TICKETS->value,
+                Permission::MANAGE_TICKETS->value,
+                Permission::MANAGE_HD_DEPARTMENTS->value,
+                Permission::VIEW_HD_REPORTS->value,
+                Permission::MANAGE_HD_PERMISSIONS->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -307,6 +335,16 @@ enum Role: string
                 // Entregas (view + gerenciar rotas)
                 Permission::VIEW_DELIVERIES->value,
                 Permission::MANAGE_ROUTES->value,
+                // Chat (view + send + criar grupos + enviar broadcasts)
+                Permission::VIEW_CHAT->value,
+                Permission::SEND_CHAT_MESSAGES->value,
+                Permission::CREATE_CHAT_GROUPS->value,
+                Permission::SEND_BROADCASTS->value,
+                // Helpdesk (view + criar + gerenciar + relatórios)
+                Permission::VIEW_HELPDESK->value,
+                Permission::CREATE_TICKETS->value,
+                Permission::MANAGE_TICKETS->value,
+                Permission::VIEW_HD_REPORTS->value,
             ],
             self::USER => [
                 // Apenas próprio perfil
@@ -321,6 +359,12 @@ enum Role: string
                 Permission::VIEW_TRAINING_COURSES->value,
                 // Entregas (view)
                 Permission::VIEW_DELIVERIES->value,
+                // Chat (view + send)
+                Permission::VIEW_CHAT->value,
+                Permission::SEND_CHAT_MESSAGES->value,
+                // Helpdesk (view + create)
+                Permission::VIEW_HELPDESK->value,
+                Permission::CREATE_TICKETS->value,
             ],
             self::DRIVER => [
                 // Perfil próprio
@@ -331,6 +375,12 @@ enum Role: string
                 Permission::VIEW_DELIVERIES->value,
                 Permission::EDIT_DELIVERIES->value,
                 Permission::MANAGE_ROUTES->value,
+                // Chat (view + send)
+                Permission::VIEW_CHAT->value,
+                Permission::SEND_CHAT_MESSAGES->value,
+                // Helpdesk (view + create)
+                Permission::VIEW_HELPDESK->value,
+                Permission::CREATE_TICKETS->value,
             ],
         };
     }
