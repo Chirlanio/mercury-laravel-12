@@ -9,6 +9,8 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\ChatBroadcastController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ChatGroupController;
+use App\Http\Controllers\HelpdeskController;
+use App\Http\Controllers\HelpdeskReportController;
 use App\Http\Controllers\Admin\EmailSettingsController;
 use App\Http\Controllers\ChecklistController;
 use App\Http\Controllers\ColorThemeController;
@@ -995,6 +997,36 @@ Route::middleware(['auth'])->group(function () {
         Route::middleware('permission:'.Permission::MANAGE_BROADCASTS->value)->group(function () {
             Route::put('/chat/broadcasts/{broadcast}', [ChatBroadcastController::class, 'update'])->name('chat.broadcasts.update');
             Route::delete('/chat/broadcasts/{broadcast}', [ChatBroadcastController::class, 'destroy'])->name('chat.broadcasts.destroy');
+        });
+    });
+
+    // ==========================================
+    // Helpdesk
+    // ==========================================
+    Route::middleware(['tenant.module:helpdesk', 'permission:'.Permission::VIEW_HELPDESK->value])->group(function () {
+        Route::get('/helpdesk', [HelpdeskController::class, 'index'])->name('helpdesk.index');
+        Route::get('/helpdesk/statistics', [HelpdeskController::class, 'statistics'])->name('helpdesk.statistics');
+        Route::get('/helpdesk/departments/{department}/categories', [HelpdeskController::class, 'categories'])->name('helpdesk.categories');
+        Route::get('/helpdesk/departments/{department}/technicians', [HelpdeskController::class, 'technicians'])->name('helpdesk.technicians');
+        Route::get('/helpdesk/{ticket}', [HelpdeskController::class, 'show'])->name('helpdesk.show');
+
+        Route::middleware('permission:'.Permission::CREATE_TICKETS->value)->group(function () {
+            Route::post('/helpdesk', [HelpdeskController::class, 'store'])->name('helpdesk.store');
+            Route::post('/helpdesk/{ticket}/comments', [HelpdeskController::class, 'addComment'])->name('helpdesk.add-comment');
+            Route::post('/helpdesk/{ticket}/attachments', [HelpdeskController::class, 'uploadAttachment'])->name('helpdesk.upload-attachment');
+        });
+
+        Route::middleware('permission:'.Permission::MANAGE_TICKETS->value)->group(function () {
+            Route::delete('/helpdesk/{ticket}', [HelpdeskController::class, 'destroy'])->name('helpdesk.destroy');
+            Route::post('/helpdesk/{ticket}/transition', [HelpdeskController::class, 'transition'])->name('helpdesk.transition');
+            Route::post('/helpdesk/{ticket}/assign', [HelpdeskController::class, 'assign'])->name('helpdesk.assign');
+            Route::post('/helpdesk/{ticket}/priority', [HelpdeskController::class, 'changePriority'])->name('helpdesk.change-priority');
+        });
+
+        Route::middleware('permission:'.Permission::VIEW_HD_REPORTS->value)->group(function () {
+            Route::get('/helpdesk-reports', [HelpdeskReportController::class, 'index'])->name('helpdesk-reports.index');
+            Route::get('/helpdesk-reports/volume', [HelpdeskReportController::class, 'volumeByDay'])->name('helpdesk-reports.volume');
+            Route::get('/helpdesk-reports/sla', [HelpdeskReportController::class, 'slaCompliance'])->name('helpdesk-reports.sla');
         });
     });
 
