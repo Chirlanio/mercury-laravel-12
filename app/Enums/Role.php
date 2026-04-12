@@ -8,6 +8,7 @@ enum Role: string
     case ADMIN = 'admin';
     case SUPPORT = 'support';
     case USER = 'user';
+    case DRIVER = 'drivers';
 
     public function label(): string
     {
@@ -16,6 +17,7 @@ enum Role: string
             self::ADMIN => 'Administrador',
             self::SUPPORT => 'Suporte',
             self::USER => 'Usuário',
+            self::DRIVER => 'Motorista',
         };
     }
 
@@ -320,6 +322,14 @@ enum Role: string
                 // Entregas (view)
                 Permission::VIEW_DELIVERIES->value,
             ],
+            self::DRIVER => [
+                // Perfil próprio
+                Permission::VIEW_OWN_PROFILE->value,
+                Permission::EDIT_OWN_PROFILE->value,
+                Permission::ACCESS_DASHBOARD->value,
+                // Apenas gerenciar rotas (painel do motorista + minhas entregas)
+                Permission::MANAGE_ROUTES->value,
+            ],
         };
     }
 
@@ -330,28 +340,27 @@ enum Role: string
         return in_array($permissionValue, $this->permissions());
     }
 
-    public function canManageRole(Role $targetRole): bool
+    public function canManageRole(Role|string $targetRole): bool
     {
+        $targetValue = $targetRole instanceof Role ? $targetRole->value : (is_object($targetRole) ? $targetRole->value : $targetRole);
+
         return match ($this) {
-            self::SUPER_ADMIN => true, // Pode gerenciar todos
-            self::ADMIN => $targetRole !== self::SUPER_ADMIN, // Não pode gerenciar super admin
-            self::SUPPORT, self::USER => false, // Não pode gerenciar roles
+            self::SUPER_ADMIN => true,
+            self::ADMIN => $targetValue !== self::SUPER_ADMIN->value,
+            default => false,
         };
     }
 
     public function canEditUser(\App\Models\User $currentUser, \App\Models\User $targetUser): bool
     {
-        // Super admin pode editar todos
         if ($this === self::SUPER_ADMIN) {
             return true;
         }
 
-        // Admin pode editar todos exceto super admins
         if ($this === self::ADMIN) {
-            return $targetUser->role !== self::SUPER_ADMIN;
+            return $targetUser->role?->value !== self::SUPER_ADMIN->value;
         }
 
-        // Support e User só podem editar a si mesmos
         return $currentUser->id === $targetUser->id;
     }
 

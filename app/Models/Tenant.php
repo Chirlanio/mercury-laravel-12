@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 use Stancl\Tenancy\Contracts\TenantWithDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDomains;
+use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 
 class Tenant extends BaseTenant implements TenantWithDatabase
 {
@@ -13,6 +13,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
 
     // String-based IDs (slugs), not auto-incrementing integers
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     // Override stancl's GeneratesIds trait which checks for a bound ID generator
@@ -101,16 +102,37 @@ class Tenant extends BaseTenant implements TenantWithDatabase
 
     /**
      * Get the roles this tenant is allowed to assign to users.
-     * Returns all role values when no restriction is configured (backward compatible).
+     * Priority: tenant settings > all active central roles.
      */
     public function getAllowedRoles(): array
     {
         $allowed = $this->settings['allowed_roles'] ?? null;
 
-        if ($allowed === null || $allowed === []) {
-            return array_map(fn ($case) => $case->value, \App\Enums\Role::cases());
+        if ($allowed !== null && $allowed !== []) {
+            return $allowed;
         }
 
-        return $allowed;
+        // Dynamic: return all active roles from central DB
+        try {
+            return CentralRole::on('mysql')
+                ->where('is_active', true)
+                ->ordered()
+                ->pluck('name')
+                ->toArray();
+        } catch (\Exception $e) {
+            // Fallback to enum
+            return array_map(fn ($case) => $case->value, \App\Enums\Role::cases());
+        }
+    }
+
+    /**
+     * Set allowed roles for this tenant.
+     */
+    public function setAllowedRoles(array $roles): void
+    {
+        $settings = $this->settings ?? [];
+        $settings['allowed_roles'] = $roles;
+        $this->settings = $settings;
+        $this->save();
     }
 }

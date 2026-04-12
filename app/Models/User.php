@@ -68,13 +68,15 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'terms_accepted_at' => 'datetime',
             'password' => 'hashed',
-            'role' => Role::class,
+            'role' => \App\Casts\FlexibleRoleCast::class,
         ];
     }
 
-    public function hasRole(Role $role): bool
+    public function hasRole(Role|string $role): bool
     {
-        return $this->role === $role;
+        $value = $role instanceof Role ? $role->value : $role;
+
+        return $this->role?->value === $value;
     }
 
     public function hasPermission(Role $requiredRole): bool
@@ -106,22 +108,37 @@ class User extends Authenticatable
 
     public function isSuperAdmin(): bool
     {
-        return $this->role === Role::SUPER_ADMIN;
+        return $this->role?->value === Role::SUPER_ADMIN->value;
     }
 
     public function isAdmin(): bool
     {
-        return $this->role === Role::ADMIN;
+        return $this->role?->value === Role::ADMIN->value;
     }
 
     public function isSupport(): bool
     {
-        return $this->role === Role::SUPPORT;
+        return $this->role?->value === Role::SUPPORT->value;
     }
 
     public function isUser(): bool
     {
-        return $this->role === Role::USER;
+        return $this->role?->value === Role::USER->value;
+    }
+
+    public function isDriver(): bool
+    {
+        return $this->role?->value === Role::DRIVER->value;
+    }
+
+    public function isAdminOrAbove(): bool
+    {
+        return in_array($this->role?->value, [Role::SUPER_ADMIN->value, Role::ADMIN->value]);
+    }
+
+    public function hasRoleValue(string ...$roleValues): bool
+    {
+        return in_array($this->role?->value, $roleValues);
     }
 
     /**

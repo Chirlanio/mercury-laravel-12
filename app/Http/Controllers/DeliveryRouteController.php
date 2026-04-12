@@ -71,6 +71,7 @@ class DeliveryRouteController extends Controller
                     'id' => $d->id,
                     'client_name' => $d->client_name,
                     'address' => $d->address,
+                    'neighborhood' => $d->neighborhood,
                     'store_name' => $d->store?->name,
                     'status_label' => $d->status_label,
                 ]),
@@ -180,15 +181,43 @@ class DeliveryRouteController extends Controller
         return response()->json(['message' => 'Entrega atualizada com sucesso.']);
     }
 
+    public function update(Request $request, DeliveryRoute $deliveryRoute)
+    {
+        if (in_array($deliveryRoute->status, [DeliveryRoute::STATUS_COMPLETED, DeliveryRoute::STATUS_CANCELLED])) {
+            return response()->json(['error' => 'Não é possível editar uma rota concluída ou cancelada.'], 422);
+        }
+
+        $validated = $request->validate([
+            'driver_id' => 'nullable|exists:drivers,id',
+            'date_route' => 'nullable|date',
+            'delivery_ids' => 'nullable|array|min:1',
+            'delivery_ids.*' => 'exists:deliveries,id',
+            'notes' => 'nullable|string|max:2000',
+        ]);
+
+        $route = $this->routeService->editRoute(
+            $deliveryRoute,
+            $validated['driver_id'] ?? null,
+            $validated['date_route'] ?? null,
+            $validated['delivery_ids'] ?? null,
+            $validated['notes'] ?? null,
+        );
+
+        return response()->json(['message' => 'Rota atualizada com sucesso.']);
+    }
+
     public function cancel(DeliveryRoute $deliveryRoute)
     {
-        if (! $deliveryRoute->canTransitionTo(DeliveryRoute::STATUS_CANCELLED)) {
+        if (! $this->routeService->cancelRoute($deliveryRoute)) {
             return response()->json(['error' => 'Não é possível cancelar esta rota.'], 422);
         }
 
-        $deliveryRoute->update(['status' => DeliveryRoute::STATUS_CANCELLED]);
+        return response()->json(['message' => 'Rota cancelada. Entregas liberadas para nova roteirização.']);
+    }
 
-        return response()->json(['message' => 'Rota cancelada.']);
+    public function statistics()
+    {
+        return response()->json($this->routeService->getStatistics());
     }
 
     public function driverDashboard()
@@ -200,6 +229,7 @@ class DeliveryRouteController extends Controller
             return Inertia::render('DeliveryRoutes/DriverDashboard', [
                 'route' => null,
                 'items' => [],
+                'history' => [],
                 'driverName' => $user->name,
             ]);
         }
@@ -209,7 +239,31 @@ class DeliveryRouteController extends Controller
         return Inertia::render('DeliveryRoutes/DriverDashboard', [
             'route' => $data['route'],
             'items' => $data['items'],
+            'history' => $data['history'] ?? [],
             'driverName' => $driver->name,
+        ]);
+    }
+
+    public function myDeliveries(Request $request)
+    {
+        $user = auth()->user();
+        $driver = Driver::where('user_id', $user->id)->first();
+
+        if (! $driver) {
+            return Inertia::render('DeliveryRoutes/MyDeliveries', [
+                'stats' => ['total_routes' => 0, 'completed_routes' => 0, 'total_items' => 0, 'delivered' => 0, 'returned' => 0, 'delivery_rate' => 0],
+                'routes' => ['data' => [], 'links' => [], 'total' => 0],
+                'driverName' => $user->name,
+            ]);
+        }
+
+        $data = $this->routeService->getDriverHistory($driver->id, $request->get('search'));
+
+        return Inertia::render('DeliveryRoutes/MyDeliveries', [
+            'stats' => $data['stats'],
+            'routes' => $data['routes'],
+            'driverName' => $driver->name,
+            'filters' => $request->only('search'),
         ]);
     }
 

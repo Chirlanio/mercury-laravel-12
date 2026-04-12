@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 import {
     TruckIcon,
@@ -6,8 +6,7 @@ import {
     PhoneIcon,
     CheckCircleIcon,
     ArrowPathIcon,
-    CreditCardIcon,
-    GiftIcon,
+    ArrowLeftIcon,
 } from '@heroicons/react/24/outline';
 import Button from '@/Components/Button';
 import StatusBadge from '@/Components/Shared/StatusBadge';
@@ -15,11 +14,13 @@ import TextInput from '@/Components/TextInput';
 
 const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
-function DriverDashboard({ route: routeData, items: initialItems, driverName }) {
+function DriverDashboard({ route: routeData, items: initialItems, history: initialHistory, driverName }) {
     const [items, setItems] = useState(initialItems || []);
     const [completing, setCompleting] = useState({});
     const [receivedBy, setReceivedBy] = useState({});
     const [notification, setNotification] = useState(null);
+    const [showHistory, setShowHistory] = useState(false);
+    const history = initialHistory || [];
 
     const deliveredCount = items.filter(i => i.is_delivered).length;
     const totalCount = items.length;
@@ -86,9 +87,15 @@ function DriverDashboard({ route: routeData, items: initialItems, driverName }) 
                 {/* Header */}
                 <div className="bg-indigo-600 text-white px-4 py-5 sm:px-6">
                     <div className="flex items-center justify-between">
-                        <div>
-                            <h1 className="text-lg font-bold">{driverName}</h1>
-                            <p className="text-sm text-indigo-200 capitalize">{today}</p>
+                        <div className="flex items-center gap-3">
+                            <a href={route('dashboard')}
+                                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors inline-flex">
+                                <ArrowLeftIcon className="w-5 h-5" />
+                            </a>
+                            <div>
+                                <h1 className="text-lg font-bold">{driverName}</h1>
+                                <p className="text-sm text-indigo-200 capitalize">{today}</p>
+                            </div>
                         </div>
                         <TruckIcon className="w-8 h-8 text-indigo-300" />
                     </div>
@@ -226,6 +233,14 @@ function DriverDashboard({ route: routeData, items: initialItems, driverName }) 
                             )}
                         </>
                     )}
+
+                    {/* Link para Minhas Entregas */}
+                    <div className="mt-6">
+                        <a href={route('my-deliveries.index')}
+                            className="block w-full bg-white rounded-xl shadow-sm p-4 text-center text-sm font-medium text-indigo-600 hover:bg-indigo-50 transition-colors">
+                            Ver todas as minhas entregas e rotas
+                        </a>
+                    </div>
                 </div>
             </div>
         </>

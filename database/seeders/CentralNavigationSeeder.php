@@ -7,6 +7,7 @@ use App\Models\CentralMenuPageDefault;
 use App\Models\CentralModule;
 use App\Models\CentralPage;
 use App\Models\CentralPageGroup;
+use App\Models\CentralRole;
 use Illuminate\Database\Seeder;
 
 /**
@@ -125,6 +126,7 @@ class CentralNavigationSeeder extends Seeder
             '/deliveries' => 'delivery',
             '/delivery-routes' => 'delivery',
             '/driver-dashboard' => 'delivery',
+            '/my-deliveries' => 'delivery',
             '/stock-adjustments' => 'stock_adjustments',
             '/stock-audits' => 'stock_audits',
             '/order-payments' => 'order_payments',
@@ -161,6 +163,7 @@ class CentralNavigationSeeder extends Seeder
             ['route' => '/deliveries', 'page_name' => 'Entregas', 'icon' => 'fas fa-truck'],
             ['route' => '/delivery-routes', 'page_name' => 'Rotas de Entrega', 'icon' => 'fas fa-route'],
             ['route' => '/driver-dashboard', 'page_name' => 'Painel do Motorista', 'icon' => 'fas fa-shipping-fast'],
+            ['route' => '/my-deliveries', 'page_name' => 'Minhas Entregas', 'icon' => 'fas fa-box-open'],
             ['route' => '/stock-adjustments', 'page_name' => 'Ajustes de Estoque', 'icon' => 'fas fa-clipboard-check'],
             ['route' => '/stock-audits', 'page_name' => 'Auditoria de Estoque', 'icon' => 'fas fa-clipboard-list'],
             ['route' => '/order-payments', 'page_name' => 'Ordens de Pagamento', 'icon' => 'fas fa-money-bill-wave'],
@@ -240,6 +243,7 @@ class CentralNavigationSeeder extends Seeder
             '/deliveries' => 'Operações',
             '/delivery-routes' => 'Operações',
             '/driver-dashboard' => 'Operações',
+            '/my-deliveries' => 'Operações',
             '/stock-adjustments' => 'Operações',
             '/stock-audits' => 'Operações',
             '/order-payments' => 'Financeiro',
@@ -295,11 +299,14 @@ class CentralNavigationSeeder extends Seeder
 
         $userRoutes = ['/dashboard', '/logout', '/my-trainings', '/trainings'];
 
+        $driverRoutes = ['/dashboard', '/logout', '/driver-dashboard', '/my-deliveries'];
+
         // Cache IDs
         $menuIds = CentralMenu::whereNull('parent_id')->pluck('id', 'name')->toArray();
         $pages = CentralPage::all()->keyBy('route');
 
-        $roles = ['super_admin', 'admin', 'support', 'user'];
+        // Todas as roles ativas do banco central
+        $roles = CentralRole::where('is_active', true)->pluck('name')->toArray();
         $order = 0;
 
         foreach ($routeToMenu as $route => $menuName) {
@@ -319,6 +326,9 @@ class CentralNavigationSeeder extends Seeder
                     'admin' => true,
                     'support' => in_array($route, $viewOnlyRoutes) || $route === '/logout',
                     'user' => in_array($route, $userRoutes),
+                    'drivers' => in_array($route, $driverRoutes),
+                    'store_manager' => in_array($route, $viewOnlyRoutes) || $route === '/logout',
+                    default => in_array($route, ['/dashboard', '/logout']),
                 };
 
                 if (! $hasPermission) {

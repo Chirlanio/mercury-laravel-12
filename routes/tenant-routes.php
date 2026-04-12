@@ -493,7 +493,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/financeiro', fn () => Inertia::render('ComingSoon', ['title' => 'Financeiro']))->name('financeiro');
     Route::get('/ativo-fixo', fn () => Inertia::render('ComingSoon', ['title' => 'Ativo Fixo']))->name('ativo-fixo');
     Route::get('/comercial', fn () => redirect('/sales'))->name('comercial');
-    // Deliveries (Entregas)
+    // Deliveries — Admin (VIEW_DELIVERIES)
     Route::middleware(['tenant.module:delivery', 'permission:'.Permission::VIEW_DELIVERIES->value])->group(function () {
         Route::get('/deliveries', [DeliveryController::class, 'index'])->name('deliveries.index');
         Route::get('/deliveries/statistics', [DeliveryController::class, 'statistics'])->name('deliveries.statistics');
@@ -512,18 +512,25 @@ Route::middleware(['auth'])->group(function () {
             Route::delete('/deliveries/{delivery}', [DeliveryController::class, 'destroy'])->name('deliveries.destroy');
         });
 
-        // Delivery Routes (Rotas de Entrega)
+        // Delivery Routes — Admin
         Route::get('/delivery-routes', [DeliveryRouteController::class, 'index'])->name('delivery-routes.index');
+        Route::get('/delivery-routes/statistics', [DeliveryRouteController::class, 'statistics'])->name('delivery-routes.statistics');
         Route::get('/delivery-routes/{deliveryRoute}', [DeliveryRouteController::class, 'show'])->name('delivery-routes.show');
         Route::get('/delivery-routes/{deliveryRoute}/print', [DeliveryRouteController::class, 'printManifest'])->name('delivery-routes.print');
-        Route::get('/driver-dashboard', [DeliveryRouteController::class, 'driverDashboard'])->name('driver-dashboard.index');
 
         Route::middleware('permission:'.Permission::MANAGE_ROUTES->value)->group(function () {
             Route::post('/delivery-routes', [DeliveryRouteController::class, 'store'])->name('delivery-routes.store');
+            Route::put('/delivery-routes/{deliveryRoute}', [DeliveryRouteController::class, 'update'])->name('delivery-routes.update');
             Route::post('/delivery-routes/{deliveryRoute}/start', [DeliveryRouteController::class, 'startRoute'])->name('delivery-routes.start');
             Route::post('/delivery-routes/{deliveryRoute}/items/{item}/complete', [DeliveryRouteController::class, 'completeItem'])->name('delivery-routes.complete-item');
             Route::post('/delivery-routes/{deliveryRoute}/cancel', [DeliveryRouteController::class, 'cancel'])->name('delivery-routes.cancel');
         });
+    });
+
+    // Driver pages — MANAGE_ROUTES (motorista + admin)
+    Route::middleware(['tenant.module:delivery', 'permission:'.Permission::MANAGE_ROUTES->value])->group(function () {
+        Route::get('/driver-dashboard', [DeliveryRouteController::class, 'driverDashboard'])->name('driver-dashboard.index');
+        Route::get('/my-deliveries', [DeliveryRouteController::class, 'myDeliveries'])->name('my-deliveries.index');
     });
 
     // ==========================================

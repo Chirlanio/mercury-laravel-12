@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers\Central;
 
-use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\CentralActivityLog;
+use App\Models\CentralRole;
 use App\Models\Tenant;
 use App\Models\TenantPlan;
 use App\Services\TenantProvisioningService;
@@ -25,9 +25,9 @@ class TenantController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('slug', 'like', "%{$search}%")
-                  ->orWhere('owner_email', 'like', "%{$search}%")
-                  ->orWhere('cnpj', 'like', "%{$search}%");
+                    ->orWhere('slug', 'like', "%{$search}%")
+                    ->orWhere('owner_email', 'like', "%{$search}%")
+                    ->orWhere('cnpj', 'like', "%{$search}%");
             });
         }
 
@@ -93,7 +93,11 @@ class TenantController extends Controller
                 'modules' => $tenant->activeModules()->pluck('module_slug'),
                 'allowed_roles' => $tenant->getAllowedRoles(),
             ],
-            'allRoles' => Role::options(),
+            'allRoles' => CentralRole::where('is_active', true)
+                ->ordered()
+                ->get()
+                ->mapWithKeys(fn ($r) => [$r->name => $r->label])
+                ->toArray(),
             'usage' => $usage,
             'plans' => TenantPlan::where('is_active', true)->get(['id', 'name', 'slug', 'max_users', 'max_stores']),
             'recentInvoices' => $tenant->invoices()
@@ -137,7 +141,7 @@ class TenantController extends Controller
             return redirect("/admin/tenants/{$tenant->id}")
                 ->with('success', "Tenant '{$tenant->name}' criado com sucesso.");
         } catch (\Exception $e) {
-            return back()->with('error', 'Erro ao criar tenant: ' . $e->getMessage())
+            return back()->with('error', 'Erro ao criar tenant: '.$e->getMessage())
                 ->withInput();
         }
     }
@@ -164,11 +168,11 @@ class TenantController extends Controller
     {
         $tenant = Tenant::findOrFail($tenant);
 
-        $validRoles = array_column(Role::cases(), 'value');
+        $validRoles = CentralRole::where('is_active', true)->pluck('name')->toArray();
 
         $validated = $request->validate([
             'allowed_roles' => 'required|array|min:1',
-            'allowed_roles.*' => 'string|in:' . implode(',', $validRoles),
+            'allowed_roles.*' => 'string|in:'.implode(',', $validRoles),
         ]);
 
         $settings = $tenant->settings ?? [];
@@ -177,7 +181,7 @@ class TenantController extends Controller
 
         CentralActivityLog::log(
             'tenant.updated',
-            "Roles permitidas atualizadas para '{$tenant->name}': " . implode(', ', $validated['allowed_roles']),
+            "Roles permitidas atualizadas para '{$tenant->name}': ".implode(', ', $validated['allowed_roles']),
             $tenant->id
         );
 

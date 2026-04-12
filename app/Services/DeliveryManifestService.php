@@ -13,7 +13,7 @@ class DeliveryManifestService
 
         $html = $this->buildHtml($route);
         $pdf = PDF::loadHTML($html);
-        $pdf->setPaper('A4', 'portrait');
+        $pdf->setPaper('A4', 'landscape');
 
         return $pdf->download("manifesto_rota_{$route->route_number}.pdf");
     }
