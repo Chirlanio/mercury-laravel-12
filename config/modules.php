@@ -206,4 +206,18 @@ return [
         'icon' => 'TruckIcon',
         'dependencies' => ['stores'],
     ],
+    'chat' => [
+        'name' => 'Chat',
+        'description' => 'Mensagens diretas, grupos e comunicados em tempo real.',
+        'routes' => ['chat.*'],
+        'icon' => 'ChatBubbleLeftRightIcon',
+        'dependencies' => ['users'],
+    ],
+    'helpdesk' => [
+        'name' => 'Helpdesk',
+        'description' => 'Sistema de chamados com SLA, departamentos e relatórios.',
+        'routes' => ['helpdesk.*', 'helpdesk-reports.*'],
+        'icon' => 'LifebuoyIcon',
+        'dependencies' => ['users'],
+    ],
 ];
