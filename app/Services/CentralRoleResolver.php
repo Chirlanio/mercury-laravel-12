@@ -81,6 +81,7 @@ class CentralRoleResolver
 
         $hierarchy = [
             'user' => 1,
+            'drivers' => 1,
             'support' => 2,
             'admin' => 3,
             'super_admin' => 4,
@@ -116,6 +117,7 @@ class CentralRoleResolver
                 Role::ADMIN => 3,
                 Role::SUPPORT => 2,
                 Role::USER => 1,
+                Role::DRIVER => 1,
             },
             'is_system' => true,
             'is_active' => true,
@@ -173,7 +175,7 @@ class CentralRoleResolver
             $cache->forget("central_role_perms:{$roleSlug}");
         } else {
             // Clear all role caches
-            foreach (['super_admin', 'admin', 'support', 'user'] as $slug) {
+            foreach (['super_admin', 'admin', 'support', 'user', 'drivers'] as $slug) {
                 $cache->forget("central_role_perms:{$slug}");
             }
 

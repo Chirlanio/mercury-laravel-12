@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\GeocodeDeliveryJob;
 use App\Models\Delivery;
+use App\Models\DeliveryReturnReason;
 use App\Models\Employee;
 use App\Models\Neighborhood;
 use App\Models\PaymentType;
 use App\Models\Store;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class DeliveryController extends Controller
@@ -79,6 +82,9 @@ class DeliveryController extends Controller
                     'name' => $e->short_name ?: $e->name,
                     'store_id' => $e->store_id,
                 ]),
+            'returnReasons' => Schema::hasTable('delivery_return_reasons')
+                ? DeliveryReturnReason::active()->orderBy('name')->get(['id', 'code', 'name'])
+                : collect(),
         ]);
     }
 
@@ -107,6 +113,8 @@ class DeliveryController extends Controller
         $validated['created_by_user_id'] = auth()->id();
 
         $delivery = Delivery::create($validated);
+
+        GeocodeDeliveryJob::dispatch($delivery->id);
 
         return redirect()->route('deliveries.index')
             ->with('success', 'Entrega criada com sucesso.');
@@ -178,7 +186,16 @@ class DeliveryController extends Controller
         ]);
 
         $validated['updated_by_user_id'] = auth()->id();
+
+        $addressChanged = $delivery->address !== ($validated['address'] ?? $delivery->address)
+            || $delivery->neighborhood !== ($validated['neighborhood'] ?? $delivery->neighborhood);
+
         $delivery->update($validated);
+
+        if ($addressChanged) {
+            $delivery->update(['geocoded_at' => null]);
+            GeocodeDeliveryJob::dispatch($delivery->id);
+        }
 
         return redirect()->route('deliveries.index')
             ->with('success', 'Entrega atualizada com sucesso.');
@@ -199,6 +216,8 @@ class DeliveryController extends Controller
     {
         $request->validate([
             'status' => 'required|string|in:'.implode(',', array_keys(Delivery::STATUS_LABELS)),
+            'return_reason_id' => 'nullable|integer',
+            'received_by' => 'nullable|string|max:255',
         ]);
 
         $newStatus = $request->status;
@@ -209,10 +228,24 @@ class DeliveryController extends Controller
             ], 422);
         }
 
-        $delivery->update([
+        $oldStatus = $delivery->status;
+        $oldStatusLabel = $delivery->status_label;
+
+        $updateData = [
             'status' => $newStatus,
             'updated_by_user_id' => auth()->id(),
-        ]);
+        ];
+
+        if (Schema::hasColumn('deliveries', 'return_reason_id')) {
+            $updateData['return_reason_id'] = $newStatus === Delivery::STATUS_RETURNED ? $request->return_reason_id : null;
+        }
+
+        $delivery->update($updateData);
+
+        $delivery->logCustomAction('status_transition',
+            "Status alterado de '{$oldStatusLabel}' para '".Delivery::STATUS_LABELS[$newStatus]."'",
+            ['old_status' => $oldStatus, 'new_status' => $newStatus]
+        );
 
         return response()->json([
             'message' => 'Status atualizado para '.Delivery::STATUS_LABELS[$newStatus].'.',

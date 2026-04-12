@@ -7,6 +7,7 @@ use App\Models\DeliveryRoute;
 use App\Models\DeliveryRouteItem;
 use App\Models\Driver;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class DeliveryRouteService
 {
@@ -62,7 +63,12 @@ class DeliveryRouteService
         // Update all deliveries to in_route
         $route->items()->with('delivery')->get()->each(function ($item) {
             if (! $item->delivery->isTerminal()) {
+                $oldStatus = $item->delivery->status;
                 $item->delivery->update(['status' => Delivery::STATUS_IN_ROUTE]);
+                $item->delivery->logCustomAction('status_transition',
+                    "Status alterado de '".Delivery::STATUS_LABELS[$oldStatus]."' para '".Delivery::STATUS_LABELS[Delivery::STATUS_IN_ROUTE]."' (rota iniciada)",
+                    ['old_status' => $oldStatus, 'new_status' => Delivery::STATUS_IN_ROUTE]
+                );
             }
         });
 
@@ -72,7 +78,7 @@ class DeliveryRouteService
     /**
      * Complete a delivery item within a route.
      */
-    public function completeItem(DeliveryRouteItem $item, string $status, ?string $receivedBy, ?string $notes): bool
+    public function completeItem(DeliveryRouteItem $item, string $status, ?string $receivedBy, ?string $notes, ?int $returnReasonId = null): bool
     {
         $delivery = $item->delivery;
 
@@ -80,13 +86,24 @@ class DeliveryRouteService
             return false;
         }
 
+        $oldStatus = $delivery->status;
+
         $item->update([
             'delivered_at' => now(),
             'received_by' => $receivedBy,
             'delivery_notes' => $notes,
         ]);
 
-        $delivery->update(['status' => $status]);
+        $updateData = ['status' => $status];
+        if (Schema::hasColumn('deliveries', 'return_reason_id')) {
+            $updateData['return_reason_id'] = $status === Delivery::STATUS_RETURNED ? $returnReasonId : null;
+        }
+        $delivery->update($updateData);
+
+        $delivery->logCustomAction('status_transition',
+            "Status alterado de '".Delivery::STATUS_LABELS[$oldStatus]."' para '".Delivery::STATUS_LABELS[$status]."' (item completado)",
+            ['old_status' => $oldStatus, 'new_status' => $status]
+        );
 
         // Check if all items in route are completed
         $route = $item->route;
@@ -112,7 +129,12 @@ class DeliveryRouteService
             // Release non-terminal deliveries back to awaiting_pickup
             $route->items()->with('delivery')->get()->each(function ($item) {
                 if (! $item->delivery->isTerminal()) {
+                    $oldStatus = $item->delivery->status;
                     $item->delivery->update(['status' => Delivery::STATUS_AWAITING_PICKUP]);
+                    $item->delivery->logCustomAction('status_transition',
+                        "Status alterado de '".Delivery::STATUS_LABELS[$oldStatus]."' para '".Delivery::STATUS_LABELS[Delivery::STATUS_AWAITING_PICKUP]."' (rota cancelada)",
+                        ['old_status' => $oldStatus, 'new_status' => Delivery::STATUS_AWAITING_PICKUP]
+                    );
                 }
             });
 
@@ -125,11 +147,14 @@ class DeliveryRouteService
     /**
      * Edit a route: change driver, date, and/or deliveries.
      */
-    public function editRoute(DeliveryRoute $route, ?int $driverId, ?string $dateRoute, ?array $deliveryIds, ?string $notes): DeliveryRoute
+    public function editRoute(DeliveryRoute $route, ?int $driverId, ?string $dateRoute, ?array $deliveryIds, ?string $notes, ?int $userId = null): DeliveryRoute
     {
-        return DB::transaction(function () use ($route, $driverId, $dateRoute, $deliveryIds, $notes) {
+        return DB::transaction(function () use ($route, $driverId, $dateRoute, $deliveryIds, $notes, $userId) {
             // Update route fields
             $updates = [];
+            if ($userId !== null) {
+                $updates['updated_by_user_id'] = $userId;
+            }
             if ($driverId !== null) {
                 $updates['driver_id'] = $driverId;
             }
@@ -259,6 +284,8 @@ class DeliveryRouteService
             'is_delivered' => $item->is_delivered,
             'delivered_at' => $item->delivered_at?->format('H:i'),
             'received_by' => $item->received_by,
+            'lat' => $item->delivery->latitude ? (float) $item->delivery->latitude : null,
+            'lng' => $item->delivery->longitude ? (float) $item->delivery->longitude : null,
         ]);
 
         $deliveredCount = $items->where('is_delivered', true)->count();

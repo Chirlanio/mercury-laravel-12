@@ -44,7 +44,7 @@ class DeliveryRoute extends Model
 
     protected $fillable = [
         'route_number', 'driver_id', 'date_route', 'status',
-        'notes', 'created_by_user_id',
+        'notes', 'created_by_user_id', 'updated_by_user_id',
     ];
 
     protected $casts = [
@@ -80,6 +80,11 @@ class DeliveryRoute extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by_user_id');
     }
 
     public function items(): HasMany

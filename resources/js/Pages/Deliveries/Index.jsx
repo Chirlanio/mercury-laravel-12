@@ -27,7 +27,7 @@ import Checkbox from '@/Components/Checkbox';
 
 const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
-export default function Index({ deliveries, filters, statusOptions, statusCounts, stores, paymentTypes, neighborhoods, employees }) {
+export default function Index({ deliveries, filters, statusOptions, statusCounts, stores, paymentTypes, neighborhoods, employees, returnReasons = [] }) {
     const { hasPermission } = usePermissions();
     const { modals, selected, openModal, closeModal } = useModalManager(['create', 'detail', 'edit']);
     // maskMoney e parseMoney importados diretamente
@@ -176,16 +176,25 @@ export default function Index({ deliveries, filters, statusOptions, statusCounts
         });
     };
 
-    const handleTransition = async (deliveryId, newStatus) => {
+    const [showReturnFlow, setShowReturnFlow] = useState(false);
+    const [returnReasonId, setReturnReasonId] = useState('');
+    const [receivedByName, setReceivedByName] = useState('');
+
+    const handleTransition = async (deliveryId, newStatus, extraData = {}) => {
         await fetch(route('deliveries.status', deliveryId), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken() },
-            body: JSON.stringify({ status: newStatus }),
+            body: JSON.stringify({ status: newStatus, ...extraData }),
         });
+        setShowReturnFlow(false);
+        setReturnReasonId('');
+        setReceivedByName('');
         // Reload detail
         const res = await fetch(route('deliveries.show', deliveryId), { headers: { 'Accept': 'application/json' } });
         const data = await res.json();
         setDetailData(data.delivery);
+        // Reload list
+        router.reload({ only: ['deliveries'] });
     };
 
     const resetForm = () => {
@@ -429,7 +438,7 @@ export default function Index({ deliveries, filters, statusOptions, statusCounts
                     headerColor="bg-gray-700" headerIcon={<TruckIcon className="h-5 w-5" />}
                     headerBadges={[{ text: detailData.status_label, className: 'bg-white/20 text-white' }]}
                     maxWidth="3xl" footer={
-                        <StandardModal.Footer onCancel={() => { closeModal('detail'); setDetailData(null); }} cancelLabel="Fechar"
+                        <StandardModal.Footer onCancel={() => { closeModal('detail'); setDetailData(null); setShowReturnFlow(false); }} cancelLabel="Fechar"
                             extraButtons={canEdit ? [
                                 detailData.next_status && detailData.next_status_label && (
                                     <Button key="next" variant="success" size="sm" onClick={() => handleTransition(selected.id, detailData.next_status)}>
@@ -511,6 +520,55 @@ export default function Index({ deliveries, filters, statusOptions, statusCounts
                             <p className="text-xs text-purple-600 mt-2">O motorista está realizando a entrega via Painel do Motorista.</p>
                         )}
                     </StandardModal.Section>
+
+                    {/* Ações de Entrega — visível para qualquer status não-terminal */}
+                    {canEdit && !['delivered', 'returned', 'cancelled'].includes(detailData.status) && (
+                        <StandardModal.Section title="Ações de Entrega">
+                            <div className="space-y-3">
+                                <div>
+                                    <InputLabel value="Recebido por" />
+                                    <TextInput className="block w-full mt-1" placeholder="Nome de quem recebeu (opcional)..."
+                                        value={receivedByName} onChange={e => setReceivedByName(e.target.value)} />
+                                </div>
+
+                                {!showReturnFlow ? (
+                                    <div className="flex gap-2">
+                                        <Button variant="success" className="flex-1"
+                                            onClick={() => handleTransition(selected.id, 'delivered', { received_by: receivedByName || null })}>
+                                            Marcar como Entregue
+                                        </Button>
+                                        <Button variant="warning" className="flex-1"
+                                            onClick={() => setShowReturnFlow(true)}>
+                                            Registrar Devolução
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg space-y-2">
+                                        <InputLabel value="Motivo da Devolução *" />
+                                        <select className="block w-full border-gray-300 rounded-lg text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                            value={returnReasonId} onChange={e => setReturnReasonId(e.target.value)}>
+                                            <option value="">Selecione o motivo...</option>
+                                            {returnReasons.map(r => (
+                                                <option key={r.id} value={r.id}>{r.code} - {r.name}</option>
+                                            ))}
+                                        </select>
+                                        <div className="flex gap-2 pt-1">
+                                            <Button variant="danger" disabled={!returnReasonId}
+                                                onClick={() => handleTransition(selected.id, 'returned', {
+                                                    return_reason_id: returnReasonId,
+                                                    received_by: receivedByName || null,
+                                                })}>
+                                                Confirmar Devolução
+                                            </Button>
+                                            <Button variant="light" onClick={() => { setShowReturnFlow(false); setReturnReasonId(''); }}>
+                                                Cancelar
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </StandardModal.Section>
+                    )}
 
                     <StandardModal.Section title="Registro">
                         <div className="grid grid-cols-2 gap-4">

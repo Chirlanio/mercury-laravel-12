@@ -69,11 +69,11 @@ class Delivery extends Model
         self::STATUS_COLLECTED => 'Pronto para Rota',
     ];
 
-    // Todas as transições válidas (inclui cancelamento e ações do motorista)
+    // Todas as transições válidas (inclui cancelamento, ações do motorista e ações da logística)
     public const VALID_TRANSITIONS = [
-        self::STATUS_REQUESTED => [self::STATUS_COLLECTED, self::STATUS_CANCELLED],
-        self::STATUS_COLLECTED => [self::STATUS_AWAITING_PICKUP, self::STATUS_CANCELLED],
-        self::STATUS_AWAITING_PICKUP => [self::STATUS_IN_ROUTE, self::STATUS_CANCELLED],
+        self::STATUS_REQUESTED => [self::STATUS_COLLECTED, self::STATUS_DELIVERED, self::STATUS_RETURNED, self::STATUS_CANCELLED],
+        self::STATUS_COLLECTED => [self::STATUS_AWAITING_PICKUP, self::STATUS_DELIVERED, self::STATUS_RETURNED, self::STATUS_CANCELLED],
+        self::STATUS_AWAITING_PICKUP => [self::STATUS_IN_ROUTE, self::STATUS_DELIVERED, self::STATUS_RETURNED, self::STATUS_CANCELLED],
         self::STATUS_IN_ROUTE => [self::STATUS_DELIVERED, self::STATUS_RETURNED, self::STATUS_CANCELLED],
         self::STATUS_DELIVERED => [],
         self::STATUS_RETURNED => [],
@@ -82,11 +82,12 @@ class Delivery extends Model
 
     protected $fillable = [
         'store_id', 'employee_id', 'client_name', 'invoice_number',
-        'address', 'neighborhood', 'contact_phone',
+        'address', 'latitude', 'longitude', 'geocoded_at',
+        'neighborhood', 'contact_phone',
         'sale_value', 'payment_method', 'installments',
         'products_qty', 'exit_point',
         'needs_card_machine', 'is_exchange', 'is_gift',
-        'status', 'observations',
+        'status', 'return_reason_id', 'observations',
         'created_by_user_id', 'updated_by_user_id',
         'deleted_at', 'deleted_by_user_id',
     ];
@@ -96,6 +97,9 @@ class Delivery extends Model
         'needs_card_machine' => 'boolean',
         'is_exchange' => 'boolean',
         'is_gift' => 'boolean',
+        'latitude' => 'decimal:8',
+        'longitude' => 'decimal:8',
+        'geocoded_at' => 'datetime',
         'deleted_at' => 'datetime',
     ];
 
@@ -138,6 +142,11 @@ class Delivery extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    public function returnReason(): BelongsTo
+    {
+        return $this->belongsTo(DeliveryReturnReason::class, 'return_reason_id');
     }
 
     public function routeItems(): HasMany

@@ -17,6 +17,7 @@ use App\Http\Controllers\Config\EmployeeEventTypeController as ConfigEmployeeEve
 use App\Http\Controllers\Config\EmployeeStatusController as ConfigEmployeeStatusController;
 use App\Http\Controllers\Config\EmploymentRelationshipController as ConfigEmploymentRelationshipController;
 use App\Http\Controllers\Config\GenderController as ConfigGenderController;
+use App\Http\Controllers\Config\DeliveryReturnReasonController as ConfigDeliveryReturnReasonController;
 use App\Http\Controllers\Config\ManagementReasonController as ConfigManagementReasonController;
 use App\Http\Controllers\Config\ManagerController as ConfigManagerController;
 use App\Http\Controllers\Config\NetworkController as ConfigNetworkController;
@@ -340,6 +341,7 @@ Route::middleware(['auth', 'tenant.module:config', 'permission:'.Permission::MAN
     Route::resource('transfer-statuses', ConfigTransferStatusController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('order-payment-statuses', ConfigOrderPaymentStatusController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('management-reasons', ConfigManagementReasonController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('delivery-return-reasons', ConfigDeliveryReturnReasonController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('percentage-awards', ConfigPercentageAwardController::class)->only(['index', 'store', 'update', 'destroy']);
 
     // Cadastro de Produtos - Grupos e Tabelas auxiliares
@@ -520,17 +522,33 @@ Route::middleware(['auth'])->group(function () {
 
         Route::middleware('permission:'.Permission::MANAGE_ROUTES->value)->group(function () {
             Route::post('/delivery-routes', [DeliveryRouteController::class, 'store'])->name('delivery-routes.store');
+            Route::post('/delivery-routes/optimize-preview', [DeliveryRouteController::class, 'optimizePreview'])->name('delivery-routes.optimize-preview');
             Route::put('/delivery-routes/{deliveryRoute}', [DeliveryRouteController::class, 'update'])->name('delivery-routes.update');
             Route::post('/delivery-routes/{deliveryRoute}/start', [DeliveryRouteController::class, 'startRoute'])->name('delivery-routes.start');
+            Route::post('/delivery-routes/{deliveryRoute}/optimize', [DeliveryRouteController::class, 'optimizeRoute'])->name('delivery-routes.optimize');
             Route::post('/delivery-routes/{deliveryRoute}/items/{item}/complete', [DeliveryRouteController::class, 'completeItem'])->name('delivery-routes.complete-item');
             Route::post('/delivery-routes/{deliveryRoute}/cancel', [DeliveryRouteController::class, 'cancel'])->name('delivery-routes.cancel');
+
+            // Route Templates
+            Route::get('/delivery-route-templates', [DeliveryRouteController::class, 'listTemplates'])->name('delivery-route-templates.index');
+            Route::get('/delivery-route-templates/{template}', [DeliveryRouteController::class, 'showTemplate'])->name('delivery-route-templates.show');
+            Route::post('/delivery-routes/{deliveryRoute}/save-template', [DeliveryRouteController::class, 'saveAsTemplate'])->name('delivery-routes.save-template');
+            Route::post('/delivery-route-templates/{template}/create-route', [DeliveryRouteController::class, 'createFromTemplate'])->name('delivery-route-templates.create-route');
+            Route::delete('/delivery-route-templates/{template}', [DeliveryRouteController::class, 'deleteTemplate'])->name('delivery-route-templates.destroy');
         });
     });
 
-    // Driver pages — MANAGE_ROUTES (motorista + admin)
-    Route::middleware(['tenant.module:delivery', 'permission:'.Permission::MANAGE_ROUTES->value])->group(function () {
+    // Driver pages — VIEW_DELIVERIES (motorista acessa seu painel, completa entregas, envia GPS)
+    Route::middleware(['tenant.module:delivery', 'permission:'.Permission::VIEW_DELIVERIES->value])->group(function () {
         Route::get('/driver-dashboard', [DeliveryRouteController::class, 'driverDashboard'])->name('driver-dashboard.index');
         Route::get('/my-deliveries', [DeliveryRouteController::class, 'myDeliveries'])->name('my-deliveries.index');
+        Route::post('/driver-location', [DeliveryRouteController::class, 'storeDriverLocation'])->name('driver-location.store');
+        Route::post('/driver-routes/{deliveryRoute}/items/{item}/complete', [DeliveryRouteController::class, 'completeItem'])->name('driver-routes.complete-item');
+    });
+
+    // GPS Tracking — VIEW_DELIVERIES (admin pode ver localização do motorista)
+    Route::middleware(['tenant.module:delivery', 'permission:'.Permission::VIEW_DELIVERIES->value])->group(function () {
+        Route::get('/delivery-routes/{deliveryRoute}/tracking', [DeliveryRouteController::class, 'getRouteTracking'])->name('delivery-routes.tracking');
     });
 
     // ==========================================

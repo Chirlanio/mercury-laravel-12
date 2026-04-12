@@ -327,7 +327,9 @@ enum Role: string
                 Permission::VIEW_OWN_PROFILE->value,
                 Permission::EDIT_OWN_PROFILE->value,
                 Permission::ACCESS_DASHBOARD->value,
-                // Apenas gerenciar rotas (painel do motorista + minhas entregas)
+                // Entregas: visualizar + completar entregas no painel do motorista
+                Permission::VIEW_DELIVERIES->value,
+                Permission::EDIT_DELIVERIES->value,
                 Permission::MANAGE_ROUTES->value,
             ],
         };
