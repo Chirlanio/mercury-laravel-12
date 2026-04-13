@@ -42,7 +42,11 @@ return [
                 'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
             ],
             'client_options' => [
-                // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
+                // Fail fast se o Reverb estiver offline — caso contrário o request do
+                // remetente trava no timeout padrão do Guzzle (~30s) porque agora
+                // usamos ShouldBroadcastNow (sync, dentro do request HTTP).
+                'connect_timeout' => 1,
+                'timeout' => 2,
             ],
         ],
 

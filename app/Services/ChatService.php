@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\Chat\MessageDeletedEvent;
 use App\Events\Chat\MessageReadEvent;
 use App\Events\Chat\NewMessageEvent;
 use App\Models\Conversation;
@@ -13,6 +14,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 
 class ChatService
 {
@@ -109,26 +111,68 @@ class ChatService
 
         $sender = User::find($senderId);
 
-        NewMessageEvent::dispatch(
-            $conversationId,
-            $senderId,
-            $sender->name,
-            [
-                'id' => $message->id,
-                'content' => $message->content,
-                'message_type' => $message->message_type,
-                'file_url' => $message->file_url,
-                'file_name' => $message->file_name,
-                'reply_to' => $message->replyTo ? [
-                    'id' => $message->replyTo->id,
-                    'content' => $message->replyTo->content,
-                    'sender_name' => $message->replyTo->sender?->name,
-                ] : null,
-                'created_at' => $message->created_at->toIso8601String(),
-            ],
-        );
+        try {
+            NewMessageEvent::dispatch(
+                $conversationId,
+                $senderId,
+                $sender->name,
+                [
+                    'id' => $message->id,
+                    'content' => $message->content,
+                    'message_type' => $message->message_type,
+                    'file_url' => $message->file_url,
+                    'file_name' => $message->file_name,
+                    'reply_to' => $message->replyTo ? [
+                        'id' => $message->replyTo->id,
+                        'content' => $message->replyTo->content,
+                        'sender_name' => $message->replyTo->sender?->name,
+                    ] : null,
+                    'created_at' => $message->created_at->toIso8601String(),
+                ],
+            );
+        } catch (\Throwable $e) {
+            // Broadcast indisponível (Reverb offline) — ignora silenciosamente
+        }
 
         return $message;
+    }
+
+    /**
+     * Delete a message. Only the sender can delete their own message.
+     * Also removes any attached file from storage and broadcasts the deletion.
+     */
+    public function deleteMessage(int $messageId, int $userId): void
+    {
+        $message = Message::findOrFail($messageId);
+
+        if ($message->sender_id !== $userId) {
+            abort(403, 'Você só pode apagar suas próprias mensagens.');
+        }
+
+        $conversationId = $message->conversation_id;
+        $filePath = $message->file_path;
+
+        DB::transaction(function () use ($message, $filePath) {
+            // Clear reply references first (FK uses nullOnDelete, so this is optional
+            // but makes the intent explicit and avoids stale references in memory).
+            Message::where('reply_to_message_id', $message->id)
+                ->update(['reply_to_message_id' => null]);
+
+            $message->delete();
+
+            if ($filePath) {
+                $disk = Storage::disk('public');
+                if ($disk->exists($filePath)) {
+                    $disk->delete($filePath);
+                }
+            }
+        });
+
+        try {
+            MessageDeletedEvent::dispatch($conversationId, $messageId, $userId);
+        } catch (\Throwable $e) {
+            // Broadcast indisponível — ignora silenciosamente
+        }
     }
 
     /**
@@ -143,7 +187,11 @@ class ChatService
         if ($participant) {
             $participant->update(['last_read_at' => now()]);
 
-            MessageReadEvent::dispatch($conversationId, $userId, now()->toIso8601String());
+            try {
+                MessageReadEvent::dispatch($conversationId, $userId, now()->toIso8601String());
+            } catch (\Throwable $e) {
+                // Broadcast indisponível — ignora silenciosamente
+            }
         }
     }
 

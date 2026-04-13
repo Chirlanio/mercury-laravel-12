@@ -4,6 +4,7 @@ import NavLink from "@/Components/NavLink";
 import ResponsiveNavLink from "@/Components/ResponsiveNavLink";
 import Sidebar from "@/Components/Sidebar";
 import UserAvatar from "@/Components/UserAvatar";
+import FloatingChat from "@/Components/Chat/FloatingChat";
 import { usePermissions, PERMISSIONS } from "@/Hooks/usePermissions";
 import { Link, usePage } from "@inertiajs/react";
 import { useState, useEffect } from "react";
@@ -55,7 +56,7 @@ export default function AuthenticatedLayout({ children }) {
     }, [flash]);
 
     return (
-        <div className="min-h-screen bg-gray-100 flex">
+        <div className="h-[100dvh] bg-gray-100 flex overflow-hidden">
             {/* Sidebar */}
             <Sidebar
                 isOpen={sidebarOpen}
@@ -66,7 +67,7 @@ export default function AuthenticatedLayout({ children }) {
 
             {/* Main Content - margem ajustada ao estado da sidebar */}
             <div
-                className={`flex-1 min-w-0 flex flex-col transition-all duration-300 ${
+                className={`flex-1 min-w-0 min-h-0 flex flex-col transition-all duration-300 ${
                     sidebarCollapsed ? "lg:ml-16" : "lg:ml-64"
                 }`}
             >
@@ -254,7 +255,7 @@ export default function AuthenticatedLayout({ children }) {
                     </div>
                 </nav>
 
-                <main className="min-w-0 overflow-hidden">{children}</main>
+                <main className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">{children}</main>
 
                 <ToastContainer
                     position="top-right"
@@ -269,6 +270,9 @@ export default function AuthenticatedLayout({ children }) {
                     theme="light"
                 />
             </div>
+
+            {/* Floating chat widget — visible on all pages except /chat itself */}
+            <FloatingChat />
         </div>
     );
 }

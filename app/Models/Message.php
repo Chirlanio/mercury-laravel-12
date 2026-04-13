@@ -59,6 +59,15 @@ class Message extends Model
 
     public function getFileUrlAttribute(): ?string
     {
-        return $this->file_path ? asset('storage/'.$this->file_path) : null;
+        // Avoid using asset()/Storage::url() because tenancy rewrites them to
+        // /tenancy/assets/... which requires the tenancy asset middleware —
+        // that route currently fails domain resolution for chat attachments.
+        // Instead we stream the file through our own chat controller endpoint,
+        // which runs within the already-working tenant route group.
+        if (! $this->file_path || ! $this->id) {
+            return null;
+        }
+
+        return route('chat.download-attachment', $this->id);
     }
 }

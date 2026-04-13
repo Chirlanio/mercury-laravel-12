@@ -962,7 +962,9 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['tenant.module:chat', 'permission:'.Permission::VIEW_CHAT->value])->group(function () {
         Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
         Route::get('/chat/conversations/{conversation}', [ChatController::class, 'show'])->name('chat.show');
+        Route::get('/chat/conversations.json', [ChatController::class, 'conversationsJson'])->name('chat.conversations-json');
         Route::get('/chat/conversations/{conversation}/messages', [ChatController::class, 'loadMessages'])->name('chat.load-messages');
+        Route::get('/chat/messages/{message}/attachment', [ChatController::class, 'downloadAttachment'])->name('chat.download-attachment');
         Route::get('/chat/search', [ChatController::class, 'search'])->name('chat.search');
         Route::get('/chat/unread-counts', [ChatController::class, 'unreadCounts'])->name('chat.unread-counts');
 
@@ -973,6 +975,7 @@ Route::middleware(['auth'])->group(function () {
         Route::middleware('permission:'.Permission::SEND_CHAT_MESSAGES->value)->group(function () {
             Route::post('/chat/conversations/direct', [ChatController::class, 'createDirect'])->name('chat.create-direct');
             Route::post('/chat/conversations/{conversation}/messages', [ChatController::class, 'sendMessage'])->name('chat.send-message');
+            Route::delete('/chat/messages/{message}', [ChatController::class, 'deleteMessage'])->name('chat.delete-message');
             Route::post('/chat/conversations/{conversation}/read', [ChatController::class, 'markRead'])->name('chat.mark-read');
             Route::post('/chat/conversations/{conversation}/typing', [ChatController::class, 'typing'])->name('chat.typing');
             Route::post('/chat/upload', [ChatController::class, 'uploadFile'])->name('chat.upload');

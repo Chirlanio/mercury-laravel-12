@@ -33,12 +33,16 @@ class ChatBroadcastService
         // Resolve target users and broadcast event
         $targetUserIds = $this->resolveTargetUsers($broadcast);
         if ($targetUserIds->isNotEmpty()) {
-            NewBroadcastEvent::dispatch($targetUserIds->toArray(), [
-                'id' => $broadcast->id,
-                'title' => $broadcast->title,
-                'priority' => $broadcast->priority,
-                'sender_name' => User::find($senderId)?->name,
-            ]);
+            try {
+                NewBroadcastEvent::dispatch($targetUserIds->toArray(), [
+                    'id' => $broadcast->id,
+                    'title' => $broadcast->title,
+                    'priority' => $broadcast->priority,
+                    'sender_name' => User::find($senderId)?->name,
+                ]);
+            } catch (\Throwable $e) {
+                // Broadcast indisponível — ignora silenciosamente
+            }
         }
 
         return $broadcast->load('sender');

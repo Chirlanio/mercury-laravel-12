@@ -119,13 +119,17 @@ class HelpdeskController extends Controller
 
         $ticket = $this->helpdeskService->createTicket($validated, auth()->id());
 
-        TicketCreatedEvent::dispatch(
-            $ticket->id,
-            $ticket->department_id,
-            $ticket->title,
-            $ticket->requester?->name ?? '',
-            HdTicket::PRIORITY_LABELS[$ticket->priority] ?? 'Média',
-        );
+        try {
+            TicketCreatedEvent::dispatch(
+                $ticket->id,
+                $ticket->department_id,
+                $ticket->title,
+                $ticket->requester?->name ?? '',
+                HdTicket::PRIORITY_LABELS[$ticket->priority] ?? 'Média',
+            );
+        } catch (\Throwable $e) {
+            // Broadcast indisponível — ignora
+        }
 
         return redirect()->route('helpdesk.index')
             ->with('success', "Chamado #{$ticket->id} criado com sucesso.");
@@ -146,7 +150,11 @@ class HelpdeskController extends Controller
         $oldStatus = $ticket->status;
         $this->transitionService->executeTransition($ticket, $validated['status'], auth()->id(), $validated['notes'] ?? null);
 
-        TicketStatusChangedEvent::dispatch($ticket->id, $ticket->department_id, $oldStatus, $validated['status']);
+        try {
+            TicketStatusChangedEvent::dispatch($ticket->id, $ticket->department_id, $oldStatus, $validated['status']);
+        } catch (\Throwable $e) {
+            // Broadcast indisponível — ignora
+        }
 
         return response()->json(['message' => 'Status atualizado para '.HdTicket::STATUS_LABELS[$validated['status']].'.']);
     }
@@ -182,12 +190,16 @@ class HelpdeskController extends Controller
 
         $interaction = $this->helpdeskService->addInteraction($ticket, $validated, auth()->id());
 
-        TicketCommentEvent::dispatch(
-            $ticket->id,
-            auth()->id(),
-            auth()->user()->name,
-            $validated['is_internal'] ?? false,
-        );
+        try {
+            TicketCommentEvent::dispatch(
+                $ticket->id,
+                auth()->id(),
+                auth()->user()->name,
+                $validated['is_internal'] ?? false,
+            );
+        } catch (\Throwable $e) {
+            // Broadcast indisponível — ignora
+        }
 
         return response()->json(['message' => 'Comentário adicionado.', 'interaction_id' => $interaction->id]);
     }

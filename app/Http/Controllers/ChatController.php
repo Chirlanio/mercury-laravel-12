@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Events\Chat\TypingIndicatorEvent;
 use App\Models\Conversation;
+use App\Models\Message;
 use App\Models\User;
 use App\Services\ChatPollingService;
 use App\Services\ChatService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class ChatController extends Controller
@@ -78,7 +80,13 @@ class ChatController extends Controller
             'reply_to_message_id' => 'nullable|exists:messages,id',
         ]);
 
-        $this->chatService->sendMessage($conversation->id, auth()->id(), $validated);
+        $message = $this->chatService->sendMessage($conversation->id, auth()->id(), $validated);
+
+        if ($request->expectsJson() || $request->wantsJson()) {
+            return response()->json([
+                'message' => $this->mapMessage($message),
+            ]);
+        }
 
         return back();
     }
@@ -94,12 +102,16 @@ class ChatController extends Controller
     {
         $user = auth()->user();
 
-        TypingIndicatorEvent::dispatch(
-            $conversation->id,
-            $user->id,
-            $user->name,
-            $request->boolean('is_typing', true),
-        );
+        try {
+            TypingIndicatorEvent::dispatch(
+                $conversation->id,
+                $user->id,
+                $user->name,
+                $request->boolean('is_typing', true),
+            );
+        } catch (\Throwable $e) {
+            // Broadcast indisponível (Reverb offline) — ignora silenciosamente
+        }
 
         return response()->json(['ok' => true]);
     }
@@ -136,6 +148,50 @@ class ChatController extends Controller
         $counts['total'] = $counts['conversations'] + $counts['broadcasts'];
 
         return response()->json($counts);
+    }
+
+    public function conversationsJson(Request $request)
+    {
+        $userId = auth()->id();
+        $conversations = $this->chatService->getConversationsForUser($userId, $request->get('search'));
+
+        return response()->json([
+            'conversations' => $conversations->through(fn ($c) => $this->mapConversation($c, $userId))->items(),
+        ]);
+    }
+
+    public function deleteMessage(Message $message)
+    {
+        $this->chatService->deleteMessage($message->id, auth()->id());
+
+        return response()->json(['deleted' => true]);
+    }
+
+    public function downloadAttachment(Message $message)
+    {
+        $userId = auth()->id();
+
+        // Verify the user participates in the conversation that contains this message
+        if (! $message->conversation->participantRecords()->where('user_id', $userId)->exists()) {
+            abort(403);
+        }
+
+        if (! $message->file_path) {
+            abort(404);
+        }
+
+        $disk = Storage::disk('public');
+        if (! $disk->exists($message->file_path)) {
+            abort(404);
+        }
+
+        // response()->file() streams inline so images render in <img> tags and PDFs open in browser.
+        // For generic files, the frontend should use the download prop or a query param if desired.
+        return response()->file($disk->path($message->file_path), [
+            'Content-Type' => $message->file_mime ?: 'application/octet-stream',
+            'Content-Disposition' => 'inline; filename="'.addslashes($message->file_name ?: basename($message->file_path)).'"',
+            'Cache-Control' => 'private, max-age=3600',
+        ]);
     }
 
     public function loadMessages(Request $request, Conversation $conversation)
