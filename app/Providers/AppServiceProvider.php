@@ -7,6 +7,7 @@ use App\Events\Helpdesk\TicketAssignedEvent;
 use App\Events\Helpdesk\TicketCommentEvent;
 use App\Events\Helpdesk\TicketCreatedEvent;
 use App\Events\Helpdesk\TicketStatusChangedEvent;
+use App\Listeners\Helpdesk\DispatchCsatSurveyListener;
 use App\Listeners\Helpdesk\DispatchWhatsappReplyListener;
 use App\Listeners\Helpdesk\SendTicketAssignedNotifications;
 use App\Listeners\Helpdesk\SendTicketCommentNotifications;
@@ -70,6 +71,9 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(TicketStatusChangedEvent::class, SendTicketStatusChangedNotifications::class);
         Event::listen(TicketCommentEvent::class, SendTicketCommentNotifications::class);
         Event::listen(HelpdeskInteractionCreated::class, DispatchWhatsappReplyListener::class);
+        // CSAT pipeline: when a ticket transitions to RESOLVED, fire off
+        // the satisfaction survey job (one per ticket, idempotent).
+        Event::listen(TicketStatusChangedEvent::class, DispatchCsatSurveyListener::class);
     }
 
     protected function configureRateLimiting(): void

@@ -20,6 +20,7 @@ import {
     Cog6ToothIcon,
     ShieldCheckIcon,
     DocumentTextIcon,
+    BookOpenIcon,
 } from '@heroicons/react/24/outline';
 
 /**
@@ -619,6 +620,16 @@ export default function Index({
                                                     >
                                                         <DocumentTextIcon className="w-4 h-4 text-indigo-500" />
                                                         Templates de Intake
+                                                    </a>
+                                                )}
+                                                {canManageHdDepartments && (
+                                                    <a
+                                                        href={route('helpdesk.articles.index')}
+                                                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                        onClick={() => setShowAdminMenu(false)}
+                                                    >
+                                                        <BookOpenIcon className="w-4 h-4 text-indigo-500" />
+                                                        Base de Conhecimento
                                                     </a>
                                                 )}
                                                 {canManageHdPermissions && (

@@ -53,6 +53,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | CSAT — satisfaction surveys
+    |--------------------------------------------------------------------------
+    |
+    | Sent automatically when a ticket transitions to RESOLVED. The signed
+    | URL embedded in the invitation is valid for `ttl_days` days.
+    |
+    */
+
+    'csat' => [
+        'ttl_days' => (int) env('HELPDESK_CSAT_TTL_DAYS', 7),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | AI classifier (Phase 4)
     |--------------------------------------------------------------------------
     |

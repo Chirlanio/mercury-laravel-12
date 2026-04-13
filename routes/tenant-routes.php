@@ -9,6 +9,8 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\ChatBroadcastController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ChatGroupController;
+use App\Http\Controllers\HdArticleController;
+use App\Http\Controllers\HdCsatController;
 use App\Http\Controllers\HdDepartmentSettingsController;
 use App\Http\Controllers\HdIntakeTemplateController;
 use App\Http\Controllers\HdPermissionController;
@@ -105,6 +107,19 @@ Route::get('/', function () {
 Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified', 'permission:'.Permission::ACCESS_DASHBOARD->value])
     ->name('dashboard');
+
+// ==========================================
+// Helpdesk CSAT public survey
+// Signed URL only — requester opens the link from email/WhatsApp and
+// rates without logging in. `signed` middleware validates the URL
+// signature and expiration built by URL::temporarySignedRoute().
+// ==========================================
+Route::middleware('signed')->group(function () {
+    Route::get('/helpdesk/csat/{token}', [HdCsatController::class, 'show'])
+        ->name('helpdesk.csat.show');
+    Route::post('/helpdesk/csat/{token}', [HdCsatController::class, 'submit'])
+        ->name('helpdesk.csat.submit');
+});
 
 // ==========================================
 // LGPD / Terms & Privacy
@@ -1049,6 +1064,15 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/helpdesk/saved-views', [HelpdeskSavedViewController::class, 'store'])->name('helpdesk.saved-views.store');
         Route::put('/helpdesk/saved-views/{savedView}', [HelpdeskSavedViewController::class, 'update'])->name('helpdesk.saved-views.update');
         Route::delete('/helpdesk/saved-views/{savedView}', [HelpdeskSavedViewController::class, 'destroy'])->name('helpdesk.saved-views.destroy');
+
+        // Knowledge Base public routes. Declared BEFORE /helpdesk/{ticket}
+        // so the route matcher doesn't confuse `/helpdesk/kb/...` with a
+        // ticket id param.
+        Route::get('/helpdesk/kb/search', [HdArticleController::class, 'search'])->name('helpdesk.articles.search');
+        Route::get('/helpdesk/kb/{slug}', [HdArticleController::class, 'show'])->name('helpdesk.articles.show');
+        Route::post('/helpdesk/kb/{article}/feedback', [HdArticleController::class, 'feedback'])->name('helpdesk.articles.feedback');
+        Route::post('/helpdesk/kb/{article}/deflect', [HdArticleController::class, 'deflect'])->name('helpdesk.articles.deflect');
+
         Route::get('/helpdesk/{ticket}', [HelpdeskController::class, 'show'])->name('helpdesk.show');
 
         Route::middleware('permission:'.Permission::CREATE_TICKETS->value)->group(function () {
@@ -1118,6 +1142,20 @@ Route::middleware(['auth'])->group(function () {
                 ->name('helpdesk.intake-templates.update');
             Route::delete('/helpdesk/admin/intake-templates/{template}', [HdIntakeTemplateController::class, 'destroy'])
                 ->name('helpdesk.intake-templates.destroy');
+
+            // Knowledge Base admin CRUD
+            Route::get('/helpdesk/admin/articles', [HdArticleController::class, 'index'])
+                ->name('helpdesk.articles.index');
+            Route::get('/helpdesk/admin/articles/create', [HdArticleController::class, 'create'])
+                ->name('helpdesk.articles.create');
+            Route::post('/helpdesk/admin/articles', [HdArticleController::class, 'store'])
+                ->name('helpdesk.articles.store');
+            Route::get('/helpdesk/admin/articles/{article}/edit', [HdArticleController::class, 'edit'])
+                ->name('helpdesk.articles.edit');
+            Route::put('/helpdesk/admin/articles/{article}', [HdArticleController::class, 'update'])
+                ->name('helpdesk.articles.update');
+            Route::delete('/helpdesk/admin/articles/{article}', [HdArticleController::class, 'destroy'])
+                ->name('helpdesk.articles.destroy');
         });
     });
 
