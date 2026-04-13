@@ -78,7 +78,20 @@
       "Bash(git status:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(awk:*)",
+      "WebSearch",
+      "Bash(git log:*)",
+      "Read(//c/Users/MSDEV/**)",
+      "Read(//c//**)",
+      "Bash(git -C /c/xampp/htdocs/mercury-laravel log --oneline --all -- \"*StockAdjustment*\")",
+      "Bash(git -C /c/xampp/htdocs/mercury-laravel log --format=\"%H %s\" --all -- \"*StockAdjustment*\")",
+      "Bash(git -C /c/xampp/htdocs/mercury-laravel show bc6379c --stat)",
+      "Bash(curl -s \"https://api.github.com/repos/EvolutionAPI/evolution-api/releases/tags/2.3.7\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/EvolutionAPI/evolution-api/2.3.7/CHANGELOG.md\")",
+      "Bash(curl -s \"https://api.github.com/repos/EvolutionAPI/evolution-api/contents/src/api/integrations/event/webhook?ref=2.3.7\")",
+      "Bash(curl:*)",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": []

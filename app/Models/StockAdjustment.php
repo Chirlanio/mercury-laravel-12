@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\Auditable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,12 +11,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class StockAdjustment extends Model
 {
     use Auditable;
+    use HasFactory;
 
     protected $fillable = [
         'store_id',
         'employee_id',
         'status',
         'observation',
+        'client_name',
         'created_by_user_id',
         'deleted_at',
         'deleted_by_user_id',
@@ -74,6 +77,16 @@ class StockAdjustment extends Model
     public function statusHistory(): HasMany
     {
         return $this->hasMany(StockAdjustmentStatusHistory::class)->orderByDesc('created_at');
+    }
+
+    public function nfs(): HasMany
+    {
+        return $this->hasMany(StockAdjustmentItemNf::class);
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(StockAdjustmentAttachment::class)->latest();
     }
 
     public function getStatusLabelAttribute(): string
