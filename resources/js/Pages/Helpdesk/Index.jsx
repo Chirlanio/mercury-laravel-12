@@ -22,6 +22,7 @@ import {
     DocumentTextIcon,
     BookOpenIcon,
     StarIcon,
+    SparklesIcon,
 } from '@heroicons/react/24/outline';
 
 /**
@@ -387,6 +388,19 @@ export default function Index({
     const [kbSuggestions, setKbSuggestions] = useState([]);
     const [kbDismissed, setKbDismissed] = useState(false);
 
+    // Reply templates (macros) — loaded when the detail modal opens and
+    // filtered to the ticket's department. Inserting a template substitutes
+    // placeholders ({{ticket.id}}, {{requester.name}}) on paste so the
+    // technician can edit the resulting text before sending.
+    const [replyTemplates, setReplyTemplates] = useState([]);
+    const [showTemplatesMenu, setShowTemplatesMenu] = useState(false);
+
+    // Ticket summary — quick deterministic summary + optional AI narrative
+    // loaded on demand. Only shown for tickets with several interactions.
+    const [summary, setSummary] = useState(null);
+    const [aiSummary, setAiSummary] = useState(null);
+    const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+
     // Statistics
     const loadStatistics = () => {
         fetch(route('helpdesk.statistics'), { headers: { 'Accept': 'application/json' } })
@@ -560,10 +574,86 @@ export default function Index({
 
     const loadDetail = (ticketId) => {
         setDetailLoading(true);
+        setSummary(null);
+        setAiSummary(null);
         fetch(route('helpdesk.show', ticketId), { headers: { 'Accept': 'application/json' } })
             .then(res => res.json())
-            .then(data => { setDetailData(data); setDetailLoading(false); })
+            .then(data => {
+                setDetailData(data);
+                setDetailLoading(false);
+                // Fetch reply templates scoped to this ticket's department.
+                // Fire-and-forget — technicians without MANAGE_TICKETS get
+                // a 403 and the dropdown stays empty, which is fine.
+                if (canManage && data?.ticket?.department_id) {
+                    fetch(
+                        `${route('helpdesk.reply-templates.index')}?department_id=${data.ticket.department_id}`,
+                        { headers: { 'Accept': 'application/json' } },
+                    )
+                        .then(res => res.ok ? res.json() : { templates: [] })
+                        .then(body => setReplyTemplates(body.templates || []))
+                        .catch(() => setReplyTemplates([]));
+                }
+                // Fetch quick summary for the detail modal header
+                fetch(route('helpdesk.summary', ticketId), { headers: { 'Accept': 'application/json' } })
+                    .then(res => res.ok ? res.json() : null)
+                    .then(body => { if (body) setSummary(body); })
+                    .catch(() => { /* silently ignore */ });
+            })
             .catch(() => setDetailLoading(false));
+    };
+
+    const generateAiSummary = async () => {
+        if (!selected) return;
+        setAiSummaryLoading(true);
+        try {
+            const res = await fetch(`${route('helpdesk.summary', selected.id)}?ai=1`, {
+                headers: { 'Accept': 'application/json' },
+            });
+            const body = await res.json();
+            setAiSummary(body?.ai || null);
+            if (!body?.ai) {
+                toast.info('Não foi possível gerar o resumo AI agora. Tente novamente em alguns instantes.');
+            }
+        } catch {
+            toast.error('Erro ao gerar resumo AI.');
+        } finally {
+            setAiSummaryLoading(false);
+        }
+    };
+
+    /**
+     * Resolve a template body by substituting {{placeholders}} with the
+     * current ticket data. Keeps the result on the clipboard-less side —
+     * the technician sees it inside the textarea and can still edit.
+     */
+    const applyReplyTemplate = (template) => {
+        if (!template || !detailData?.ticket) return;
+
+        const ticket = detailData.ticket;
+        const replacements = {
+            '{{ticket.id}}': `#${ticket.id}`,
+            '{{ticket.title}}': ticket.title ?? '',
+            '{{ticket.status}}': ticket.status_label ?? '',
+            '{{requester.name}}': ticket.requester_name ?? '',
+            '{{technician.name}}': ticket.technician_name ?? '',
+            '{{department.name}}': ticket.department_name ?? '',
+            '{{category.name}}': ticket.category_name ?? '',
+        };
+        let body = template.body || '';
+        for (const [key, value] of Object.entries(replacements)) {
+            body = body.split(key).join(value);
+        }
+
+        // Append to existing draft rather than replace, so the technician
+        // can mix a greeting template with a signature template.
+        setCommentText(prev => prev ? `${prev}\n\n${body}` : body);
+        setShowTemplatesMenu(false);
+
+        // Fire-and-forget usage ping
+        fetch(route('helpdesk.reply-templates.use', template.id), {
+            method: 'POST',
+            headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken() },
+        }).catch(() => { /* noop */ });
     };
 
     const handleTransition = async (ticketId, newStatus) => {
@@ -1142,6 +1232,50 @@ export default function Index({
                                 }}
                             />
 
+                            {/* Summary — only for tickets with multiple interactions */}
+                            {summary && summary.quick && summary.quick.interactions >= 5 && (
+                                <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                                    <div className="flex items-start justify-between gap-2 mb-2">
+                                        <div className="text-xs sm:text-sm text-gray-700">
+                                            <span className="font-medium">📋 Resumo:</span>{' '}
+                                            {summary.quick.interactions} interações ·{' '}
+                                            {summary.quick.public_comments} comentário{summary.quick.public_comments === 1 ? '' : 's'} público{summary.quick.public_comments === 1 ? '' : 's'}
+                                            {summary.quick.internal_notes > 0 && (
+                                                <> · {summary.quick.internal_notes} nota{summary.quick.internal_notes === 1 ? '' : 's'} interna{summary.quick.internal_notes === 1 ? '' : 's'}</>
+                                            )}
+                                            <br />
+                                            <span className="text-xs text-gray-500">
+                                                Última mensagem: {summary.quick.last_author || 'Sistema'} em {summary.quick.last_at}
+                                                {summary.quick.unique_authors > 1 && (
+                                                    <> · {summary.quick.unique_authors} autores</>
+                                                )}
+                                            </span>
+                                        </div>
+                                        {summary.ai_available && canManage && !aiSummary && (
+                                            <Button
+                                                variant="light"
+                                                size="xs"
+                                                onClick={generateAiSummary}
+                                                loading={aiSummaryLoading}
+                                                icon={SparklesIcon}
+                                            >
+                                                Gerar resumo IA
+                                            </Button>
+                                        )}
+                                    </div>
+                                    {aiSummary && (
+                                        <div className="mt-2 pt-2 border-t border-gray-200">
+                                            <div className="flex items-center gap-2 mb-1 text-indigo-700">
+                                                <SparklesIcon className="w-4 h-4" />
+                                                <span className="text-xs font-medium">Resumo gerado por IA</span>
+                                                <span className="text-[10px] text-gray-400">({aiSummary.model})</span>
+                                            </div>
+                                            <p className="text-xs sm:text-sm text-gray-700 whitespace-pre-wrap">{aiSummary.text}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Interactions Timeline */}
                             <StandardModal.Section title={`Interações (${detailData.interactions?.length || 0})`}>
                                 <div className="space-y-3 max-h-60 overflow-y-auto">
@@ -1192,11 +1326,53 @@ export default function Index({
                                             placeholder="Adicionar comentário..."
                                             value={commentText} onChange={e => setCommentText(e.target.value)} />
                                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                                            <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
-                                                <input type="checkbox" className="rounded border-gray-300 text-indigo-600"
-                                                    checked={commentInternal} onChange={e => setCommentInternal(e.target.checked)} />
-                                                Nota interna (não visível ao solicitante)
-                                            </label>
+                                            <div className="flex items-center gap-3">
+                                                <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
+                                                    <input type="checkbox" className="rounded border-gray-300 text-indigo-600"
+                                                        checked={commentInternal} onChange={e => setCommentInternal(e.target.checked)} />
+                                                    Nota interna
+                                                </label>
+                                                {canManage && replyTemplates.length > 0 && (
+                                                    <div className="relative">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowTemplatesMenu(v => !v)}
+                                                            className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                                                        >
+                                                            📋 Inserir template ({replyTemplates.length})
+                                                        </button>
+                                                        {showTemplatesMenu && (
+                                                            <>
+                                                                <div
+                                                                    className="fixed inset-0 z-10"
+                                                                    onClick={() => setShowTemplatesMenu(false)}
+                                                                />
+                                                                <div className="absolute left-0 bottom-full mb-1 w-72 max-h-72 overflow-y-auto bg-white shadow-lg rounded-md border z-20 py-1">
+                                                                    {replyTemplates.map(t => (
+                                                                        <button
+                                                                            key={t.id}
+                                                                            type="button"
+                                                                            onClick={() => applyReplyTemplate(t)}
+                                                                            className="w-full text-left px-3 py-2 hover:bg-gray-100 border-b border-gray-50 last:border-0"
+                                                                        >
+                                                                            <div className="flex items-center justify-between gap-2">
+                                                                                <span className="text-sm font-medium text-gray-900 truncate">{t.name}</span>
+                                                                                {!t.is_shared && (
+                                                                                    <span className="text-[10px] text-gray-400 shrink-0">pessoal</span>
+                                                                                )}
+                                                                            </div>
+                                                                            {t.category && (
+                                                                                <div className="text-[10px] text-gray-400">{t.category}</div>
+                                                                            )}
+                                                                            <div className="text-xs text-gray-500 mt-1 line-clamp-2">{t.body}</div>
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
                                             <Button variant="primary" size="sm" onClick={handleAddComment} disabled={!commentText.trim()} className="w-full sm:w-auto">
                                                 Comentar
                                             </Button>

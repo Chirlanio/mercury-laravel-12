@@ -14,6 +14,7 @@ use App\Http\Controllers\HdCsatController;
 use App\Http\Controllers\HdDepartmentSettingsController;
 use App\Http\Controllers\HdIntakeTemplateController;
 use App\Http\Controllers\HdPermissionController;
+use App\Http\Controllers\HdReplyTemplateController;
 use App\Http\Controllers\HelpdeskController;
 use App\Http\Controllers\HelpdeskReportController;
 use App\Http\Controllers\HelpdeskSavedViewController;
@@ -1065,30 +1066,59 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/helpdesk/saved-views/{savedView}', [HelpdeskSavedViewController::class, 'update'])->name('helpdesk.saved-views.update');
         Route::delete('/helpdesk/saved-views/{savedView}', [HelpdeskSavedViewController::class, 'destroy'])->name('helpdesk.saved-views.destroy');
 
-        // Knowledge Base public routes. Declared BEFORE /helpdesk/{ticket}
-        // so the route matcher doesn't confuse `/helpdesk/kb/...` with a
-        // ticket id param.
+        // String-path routes must come BEFORE any /helpdesk/{ticket}
+        // matcher or they get swallowed. As belt-and-suspenders, every
+        // ticket route also carries ->whereNumber('ticket') so route
+        // registration order becomes less load-bearing.
         Route::get('/helpdesk/kb/search', [HdArticleController::class, 'search'])->name('helpdesk.articles.search');
         Route::get('/helpdesk/kb/{slug}', [HdArticleController::class, 'show'])->name('helpdesk.articles.show');
         Route::post('/helpdesk/kb/{article}/feedback', [HdArticleController::class, 'feedback'])->name('helpdesk.articles.feedback');
         Route::post('/helpdesk/kb/{article}/deflect', [HdArticleController::class, 'deflect'])->name('helpdesk.articles.deflect');
 
-        Route::get('/helpdesk/{ticket}', [HelpdeskController::class, 'show'])->name('helpdesk.show');
+        Route::get('/helpdesk/{ticket}/summary', [HelpdeskController::class, 'summary'])
+            ->whereNumber('ticket')
+            ->name('helpdesk.summary');
+        Route::get('/helpdesk/{ticket}', [HelpdeskController::class, 'show'])
+            ->whereNumber('ticket')
+            ->name('helpdesk.show');
 
         Route::middleware('permission:'.Permission::CREATE_TICKETS->value)->group(function () {
             Route::post('/helpdesk', [HelpdeskController::class, 'store'])->name('helpdesk.store');
-            Route::post('/helpdesk/{ticket}/comments', [HelpdeskController::class, 'addComment'])->name('helpdesk.add-comment');
-            Route::post('/helpdesk/{ticket}/attachments', [HelpdeskController::class, 'uploadAttachment'])->name('helpdesk.upload-attachment');
+            Route::post('/helpdesk/{ticket}/comments', [HelpdeskController::class, 'addComment'])
+                ->whereNumber('ticket')->name('helpdesk.add-comment');
+            Route::post('/helpdesk/{ticket}/attachments', [HelpdeskController::class, 'uploadAttachment'])
+                ->whereNumber('ticket')->name('helpdesk.upload-attachment');
         });
 
         Route::middleware('permission:'.Permission::MANAGE_TICKETS->value)->group(function () {
-            Route::delete('/helpdesk/{ticket}', [HelpdeskController::class, 'destroy'])->name('helpdesk.destroy');
+            Route::delete('/helpdesk/{ticket}', [HelpdeskController::class, 'destroy'])
+                ->whereNumber('ticket')->name('helpdesk.destroy');
             Route::post('/helpdesk/bulk', [HelpdeskController::class, 'bulkAction'])->name('helpdesk.bulk');
-            Route::post('/helpdesk/{ticket}/transition', [HelpdeskController::class, 'transition'])->name('helpdesk.transition');
-            Route::post('/helpdesk/{ticket}/assign', [HelpdeskController::class, 'assign'])->name('helpdesk.assign');
-            Route::post('/helpdesk/{ticket}/priority', [HelpdeskController::class, 'changePriority'])->name('helpdesk.change-priority');
-            Route::post('/helpdesk/{ticket}/category', [HelpdeskController::class, 'changeCategory'])->name('helpdesk.change-category');
-            Route::post('/helpdesk/{ticket}/merge', [HelpdeskController::class, 'merge'])->name('helpdesk.merge');
+            Route::post('/helpdesk/{ticket}/transition', [HelpdeskController::class, 'transition'])
+                ->whereNumber('ticket')->name('helpdesk.transition');
+            Route::post('/helpdesk/{ticket}/assign', [HelpdeskController::class, 'assign'])
+                ->whereNumber('ticket')->name('helpdesk.assign');
+            Route::post('/helpdesk/{ticket}/priority', [HelpdeskController::class, 'changePriority'])
+                ->whereNumber('ticket')->name('helpdesk.change-priority');
+            Route::post('/helpdesk/{ticket}/category', [HelpdeskController::class, 'changeCategory'])
+                ->whereNumber('ticket')->name('helpdesk.change-category');
+            Route::post('/helpdesk/{ticket}/merge', [HelpdeskController::class, 'merge'])
+                ->whereNumber('ticket')->name('helpdesk.merge');
+
+            // Reply templates (macros). Technicians can create their own
+            // personal templates AND see shared ones. CRUD is cheap JSON
+            // because the UI lives inside the ticket detail modal, not a
+            // separate page.
+            Route::get('/helpdesk/reply-templates', [HdReplyTemplateController::class, 'index'])
+                ->name('helpdesk.reply-templates.index');
+            Route::post('/helpdesk/reply-templates', [HdReplyTemplateController::class, 'store'])
+                ->name('helpdesk.reply-templates.store');
+            Route::put('/helpdesk/reply-templates/{template}', [HdReplyTemplateController::class, 'update'])
+                ->name('helpdesk.reply-templates.update');
+            Route::delete('/helpdesk/reply-templates/{template}', [HdReplyTemplateController::class, 'destroy'])
+                ->name('helpdesk.reply-templates.destroy');
+            Route::post('/helpdesk/reply-templates/{template}/use', [HdReplyTemplateController::class, 'recordUsage'])
+                ->name('helpdesk.reply-templates.use');
         });
 
         Route::middleware('permission:'.Permission::VIEW_HD_REPORTS->value)->group(function () {

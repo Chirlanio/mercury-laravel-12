@@ -17,6 +17,7 @@ use App\Models\HdPermission;
 use App\Models\HdTicket;
 use App\Models\Store;
 use App\Enums\Permission;
+use App\Services\Helpdesk\TicketSummarizer;
 use App\Services\HelpdeskIntakeService;
 use App\Services\HelpdeskReportService;
 use App\Services\HelpdeskService;
@@ -330,6 +331,32 @@ class HelpdeskController extends Controller
             'name' => $attachment->original_filename,
             'url' => route('helpdesk.download-attachment', $attachment->id),
             'size' => $attachment->formatted_size,
+        ]);
+    }
+
+    /**
+     * Ticket summary endpoint for the detail modal. Always returns the
+     * deterministic quick summary; when the caller passes ?ai=1 AND the
+     * Groq classifier is configured, also returns an AI narrative.
+     * Failure to produce AI is non-fatal — the quick summary is still
+     * returned and the UI shows a placeholder.
+     */
+    public function summary(Request $request, HdTicket $ticket, TicketSummarizer $summarizer)
+    {
+        abort_unless($this->helpdeskService->userCanViewTicket(auth()->user(), $ticket), 403);
+
+        $quick = $summarizer->quick($ticket);
+        $ai = null;
+
+        if ($request->boolean('ai')) {
+            $ai = $summarizer->ai($ticket);
+        }
+
+        return response()->json([
+            'quick' => $quick,
+            'ai' => $ai,
+            'ai_available' => (string) config('helpdesk.ai.classifier', 'null') === 'groq'
+                && ! empty(config('helpdesk.ai.groq.api_key')),
         ]);
     }
 
