@@ -976,6 +976,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/chat/conversations/direct', [ChatController::class, 'createDirect'])->name('chat.create-direct');
             Route::post('/chat/conversations/{conversation}/messages', [ChatController::class, 'sendMessage'])->name('chat.send-message');
             Route::delete('/chat/messages/{message}', [ChatController::class, 'deleteMessage'])->name('chat.delete-message');
+            Route::patch('/chat/messages/{message}', [ChatController::class, 'editMessage'])->name('chat.edit-message');
             Route::post('/chat/conversations/{conversation}/read', [ChatController::class, 'markRead'])->name('chat.mark-read');
             Route::post('/chat/conversations/{conversation}/typing', [ChatController::class, 'typing'])->name('chat.typing');
             Route::post('/chat/upload', [ChatController::class, 'uploadFile'])->name('chat.upload');

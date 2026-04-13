@@ -167,6 +167,19 @@ class ChatController extends Controller
         return response()->json(['deleted' => true]);
     }
 
+    public function editMessage(Request $request, Message $message)
+    {
+        $validated = $request->validate([
+            'content' => 'required|string|max:5000',
+        ]);
+
+        $updated = $this->chatService->editMessage($message->id, auth()->id(), $validated['content']);
+
+        return response()->json([
+            'message' => $this->mapMessage($updated),
+        ]);
+    }
+
     public function downloadAttachment(Message $message)
     {
         $userId = auth()->id();
@@ -250,6 +263,8 @@ class ChatController extends Controller
             'created_at' => $m->created_at->format('H:i'),
             'created_at_full' => $m->created_at->format('d/m/Y H:i'),
             'created_at_date' => $m->created_at->format('Y-m-d'),
+            'edited_at' => $m->edited_at?->toIso8601String(),
+            'is_edited' => $m->is_edited,
         ];
     }
 }

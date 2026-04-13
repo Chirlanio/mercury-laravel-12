@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Events\Chat\MessageDeletedEvent;
+use App\Events\Chat\MessageEditedEvent;
 use App\Events\Chat\MessageReadEvent;
 use App\Events\Chat\NewMessageEvent;
 use App\Models\Conversation;
@@ -56,13 +57,17 @@ class ChatService
      */
     public function getOrCreateDirectConversation(int $userId, int $otherUserId): Conversation
     {
-        // Find existing direct conversation between these two users
-        $conversation = Conversation::direct()
-            ->forUser($userId)
+        // Find existing direct conversation between these two users.
+        // We match candidate conversations that contain both users, then filter in PHP
+        // to keep only conversations with exactly 2 participants. Using HAVING on a
+        // withCount subquery is not portable (SQLite rejects HAVING without GROUP BY).
+        $candidates = Conversation::direct()
+            ->whereHas('participantRecords', fn ($q) => $q->where('user_id', $userId))
             ->whereHas('participantRecords', fn ($q) => $q->where('user_id', $otherUserId))
             ->withCount('participantRecords')
-            ->having('participant_records_count', '=', 2)
-            ->first();
+            ->get();
+
+        $conversation = $candidates->firstWhere('participant_records_count', 2);
 
         if ($conversation) {
             return $conversation;
@@ -132,6 +137,46 @@ class ChatService
             );
         } catch (\Throwable $e) {
             // Broadcast indisponível (Reverb offline) — ignora silenciosamente
+        }
+
+        return $message;
+    }
+
+    /**
+     * Edit a text message. Only the sender can edit, and only text messages
+     * can be edited (files/images are delete-and-resend). Sets edited_at and
+     * broadcasts a MessageEditedEvent for real-time updates.
+     */
+    public function editMessage(int $messageId, int $userId, string $content): Message
+    {
+        $message = Message::findOrFail($messageId);
+
+        if ($message->sender_id !== $userId) {
+            abort(403, 'Você só pode editar suas próprias mensagens.');
+        }
+
+        if ($message->message_type !== 'text') {
+            abort(422, 'Apenas mensagens de texto podem ser editadas.');
+        }
+
+        $message->update([
+            'content' => $content,
+            'edited_at' => now(),
+        ]);
+
+        $message->refresh();
+        $message->load('sender', 'replyTo');
+
+        try {
+            MessageEditedEvent::dispatch(
+                $message->conversation_id,
+                $message->id,
+                $userId,
+                $message->content,
+                $message->edited_at->toIso8601String(),
+            );
+        } catch (\Throwable $e) {
+            // Broadcast indisponível — ignora silenciosamente
         }
 
         return $message;

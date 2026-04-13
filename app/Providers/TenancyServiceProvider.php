@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Stancl\JobPipeline\JobPipeline;
+use Stancl\Tenancy\Controllers\TenantAssetsController;
 use Stancl\Tenancy\Events;
 use Stancl\Tenancy\Jobs;
 use Stancl\Tenancy\Listeners;
@@ -99,6 +100,13 @@ class TenancyServiceProvider extends ServiceProvider
         $this->mapRoutes();
 
         $this->makeTenancyMiddlewareHighestPriority();
+
+        // The package's TenantAssetsController hard-codes InitializeTenancyByDomain
+        // as its tenancy middleware, but this app identifies tenants by subdomain.
+        // Domains table stores entries like "meia-sola", not "meia-sola.localhost",
+        // so InitializeTenancyByDomain fails to resolve the tenant for asset requests.
+        // Override it to use subdomain identification to match the rest of the app.
+        TenantAssetsController::$tenancyMiddleware = Middleware\InitializeTenancyBySubdomain::class;
     }
 
     protected function bootEvents()

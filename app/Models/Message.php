@@ -13,11 +13,12 @@ class Message extends Model
     protected $fillable = [
         'conversation_id', 'sender_id', 'content', 'message_type',
         'file_path', 'file_name', 'file_size', 'file_mime',
-        'reply_to_message_id', 'created_at',
+        'reply_to_message_id', 'created_at', 'edited_at',
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
+        'edited_at' => 'datetime',
         'file_size' => 'integer',
     ];
 
@@ -55,6 +56,11 @@ class Message extends Model
     public function getIsFileAttribute(): bool
     {
         return $this->message_type !== 'text';
+    }
+
+    public function getIsEditedAttribute(): bool
+    {
+        return $this->edited_at !== null;
     }
 
     public function getFileUrlAttribute(): ?string

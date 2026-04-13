@@ -12,6 +12,8 @@ import {
     ArrowUturnLeftIcon,
     ArrowLeftIcon,
     TrashIcon,
+    PencilSquareIcon,
+    CheckIcon,
 } from '@heroicons/react/24/outline';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
@@ -43,6 +45,7 @@ export default function Index({ conversations: initialConversations, activeConve
     const [sending, setSending] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [replyTo, setReplyTo] = useState(null);
+    const [editingMessage, setEditingMessage] = useState(null); // { id, content }
     const [typingUsers, setTypingUsers] = useState({});
     const [tab, setTab] = useState('direct');
     const [loadingMessages, setLoadingMessages] = useState(false);
@@ -171,6 +174,18 @@ export default function Index({ conversations: initialConversations, activeConve
         !!activeId,
     );
 
+    // Real-time message edition via Echo
+    useEcho(
+        activeId ? `conversation.${activeId}` : null,
+        '.message.edited',
+        (data) => {
+            setMessages(prev => prev.map(m => m.id === data.message_id
+                ? { ...m, content: data.content, edited_at: data.edited_at, is_edited: true }
+                : m));
+        },
+        !!activeId,
+    );
+
     const activeTypingNames = Object.values(typingUsers).filter(Boolean);
 
     const handleDeleteMessage = async (message) => {
@@ -203,6 +218,56 @@ export default function Index({ conversations: initialConversations, activeConve
             }
         } catch {
             setMessages(snapshot);
+        }
+    };
+
+    const handleStartEdit = (message) => {
+        setEditingMessage({ id: message.id, content: message.content || '' });
+    };
+
+    const handleCancelEdit = () => setEditingMessage(null);
+
+    const handleSaveEdit = async () => {
+        if (!editingMessage) return;
+        const trimmed = (editingMessage.content || '').trim();
+        if (!trimmed) return;
+
+        const messageId = editingMessage.id;
+        const originalMessage = messages.find(m => m.id === messageId);
+        if (!originalMessage || trimmed === originalMessage.content) {
+            setEditingMessage(null);
+            return;
+        }
+
+        // Optimistic update
+        const nowIso = new Date().toISOString();
+        setMessages(prev => prev.map(m => m.id === messageId
+            ? { ...m, content: trimmed, edited_at: nowIso, is_edited: true }
+            : m));
+        setEditingMessage(null);
+
+        try {
+            const res = await fetch(route('chat.edit-message', messageId), {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ content: trimmed }),
+            });
+            if (!res.ok) {
+                // Revert on failure
+                setMessages(prev => prev.map(m => m.id === messageId ? originalMessage : m));
+            } else {
+                const data = await res.json();
+                if (data?.message) {
+                    setMessages(prev => prev.map(m => m.id === messageId ? data.message : m));
+                }
+            }
+        } catch {
+            setMessages(prev => prev.map(m => m.id === messageId ? originalMessage : m));
         }
     };
 
@@ -521,25 +586,71 @@ export default function Index({ conversations: initialConversations, activeConve
                                                                 <PaperClipIcon className="w-3 h-3" /> {msg.file_name}
                                                             </a>
                                                         )}
-                                                        {msg.content && <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>}
-                                                        <div className={`text-xs mt-0.5 ${isOwn ? 'text-indigo-200' : 'text-gray-400'} flex items-center justify-between gap-2`}>
-                                                            <span>{msg.created_at}</span>
-                                                            <div className="flex items-center gap-2">
-                                                                {!isOwn && canSend && (
-                                                                    <button onClick={() => setReplyTo(msg)} className="hover:underline">Responder</button>
-                                                                )}
-                                                                {isOwn && !msg._pending && (
+                                                        {editingMessage?.id === msg.id ? (
+                                                            <div className="space-y-2">
+                                                                <textarea
+                                                                    value={editingMessage.content}
+                                                                    onChange={e => setEditingMessage({ ...editingMessage, content: e.target.value })}
+                                                                    onKeyDown={e => {
+                                                                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveEdit(); }
+                                                                        if (e.key === 'Escape') { e.preventDefault(); handleCancelEdit(); }
+                                                                    }}
+                                                                    autoFocus
+                                                                    rows={2}
+                                                                    className={`w-full text-sm rounded-lg p-2 resize-none focus:outline-none ${isOwn ? 'bg-indigo-500 text-white placeholder-indigo-200 border border-indigo-300' : 'bg-white text-gray-900 border border-gray-300'}`}
+                                                                />
+                                                                <div className="flex items-center justify-end gap-2">
                                                                     <button
-                                                                        onClick={() => handleDeleteMessage(msg)}
-                                                                        className="hover:text-white transition-colors"
-                                                                        title="Apagar mensagem"
-                                                                        aria-label="Apagar mensagem"
+                                                                        onClick={handleCancelEdit}
+                                                                        className={`text-xs px-2 py-1 rounded hover:underline ${isOwn ? 'text-indigo-100' : 'text-gray-500'}`}
                                                                     >
-                                                                        <TrashIcon className="w-3.5 h-3.5" />
+                                                                        Cancelar
                                                                     </button>
-                                                                )}
+                                                                    <button
+                                                                        onClick={handleSaveEdit}
+                                                                        disabled={!editingMessage.content?.trim()}
+                                                                        className={`flex items-center gap-1 text-xs px-2 py-1 rounded disabled:opacity-50 ${isOwn ? 'bg-white text-indigo-700 hover:bg-indigo-50' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+                                                                    >
+                                                                        <CheckIcon className="w-3 h-3" /> Salvar
+                                                                    </button>
+                                                                </div>
                                                             </div>
-                                                        </div>
+                                                        ) : (
+                                                            msg.content && <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                                                        )}
+                                                        {editingMessage?.id !== msg.id && (
+                                                            <div className={`text-xs mt-0.5 ${isOwn ? 'text-indigo-200' : 'text-gray-400'} flex items-center justify-between gap-2`}>
+                                                                <span className="flex items-center gap-1">
+                                                                    {msg.created_at}
+                                                                    {msg.is_edited && <span className="italic" title="Mensagem editada">(editado)</span>}
+                                                                </span>
+                                                                <div className="flex items-center gap-2">
+                                                                    {!isOwn && canSend && (
+                                                                        <button onClick={() => setReplyTo(msg)} className="hover:underline">Responder</button>
+                                                                    )}
+                                                                    {isOwn && !msg._pending && msg.message_type === 'text' && (
+                                                                        <button
+                                                                            onClick={() => handleStartEdit(msg)}
+                                                                            className="hover:text-white transition-colors"
+                                                                            title="Editar mensagem"
+                                                                            aria-label="Editar mensagem"
+                                                                        >
+                                                                            <PencilSquareIcon className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                    )}
+                                                                    {isOwn && !msg._pending && (
+                                                                        <button
+                                                                            onClick={() => handleDeleteMessage(msg)}
+                                                                            className="hover:text-white transition-colors"
+                                                                            title="Apagar mensagem"
+                                                                            aria-label="Apagar mensagem"
+                                                                        >
+                                                                            <TrashIcon className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             );
