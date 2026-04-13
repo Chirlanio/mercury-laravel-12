@@ -47,4 +47,33 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI', '/auth/google/callback'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Evolution API (WhatsApp)
+    |--------------------------------------------------------------------------
+    |
+    | Evolution runs in a Docker container. When the Laravel app is on the
+    | host, `base_url` should be http://localhost:8085 (or whatever port is
+    | exposed). When both run in the same docker network, use the service
+    | name (e.g. http://evolution-api:8080). Never hardcode — always env.
+    |
+    | `webhook_token` is the shared secret Evolution sends in the
+    | `x-mercury-webhook-token` header so our public webhook can verify the
+    | caller.
+    |
+    */
+    'evolution' => [
+        'base_url' => env('EVOLUTION_API_URL', 'http://localhost:8085'),
+        'api_key' => env('EVOLUTION_API_KEY'),
+        'instance' => env('EVOLUTION_INSTANCE', 'mercury-dp'),
+        'webhook_token' => env('EVOLUTION_WEBHOOK_TOKEN'),
+        // Public URL of the Laravel app AS SEEN BY the Evolution container.
+        // On Windows/Mac with app on host and Evolution in Docker, this is
+        // typically http://host.docker.internal:8000. When both are in the
+        // same docker network, use the service name (e.g. http://mercury-app).
+        'webhook_public_url' => env('HELPDESK_WEBHOOK_PUBLIC_URL', 'http://host.docker.internal:8000'),
+        // When true, skip outbound calls — useful in tests/CI.
+        'fake' => env('EVOLUTION_FAKE', false),
+    ],
+
 ];

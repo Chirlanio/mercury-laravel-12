@@ -61,7 +61,7 @@
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fdba74\" \"C:\\\\wamp64\\\\bin\\\\php\\\\php8.4.0\\\\php.exe artisan serve\" \"C:\\\\wamp64\\\\bin\\\\php\\\\php8.4.0\\\\php.exe artisan queue:listen --tries=1\" \"npm run dev\" --names=server,queue,vite --kill-others"
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fdba74\" \"C:\\\\wamp64\\\\bin\\\\php\\\\php8.4.0\\\\php.exe artisan serve --host=0.0.0.0 --port=8000\" \"C:\\\\wamp64\\\\bin\\\\php\\\\php8.4.0\\\\php.exe artisan queue:listen --tries=1\" \"npm run dev\" --names=server,queue,vite --kill-others"
         ],
         "test": [
             "@php artisan config:clear --ansi",

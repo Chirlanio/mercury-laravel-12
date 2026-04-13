@@ -11,14 +11,22 @@
 */
 
 use App\Http\Controllers\Api\AsaasWebhookController;
-use App\Http\Controllers\Api\IntegrationWebhookController;
 use App\Http\Controllers\Api\IntegrationApiController;
+use App\Http\Controllers\Api\IntegrationWebhookController;
+use App\Http\Controllers\Api\WhatsappWebhookController;
 use Illuminate\Support\Facades\Route;
 
 // Asaas payment webhook (no CSRF, no auth — verified by asaas-access-token header)
 Route::post('/asaas/webhook', [AsaasWebhookController::class, 'handle'])
     ->middleware('throttle:webhooks')
     ->name('api.asaas.webhook');
+
+// Evolution API (WhatsApp) inbound — one endpoint per tenant, verified by
+// EVOLUTION_WEBHOOK_TOKEN in the x-mercury-webhook-token header. Always
+// returns 202 Accepted once queued.
+Route::post('/webhooks/whatsapp/{tenant}', [WhatsappWebhookController::class, 'handle'])
+    ->middleware('throttle:webhooks')
+    ->name('api.whatsapp.webhook');
 
 Route::prefix('v1')->group(function () {
     // Webhook receiver - external systems push data to Mercury
