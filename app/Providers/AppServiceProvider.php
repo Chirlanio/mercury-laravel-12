@@ -2,13 +2,22 @@
 
 namespace App\Providers;
 
+use App\Events\Helpdesk\TicketAssignedEvent;
+use App\Events\Helpdesk\TicketCommentEvent;
+use App\Events\Helpdesk\TicketCreatedEvent;
+use App\Events\Helpdesk\TicketStatusChangedEvent;
+use App\Listeners\Helpdesk\SendTicketAssignedNotifications;
+use App\Listeners\Helpdesk\SendTicketCommentNotifications;
+use App\Listeners\Helpdesk\SendTicketCreatedNotifications;
+use App\Listeners\Helpdesk\SendTicketStatusChangedNotifications;
 use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -49,6 +58,15 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->configureRateLimiting();
+        $this->registerHelpdeskListeners();
+    }
+
+    protected function registerHelpdeskListeners(): void
+    {
+        Event::listen(TicketCreatedEvent::class, SendTicketCreatedNotifications::class);
+        Event::listen(TicketAssignedEvent::class, SendTicketAssignedNotifications::class);
+        Event::listen(TicketStatusChangedEvent::class, SendTicketStatusChangedNotifications::class);
+        Event::listen(TicketCommentEvent::class, SendTicketCommentNotifications::class);
     }
 
     protected function configureRateLimiting(): void

@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HdInteraction extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'ticket_id', 'user_id', 'comment', 'type',
         'old_value', 'new_value', 'is_internal',

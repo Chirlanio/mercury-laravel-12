@@ -2,12 +2,19 @@
 
 namespace App\Services;
 
+use App\Events\Helpdesk\TicketAssignedEvent;
 use App\Models\HdInteraction;
 use App\Models\HdTicket;
 use Illuminate\Support\Facades\DB;
 
 class HelpdeskTransitionService
 {
+    public function __construct(
+        private ?HelpdeskSlaCalculator $slaCalculator = null,
+    ) {
+        $this->slaCalculator ??= app(HelpdeskSlaCalculator::class);
+    }
+
     /**
      * Validate if a transition is allowed.
      */
@@ -86,6 +93,17 @@ class HelpdeskTransitionService
                 'old_value' => $oldName,
                 'new_value' => $newName,
             ]);
+
+            try {
+                TicketAssignedEvent::dispatch(
+                    $ticket->id,
+                    $ticket->department_id,
+                    $technicianId,
+                    $oldTechnicianId,
+                );
+            } catch (\Throwable $e) {
+                // Broadcast indisponível — ignora
+            }
         });
     }
 
@@ -97,11 +115,19 @@ class HelpdeskTransitionService
         DB::transaction(function () use ($ticket, $newPriority, $changedBy) {
             $oldPriority = $ticket->priority;
 
-            // Recalculate SLA based on new priority
+            // Recalculate SLA based on new priority and the ticket's department schedule.
+            // Anchored to created_at (not "now") so a tightened SLA can retroactively
+            // move the due date earlier rather than reward slow priority changes.
             $slaHours = HdTicket::SLA_HOURS[$newPriority] ?? 48;
+            $newDueAt = $this->slaCalculator->calculateDueDate(
+                $ticket->created_at->copy(),
+                $slaHours,
+                $ticket->department,
+            );
+
             $ticket->update([
                 'priority' => $newPriority,
-                'sla_due_at' => $ticket->created_at->addHours($slaHours),
+                'sla_due_at' => $newDueAt,
                 'updated_by_user_id' => $changedBy,
             ]);
 

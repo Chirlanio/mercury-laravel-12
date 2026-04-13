@@ -166,6 +166,8 @@ return new class extends Migration
         $listarGroup = CentralPageGroup::where('name', 'Listar')->first();
         $moduleIds = CentralModule::pluck('id', 'slug')->toArray();
 
+        // Reports tab is now part of the main Helpdesk page (/helpdesk?tab=reports),
+        // so /helpdesk-reports is not registered as a separate menu entry anymore.
         $pages = [
             [
                 'route' => '/chat',
@@ -177,12 +179,6 @@ return new class extends Migration
                 'route' => '/helpdesk',
                 'page_name' => 'Helpdesk',
                 'icon' => 'fas fa-headset',
-                'module_slug' => 'helpdesk',
-            ],
-            [
-                'route' => '/helpdesk-reports',
-                'page_name' => 'Relatórios Helpdesk',
-                'icon' => 'fas fa-chart-bar',
                 'module_slug' => 'helpdesk',
             ],
         ];
@@ -208,14 +204,12 @@ return new class extends Migration
         $routeToMenu = [
             '/chat' => 'Chat',
             '/helpdesk' => 'Helpdesk',
-            '/helpdesk-reports' => 'Helpdesk',
         ];
 
         // Role access matrix
         $routeAccess = [
             '/chat' => ['super_admin', 'admin', 'support', 'user', 'drivers'],
             '/helpdesk' => ['super_admin', 'admin', 'support', 'user', 'drivers'],
-            '/helpdesk-reports' => ['super_admin', 'admin', 'support'],
         ];
 
         $menuIds = CentralMenu::whereNull('parent_id')->pluck('id', 'name')->toArray();

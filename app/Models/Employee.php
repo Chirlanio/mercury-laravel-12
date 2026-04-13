@@ -21,6 +21,8 @@ class Employee extends Model
         'short_name',
         'profile_image',
         'cpf',
+        'phone_primary',
+        'phone_last_used_at',
         'admission_date',
         'dismissal_date',
         'position_id',
@@ -40,6 +42,7 @@ class Employee extends Model
         'admission_date' => 'date',
         'dismissal_date' => 'date',
         'birth_date' => 'date',
+        'phone_last_used_at' => 'datetime',
         'is_pcd' => 'boolean',
         'is_apprentice' => 'boolean',
         'created_at' => 'datetime',
@@ -88,6 +91,16 @@ class Employee extends Model
     {
         $cpf = $this->cpf;
         return substr($cpf, 0, 3) . '.' . substr($cpf, 3, 3) . '.' . substr($cpf, 6, 3) . '-' . substr($cpf, 9, 2);
+    }
+
+    /**
+     * First name for conversational greetings and the sanitized AI context.
+     * Split on whitespace so we get "Maria" from "Maria da Silva".
+     */
+    public function getFirstNameAttribute(): string
+    {
+        $parts = preg_split('/\s+/', trim((string) $this->name), 2) ?: [];
+        return $parts[0] ?? '';
     }
 
     /**

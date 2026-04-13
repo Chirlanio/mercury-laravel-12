@@ -111,10 +111,22 @@ class HelpdeskReportService
         if (! empty($filters['department_id'])) {
             $query->forDepartment((int) $filters['department_id']);
         }
+        if (! empty($filters['date_from'])) {
+            $query->whereDate('created_at', '>=', $filters['date_from']);
+        }
+        if (! empty($filters['date_to'])) {
+            $query->whereDate('created_at', '<=', $filters['date_to']);
+        }
 
-        $avg = $query->selectRaw('AVG(TIMESTAMPDIFF(HOUR, created_at, resolved_at)) as avg_hours')
-            ->value('avg_hours');
+        // Portable across MySQL/MariaDB/SQLite/Postgres: compute in PHP.
+        // Reports are aggregate views — dataset is small, no hot path here.
+        $tickets = $query->get(['created_at', 'resolved_at']);
+        if ($tickets->isEmpty()) {
+            return 0;
+        }
 
-        return round($avg ?? 0, 1);
+        $totalHours = $tickets->sum(fn ($t) => $t->created_at->diffInMinutes($t->resolved_at) / 60);
+
+        return round($totalHours / $tickets->count(), 1);
     }
 }

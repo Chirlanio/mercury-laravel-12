@@ -30,3 +30,9 @@ Schedule::command('experience:notify')
     ->dailyAt('08:00')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/experience-notifications.log'));
+
+// Helpdesk SLA monitoring: every 10 minutes (warnings 2h before breach + breach notifications)
+Schedule::command('helpdesk:sla-monitor')
+    ->everyTenMinutes()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/helpdesk-sla.log'));

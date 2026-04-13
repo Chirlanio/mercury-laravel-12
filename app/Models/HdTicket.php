@@ -2,8 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\HdTicketPriority;
+use App\Enums\HdTicketStatus;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,9 +14,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HdTicket extends Model
 {
-    use Auditable, SoftDeletes;
+    use Auditable, HasFactory, SoftDeletes;
 
-    // Statuses
+    // ---------------------------------------------------------------------
+    // Status / priority are the canonical enums. The const shims below
+    // preserve back-compat with existing call sites that reference
+    // HdTicket::STATUS_OPEN etc. New code should prefer the enums directly.
+    // ---------------------------------------------------------------------
+
     public const STATUS_OPEN = 'open';
 
     public const STATUS_IN_PROGRESS = 'in_progress';
@@ -26,6 +34,58 @@ class HdTicket extends Model
 
     public const STATUS_CANCELLED = 'cancelled';
 
+    public const PRIORITY_LOW = 1;
+
+    public const PRIORITY_MEDIUM = 2;
+
+    public const PRIORITY_HIGH = 3;
+
+    public const PRIORITY_URGENT = 4;
+
+    public static function statusLabels(): array
+    {
+        return HdTicketStatus::labels();
+    }
+
+    public static function statusColors(): array
+    {
+        return HdTicketStatus::colors();
+    }
+
+    public static function priorityLabels(): array
+    {
+        return HdTicketPriority::labels();
+    }
+
+    public static function priorityColors(): array
+    {
+        return HdTicketPriority::colors();
+    }
+
+    public static function slaHoursMap(): array
+    {
+        return HdTicketPriority::slaHoursMap();
+    }
+
+    public static function validTransitions(): array
+    {
+        return HdTicketStatus::transitionMap();
+    }
+
+    public static function terminalStatuses(): array
+    {
+        return array_map(fn ($s) => $s->value, HdTicketStatus::terminal());
+    }
+
+    /**
+     * Back-compat: class constants that existing callsites read like
+     * `HdTicket::STATUS_LABELS`, `::PRIORITY_LABELS`, `::SLA_HOURS`,
+     * `::VALID_TRANSITIONS`, `::TERMINAL_STATUSES`.
+     *
+     * PHP constants cannot reference functions, so these are mirrored as
+     * `public const` arrays below. They must stay in sync with the enums;
+     * the enums are the source of truth.
+     */
     public const STATUS_LABELS = [
         self::STATUS_OPEN => 'Aberto',
         self::STATUS_IN_PROGRESS => 'Em Andamento',
@@ -49,20 +109,11 @@ class HdTicket extends Model
         self::STATUS_IN_PROGRESS => [self::STATUS_PENDING, self::STATUS_RESOLVED, self::STATUS_CANCELLED],
         self::STATUS_PENDING => [self::STATUS_IN_PROGRESS, self::STATUS_CANCELLED],
         self::STATUS_RESOLVED => [self::STATUS_CLOSED, self::STATUS_IN_PROGRESS],
-        self::STATUS_CLOSED => [],
+        self::STATUS_CLOSED => [self::STATUS_IN_PROGRESS],
         self::STATUS_CANCELLED => [],
     ];
 
     public const TERMINAL_STATUSES = [self::STATUS_CLOSED, self::STATUS_CANCELLED];
-
-    // Priorities
-    public const PRIORITY_LOW = 1;
-
-    public const PRIORITY_MEDIUM = 2;
-
-    public const PRIORITY_HIGH = 3;
-
-    public const PRIORITY_URGENT = 4;
 
     public const PRIORITY_LABELS = [
         1 => 'Baixa',
@@ -86,29 +137,53 @@ class HdTicket extends Model
     ];
 
     protected $fillable = [
-        'requester_id', 'assigned_technician_id', 'department_id', 'category_id',
+        'requester_id', 'employee_id', 'assigned_technician_id', 'department_id', 'category_id',
         'store_id', 'title', 'description', 'status', 'priority',
-        'sla_due_at', 'resolved_at', 'closed_at',
+        'source', 'ai_confidence', 'ai_model', 'ai_classified_at',
+        'sla_due_at', 'resolved_at', 'closed_at', 'merged_into_ticket_id',
         'created_by_user_id', 'updated_by_user_id',
     ];
 
     protected $casts = [
         'priority' => 'integer',
+        'ai_confidence' => 'decimal:2',
+        'ai_classified_at' => 'datetime',
         'sla_due_at' => 'datetime',
         'resolved_at' => 'datetime',
         'closed_at' => 'datetime',
     ];
 
+    protected $attributes = [
+        'source' => 'web',
+    ];
+
     // State machine
+
+    public function statusEnum(): ?HdTicketStatus
+    {
+        return HdTicketStatus::tryFrom($this->status);
+    }
+
+    public function priorityEnum(): ?HdTicketPriority
+    {
+        return $this->priority !== null ? HdTicketPriority::tryFrom((int) $this->priority) : null;
+    }
 
     public function canTransitionTo(string $newStatus): bool
     {
-        return in_array($newStatus, self::VALID_TRANSITIONS[$this->status] ?? []);
+        $current = $this->statusEnum();
+        $target = HdTicketStatus::tryFrom($newStatus);
+
+        if ($current === null || $target === null) {
+            return false;
+        }
+
+        return $current->canTransitionTo($target);
     }
 
     public function isTerminal(): bool
     {
-        return in_array($this->status, self::TERMINAL_STATUSES);
+        return $this->statusEnum()?->isTerminal() ?? false;
     }
 
     // Accessors
@@ -154,6 +229,11 @@ class HdTicket extends Model
         return $this->belongsTo(User::class, 'requester_id');
     }
 
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'employee_id');
+    }
+
     public function assignedTechnician(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_technician_id');
@@ -182,6 +262,16 @@ class HdTicket extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(HdAttachment::class, 'ticket_id');
+    }
+
+    public function ticketChannels(): HasMany
+    {
+        return $this->hasMany(HdTicketChannel::class, 'ticket_id');
+    }
+
+    public function intakeData(): HasMany
+    {
+        return $this->hasMany(HdTicketIntakeData::class, 'ticket_id');
     }
 
     public function createdBy(): BelongsTo

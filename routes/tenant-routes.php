@@ -9,8 +9,12 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\ChatBroadcastController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ChatGroupController;
+use App\Http\Controllers\HdPermissionController;
 use App\Http\Controllers\HelpdeskController;
 use App\Http\Controllers\HelpdeskReportController;
+use App\Http\Controllers\HelpdeskSavedViewController;
+use App\Http\Controllers\Config\HdCategoryController as ConfigHdCategoryController;
+use App\Http\Controllers\Config\HdDepartmentController as ConfigHdDepartmentController;
 use App\Http\Controllers\Admin\EmailSettingsController;
 use App\Http\Controllers\ChecklistController;
 use App\Http\Controllers\ColorThemeController;
@@ -43,6 +47,7 @@ use App\Http\Controllers\Config\ProductSizeController as ConfigProductSizeContro
 use App\Http\Controllers\Config\ProductSubcollectionController as ConfigProductSubcollectionController;
 use App\Http\Controllers\Config\SectorController as ConfigSectorController;
 use App\Http\Controllers\Config\StatusController as ConfigStatusController;
+use App\Http\Controllers\Config\StockAdjustmentReasonController as ConfigStockAdjustmentReasonController;
 use App\Http\Controllers\Config\StockAdjustmentStatusController as ConfigStockAdjustmentStatusController;
 use App\Http\Controllers\Config\StockAuditCycleController as ConfigStockAuditCycleController;
 use App\Http\Controllers\Config\StockAuditVendorController as ConfigStockAuditVendorController;
@@ -343,6 +348,7 @@ Route::middleware(['auth', 'tenant.module:config', 'permission:'.Permission::MAN
     Route::resource('payment-types', ConfigPaymentTypeController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('drivers', ConfigDriverController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('stock-adjustment-statuses', ConfigStockAdjustmentStatusController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('stock-adjustment-reasons', ConfigStockAdjustmentReasonController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('transfer-statuses', ConfigTransferStatusController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('order-payment-statuses', ConfigOrderPaymentStatusController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('management-reasons', ConfigManagementReasonController::class)->only(['index', 'store', 'update', 'destroy']);
@@ -591,16 +597,36 @@ Route::middleware(['auth'])->group(function () {
     // ==========================================
     Route::middleware(['tenant.module:stock_adjustments', 'permission:'.Permission::VIEW_ADJUSTMENTS->value])->group(function () {
         Route::get('/stock-adjustments', [StockAdjustmentController::class, 'index'])->name('stock-adjustments.index');
+        Route::get('/stock-adjustments/export', [StockAdjustmentController::class, 'export'])->name('stock-adjustments.export');
+        // Lookups para o formulário (precisam vir antes do {stockAdjustment})
+        Route::get('/stock-adjustments/lookup/employees', [StockAdjustmentController::class, 'employeesByStore'])
+            ->name('stock-adjustments.lookup.employees');
+        Route::get('/stock-adjustments/lookup/products', [StockAdjustmentController::class, 'searchProducts'])
+            ->name('stock-adjustments.lookup.products');
+        Route::get('/stock-adjustments/lookup/products/{reference}/sizes', [StockAdjustmentController::class, 'productSizes'])
+            ->name('stock-adjustments.lookup.product-sizes');
         Route::get('/stock-adjustments/{stockAdjustment}', [StockAdjustmentController::class, 'show'])->name('stock-adjustments.show');
+        Route::get('/stock-adjustments/{stockAdjustment}/attachments/{attachment}/download', [StockAdjustmentController::class, 'downloadAttachment'])
+            ->name('stock-adjustments.attachments.download');
+
         Route::middleware('permission:'.Permission::CREATE_ADJUSTMENTS->value)->group(function () {
             Route::post('/stock-adjustments', [StockAdjustmentController::class, 'store'])->name('stock-adjustments.store');
+            Route::post('/stock-adjustments/{stockAdjustment}/attachments', [StockAdjustmentController::class, 'storeAttachment'])
+                ->name('stock-adjustments.attachments.store');
         });
+
         Route::middleware('permission:'.Permission::EDIT_ADJUSTMENTS->value)->group(function () {
             Route::put('/stock-adjustments/{stockAdjustment}', [StockAdjustmentController::class, 'update'])->name('stock-adjustments.update');
             Route::post('/stock-adjustments/{stockAdjustment}/transition', [StockAdjustmentController::class, 'transition'])->name('stock-adjustments.transition');
+            Route::post('/stock-adjustments/bulk-transition', [StockAdjustmentController::class, 'bulkTransition'])->name('stock-adjustments.bulk-transition');
+            Route::post('/stock-adjustments/{stockAdjustment}/nfs', [StockAdjustmentController::class, 'storeNf'])->name('stock-adjustments.nfs.store');
+            Route::delete('/stock-adjustments/{stockAdjustment}/nfs/{nf}', [StockAdjustmentController::class, 'destroyNf'])->name('stock-adjustments.nfs.destroy');
         });
+
         Route::middleware('permission:'.Permission::DELETE_ADJUSTMENTS->value)->group(function () {
             Route::delete('/stock-adjustments/{stockAdjustment}', [StockAdjustmentController::class, 'destroy'])->name('stock-adjustments.destroy');
+            Route::delete('/stock-adjustments/{stockAdjustment}/attachments/{attachment}', [StockAdjustmentController::class, 'destroyAttachment'])
+                ->name('stock-adjustments.attachments.destroy');
         });
     });
 
@@ -1012,6 +1038,14 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/helpdesk/statistics', [HelpdeskController::class, 'statistics'])->name('helpdesk.statistics');
         Route::get('/helpdesk/departments/{department}/categories', [HelpdeskController::class, 'categories'])->name('helpdesk.categories');
         Route::get('/helpdesk/departments/{department}/technicians', [HelpdeskController::class, 'technicians'])->name('helpdesk.technicians');
+        Route::get('/helpdesk/attachments/{attachment}/download', [HelpdeskController::class, 'downloadAttachment'])->name('helpdesk.download-attachment');
+        Route::get('/helpdesk/export/csv', [HelpdeskController::class, 'exportCsv'])->name('helpdesk.export.csv');
+        Route::get('/helpdesk/export/xlsx', [HelpdeskController::class, 'exportXlsx'])->name('helpdesk.export.xlsx');
+        Route::get('/helpdesk/export/pdf', [HelpdeskController::class, 'exportPdf'])->name('helpdesk.export.pdf');
+        Route::get('/helpdesk/saved-views', [HelpdeskSavedViewController::class, 'index'])->name('helpdesk.saved-views.index');
+        Route::post('/helpdesk/saved-views', [HelpdeskSavedViewController::class, 'store'])->name('helpdesk.saved-views.store');
+        Route::put('/helpdesk/saved-views/{savedView}', [HelpdeskSavedViewController::class, 'update'])->name('helpdesk.saved-views.update');
+        Route::delete('/helpdesk/saved-views/{savedView}', [HelpdeskSavedViewController::class, 'destroy'])->name('helpdesk.saved-views.destroy');
         Route::get('/helpdesk/{ticket}', [HelpdeskController::class, 'show'])->name('helpdesk.show');
 
         Route::middleware('permission:'.Permission::CREATE_TICKETS->value)->group(function () {
@@ -1022,15 +1056,34 @@ Route::middleware(['auth'])->group(function () {
 
         Route::middleware('permission:'.Permission::MANAGE_TICKETS->value)->group(function () {
             Route::delete('/helpdesk/{ticket}', [HelpdeskController::class, 'destroy'])->name('helpdesk.destroy');
+            Route::post('/helpdesk/bulk', [HelpdeskController::class, 'bulkAction'])->name('helpdesk.bulk');
             Route::post('/helpdesk/{ticket}/transition', [HelpdeskController::class, 'transition'])->name('helpdesk.transition');
             Route::post('/helpdesk/{ticket}/assign', [HelpdeskController::class, 'assign'])->name('helpdesk.assign');
             Route::post('/helpdesk/{ticket}/priority', [HelpdeskController::class, 'changePriority'])->name('helpdesk.change-priority');
+            Route::post('/helpdesk/{ticket}/merge', [HelpdeskController::class, 'merge'])->name('helpdesk.merge');
         });
 
         Route::middleware('permission:'.Permission::VIEW_HD_REPORTS->value)->group(function () {
-            Route::get('/helpdesk-reports', [HelpdeskReportController::class, 'index'])->name('helpdesk-reports.index');
+            // Legacy route — redirects to the unified /helpdesk?tab=reports view.
+            Route::get('/helpdesk-reports', fn () => redirect()->route('helpdesk.index', ['tab' => 'reports']))
+                ->name('helpdesk-reports.index');
+            // JSON endpoints kept for dynamic in-page updates.
             Route::get('/helpdesk-reports/volume', [HelpdeskReportController::class, 'volumeByDay'])->name('helpdesk-reports.volume');
             Route::get('/helpdesk-reports/sla', [HelpdeskReportController::class, 'slaCompliance'])->name('helpdesk-reports.sla');
+        });
+
+        // Admin CRUD: Departments & Categories (MANAGE_HD_DEPARTMENTS)
+        Route::middleware('permission:'.Permission::MANAGE_HD_DEPARTMENTS->value)->prefix('config')->name('config.')->group(function () {
+            Route::resource('hd-departments', ConfigHdDepartmentController::class)->only(['index', 'store', 'update', 'destroy']);
+            Route::resource('hd-categories', ConfigHdCategoryController::class)->only(['index', 'store', 'update', 'destroy']);
+        });
+
+        // Admin CRUD: Department-level permissions (MANAGE_HD_PERMISSIONS)
+        Route::middleware('permission:'.Permission::MANAGE_HD_PERMISSIONS->value)->group(function () {
+            Route::get('/helpdesk/admin/permissions', [HdPermissionController::class, 'index'])->name('helpdesk.permissions.index');
+            Route::post('/helpdesk/admin/permissions', [HdPermissionController::class, 'store'])->name('helpdesk.permissions.store');
+            Route::put('/helpdesk/admin/permissions/{department}/{user}', [HdPermissionController::class, 'update'])->name('helpdesk.permissions.update');
+            Route::delete('/helpdesk/admin/permissions/{department}/{user}', [HdPermissionController::class, 'destroy'])->name('helpdesk.permissions.destroy');
         });
     });
 

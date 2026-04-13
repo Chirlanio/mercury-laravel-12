@@ -4,17 +4,20 @@ namespace App\Models;
 
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HdDepartment extends Model
 {
-    use Auditable;
+    use Auditable, HasFactory;
 
-    protected $fillable = ['name', 'description', 'icon', 'is_active', 'sort_order'];
+    protected $fillable = ['name', 'description', 'icon', 'is_active', 'auto_assign', 'requires_identification', 'sort_order'];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'auto_assign' => 'boolean',
+        'requires_identification' => 'boolean',
         'sort_order' => 'integer',
     ];
 

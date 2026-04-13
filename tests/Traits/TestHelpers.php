@@ -3,12 +3,16 @@
 namespace Tests\Traits;
 
 use App\Enums\Role;
-use App\Models\User;
+use App\Models\HdCategory;
+use App\Models\HdDepartment;
+use App\Models\HdPermission;
+use App\Models\HdTicket;
 use App\Models\Product;
 use App\Models\ProductBrand;
-use App\Models\ProductVariant;
 use App\Models\ProductSyncLog;
+use App\Models\ProductVariant;
 use App\Models\Supplier;
+use App\Models\User;
 use App\Models\WorkSchedule;
 use App\Models\WorkScheduleDay;
 use Illuminate\Support\Facades\DB;
@@ -471,6 +475,43 @@ trait TestHelpers
             'razao_social' => 'TEST SUPPLIER LTDA',
             'is_active' => true,
         ], $overrides));
+    }
+
+    /**
+     * Create a helpdesk base dataset: 1 department + 2 categories.
+     * Returns ['department' => HdDepartment, 'categories' => [HdCategory, HdCategory]].
+     */
+    protected function createHelpdeskBaseData(): array
+    {
+        $department = HdDepartment::factory()->create([
+            'name' => 'TI Test',
+            'sort_order' => 1,
+        ]);
+
+        $categories = [
+            HdCategory::factory()->forDepartment($department)->create([
+                'name' => 'Hardware',
+                'default_priority' => HdTicket::PRIORITY_MEDIUM,
+            ]),
+            HdCategory::factory()->forDepartment($department)->create([
+                'name' => 'Software',
+                'default_priority' => HdTicket::PRIORITY_HIGH,
+            ]),
+        ];
+
+        return ['department' => $department, 'categories' => $categories];
+    }
+
+    /**
+     * Grant a helpdesk permission (technician|manager) to a user for a department.
+     */
+    protected function grantHelpdeskPermission(User $user, HdDepartment $department, string $level = 'technician'): HdPermission
+    {
+        return HdPermission::factory()
+            ->forUser($user)
+            ->forDepartment($department)
+            ->state(['level' => $level])
+            ->create();
     }
 
     protected function createTestProductSyncLog(array $overrides = []): ProductSyncLog
