@@ -9,6 +9,8 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\ChatBroadcastController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ChatGroupController;
+use App\Http\Controllers\HdDepartmentSettingsController;
+use App\Http\Controllers\HdIntakeTemplateController;
 use App\Http\Controllers\HdPermissionController;
 use App\Http\Controllers\HelpdeskController;
 use App\Http\Controllers\HelpdeskReportController;
@@ -1081,11 +1083,41 @@ Route::middleware(['auth'])->group(function () {
         });
 
         // Admin CRUD: Department-level permissions (MANAGE_HD_PERMISSIONS)
+        // Restricted to Admin/SuperAdmin — assigning technicians/managers is
+        // a privileged operation and should not be delegated to Support.
         Route::middleware('permission:'.Permission::MANAGE_HD_PERMISSIONS->value)->group(function () {
             Route::get('/helpdesk/admin/permissions', [HdPermissionController::class, 'index'])->name('helpdesk.permissions.index');
             Route::post('/helpdesk/admin/permissions', [HdPermissionController::class, 'store'])->name('helpdesk.permissions.store');
             Route::put('/helpdesk/admin/permissions/{department}/{user}', [HdPermissionController::class, 'update'])->name('helpdesk.permissions.update');
             Route::delete('/helpdesk/admin/permissions/{department}/{user}', [HdPermissionController::class, 'destroy'])->name('helpdesk.permissions.destroy');
+        });
+
+        // Admin CRUD: Department settings and intake templates (MANAGE_HD_DEPARTMENTS)
+        // Open to Support as well — configuring expediente, feriados, IA
+        // prompts and intake templates is part of day-to-day helpdesk admin
+        // work that Support legitimately owns.
+        Route::middleware('permission:'.Permission::MANAGE_HD_DEPARTMENTS->value)->group(function () {
+            // Per-department settings: business hours, holidays, AI classifier
+            Route::get('/helpdesk/admin/department-settings', [HdDepartmentSettingsController::class, 'index'])
+                ->name('helpdesk.department-settings.index');
+            Route::put('/helpdesk/admin/department-settings/{department}/business-hours', [HdDepartmentSettingsController::class, 'updateBusinessHours'])
+                ->name('helpdesk.department-settings.business-hours.update');
+            Route::post('/helpdesk/admin/department-settings/{department}/holidays', [HdDepartmentSettingsController::class, 'storeHoliday'])
+                ->name('helpdesk.department-settings.holidays.store');
+            Route::delete('/helpdesk/admin/department-settings/{department}/holidays/{holiday}', [HdDepartmentSettingsController::class, 'destroyHoliday'])
+                ->name('helpdesk.department-settings.holidays.destroy');
+            Route::put('/helpdesk/admin/department-settings/{department}/ai', [HdDepartmentSettingsController::class, 'updateAi'])
+                ->name('helpdesk.department-settings.ai.update');
+
+            // Intake templates CRUD
+            Route::get('/helpdesk/admin/intake-templates', [HdIntakeTemplateController::class, 'index'])
+                ->name('helpdesk.intake-templates.index');
+            Route::post('/helpdesk/admin/intake-templates', [HdIntakeTemplateController::class, 'store'])
+                ->name('helpdesk.intake-templates.store');
+            Route::put('/helpdesk/admin/intake-templates/{template}', [HdIntakeTemplateController::class, 'update'])
+                ->name('helpdesk.intake-templates.update');
+            Route::delete('/helpdesk/admin/intake-templates/{template}', [HdIntakeTemplateController::class, 'destroy'])
+                ->name('helpdesk.intake-templates.destroy');
         });
     });
 

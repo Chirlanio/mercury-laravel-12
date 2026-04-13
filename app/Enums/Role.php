@@ -348,10 +348,15 @@ enum Role: string
                 Permission::SEND_CHAT_MESSAGES->value,
                 Permission::CREATE_CHAT_GROUPS->value,
                 Permission::SEND_BROADCASTS->value,
-                // Helpdesk (view + criar + gerenciar + relatórios)
+                // Helpdesk (view + criar + gerenciar + relatórios + configuração de departamentos)
+                // MANAGE_HD_DEPARTMENTS permite configurar expediente, feriados,
+                // templates de intake e IA por departamento. Não inclui
+                // MANAGE_HD_PERMISSIONS (gerenciar quem é técnico/manager),
+                // que continua restrito a Admin/SuperAdmin.
                 Permission::VIEW_HELPDESK->value,
                 Permission::CREATE_TICKETS->value,
                 Permission::MANAGE_TICKETS->value,
+                Permission::MANAGE_HD_DEPARTMENTS->value,
                 Permission::VIEW_HD_REPORTS->value,
                 // TaneIA (view + send)
                 Permission::VIEW_TANEIA->value,

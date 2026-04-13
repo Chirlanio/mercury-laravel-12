@@ -1,5 +1,6 @@
 import { Head, router } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { toast } from 'react-toastify';
 import {
     LifebuoyIcon,
     PlusIcon,
@@ -16,6 +17,9 @@ import {
     EnvelopeIcon,
     CodeBracketIcon,
     ArrowUpTrayIcon,
+    Cog6ToothIcon,
+    ShieldCheckIcon,
+    DocumentTextIcon,
 } from '@heroicons/react/24/outline';
 
 /**
@@ -120,7 +124,7 @@ import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from 'recharts';
-import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
+import { usePermissions, PERMISSIONS, ROLES } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
@@ -237,10 +241,18 @@ export default function Index({
     tickets, filters, statusOptions, priorityOptions, sourceOptions = {}, departments, stores,
     activeTab = 'tickets', canViewReports = false, reports = null,
 }) {
-    const { hasPermission } = usePermissions();
+    const { hasPermission, hasRoleLevel } = usePermissions();
     const { modals, selected, openModal, closeModal } = useModalManager(['create', 'detail', 'assign', 'priority']);
     const canCreate = hasPermission(PERMISSIONS.CREATE_TICKETS);
     const canManage = hasPermission(PERMISSIONS.MANAGE_TICKETS);
+
+    // Admin menu is visible to Support and above. Each item inside is
+    // still gated by its own permission — Support sees department-settings
+    // and intake-templates but not the user permissions management page.
+    const canSeeAdminMenu = hasRoleLevel(ROLES.SUPPORT);
+    const canManageHdDepartments = hasPermission(PERMISSIONS.MANAGE_HD_DEPARTMENTS);
+    const canManageHdPermissions = hasPermission(PERMISSIONS.MANAGE_HD_PERMISSIONS);
+    const [showAdminMenu, setShowAdminMenu] = useState(false);
 
     const [stats, setStats] = useState(null);
     const [statsLoading, setStatsLoading] = useState(true);
@@ -269,12 +281,73 @@ export default function Index({
     const [actionError, setActionError] = useState('');
 
     // Statistics
-    useEffect(() => {
+    const loadStatistics = () => {
         fetch(route('helpdesk.statistics'), { headers: { 'Accept': 'application/json' } })
             .then(res => res.json())
             .then(data => { setStats(data); setStatsLoading(false); })
             .catch(() => setStatsLoading(false));
-    }, []);
+    };
+    useEffect(() => { loadStatistics(); }, []);
+
+    // Realtime dashboard via Reverb — subscribes to every department the
+    // current user sees (the broadcast channel auth in routes/channels.php
+    // still enforces permission; unauthorized channels just silently no-op).
+    // On any ticket event we debounce a partial reload of the tickets prop
+    // via Inertia so the list stays fresh without a full page navigation.
+    const [realtimeConnected, setRealtimeConnected] = useState(false);
+    const reloadTimerRef = useRef(null);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || !window.Echo) {
+            return;
+        }
+
+        const pusherState = window.Echo?.connector?.pusher?.connection?.state;
+        setRealtimeConnected(pusherState === 'connected');
+
+        const scheduleReload = () => {
+            if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+            reloadTimerRef.current = setTimeout(() => {
+                router.reload({ only: ['tickets'] });
+                loadStatistics();
+            }, 500);
+        };
+
+        const channels = [];
+        (departments || []).forEach(dept => {
+            try {
+                const channel = window.Echo.private(`hd-department.${dept.id}`);
+                channel
+                    .listen('.ticket.created', (payload) => {
+                        toast.info(`Novo chamado: ${payload.title || '#' + payload.ticket_id}`, { autoClose: 3500 });
+                        scheduleReload();
+                    })
+                    .listen('.ticket.status.changed', () => scheduleReload())
+                    .listen('.ticket.assigned', () => scheduleReload())
+                    // Some Laravel broadcast setups use the full class name as the event alias.
+                    // Register both forms so the front works regardless of broadcastAs config.
+                    .listen('TicketCreatedEvent', (payload) => {
+                        toast.info(`Novo chamado: ${payload.title || '#' + payload.ticket_id}`, { autoClose: 3500 });
+                        scheduleReload();
+                    })
+                    .listen('TicketStatusChangedEvent', () => scheduleReload())
+                    .listen('TicketAssignedEvent', () => scheduleReload());
+                channels.push(channel);
+            } catch (e) {
+                // Echo not configured or channel auth failed — silent no-op.
+            }
+        });
+
+        return () => {
+            channels.forEach(ch => {
+                try { window.Echo.leave(`private-${ch.name || ''}`); } catch (e) { /* noop */ }
+            });
+            (departments || []).forEach(dept => {
+                try { window.Echo.leave(`hd-department.${dept.id}`); } catch (e) { /* noop */ }
+            });
+            if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+        };
+    }, [departments]);
 
     const statisticsCards = [
         { label: 'Total', value: stats?.total, icon: LifebuoyIcon, color: 'indigo' },
@@ -477,7 +550,18 @@ export default function Index({
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
                         <div>
                             <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Helpdesk</h1>
-                            <p className="text-xs sm:text-sm text-gray-500">Gerenciamento de chamados</p>
+                            <div className="flex items-center gap-2">
+                                <p className="text-xs sm:text-sm text-gray-500">Gerenciamento de chamados</p>
+                                {realtimeConnected && (
+                                    <span
+                                        className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-green-700 bg-green-100 px-1.5 py-0.5 rounded"
+                                        title="Atualização em tempo real ativa"
+                                    >
+                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                                        ao vivo
+                                    </span>
+                                )}
+                            </div>
                         </div>
                         <div className="flex flex-wrap gap-2">
                             {activeTab === 'tickets' && (
@@ -496,6 +580,64 @@ export default function Index({
                                                 </a>
                                             ))}
                                         </div>
+                                    )}
+                                </div>
+                            )}
+                            {canSeeAdminMenu && (canManageHdDepartments || canManageHdPermissions) && (
+                                <div className="relative inline-block">
+                                    <Button
+                                        variant="outline"
+                                        icon={Cog6ToothIcon}
+                                        onClick={() => setShowAdminMenu(v => !v)}
+                                    >
+                                        <span className="hidden sm:inline">Administração</span>
+                                        <span className="sm:hidden">Admin</span>
+                                    </Button>
+                                    {showAdminMenu && (
+                                        <>
+                                            {/* Click-outside catcher */}
+                                            <div
+                                                className="fixed inset-0 z-10"
+                                                onClick={() => setShowAdminMenu(false)}
+                                            />
+                                            <div className="absolute right-0 mt-1 w-56 bg-white shadow-lg rounded-md border z-20 py-1">
+                                                {canManageHdDepartments && (
+                                                    <a
+                                                        href={route('helpdesk.department-settings.index')}
+                                                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                        onClick={() => setShowAdminMenu(false)}
+                                                    >
+                                                        <Cog6ToothIcon className="w-4 h-4 text-indigo-500" />
+                                                        Configurações
+                                                    </a>
+                                                )}
+                                                {canManageHdDepartments && (
+                                                    <a
+                                                        href={route('helpdesk.intake-templates.index')}
+                                                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                        onClick={() => setShowAdminMenu(false)}
+                                                    >
+                                                        <DocumentTextIcon className="w-4 h-4 text-indigo-500" />
+                                                        Templates de Intake
+                                                    </a>
+                                                )}
+                                                {canManageHdPermissions && (
+                                                    <>
+                                                        {canManageHdDepartments && (
+                                                            <div className="border-t border-gray-100 my-1" />
+                                                        )}
+                                                        <a
+                                                            href={route('helpdesk.permissions.index')}
+                                                            className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                            onClick={() => setShowAdminMenu(false)}
+                                                        >
+                                                            <ShieldCheckIcon className="w-4 h-4 text-indigo-500" />
+                                                            Permissões
+                                                        </a>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </>
                                     )}
                                 </div>
                             )}
