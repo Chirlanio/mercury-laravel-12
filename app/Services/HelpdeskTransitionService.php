@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Events\Helpdesk\TicketAssignedEvent;
+use App\Models\HdAiClassificationCorrection;
+use App\Models\HdCategory;
 use App\Models\HdInteraction;
 use App\Models\HdTicket;
 use Illuminate\Support\Facades\DB;
@@ -139,6 +141,73 @@ class HelpdeskTransitionService
                 'old_value' => HdTicket::PRIORITY_LABELS[$oldPriority] ?? $oldPriority,
                 'new_value' => HdTicket::PRIORITY_LABELS[$newPriority] ?? $newPriority,
             ]);
+
+            // Feedback loop: if the ticket had an AI suggestion, log whether
+            // the technician ended up matching it or diverging. We log
+            // regardless of the direction so analysts can measure accuracy.
+            if ($ticket->ai_confidence !== null) {
+                $this->logAiCorrection($ticket, null, $newPriority, $changedBy);
+            }
         });
+    }
+
+    /**
+     * Change ticket category. Guard that the category belongs to the
+     * ticket's department is done at the controller layer.
+     */
+    public function changeCategory(HdTicket $ticket, int $newCategoryId, int $changedBy): void
+    {
+        DB::transaction(function () use ($ticket, $newCategoryId, $changedBy) {
+            $oldCategoryId = $ticket->category_id;
+
+            if ($oldCategoryId === $newCategoryId) {
+                return;
+            }
+
+            $ticket->update([
+                'category_id' => $newCategoryId,
+                'updated_by_user_id' => $changedBy,
+            ]);
+
+            $oldName = $oldCategoryId ? HdCategory::find($oldCategoryId)?->name : '(nenhuma)';
+            $newName = HdCategory::find($newCategoryId)?->name ?? 'desconhecida';
+
+            HdInteraction::create([
+                'ticket_id' => $ticket->id,
+                'user_id' => $changedBy,
+                'comment' => "Categoria alterada de {$oldName} para {$newName}.",
+                'type' => 'comment',
+                'old_value' => $oldName,
+                'new_value' => $newName,
+            ]);
+
+            if ($ticket->ai_confidence !== null) {
+                $this->logAiCorrection($ticket, $newCategoryId, null, $changedBy);
+            }
+        });
+    }
+
+    /**
+     * Persist an AI-vs-human correction record for feedback analysis.
+     * One row per correction event; multiple rows per ticket are expected
+     * when the technician changes both category and priority in sequence.
+     */
+    protected function logAiCorrection(
+        HdTicket $ticket,
+        ?int $correctedCategoryId,
+        ?int $correctedPriority,
+        int $userId,
+    ): void {
+        HdAiClassificationCorrection::create([
+            'ticket_id' => $ticket->id,
+            'original_ai_category_id' => $ticket->ai_category_id,
+            'original_ai_priority' => $ticket->ai_priority,
+            'original_ai_confidence' => $ticket->ai_confidence,
+            'original_ai_model' => $ticket->ai_model,
+            'corrected_category_id' => $correctedCategoryId,
+            'corrected_priority' => $correctedPriority,
+            'corrected_by_user_id' => $userId,
+            'created_at' => now(),
+        ]);
     }
 }

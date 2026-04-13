@@ -75,6 +75,7 @@ use App\Http\Controllers\StockAuditController;
 use App\Http\Controllers\StoreController;
 use App\Http\Controllers\StoreGoalController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\TaneiaController;
 use App\Http\Controllers\TrainingContentController;
 use App\Http\Controllers\TrainingCourseController;
 use App\Http\Controllers\TrainingEventController;
@@ -1060,6 +1061,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/helpdesk/{ticket}/transition', [HelpdeskController::class, 'transition'])->name('helpdesk.transition');
             Route::post('/helpdesk/{ticket}/assign', [HelpdeskController::class, 'assign'])->name('helpdesk.assign');
             Route::post('/helpdesk/{ticket}/priority', [HelpdeskController::class, 'changePriority'])->name('helpdesk.change-priority');
+            Route::post('/helpdesk/{ticket}/category', [HelpdeskController::class, 'changeCategory'])->name('helpdesk.change-category');
             Route::post('/helpdesk/{ticket}/merge', [HelpdeskController::class, 'merge'])->name('helpdesk.merge');
         });
 
@@ -1085,6 +1087,16 @@ Route::middleware(['auth'])->group(function () {
             Route::put('/helpdesk/admin/permissions/{department}/{user}', [HdPermissionController::class, 'update'])->name('helpdesk.permissions.update');
             Route::delete('/helpdesk/admin/permissions/{department}/{user}', [HdPermissionController::class, 'destroy'])->name('helpdesk.permissions.destroy');
         });
+    });
+
+    // ==========================================
+    // TaneIA (AI assistant interface — backend proxies a Python microservice)
+    // ==========================================
+    Route::prefix('taneia')->name('taneia.')->group(function () {
+        Route::get('/', [TaneiaController::class, 'index'])->name('index');
+        Route::post('/conversations', [TaneiaController::class, 'store'])->name('store');
+        Route::get('/conversations/{conversation}', [TaneiaController::class, 'show'])->name('show');
+        Route::post('/conversations/{conversation}/messages', [TaneiaController::class, 'sendMessage'])->name('send-message');
     });
 
     // ==========================================

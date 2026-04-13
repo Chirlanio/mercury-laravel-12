@@ -216,7 +216,15 @@ class HelpdeskService
                 }
             }
 
-            return $ticket->load('requester', 'department', 'category', 'assignedTechnician');
+            $loaded = $ticket->load('requester', 'department', 'category', 'assignedTechnician');
+
+            // Queue AI classification. The job itself checks if the department
+            // has ai_classification_enabled, so it's a cheap no-op otherwise.
+            // Dispatched inside the transaction closure so that if the txn
+            // rolls back, the queue insert rolls back too (database driver).
+            \App\Jobs\Helpdesk\ClassifyTicketJob::dispatch($loaded->id);
+
+            return $loaded;
         });
     }
 
@@ -263,7 +271,7 @@ class HelpdeskService
     public function getTicketDetails(HdTicket $ticket): array
     {
         $ticket->load([
-            'requester', 'assignedTechnician', 'department', 'category', 'store',
+            'requester', 'assignedTechnician', 'department', 'category', 'aiCategory', 'store',
             'interactions.user', 'interactions.attachments', 'attachments.uploadedBy',
             'createdBy',
         ]);

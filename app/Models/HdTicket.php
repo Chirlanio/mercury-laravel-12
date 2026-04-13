@@ -140,6 +140,7 @@ class HdTicket extends Model
         'requester_id', 'employee_id', 'assigned_technician_id', 'department_id', 'category_id',
         'store_id', 'title', 'description', 'status', 'priority',
         'source', 'ai_confidence', 'ai_model', 'ai_classified_at',
+        'ai_category_id', 'ai_priority',
         'sla_due_at', 'resolved_at', 'closed_at', 'merged_into_ticket_id',
         'created_by_user_id', 'updated_by_user_id',
     ];
@@ -147,6 +148,7 @@ class HdTicket extends Model
     protected $casts = [
         'priority' => 'integer',
         'ai_confidence' => 'decimal:2',
+        'ai_priority' => 'integer',
         'ai_classified_at' => 'datetime',
         'sla_due_at' => 'datetime',
         'resolved_at' => 'datetime',
@@ -247,6 +249,11 @@ class HdTicket extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(HdCategory::class, 'category_id');
+    }
+
+    public function aiCategory(): BelongsTo
+    {
+        return $this->belongsTo(HdCategory::class, 'ai_category_id');
     }
 
     public function store(): BelongsTo

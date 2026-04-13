@@ -142,6 +142,20 @@ class HelpdeskController extends Controller
                 'can_delete' => $this->helpdeskService->userCanDeleteTicket(auth()->user(), $t),
                 'created_by' => $t->createdBy?->name,
                 'created_at' => $t->created_at->format('d/m/Y H:i'),
+                // AI suggestion fields — populated asynchronously by
+                // ClassifyTicketJob. When ai_category_id differs from
+                // category_id and confidence >= apply_threshold, the UI
+                // shows a badge so the technician can accept the suggestion.
+                'ai_category_id' => $t->ai_category_id,
+                'ai_category_name' => $t->aiCategory?->name,
+                'ai_priority' => $t->ai_priority,
+                'ai_priority_label' => $t->ai_priority !== null
+                    ? (HdTicket::PRIORITY_LABELS[$t->ai_priority] ?? null)
+                    : null,
+                'ai_confidence' => $t->ai_confidence !== null ? (float) $t->ai_confidence : null,
+                'ai_model' => $t->ai_model,
+                'ai_classified_at' => $t->ai_classified_at?->format('d/m/Y H:i'),
+                'ai_apply_threshold' => (float) config('helpdesk.ai.apply_threshold', 0.7),
             ],
             'interactions' => $details['interactions']->map(fn ($i) => [
                 'id' => $i->id,
@@ -249,6 +263,25 @@ class HelpdeskController extends Controller
         $this->transitionService->changePriority($ticket, $request->validated()['priority'], auth()->id());
 
         return response()->json(['message' => 'Prioridade atualizada.']);
+    }
+
+    public function changeCategory(Request $request, HdTicket $ticket)
+    {
+        abort_unless($this->helpdeskService->userCanModifyTicket(auth()->user(), $ticket), 403);
+
+        $validated = $request->validate([
+            'category_id' => 'required|integer|exists:hd_categories,id',
+        ]);
+
+        // Guard: the chosen category must belong to the ticket's department.
+        $category = \App\Models\HdCategory::find($validated['category_id']);
+        if (! $category || $category->department_id !== $ticket->department_id) {
+            return response()->json(['error' => 'Categoria inválida para este departamento.'], 422);
+        }
+
+        $this->transitionService->changeCategory($ticket, $validated['category_id'], auth()->id());
+
+        return response()->json(['message' => 'Categoria atualizada.']);
     }
 
     public function addComment(AddCommentRequest $request, HdTicket $ticket)

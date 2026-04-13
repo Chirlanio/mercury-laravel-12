@@ -51,6 +51,71 @@ function SourceBadge({ source = 'web', label = 'Web' }) {
         </span>
     );
 }
+
+/**
+ * Renders a small highlight box inside the ticket detail modal when the AI
+ * classifier produced a suggestion that differs from the current ticket.
+ * Only shows up when confidence >= ai_apply_threshold (default 0.7) so
+ * low-signal opinions don't pollute the UI. The technician clicks to
+ * accept category and/or priority independently, which triggers the
+ * normal change endpoints and the feedback-loop correction logger.
+ */
+function AiSuggestionBanner({ ticket, canModify, onAcceptCategory, onAcceptPriority }) {
+    if (ticket.ai_confidence === null || ticket.ai_confidence === undefined) {
+        return null;
+    }
+
+    const threshold = ticket.ai_apply_threshold ?? 0.7;
+    if (ticket.ai_confidence < threshold) {
+        return null;
+    }
+
+    const categoryDiffers =
+        ticket.ai_category_id != null &&
+        ticket.ai_category_id !== ticket.category_id;
+    const priorityDiffers =
+        ticket.ai_priority != null &&
+        Number(ticket.ai_priority) !== Number(ticket.priority);
+
+    if (!categoryDiffers && !priorityDiffers) {
+        return null;
+    }
+
+    const confidencePct = Math.round(ticket.ai_confidence * 100);
+
+    return (
+        <div className="mt-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-sm">
+            <div className="flex items-center gap-2 mb-2 text-indigo-900 font-medium">
+                <span>💡 Sugestão da IA</span>
+                <span className="text-xs text-indigo-600">({confidencePct}% confiança · {ticket.ai_model || 'modelo'})</span>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                {categoryDiffers && (
+                    <div className="flex items-center gap-2">
+                        <span className="text-gray-600">Categoria sugerida:</span>
+                        <StatusBadge variant="info">{ticket.ai_category_name}</StatusBadge>
+                        {canModify && (
+                            <Button variant="primary" size="xs" onClick={onAcceptCategory}>
+                                Aceitar
+                            </Button>
+                        )}
+                    </div>
+                )}
+                {priorityDiffers && (
+                    <div className="flex items-center gap-2">
+                        <span className="text-gray-600">Prioridade sugerida:</span>
+                        <StatusBadge variant="warning">{ticket.ai_priority_label}</StatusBadge>
+                        {canModify && (
+                            <Button variant="primary" size="xs" onClick={onAcceptPriority}>
+                                Aceitar
+                            </Button>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
 import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, PieChart, Pie, Cell, Legend,
@@ -681,6 +746,29 @@ export default function Index({
                                     {detailData.ticket.description}
                                 </div>
                             </StandardModal.Section>
+
+                            {/* AI suggestion banner — shows only when the AI disagrees
+                                with the current classification with enough confidence. */}
+                            <AiSuggestionBanner
+                                ticket={detailData.ticket}
+                                canModify={detailData.ticket.can_modify}
+                                onAcceptCategory={async () => {
+                                    await fetch(route('helpdesk.change-category', selected.id), {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken() },
+                                        body: JSON.stringify({ category_id: detailData.ticket.ai_category_id }),
+                                    });
+                                    loadDetail(selected.id);
+                                }}
+                                onAcceptPriority={async () => {
+                                    await fetch(route('helpdesk.change-priority', selected.id), {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken() },
+                                        body: JSON.stringify({ priority: detailData.ticket.ai_priority }),
+                                    });
+                                    loadDetail(selected.id);
+                                }}
+                            />
 
                             {/* Interactions Timeline */}
                             <StandardModal.Section title={`Interações (${detailData.interactions?.length || 0})`}>

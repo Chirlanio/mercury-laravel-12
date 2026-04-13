@@ -53,17 +53,38 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | AI classifier (Phase 4 — intentionally unused for now)
+    | AI classifier (Phase 4)
     |--------------------------------------------------------------------------
+    |
+    | 'null'  → NullClassifier, inert, default
+    | 'groq'  → GroqClassifier, Llama 3.3 70b via Groq's OpenAI-compatible API
+    |
+    | The classifier only runs when the ticket's department has
+    | ai_classification_enabled = true. Failures (missing key, rate limit,
+    | bad response) never block ticket creation — they return empty.
+    |
     */
 
     'ai' => [
         'classifier' => env('HELPDESK_AI_CLASSIFIER', 'null'),
+
+        // Threshold below which the dashboard does NOT surface an AI
+        // suggestion to the technician. The raw confidence is always
+        // persisted for analysis regardless.
+        'apply_threshold' => (float) env('HELPDESK_AI_APPLY_THRESHOLD', 0.7),
+
         'groq' => [
             'api_key' => env('GROQ_API_KEY'),
             'model' => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
             'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
+            'rate_limit_per_minute' => (int) env('GROQ_RATE_LIMIT_PER_MINUTE', 25),
         ],
+
+        // Default prompt used when a department's ai_classification_prompt
+        // is null. Available placeholders:
+        //   {{department_name}}, {{categories_list}}, {{employee_block}},
+        //   {{title}}, {{description}}
+        'default_prompt' => null,
     ],
 
 ];

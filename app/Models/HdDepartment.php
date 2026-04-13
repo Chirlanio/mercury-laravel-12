@@ -12,12 +12,17 @@ class HdDepartment extends Model
 {
     use Auditable, HasFactory;
 
-    protected $fillable = ['name', 'description', 'icon', 'is_active', 'auto_assign', 'requires_identification', 'sort_order'];
+    protected $fillable = [
+        'name', 'description', 'icon', 'is_active', 'auto_assign',
+        'requires_identification', 'ai_classification_enabled',
+        'ai_classification_prompt', 'sort_order',
+    ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'auto_assign' => 'boolean',
         'requires_identification' => 'boolean',
+        'ai_classification_enabled' => 'boolean',
         'sort_order' => 'integer',
     ];
 
