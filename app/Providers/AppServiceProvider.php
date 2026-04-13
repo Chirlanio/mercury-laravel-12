@@ -2,10 +2,12 @@
 
 namespace App\Providers;
 
+use App\Events\Helpdesk\HelpdeskInteractionCreated;
 use App\Events\Helpdesk\TicketAssignedEvent;
 use App\Events\Helpdesk\TicketCommentEvent;
 use App\Events\Helpdesk\TicketCreatedEvent;
 use App\Events\Helpdesk\TicketStatusChangedEvent;
+use App\Listeners\Helpdesk\DispatchWhatsappReplyListener;
 use App\Listeners\Helpdesk\SendTicketAssignedNotifications;
 use App\Listeners\Helpdesk\SendTicketCommentNotifications;
 use App\Listeners\Helpdesk\SendTicketCreatedNotifications;
@@ -67,6 +69,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(TicketAssignedEvent::class, SendTicketAssignedNotifications::class);
         Event::listen(TicketStatusChangedEvent::class, SendTicketStatusChangedNotifications::class);
         Event::listen(TicketCommentEvent::class, SendTicketCommentNotifications::class);
+        Event::listen(HelpdeskInteractionCreated::class, DispatchWhatsappReplyListener::class);
     }
 
     protected function configureRateLimiting(): void

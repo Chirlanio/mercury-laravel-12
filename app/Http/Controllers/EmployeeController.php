@@ -167,6 +167,7 @@ class EmployeeController extends Controller
             'area_id' => 'nullable|integer',
             'is_pcd' => 'boolean',
             'is_apprentice' => 'boolean',
+            'phone_primary' => 'nullable|string|max:20',
             'profile_image' => $request->hasFile('profile_image') ? ['nullable', ValidImageRule::avatar()] : 'nullable',
         ]);
 
@@ -290,6 +291,7 @@ class EmployeeController extends Controller
                 'name' => $employee->name,
                 'short_name' => $employee->short_name,
                 'cpf' => $employee->cpf, // CPF sem máscara para edição
+                'phone_primary' => $employee->phone_primary,
                 'admission_date' => $employee->admission_date?->format('Y-m-d'),
                 'dismissal_date' => $employee->dismissal_date?->format('Y-m-d'),
                 'birth_date' => $employee->birth_date?->format('Y-m-d'),
@@ -340,6 +342,7 @@ class EmployeeController extends Controller
             'area_id' => 'nullable|integer',
             'is_pcd' => 'boolean',
             'is_apprentice' => 'boolean',
+            'phone_primary' => 'nullable|string|max:20',
             'profile_image' => $request->hasFile('profile_image') ? ['nullable', ValidImageRule::avatar()] : 'nullable',
         ]);
 

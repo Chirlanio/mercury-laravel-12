@@ -5,7 +5,7 @@ import TextInput from '@/Components/TextInput';
 import InputLabel from '@/Components/InputLabel';
 import InputError from '@/Components/InputError';
 import Checkbox from '@/Components/Checkbox';
-import { maskCpf } from '@/Hooks/useMasks';
+import { maskCpf, maskPhone } from '@/Hooks/useMasks';
 import { PencilSquareIcon } from '@heroicons/react/24/outline';
 
 export default function EmployeeEditModal({ show, onClose, onSuccess, employee, positions = [], stores = [], statuses = [], educationLevels = [] }) {
@@ -14,6 +14,7 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
         name: '',
         short_name: '',
         cpf: '',
+        phone_primary: '',
         admission_date: '',
         birth_date: '',
         dismissal_date: '',
@@ -42,6 +43,7 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
                 name: employee.name || '',
                 short_name: employee.short_name || '',
                 cpf: employee.cpf ? maskCpf(employee.cpf) : '',
+                phone_primary: employee.phone_primary ? maskPhone(employee.phone_primary) : '',
                 admission_date: employee.admission_date ? formatDateForInput(employee.admission_date) : '',
                 birth_date: employee.birth_date ? formatDateForInput(employee.birth_date) : '',
                 dismissal_date: employee.dismissal_date ? formatDateForInput(employee.dismissal_date) : '',
@@ -201,6 +203,22 @@ export default function EmployeeEditModal({ show, onClose, onSuccess, employee, 
                                     required
                                 />
                                 <InputError message={errors.cpf} className="mt-1" />
+                            </div>
+
+                            <div>
+                                <InputLabel htmlFor="edit-phone_primary" value="Telefone / WhatsApp" />
+                                <TextInput
+                                    id="edit-phone_primary"
+                                    className="mt-1 w-full"
+                                    value={data.phone_primary}
+                                    onChange={(e) => setData('phone_primary', maskPhone(e.target.value))}
+                                    placeholder="(85) 98746-0451"
+                                    maxLength="16"
+                                />
+                                <p className="mt-1 text-xs text-gray-500">
+                                    Usado para identificar o colaborador quando ele contata o helpdesk via WhatsApp.
+                                </p>
+                                <InputError message={errors.phone_primary} className="mt-1" />
                             </div>
 
                             <div>

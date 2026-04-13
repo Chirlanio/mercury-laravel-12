@@ -5,7 +5,7 @@ import TextInput from '@/Components/TextInput';
 import InputLabel from '@/Components/InputLabel';
 import InputError from '@/Components/InputError';
 import Checkbox from '@/Components/Checkbox';
-import { maskCpf } from '@/Hooks/useMasks';
+import { maskCpf, maskPhone } from '@/Hooks/useMasks';
 import { UserPlusIcon } from '@heroicons/react/24/outline';
 
 export default function EmployeeCreateModal({ show, onClose, onSuccess, positions = [], stores = [], educationLevels = [] }) {
@@ -14,6 +14,7 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
         name: '',
         short_name: '',
         cpf: '',
+        phone_primary: '',
         admission_date: '',
         birth_date: '',
         dismissal_date: '',
@@ -159,6 +160,22 @@ export default function EmployeeCreateModal({ show, onClose, onSuccess, position
                             required
                         />
                         <InputError message={errors.cpf} className="mt-1" />
+                    </div>
+
+                    <div>
+                        <InputLabel htmlFor="create-phone_primary" value="Telefone / WhatsApp" />
+                        <TextInput
+                            id="create-phone_primary"
+                            className="mt-1 w-full"
+                            value={data.phone_primary}
+                            onChange={(e) => setData('phone_primary', maskPhone(e.target.value))}
+                            placeholder="(85) 98746-0451"
+                            maxLength="16"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                            Usado para identificar o colaborador quando ele contata o helpdesk via WhatsApp.
+                        </p>
+                        <InputError message={errors.phone_primary} className="mt-1" />
                     </div>
 
                     <div>

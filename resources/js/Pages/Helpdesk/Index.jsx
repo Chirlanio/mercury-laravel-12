@@ -11,7 +11,46 @@ import {
     ArrowDownTrayIcon,
     ChartBarIcon,
     ListBulletIcon,
+    GlobeAltIcon,
+    ChatBubbleLeftRightIcon,
+    EnvelopeIcon,
+    CodeBracketIcon,
+    ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline';
+
+/**
+ * Compact badge showing which channel a ticket originated from. The source
+ * field comes from the backend as one of: web, whatsapp, email, api, import.
+ */
+const SOURCE_ICONS = {
+    web: GlobeAltIcon,
+    whatsapp: ChatBubbleLeftRightIcon,
+    email: EnvelopeIcon,
+    api: CodeBracketIcon,
+    import: ArrowUpTrayIcon,
+};
+
+const SOURCE_COLORS = {
+    web: 'text-gray-500 bg-gray-100',
+    whatsapp: 'text-green-700 bg-green-100',
+    email: 'text-blue-700 bg-blue-100',
+    api: 'text-purple-700 bg-purple-100',
+    import: 'text-orange-700 bg-orange-100',
+};
+
+function SourceBadge({ source = 'web', label = 'Web' }) {
+    const Icon = SOURCE_ICONS[source] || GlobeAltIcon;
+    const color = SOURCE_COLORS[source] || SOURCE_COLORS.web;
+    return (
+        <span
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${color}`}
+            title={`Origem: ${label}`}
+        >
+            <Icon className="w-3 h-3" />
+            {label}
+        </span>
+    );
+}
 import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, PieChart, Pie, Cell, Legend,
@@ -130,7 +169,7 @@ function ReportsPanel({ reports, departments, filters, onFilterChange, onApplyFi
 }
 
 export default function Index({
-    tickets, filters, statusOptions, priorityOptions, departments, stores,
+    tickets, filters, statusOptions, priorityOptions, sourceOptions = {}, departments, stores,
     activeTab = 'tickets', canViewReports = false, reports = null,
 }) {
     const { hasPermission } = usePermissions();
@@ -147,6 +186,7 @@ export default function Index({
     const [localFilters, setLocalFilters] = useState({
         search: filters?.search || '', status: filters?.status || '',
         priority: filters?.priority || '', department_id: filters?.department_id || '',
+        source: filters?.source || '',
         date_from: filters?.date_from || '', date_to: filters?.date_to || '',
     });
     const [processing, setProcessing] = useState(false);
@@ -339,7 +379,17 @@ export default function Index({
 
     const columns = [
         { field: 'id', label: '#', sortable: true },
-        { field: 'title', label: 'Título', sortable: true },
+        {
+            field: 'title',
+            label: 'Título',
+            sortable: true,
+            render: (row) => (
+                <div className="flex items-center gap-2">
+                    <SourceBadge source={row.source} label={row.source_label} />
+                    <span className="truncate">{row.title}</span>
+                </div>
+            ),
+        },
         { field: 'requester_name', label: 'Solicitante' },
         { field: 'department_name', label: 'Departamento' },
         { field: 'priority_label', label: 'Prioridade', sortable: true, render: (row) => <StatusBadge variant={row.priority_color}>{row.priority_label}</StatusBadge> },
@@ -459,9 +509,14 @@ export default function Index({
                                     <option value="">Todos os departamentos</option>
                                     {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                                 </select>
-                                <div className="flex gap-2">
-                                    <Button variant="primary" size="sm" className="flex-1" onClick={handleFilter}>Filtrar</Button>
-                                    <Button variant="light" size="sm" onClick={() => { setLocalFilters({ search: '', status: '', priority: '', department_id: '', date_from: '', date_to: '' }); router.get(route('helpdesk.index')); }}>Limpar</Button>
+                                <select className="w-full border-gray-300 rounded-lg text-sm" value={localFilters.source}
+                                    onChange={e => setLocalFilters(p => ({ ...p, source: e.target.value }))}>
+                                    <option value="">Todos os canais</option>
+                                    {Object.entries(sourceOptions).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                                </select>
+                                <div className="flex gap-2 lg:col-span-4">
+                                    <Button variant="primary" size="sm" className="flex-1 sm:flex-initial" onClick={handleFilter}>Filtrar</Button>
+                                    <Button variant="light" size="sm" onClick={() => { setLocalFilters({ search: '', status: '', priority: '', department_id: '', source: '', date_from: '', date_to: '' }); router.get(route('helpdesk.index')); }}>Limpar</Button>
                                 </div>
                             </div>
                         )}

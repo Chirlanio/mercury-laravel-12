@@ -49,7 +49,7 @@ class HelpdeskController extends Controller
 
         $filters = $request->only([
             'search', 'status', 'priority', 'department_id',
-            'assigned_to_me', 'date_from', 'date_to',
+            'assigned_to_me', 'date_from', 'date_to', 'source',
         ]);
 
         $tickets = $this->helpdeskService->getTicketsForUser($user, $filters);
@@ -87,6 +87,8 @@ class HelpdeskController extends Controller
                 'priority_color' => $t->priority_color,
                 'is_overdue' => $t->is_overdue,
                 'sla_remaining_hours' => $t->sla_remaining_hours,
+                'source' => $t->source ?? 'web',
+                'source_label' => \App\Enums\HdTicketSource::tryFrom($t->source ?? 'web')?->label() ?? 'Web',
                 'created_at' => $t->created_at->format('d/m/Y H:i'),
             ]),
             'filters' => $filters,
@@ -95,6 +97,7 @@ class HelpdeskController extends Controller
             'reports' => $reports,
             'statusOptions' => HdTicket::STATUS_LABELS,
             'priorityOptions' => HdTicket::PRIORITY_LABELS,
+            'sourceOptions' => \App\Enums\HdTicketSource::labels(),
             'departments' => HdDepartment::active()->ordered()->get(['id', 'name']),
             'stores' => Store::orderBy('name')->get(['id', 'name', 'code']),
         ]);

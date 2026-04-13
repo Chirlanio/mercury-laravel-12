@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\Helpdesk\HelpdeskInteractionCreated;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,11 +14,20 @@ class HdInteraction extends Model
 
     protected $fillable = [
         'ticket_id', 'user_id', 'comment', 'type',
-        'old_value', 'new_value', 'is_internal',
+        'old_value', 'new_value', 'external_id', 'is_internal',
     ];
 
     protected $casts = [
         'is_internal' => 'boolean',
+    ];
+
+    /**
+     * Maps the Eloquent `created` lifecycle event to our custom
+     * HelpdeskInteractionCreated event, which the outbound pipeline
+     * listens to for WhatsApp reply dispatch.
+     */
+    protected $dispatchesEvents = [
+        'created' => HelpdeskInteractionCreated::class,
     ];
 
     public function ticket(): BelongsTo

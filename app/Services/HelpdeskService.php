@@ -55,6 +55,9 @@ class HelpdeskService
         if (! empty($filters['assigned_to_me'])) {
             $query->where('assigned_technician_id', $user->id);
         }
+        if (! empty($filters['source'])) {
+            $query->where('source', $filters['source']);
+        }
         if (! empty($filters['search'])) {
             $this->applySearch($query, (string) $filters['search']);
         }
