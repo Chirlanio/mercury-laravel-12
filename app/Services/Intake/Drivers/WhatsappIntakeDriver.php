@@ -2,6 +2,8 @@
 
 namespace App\Services\Intake\Drivers;
 
+use App\Models\HdArticle;
+use App\Models\HdArticleView;
 use App\Models\HdChannel;
 use App\Models\HdChatSession;
 use App\Models\HdDepartment;
@@ -57,6 +59,8 @@ class WhatsappIntakeDriver implements IntakeDriverInterface
 
     protected const STEP_AWAITING_DESCRIPTION = 'awaiting_description';
 
+    protected const STEP_AWAITING_KB_CONFIRMATION = 'awaiting_kb_confirmation';
+
     protected const MAX_CPF_ATTEMPTS = 2;
 
     public function __construct(
@@ -92,6 +96,7 @@ class WhatsappIntakeDriver implements IntakeDriverInterface
             self::STEP_AWAITING_CPF => $this->handleCpfInput($channel, $session, $message),
             self::STEP_AWAITING_CATEGORY => $this->handleCategoryChoice($channel, $session, $message),
             self::STEP_AWAITING_DESCRIPTION => $this->handleDescription($channel, $session, $message, $context),
+            self::STEP_AWAITING_KB_CONFIRMATION => $this->handleKbConfirmation($channel, $session, $message, $context),
             default => $this->startFlow($channel, $externalContact, reset: $session),
         };
     }
@@ -374,9 +379,162 @@ class WhatsappIntakeDriver implements IntakeDriverInterface
         }
 
         $departmentId = (int) ($session->context['department_id'] ?? 0);
+
+        // KB deflection attempt — try to match a published article to the
+        // description before creating the ticket. If a match exists, park
+        // the session on awaiting_kb_confirmation with the description and
+        // suggested article stored in context; the user can then reply
+        // "sim" to proceed with opening the ticket or "resolvido" to mark
+        // the article as deflecting this problem.
+        $suggested = $this->findKbSuggestion($message, $departmentId);
+        if ($suggested) {
+            $session->update([
+                'step' => self::STEP_AWAITING_KB_CONFIRMATION,
+                'context' => array_merge($session->context ?? [], [
+                    'pending_description' => $message,
+                    'kb_article_id' => $suggested->id,
+                    'kb_article_title' => $suggested->title,
+                ]),
+                'expires_at' => now()->addMinutes(self::SESSION_TTL_MINUTES),
+            ]);
+
+            // Record the view so the article's counter reflects it and
+            // analytics can later join this suggestion with the user's choice.
+            HdArticleView::create([
+                'article_id' => $suggested->id,
+                'user_id' => null,
+                'source' => 'intake_whatsapp',
+                'action' => 'viewed',
+                'created_at' => now(),
+            ]);
+            $suggested->increment('view_count');
+
+            $summary = $suggested->summary
+                ? "\n\n_{$suggested->summary}_"
+                : '';
+
+            return IntakeStep::ask(
+                "Antes de abrir o chamado, encontrei um artigo que pode resolver: *{$suggested->title}*"
+                .$summary
+                ."\n\n"
+                ."Responda:\n"
+                ."• *SIM* para abrir o chamado mesmo assim\n"
+                ."• *RESOLVIDO* se o artigo já resolveu seu problema",
+            );
+        }
+
+        return $this->createTicketFromSession($session, $channel, $message, $context);
+    }
+
+    /**
+     * Handle the yes/no after a KB suggestion. "sim/continuar/abrir" opens
+     * the ticket with the originally pending description; "li/resolvido/
+     * resolveu" logs a deflection view and closes the session without
+     * creating a ticket.
+     */
+    protected function handleKbConfirmation(HdChannel $channel, HdChatSession $session, string $message, array $context): IntakeStep
+    {
+        $normalized = mb_strtolower(trim($message));
+        $articleId = $session->context['kb_article_id'] ?? null;
+        $articleTitle = $session->context['kb_article_title'] ?? null;
+        $pendingDescription = $session->context['pending_description'] ?? '';
+
+        $positive = ['sim', 's', 'abrir', 'continuar', 'quero', 'abrir chamado'];
+        $deflect = ['resolvido', 'resolveu', 'li', 'ok', 'obrigado', 'não', 'nao'];
+
+        $looksPositive = in_array($normalized, $positive, true);
+        $looksDeflect = in_array($normalized, $deflect, true);
+
+        // User confirms the article solved their problem → log deflection,
+        // close session, no ticket is opened.
+        if ($looksDeflect && $articleId) {
+            HdArticleView::create([
+                'article_id' => $articleId,
+                'user_id' => null,
+                'source' => 'intake_whatsapp',
+                'action' => 'deflected',
+                'created_at' => now(),
+            ]);
+            $session->delete();
+
+            return IntakeStep::ask(
+                "Ótimo! Ficamos felizes que *{$articleTitle}* resolveu seu problema. 😊\n\n"
+                ."Se precisar de mais alguma coisa, é só mandar uma mensagem.",
+            );
+        }
+
+        // User wants to open the ticket anyway → proceed with the pending
+        // description that was captured BEFORE the KB suggestion.
+        if ($looksPositive) {
+            return $this->createTicketFromSession($session, $channel, $pendingDescription, $context);
+        }
+
+        // Re-prompt with the same choices.
+        return IntakeStep::ask(
+            "Não entendi. Responda:\n"
+            ."• *SIM* para abrir o chamado mesmo assim\n"
+            ."• *RESOLVIDO* se o artigo já resolveu seu problema",
+        );
+    }
+
+    /**
+     * Search the KB for a single top-match article for this description
+     * in the given department. Returns null if nothing matches or the
+     * score is too low to be worth suggesting. Runs against FULLTEXT on
+     * MySQL, falls back to LIKE on SQLite (tests).
+     */
+    protected function findKbSuggestion(string $description, int $departmentId): ?HdArticle
+    {
+        $q = trim($description);
+        if (mb_strlen($q) < 3) {
+            return null;
+        }
+
+        $query = HdArticle::published()->forDepartment($departmentId)->limit(1);
+
+        if (DB::connection()->getDriverName() === 'mysql') {
+            return $query
+                ->whereRaw('MATCH(title, summary, content_md) AGAINST (? IN NATURAL LANGUAGE MODE)', [$q])
+                ->orderByRaw('MATCH(title, summary, content_md) AGAINST (? IN NATURAL LANGUAGE MODE) DESC', [$q])
+                ->first();
+        }
+
+        // SQLite / other drivers: naive LIKE against any of the key words
+        // in the description. Strip common trailing punctuation (commas,
+        // periods) so "senha," still matches "senha". Caps at 10 tokens so
+        // the resulting SQL stays reasonable on long descriptions.
+        $tokens = collect(preg_split('/\s+/u', $q))
+            ->map(fn ($t) => rtrim($t, ",.;:!?"))
+            ->filter(fn ($t) => mb_strlen($t) >= 3)
+            ->take(10)
+            ->values();
+
+        if ($tokens->isEmpty()) {
+            return null;
+        }
+
+        return $query->where(function ($sub) use ($tokens) {
+            foreach ($tokens as $token) {
+                $like = '%'.$token.'%';
+                $sub->orWhere('title', 'like', $like)
+                    ->orWhere('summary', 'like', $like)
+                    ->orWhere('content_md', 'like', $like);
+            }
+        })->first();
+    }
+
+    /**
+     * Actually create the ticket from the session state. Extracted from
+     * handleDescription so it can be reused by handleKbConfirmation when
+     * the user declines the KB suggestion.
+     */
+    protected function createTicketFromSession(HdChatSession $session, HdChannel $channel, string $description, array $context): IntakeStep
+    {
+        $departmentId = (int) ($session->context['department_id'] ?? 0);
         $categoryId = $session->context['category_id'] ?? null;
         $employeeId = $session->context['employee_id'] ?? null;
         $identificationFailed = (bool) ($session->context['identification_failed'] ?? false);
+        $message = $description;
 
         $data = [
             'department_id' => $departmentId,

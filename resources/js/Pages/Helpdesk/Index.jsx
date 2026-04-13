@@ -21,6 +21,7 @@ import {
     ShieldCheckIcon,
     DocumentTextIcon,
     BookOpenIcon,
+    StarIcon,
 } from '@heroicons/react/24/outline';
 
 /**
@@ -143,6 +144,7 @@ const CHART_COLORS = ['#4f46e5', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#0
 
 function ReportsPanel({ reports, departments, filters, onFilterChange, onApplyFilter }) {
     const sla = reports?.slaCompliance;
+    const csat = reports?.csatOverview;
     const reportCards = [
         {
             label: 'Taxa SLA',
@@ -154,6 +156,13 @@ function ReportsPanel({ reports, departments, filters, onFilterChange, onApplyFi
         { label: 'Dentro do SLA', value: sla?.within_sla ?? 0, icon: CheckCircleIcon, color: 'green' },
         { label: 'SLA Violado', value: sla?.breached ?? 0, icon: ClockIcon, color: 'red' },
         { label: 'Tempo Médio', value: `${reports?.averageResolutionTime ?? 0}h`, icon: ClockIcon, color: 'blue' },
+        {
+            label: 'CSAT Médio',
+            value: csat?.total_submitted > 0 ? `${csat.average}★` : '—',
+            sub: csat?.total_submitted > 0 ? `${csat.total_submitted} avaliações · ${csat.response_rate}% resposta` : null,
+            icon: StarIcon,
+            color: csat?.average >= 4 ? 'green' : csat?.average >= 3 ? 'yellow' : 'red',
+        },
     ];
 
     return (
@@ -234,6 +243,96 @@ function ReportsPanel({ reports, departments, filters, onFilterChange, onApplyFi
                     )}
                 </div>
             </div>
+
+            {/* 4. CSAT section — only shown when there are submitted surveys.
+                   Distribution bar + top technicians + department ranking. */}
+            {csat && csat.total_submitted > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mt-4 sm:mt-6">
+                    <div className="bg-white shadow-sm rounded-lg p-4 sm:p-6">
+                        <h3 className="text-sm font-semibold text-gray-900 mb-3 sm:mb-4">
+                            Distribuição de avaliações
+                        </h3>
+                        <div className="space-y-2">
+                            {[5, 4, 3, 2, 1].map(star => {
+                                const count = csat.distribution[star] ?? 0;
+                                const pct = csat.total_submitted > 0
+                                    ? Math.round((count / csat.total_submitted) * 100)
+                                    : 0;
+                                return (
+                                    <div key={star} className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-700 w-8 shrink-0">{star}★</span>
+                                        <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                                            <div
+                                                className={`h-full rounded-full ${
+                                                    star >= 4 ? 'bg-green-500'
+                                                    : star === 3 ? 'bg-yellow-500'
+                                                    : 'bg-red-500'
+                                                }`}
+                                                style={{ width: `${pct}%` }}
+                                            />
+                                        </div>
+                                        <span className="text-xs text-gray-500 w-16 text-right shrink-0">
+                                            {count} ({pct}%)
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-500">
+                            <div className="grid grid-cols-3 gap-2 text-center">
+                                <div>
+                                    <div className="font-semibold text-green-600">{csat.nps_like.promoters}</div>
+                                    <div>Promotores</div>
+                                </div>
+                                <div>
+                                    <div className="font-semibold text-yellow-600">{csat.nps_like.passives}</div>
+                                    <div>Neutros</div>
+                                </div>
+                                <div>
+                                    <div className="font-semibold text-red-600">{csat.nps_like.detractors}</div>
+                                    <div>Detratores</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white shadow-sm rounded-lg p-4 sm:p-6">
+                        <h3 className="text-sm font-semibold text-gray-900 mb-3 sm:mb-4">
+                            Top técnicos por CSAT
+                        </h3>
+                        {reports?.csatByTechnician?.length > 0 ? (
+                            <ul className="space-y-2">
+                                {reports.csatByTechnician.map(t => (
+                                    <li key={t.user_id} className="flex items-center justify-between gap-2 py-2 border-b border-gray-100 last:border-0">
+                                        <span className="text-sm text-gray-800 truncate">{t.user_name || `#${t.user_id}`}</span>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <span className="text-sm font-semibold text-gray-900">{t.average}★</span>
+                                            <span className="text-xs text-gray-400">({t.total})</span>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-sm text-gray-400 text-center py-8">Sem dados ainda.</p>
+                        )}
+                        {reports?.csatByDepartment?.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-gray-100">
+                                <h4 className="text-xs font-semibold text-gray-700 uppercase mb-2">Por departamento</h4>
+                                <ul className="space-y-1">
+                                    {reports.csatByDepartment.map(d => (
+                                        <li key={d.department_id} className="flex items-center justify-between gap-2 text-xs">
+                                            <span className="text-gray-700 truncate">{d.department_name}</span>
+                                            <span className="text-gray-900 font-medium shrink-0">
+                                                {d.average}★ <span className="text-gray-400">({d.total})</span>
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -280,6 +379,13 @@ export default function Index({
     const [selectedPriority, setSelectedPriority] = useState(2);
     const [actionProcessing, setActionProcessing] = useState(false);
     const [actionError, setActionError] = useState('');
+
+    // KB deflection suggestions — debounced search against the article
+    // index as the user types the ticket title. When a suggestion is
+    // marked as "this resolved my problem", we call /helpdesk/kb/{id}/deflect
+    // and close the create modal so no ticket is opened.
+    const [kbSuggestions, setKbSuggestions] = useState([]);
+    const [kbDismissed, setKbDismissed] = useState(false);
 
     // Statistics
     const loadStatistics = () => {
@@ -358,6 +464,61 @@ export default function Index({
         { label: 'Resolvidos', value: stats?.resolved, icon: CheckCircleIcon, color: 'green' },
         { label: 'SLA Vencido', value: stats?.overdue, icon: ExclamationTriangleIcon, color: 'red' },
     ];
+
+    // KB article suggestions — debounced search while the user types the
+    // title in the create modal. Only runs when the create modal is open
+    // and the user hasn't dismissed the suggestions for this session.
+    useEffect(() => {
+        if (!modals.create || kbDismissed) {
+            setKbSuggestions([]);
+            return;
+        }
+        const query = (formData.title || '').trim();
+        if (query.length < 3) {
+            setKbSuggestions([]);
+            return;
+        }
+        const timer = setTimeout(() => {
+            const params = new URLSearchParams({ q: query });
+            if (formData.department_id) params.append('department_id', formData.department_id);
+            fetch(`${route('helpdesk.articles.search')}?${params.toString()}`, {
+                headers: { 'Accept': 'application/json' },
+            })
+                .then(res => res.json())
+                .then(data => setKbSuggestions(data.results || []))
+                .catch(() => setKbSuggestions([]));
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [formData.title, formData.department_id, modals.create, kbDismissed]);
+
+    // Reset KB state whenever the modal opens fresh
+    useEffect(() => {
+        if (modals.create) {
+            setKbDismissed(false);
+            setKbSuggestions([]);
+        }
+    }, [modals.create]);
+
+    const handleDeflect = async (articleId, articleTitle) => {
+        try {
+            await fetch(route('helpdesk.articles.deflect', articleId), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken(),
+                },
+                body: JSON.stringify({ source: 'intake_form' }),
+            });
+            toast.success(`Ótimo! Ficamos felizes que "${articleTitle}" resolveu seu problema.`, {
+                autoClose: 4000,
+            });
+            closeModal('create');
+            setFormData({ department_id: '', category_id: '', store_id: '', title: '', description: '', priority: 2 });
+        } catch {
+            toast.error('Erro ao registrar. Tente novamente.');
+        }
+    };
 
     // Load categories when department changes
     useEffect(() => {
@@ -842,6 +1003,64 @@ export default function Index({
                         <TextInput className="w-full mt-1" value={formData.title} onChange={e => setFormData(p => ({ ...p, title: e.target.value }))} />
                         <InputError message={errors.title} />
                     </div>
+
+                    {/* KB deflection suggestions — shown only while typing
+                        the title. If the user finds an article that solves
+                        their problem, clicking "Isso resolveu" logs a
+                        deflection event and closes the modal without
+                        creating a ticket. */}
+                    {!kbDismissed && kbSuggestions.length > 0 && (
+                        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                                <div className="flex items-center gap-2">
+                                    <BookOpenIcon className="w-4 h-4 text-blue-600 shrink-0" />
+                                    <span className="text-xs sm:text-sm font-medium text-blue-900">
+                                        {kbSuggestions.length === 1
+                                            ? 'Encontramos um artigo que pode ajudar:'
+                                            : `Encontramos ${kbSuggestions.length} artigos que podem ajudar:`}
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setKbDismissed(true)}
+                                    className="text-xs text-blue-600 hover:text-blue-800"
+                                    title="Dispensar"
+                                >
+                                    <XMarkIcon className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <ul className="space-y-2">
+                                {kbSuggestions.map(article => (
+                                    <li key={article.id} className="bg-white rounded p-2 border border-blue-100">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0 flex-1">
+                                                <a
+                                                    href={article.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline block truncate"
+                                                >
+                                                    {article.title}
+                                                </a>
+                                                {article.summary && (
+                                                    <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{article.summary}</p>
+                                                )}
+                                            </div>
+                                            <Button
+                                                variant="success"
+                                                size="xs"
+                                                onClick={() => handleDeflect(article.id, article.title)}
+                                                title="Marcar como resolvido e fechar"
+                                            >
+                                                Isso resolveu
+                                            </Button>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
                     <div className="mt-4">
                         <InputLabel value="Descrição *" />
                         <textarea className="w-full mt-1 border-gray-300 rounded-lg text-sm" rows={4} value={formData.description}

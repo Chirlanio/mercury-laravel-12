@@ -68,6 +68,9 @@ class HelpdeskController extends Controller
                 'slaCompliance' => $this->reportService->slaCompliance($reportFilters),
                 'distributionByDepartment' => $this->reportService->distributionByDepartment($reportFilters),
                 'averageResolutionTime' => $this->reportService->averageResolutionTime($reportFilters),
+                'csatOverview' => $this->reportService->csatOverview($reportFilters),
+                'csatByTechnician' => $this->reportService->csatByTechnician($reportFilters, 1, 5),
+                'csatByDepartment' => $this->reportService->csatByDepartment($reportFilters),
             ];
         }
 
