@@ -62,6 +62,19 @@ return [
     | caller.
     |
     */
+    /*
+    |--------------------------------------------------------------------------
+    | TaneIA (AI assistant microservice)
+    |--------------------------------------------------------------------------
+    |
+    | The Python microservice that backs the TaneIA assistant. The Laravel
+    | app only proxies prompts to this endpoint; all LLM logic lives there.
+    |
+    */
+    'taneia' => [
+        'url' => env('TANEIA_SERVICE_URL', 'http://localhost:8000/api/taneia'),
+    ],
+
     'evolution' => [
         'base_url' => env('EVOLUTION_API_URL', 'http://localhost:8085'),
         'api_key' => env('EVOLUTION_API_KEY'),

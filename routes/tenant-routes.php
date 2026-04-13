@@ -1092,12 +1092,18 @@ Route::middleware(['auth'])->group(function () {
     // ==========================================
     // TaneIA (AI assistant interface — backend proxies a Python microservice)
     // ==========================================
-    Route::prefix('taneia')->name('taneia.')->group(function () {
-        Route::get('/', [TaneiaController::class, 'index'])->name('index');
-        Route::post('/conversations', [TaneiaController::class, 'store'])->name('store');
-        Route::get('/conversations/{conversation}', [TaneiaController::class, 'show'])->name('show');
-        Route::post('/conversations/{conversation}/messages', [TaneiaController::class, 'sendMessage'])->name('send-message');
-    });
+    Route::middleware(['tenant.module:taneia', 'permission:'.Permission::VIEW_TANEIA->value])
+        ->prefix('taneia')
+        ->name('taneia.')
+        ->group(function () {
+            Route::get('/', [TaneiaController::class, 'index'])->name('index');
+            Route::get('/conversations/{conversation}', [TaneiaController::class, 'show'])->name('show');
+
+            Route::middleware('permission:'.Permission::SEND_TANEIA_MESSAGES->value)->group(function () {
+                Route::post('/conversations', [TaneiaController::class, 'store'])->name('store');
+                Route::post('/conversations/{conversation}/messages', [TaneiaController::class, 'sendMessage'])->name('send-message');
+            });
+        });
 
     // ==========================================
     // Placeholder Coming Soon

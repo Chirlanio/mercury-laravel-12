@@ -175,6 +175,11 @@ enum Permission: string
     case VIEW_HD_REPORTS = 'helpdesk.view_reports';
     case MANAGE_HD_PERMISSIONS = 'helpdesk.manage_permissions';
 
+    // TaneIA (assistente de IA)
+    case VIEW_TANEIA = 'taneia.view';
+    case SEND_TANEIA_MESSAGES = 'taneia.send';
+    case MANAGE_TANEIA = 'taneia.manage';
+
     public function label(): string
     {
         return match ($this) {
@@ -316,6 +321,10 @@ enum Permission: string
             self::MANAGE_HD_DEPARTMENTS => 'Gerenciar departamentos',
             self::VIEW_HD_REPORTS => 'Visualizar relatórios',
             self::MANAGE_HD_PERMISSIONS => 'Gerenciar permissões do helpdesk',
+            // TaneIA
+            self::VIEW_TANEIA => 'Visualizar TaneIA',
+            self::SEND_TANEIA_MESSAGES => 'Conversar com a TaneIA',
+            self::MANAGE_TANEIA => 'Gerenciar TaneIA',
         };
     }
 
@@ -460,6 +469,10 @@ enum Permission: string
             self::MANAGE_HD_DEPARTMENTS => 'Permite configurar departamentos e categorias',
             self::VIEW_HD_REPORTS => 'Permite visualizar relatórios do helpdesk',
             self::MANAGE_HD_PERMISSIONS => 'Permite gerenciar permissões de técnicos por departamento',
+            // TaneIA
+            self::VIEW_TANEIA => 'Permite acessar o módulo da assistente virtual TaneIA',
+            self::SEND_TANEIA_MESSAGES => 'Permite criar conversas e enviar mensagens para a TaneIA',
+            self::MANAGE_TANEIA => 'Permite gerenciar configurações e histórico global da TaneIA',
         };
     }
 

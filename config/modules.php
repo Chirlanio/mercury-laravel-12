@@ -220,4 +220,11 @@ return [
         'icon' => 'LifebuoyIcon',
         'dependencies' => ['users'],
     ],
+    'taneia' => [
+        'name' => 'TaneIA',
+        'description' => 'Assistente virtual de inteligência artificial (microsserviço Python).',
+        'routes' => ['taneia.*'],
+        'icon' => 'SparklesIcon',
+        'dependencies' => ['users'],
+    ],
 ];

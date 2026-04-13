@@ -162,6 +162,10 @@ enum Role: string
                 Permission::MANAGE_HD_DEPARTMENTS->value,
                 Permission::VIEW_HD_REPORTS->value,
                 Permission::MANAGE_HD_PERMISSIONS->value,
+                // TaneIA (todas)
+                Permission::VIEW_TANEIA->value,
+                Permission::SEND_TANEIA_MESSAGES->value,
+                Permission::MANAGE_TANEIA->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -286,6 +290,10 @@ enum Role: string
                 Permission::MANAGE_HD_DEPARTMENTS->value,
                 Permission::VIEW_HD_REPORTS->value,
                 Permission::MANAGE_HD_PERMISSIONS->value,
+                // TaneIA (todas)
+                Permission::VIEW_TANEIA->value,
+                Permission::SEND_TANEIA_MESSAGES->value,
+                Permission::MANAGE_TANEIA->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -345,6 +353,9 @@ enum Role: string
                 Permission::CREATE_TICKETS->value,
                 Permission::MANAGE_TICKETS->value,
                 Permission::VIEW_HD_REPORTS->value,
+                // TaneIA (view + send)
+                Permission::VIEW_TANEIA->value,
+                Permission::SEND_TANEIA_MESSAGES->value,
             ],
             self::USER => [
                 // Apenas próprio perfil
@@ -365,6 +376,9 @@ enum Role: string
                 // Helpdesk (view + create)
                 Permission::VIEW_HELPDESK->value,
                 Permission::CREATE_TICKETS->value,
+                // TaneIA (view + send)
+                Permission::VIEW_TANEIA->value,
+                Permission::SEND_TANEIA_MESSAGES->value,
             ],
             self::DRIVER => [
                 // Perfil próprio
@@ -381,6 +395,9 @@ enum Role: string
                 // Helpdesk (view + create)
                 Permission::VIEW_HELPDESK->value,
                 Permission::CREATE_TICKETS->value,
+                // TaneIA (view + send)
+                Permission::VIEW_TANEIA->value,
+                Permission::SEND_TANEIA_MESSAGES->value,
             ],
         };
     }

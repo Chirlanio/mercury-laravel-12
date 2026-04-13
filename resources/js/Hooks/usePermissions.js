@@ -166,6 +166,10 @@ export const PERMISSIONS = {
     MANAGE_HD_DEPARTMENTS: 'helpdesk.manage_departments',
     VIEW_HD_REPORTS: 'helpdesk.view_reports',
     MANAGE_HD_PERMISSIONS: 'helpdesk.manage_permissions',
+    // TaneIA
+    VIEW_TANEIA: 'taneia.view',
+    SEND_TANEIA_MESSAGES: 'taneia.send',
+    MANAGE_TANEIA: 'taneia.manage',
 };
 
 export const ROLES = {

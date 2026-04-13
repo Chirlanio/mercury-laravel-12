@@ -248,4 +248,12 @@ class User extends Authenticatable
     {
         return $this->belongsTo(\App\Models\AccessLevel::class);
     }
+
+    /**
+     * TaneIA assistant conversations owned by the user.
+     */
+    public function taneiaConversations(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Models\TaneiaConversation::class);
+    }
 }
