@@ -5,9 +5,12 @@ namespace Tests\Feature;
 use App\Enums\VacancyRequestType;
 use App\Enums\VacancyStatus;
 use App\Models\Employee;
+use App\Models\Position;
 use App\Models\Store;
 use App\Models\Vacancy;
+use App\Services\VacancyService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 use Tests\Traits\TestHelpers;
 
@@ -57,7 +60,6 @@ class VacancyControllerTest extends TestCase
             'store_id' => $this->store->code,
             'position_id' => 1,
             'request_type' => VacancyRequestType::HEADCOUNT_INCREASE->value,
-            'predicted_sla_days' => 30,
             'comments' => 'Crescimento da loja',
         ]);
 
@@ -82,7 +84,6 @@ class VacancyControllerTest extends TestCase
             'store_id' => $this->store->code,
             'position_id' => 1,
             'request_type' => VacancyRequestType::SUBSTITUTION->value,
-            'predicted_sla_days' => 30,
         ]);
 
         $response->assertSessionHasErrors('replaced_employee_id');
@@ -99,7 +100,6 @@ class VacancyControllerTest extends TestCase
             'position_id' => 1,
             'request_type' => VacancyRequestType::SUBSTITUTION->value,
             'replaced_employee_id' => $this->employee->id,
-            'predicted_sla_days' => 30,
         ]);
 
         $response->assertRedirect();
@@ -114,7 +114,10 @@ class VacancyControllerTest extends TestCase
     {
         $response = $this->actingAs($this->adminUser)->post(route('vacancies.store'), []);
 
-        $response->assertSessionHasErrors(['store_id', 'position_id', 'request_type', 'predicted_sla_days']);
+        $response->assertSessionHasErrors(['store_id', 'position_id', 'request_type']);
+        // predicted_sla_days NÃO é mais validado aqui — é calculado pelo
+        // VacancyService a partir do position.
+        $response->assertSessionDoesntHaveErrors(['predicted_sla_days', 'delivery_forecast']);
     }
 
     public function test_destroy_requires_reason(): void
@@ -143,21 +146,66 @@ class VacancyControllerTest extends TestCase
         $this->assertEquals($this->adminUser->id, $fresh->deleted_by_user_id);
     }
 
-    public function test_delivery_forecast_defaults_to_today_plus_sla(): void
+    public function test_managerial_position_applies_40_day_sla(): void
     {
+        // Position id=1 (Vendedor) no TestHelpers tem level_category_id=1,
+        // o mesmo id usado pelo PositionLevelSeeder para "Gerencial" em
+        // producao. Tratamos como gerencial nos testes.
         $this->actingAs($this->adminUser)->post(route('vacancies.store'), [
             'store_id' => $this->store->code,
             'position_id' => 1,
             'request_type' => VacancyRequestType::HEADCOUNT_INCREASE->value,
-            'predicted_sla_days' => 15,
         ]);
 
         $vacancy = Vacancy::first();
-        $this->assertNotNull($vacancy->delivery_forecast);
+        $this->assertEquals(VacancyService::SLA_MANAGERIAL_DAYS, $vacancy->predicted_sla_days);
         $this->assertEquals(
-            now()->addDays(15)->toDateString(),
+            now()->addDays(VacancyService::SLA_MANAGERIAL_DAYS)->toDateString(),
             $vacancy->delivery_forecast->toDateString()
         );
+    }
+
+    public function test_operational_position_applies_20_day_sla(): void
+    {
+        // Cria uma position com level_category_id=2 (operacional) só pra
+        // este teste, pois o TestHelpers so semeia category_id=1.
+        $operationalPositionId = DB::table('positions')->insertGetId([
+            'name' => 'Caixa',
+            'level' => 'Junior',
+            'level_category_id' => 2,
+            'status_id' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($this->adminUser)->post(route('vacancies.store'), [
+            'store_id' => $this->store->code,
+            'position_id' => $operationalPositionId,
+            'request_type' => VacancyRequestType::HEADCOUNT_INCREASE->value,
+        ]);
+
+        $vacancy = Vacancy::where('position_id', $operationalPositionId)->first();
+        $this->assertNotNull($vacancy);
+        $this->assertEquals(VacancyService::SLA_OPERATIONAL_DAYS, $vacancy->predicted_sla_days);
+        $this->assertEquals(
+            now()->addDays(VacancyService::SLA_OPERATIONAL_DAYS)->toDateString(),
+            $vacancy->delivery_forecast->toDateString()
+        );
+    }
+
+    public function test_sla_in_payload_is_ignored_on_create(): void
+    {
+        // Mesmo se o cliente insistir em mandar predicted_sla_days, o
+        // backend ignora e aplica o SLA resolvido do position.
+        $this->actingAs($this->adminUser)->post(route('vacancies.store'), [
+            'store_id' => $this->store->code,
+            'position_id' => 1,
+            'request_type' => VacancyRequestType::HEADCOUNT_INCREASE->value,
+            'predicted_sla_days' => 7, // tentando forçar 7 dias
+        ]);
+
+        $vacancy = Vacancy::first();
+        $this->assertEquals(VacancyService::SLA_MANAGERIAL_DAYS, $vacancy->predicted_sla_days);
     }
 
     public function test_show_returns_detailed_vacancy(): void
@@ -193,8 +241,8 @@ class VacancyControllerTest extends TestCase
             'position_id' => 1,
             'request_type' => VacancyRequestType::HEADCOUNT_INCREASE->value,
             'status' => VacancyStatus::OPEN->value,
-            'predicted_sla_days' => 30,
-            'delivery_forecast' => now()->addDays(30),
+            'predicted_sla_days' => VacancyService::SLA_MANAGERIAL_DAYS,
+            'delivery_forecast' => now()->addDays(VacancyService::SLA_MANAGERIAL_DAYS),
             'created_by_user_id' => $this->adminUser->id,
         ], $overrides));
     }

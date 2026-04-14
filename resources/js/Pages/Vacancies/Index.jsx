@@ -37,6 +37,7 @@ export default function Index({
     isStoreScoped = false,
     scopedStoreCode = null,
     selects = {},
+    slaDefaults = { managerial_days: 40, operational_days: 20, managerial_category_id: 1 },
 }) {
     const { hasPermission } = usePermissions();
     const canCreate = hasPermission(PERMISSIONS.CREATE_VACANCIES);
@@ -49,14 +50,16 @@ export default function Index({
     ]);
 
     // Form states
+    // predicted_sla_days e delivery_forecast NÃO estão no create — são
+    // calculados automaticamente no backend a partir do level_category_id
+    // da position (gerencial=40d / operacional=20d). Só o recrutador pode
+    // ajustar depois via edit.
     const emptyCreate = {
         store_id: scopedStoreCode || '',
         position_id: '',
         work_schedule_id: '',
         request_type: 'headcount_increase',
         replaced_employee_id: '',
-        predicted_sla_days: 30,
-        delivery_forecast: '',
         comments: '',
     };
     const [createForm, setCreateForm] = useState(emptyCreate);
@@ -509,7 +512,7 @@ export default function Index({
                             {createErrors.position_id && <p className="mt-1 text-xs text-red-600">{createErrors.position_id}</p>}
                         </div>
 
-                        <div>
+                        <div className="md:col-span-2">
                             <label className="block text-sm font-medium text-gray-700 mb-1">Escala de Trabalho</label>
                             <select
                                 value={createForm.work_schedule_id}
@@ -522,31 +525,32 @@ export default function Index({
                                 ))}
                             </select>
                         </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">SLA Previsto (dias) *</label>
-                            <input
-                                type="number"
-                                min="1"
-                                max="365"
-                                value={createForm.predicted_sla_days}
-                                onChange={(e) => setCreateForm({ ...createForm, predicted_sla_days: e.target.value })}
-                                className="w-full rounded-md border-gray-300 shadow-sm"
-                            />
-                            {createErrors.predicted_sla_days && <p className="mt-1 text-xs text-red-600">{createErrors.predicted_sla_days}</p>}
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Data Prevista (opcional)</label>
-                            <input
-                                type="date"
-                                value={createForm.delivery_forecast}
-                                onChange={(e) => setCreateForm({ ...createForm, delivery_forecast: e.target.value })}
-                                className="w-full rounded-md border-gray-300 shadow-sm"
-                            />
-                            <p className="mt-1 text-xs text-gray-500">Se vazio, será calculado: hoje + SLA</p>
-                        </div>
                     </div>
+
+                    {/* Preview do SLA automático baseado na position escolhida */}
+                    {createForm.position_id && (() => {
+                        const pos = (selects.positions || []).find(p => String(p.id) === String(createForm.position_id));
+                        if (!pos) return null;
+                        const isManagerial = Number(pos.level_category_id) === Number(slaDefaults.managerial_category_id);
+                        const slaDays = isManagerial ? slaDefaults.managerial_days : slaDefaults.operational_days;
+                        const forecast = new Date();
+                        forecast.setDate(forecast.getDate() + slaDays);
+                        return (
+                            <div className="mt-4 p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
+                                <p className="text-xs font-semibold text-indigo-700 uppercase">
+                                    SLA aplicado automaticamente
+                                </p>
+                                <p className="text-sm text-indigo-900 mt-1">
+                                    <strong>{slaDays} dias</strong> — {isManagerial ? 'cargo gerencial' : 'cargo operacional'}
+                                    <span className="text-indigo-600"> · Prazo previsto: </span>
+                                    <strong>{forecast.toLocaleDateString('pt-BR')}</strong>
+                                </p>
+                                <p className="mt-1 text-xs text-indigo-500 italic">
+                                    Somente o recrutador pode ajustar o SLA depois da criação, se necessário.
+                                </p>
+                            </div>
+                        );
+                    })()}
                 </StandardModal.Section>
 
                 <StandardModal.Section title="Observações">

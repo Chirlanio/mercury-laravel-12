@@ -14,6 +14,9 @@ use App\Models\WorkSchedule;
 use App\Services\VacancyIntegrationService;
 use App\Services\VacancyService;
 use App\Services\VacancyTransitionService;
+// SLA constants used in the Inertia payload so the frontend can preview
+// "qual SLA será aplicado" conforme o cargo escolhido, sem precisar de
+// um endpoint dedicado.
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -94,8 +97,16 @@ class VacancyController extends Controller
                 'stores' => $scopedStoreCode
                     ? Store::where('code', $scopedStoreCode)->get(['id', 'code', 'name'])
                     : Store::orderBy('name')->get(['id', 'code', 'name']),
-                'positions' => Position::orderBy('name')->get(['id', 'name']),
+                // Inclui level_category_id para o frontend calcular o SLA
+                // que será aplicado (40d Gerencial / 20d operacional) antes
+                // mesmo de submeter o form.
+                'positions' => Position::orderBy('name')->get(['id', 'name', 'level_category_id']),
                 'workSchedules' => WorkSchedule::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            ],
+            'slaDefaults' => [
+                'managerial_days' => VacancyService::SLA_MANAGERIAL_DAYS,
+                'operational_days' => VacancyService::SLA_OPERATIONAL_DAYS,
+                'managerial_category_id' => 1,
             ],
         ]);
     }
@@ -117,14 +128,16 @@ class VacancyController extends Controller
         $user = $request->user();
         $scopedStoreCode = $this->resolveScopedStoreCode($user);
 
+        // predicted_sla_days e delivery_forecast NÃO são aceitos aqui — o
+        // SLA é resolvido automaticamente do nível da position (Gerencial
+        // = 40d, Operacional = 20d). Só o recrutador pode ajustar depois,
+        // via update() que exige permissão EDIT_VACANCIES.
         $data = $request->validate([
             'store_id' => 'required|string|max:10|exists:stores,code',
             'position_id' => 'required|exists:positions,id',
             'work_schedule_id' => 'nullable|exists:work_schedules,id',
             'request_type' => 'required|in:substitution,headcount_increase,floater',
             'replaced_employee_id' => 'nullable|exists:employees,id',
-            'predicted_sla_days' => 'required|integer|min:1|max:365',
-            'delivery_forecast' => 'nullable|date',
             'comments' => 'nullable|string|max:5000',
         ]);
 

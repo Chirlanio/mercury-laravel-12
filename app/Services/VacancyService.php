@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\VacancyRequestType;
 use App\Enums\VacancyStatus;
+use App\Models\Position;
 use App\Models\User;
 use App\Models\Vacancy;
 use App\Models\VacancyStatusHistory;
@@ -17,7 +18,14 @@ use Illuminate\Validation\ValidationException;
  *
  * Regras principais:
  *  - request_type=substitution exige replaced_employee_id
- *  - delivery_forecast default = created_at + predicted_sla_days
+ *  - SLA NUNCA vem do payload de criação. É resolvido automaticamente do
+ *    `level_category_id` da position:
+ *      - Gerencial (level_category_id=1) → 40 dias
+ *      - Qualquer outra (Operacional, Aprendiz, etc.) → 20 dias
+ *    Apenas usuários com EDIT_VACANCIES (recrutadores/RH) podem alterar
+ *    o SLA depois via update() — gestores de loja que só têm CREATE
+ *    nunca conseguem mudar o SLA.
+ *  - delivery_forecast = created_at + SLA resolvido
  *  - Toda criação dispara entrada inicial em vacancy_status_history
  *    (from_status=null, to_status=open)
  *  - delete é soft-delete com motivo obrigatório
@@ -25,7 +33,32 @@ use Illuminate\Validation\ValidationException;
 class VacancyService
 {
     /**
+     * SLA padrão em dias para vagas gerenciais (level_category_id=1).
+     */
+    public const SLA_MANAGERIAL_DAYS = 40;
+
+    /**
+     * SLA padrão em dias para vagas operacionais / demais categorias.
+     */
+    public const SLA_OPERATIONAL_DAYS = 20;
+
+    /**
+     * Resolve o SLA padrão em dias a partir do nível da position.
+     * Gerencial (category 1) → 40. Qualquer outra → 20.
+     */
+    public function resolveSlaForPosition(Position $position): int
+    {
+        return (int) $position->level_category_id === 1
+            ? self::SLA_MANAGERIAL_DAYS
+            : self::SLA_OPERATIONAL_DAYS;
+    }
+
+    /**
      * Cria uma nova vaga e registra a entrada inicial no histórico.
+     *
+     * O SLA é calculado automaticamente a partir do position — o payload
+     * NÃO deve conter predicted_sla_days. Apenas o recrutador, via update(),
+     * pode alterar o SLA depois da criação.
      *
      * @throws ValidationException quando replaced_employee_id falta num tipo substitution
      */
@@ -34,13 +67,13 @@ class VacancyService
         $this->validateRequestTypeRules($data);
 
         return DB::transaction(function () use ($data, $actor) {
-            $predictedSla = (int) $data['predicted_sla_days'];
-            $deliveryForecast = $data['delivery_forecast']
-                ?? Carbon::today()->addDays($predictedSla)->toDateString();
+            $position = Position::findOrFail($data['position_id']);
+            $predictedSla = $this->resolveSlaForPosition($position);
+            $deliveryForecast = Carbon::today()->addDays($predictedSla)->toDateString();
 
             $vacancy = Vacancy::create([
                 'store_id' => $data['store_id'],
-                'position_id' => $data['position_id'],
+                'position_id' => $position->id,
                 'work_schedule_id' => $data['work_schedule_id'] ?? null,
                 'request_type' => $data['request_type'],
                 'replaced_employee_id' => $data['replaced_employee_id'] ?? null,
