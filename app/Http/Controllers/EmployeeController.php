@@ -315,6 +315,15 @@ class EmployeeController extends Controller
     {
         $employee = Employee::findOrFail($id);
 
+        // Captura o status ANTES do update para detectar a ativação de
+        // funcionário pré-cadastrado (status 1 = Pendente → qualquer outro).
+        // Pré-cadastros são criados pelo VacancyIntegrationService ao
+        // finalizar uma vaga, propositalmente SEM EmploymentContract nem
+        // ExperienceEvaluations. Quando o DP completa os dados e muda o
+        // status, criamos o contrato de admissão e as avaliações 45/90d
+        // aqui — mesma lógica do store(), mas defensiva contra duplicatas.
+        $wasPending = (int) $employee->status_id === 1;
+
         // Limpar CPF removendo máscara
         $cleanCpf = $request->cpf ? preg_replace('/[^0-9]/', '', $request->cpf) : '';
 
@@ -409,12 +418,87 @@ class EmployeeController extends Controller
 
             $employee->update($data);
 
+            // === ATIVAÇÃO DE PRÉ-CADASTRO ===
+            // Se o funcionário estava Pendente (status 1) e saiu de Pendente
+            // nesta edição, criamos contrato de admissão + avaliações de
+            // experiência 45/90d — replicando a lógica do store(), mas com
+            // checks defensivos para nunca criar duplicatas.
+            $isNowActivated = $wasPending && (int) $employee->status_id !== 1;
+            if ($isNowActivated) {
+                $this->activatePreRegisteredEmployee($employee);
+            }
+
             return redirect()->route('employees.index')->with('success', 'Funcionário atualizado com sucesso!');
 
         } catch (Exception $e) {
             return redirect()->back()->withErrors([
                 'general' => 'Erro ao atualizar funcionário: '.$e->getMessage(),
             ])->withInput();
+        }
+    }
+
+    /**
+     * Completa a ativação de um funcionário pré-cadastrado: cria o contrato
+     * de admissão (type=Admissão) e as avaliações de experiência 45/90d.
+     *
+     * Chamado quando status_id transita de 1 (Pendente) para qualquer outro
+     * estado. Idempotente: skipa a criação do contrato se já existir um
+     * ativo, e skipa cada avaliação individualmente se já existir para o
+     * milestone. Isso protege contra cenários de re-ativação ou edições
+     * que não deveriam duplicar registros.
+     */
+    protected function activatePreRegisteredEmployee(Employee $employee): void
+    {
+        // Contrato: só cria se não houver um ativo para este employee
+        $hasActiveContract = EmploymentContract::where('employee_id', $employee->id)
+            ->where('is_active', true)
+            ->exists();
+
+        if (! $hasActiveContract) {
+            EmploymentContract::create([
+                'employee_id' => $employee->id,
+                'position_id' => $employee->position_id,
+                'movement_type_id' => 1, // Admissão
+                'store_id' => $employee->store_id,
+                'start_date' => $employee->admission_date,
+                'end_date' => null,
+                'is_active' => true,
+            ]);
+        }
+
+        // Avaliações 45/90d: só cria se admission_date existir e se a
+        // avaliação específica do milestone ainda não existir para este
+        // employee. Evita duplicatas numa re-ativação.
+        if (! $employee->admission_date) {
+            return;
+        }
+
+        $admissionDate = Carbon::parse($employee->admission_date);
+        $managerId = auth()->id();
+
+        foreach ([45, 90] as $milestone) {
+            $existing = ExperienceEvaluation::where('employee_id', $employee->id)
+                ->where('milestone', (string) $milestone)
+                ->exists();
+
+            if ($existing) {
+                continue;
+            }
+
+            $evaluation = ExperienceEvaluation::create([
+                'employee_id' => $employee->id,
+                'manager_id' => $managerId,
+                'store_id' => $employee->store_id,
+                'milestone' => (string) $milestone,
+                'date_admission' => $admissionDate,
+                'milestone_date' => $admissionDate->copy()->addDays($milestone),
+                'employee_token' => Str::random(64),
+            ]);
+
+            SendExperienceNotificationJob::dispatch(
+                $evaluation->id,
+                ExperienceNotification::TYPE_CREATED
+            );
         }
     }
 
