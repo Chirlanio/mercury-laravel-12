@@ -1,0 +1,264 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Enums\VacancyRequestType;
+use App\Enums\VacancyStatus;
+use App\Events\PersonnelMovementCreated;
+use App\Models\Employee;
+use App\Models\EmploymentContract;
+use App\Models\ExperienceEvaluation;
+use App\Models\PersonnelMovement;
+use App\Models\Store;
+use App\Models\Vacancy;
+use App\Services\VacancyIntegrationService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
+use Tests\TestCase;
+use Tests\Traits\TestHelpers;
+
+class VacancyIntegrationTest extends TestCase
+{
+    use RefreshDatabase, TestHelpers;
+
+    protected Store $store;
+
+    protected Employee $employee;
+
+    protected VacancyIntegrationService $service;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->setUpTestData();
+
+        $this->store = Store::factory()->create(['code' => 'Z424', 'name' => 'Loja']);
+        $this->employee = Employee::factory()->create([
+            'name' => 'Funcionário A',
+            'store_id' => $this->store->code,
+            'position_id' => 1,
+            'status_id' => 2,
+            'area_id' => 1,
+        ]);
+
+        $this->service = app(VacancyIntegrationService::class);
+    }
+
+    // ------------------------------------------------------------------
+    // Fluxo Desligamento → Vaga
+    // ------------------------------------------------------------------
+
+    public function test_dismissal_with_open_vacancy_flag_creates_substitution_vacancy(): void
+    {
+        $movement = PersonnelMovement::create([
+            'type' => PersonnelMovement::TYPE_DISMISSAL,
+            'employee_id' => $this->employee->id,
+            'store_id' => $this->store->code,
+            'status' => PersonnelMovement::STATUS_PENDING,
+            'last_day_worked' => now()->addDays(10),
+            'open_vacancy' => true,
+            'created_by_user_id' => $this->adminUser->id,
+        ]);
+
+        $vacancy = $this->service->suggestVacancyForDismissal($movement);
+
+        $this->assertNotNull($vacancy);
+        $this->assertEquals(VacancyStatus::OPEN->value, $vacancy->status->value);
+        $this->assertEquals(VacancyRequestType::SUBSTITUTION->value, $vacancy->request_type->value);
+        $this->assertEquals($this->employee->id, $vacancy->replaced_employee_id);
+        $this->assertEquals($movement->id, $vacancy->origin_movement_id);
+        $this->assertEquals($this->store->code, $vacancy->store_id);
+    }
+
+    public function test_dismissal_without_open_vacancy_flag_does_not_create_vacancy(): void
+    {
+        $movement = PersonnelMovement::create([
+            'type' => PersonnelMovement::TYPE_DISMISSAL,
+            'employee_id' => $this->employee->id,
+            'store_id' => $this->store->code,
+            'status' => PersonnelMovement::STATUS_PENDING,
+            'open_vacancy' => false,
+            'created_by_user_id' => $this->adminUser->id,
+        ]);
+
+        $result = $this->service->suggestVacancyForDismissal($movement);
+
+        $this->assertNull($result);
+        $this->assertEquals(0, Vacancy::count());
+    }
+
+    public function test_non_dismissal_movement_does_not_create_vacancy(): void
+    {
+        $movement = PersonnelMovement::create([
+            'type' => PersonnelMovement::TYPE_PROMOTION,
+            'employee_id' => $this->employee->id,
+            'store_id' => $this->store->code,
+            'status' => PersonnelMovement::STATUS_PENDING,
+            'open_vacancy' => true, // mesmo com flag true, não é dismissal
+            'created_by_user_id' => $this->adminUser->id,
+        ]);
+
+        $result = $this->service->suggestVacancyForDismissal($movement);
+
+        $this->assertNull($result);
+    }
+
+    public function test_duplicate_suggestion_returns_existing_vacancy(): void
+    {
+        $movement = PersonnelMovement::create([
+            'type' => PersonnelMovement::TYPE_DISMISSAL,
+            'employee_id' => $this->employee->id,
+            'store_id' => $this->store->code,
+            'status' => PersonnelMovement::STATUS_PENDING,
+            'open_vacancy' => true,
+            'created_by_user_id' => $this->adminUser->id,
+        ]);
+
+        $first = $this->service->suggestVacancyForDismissal($movement);
+        $second = $this->service->suggestVacancyForDismissal($movement);
+
+        $this->assertEquals($first->id, $second->id);
+        $this->assertEquals(1, Vacancy::count());
+    }
+
+    // ------------------------------------------------------------------
+    // Fluxo Finalização → Pré-cadastro de Employee
+    // ------------------------------------------------------------------
+
+    public function test_finalizing_vacancy_creates_pre_registered_employee_with_status_pendente(): void
+    {
+        $vacancy = $this->createInAdmissionVacancy();
+
+        $hired = $this->service->preRegisterEmployeeFromVacancy(
+            $vacancy,
+            [
+                'name' => 'Maria Contratada',
+                'cpf' => '12345678901',
+                'date_admission' => now()->toDateString(),
+            ],
+            $this->adminUser
+        );
+
+        $this->assertNotNull($hired);
+        $this->assertEquals('Maria Contratada', $hired->name);
+        $this->assertEquals('12345678901', $hired->cpf);
+        $this->assertEquals(1, $hired->status_id); // Pendente
+        $this->assertEquals($this->store->code, $hired->store_id);
+        $this->assertEquals($vacancy->position_id, $hired->position_id);
+    }
+
+    public function test_pre_registered_employee_does_not_trigger_employment_contract_creation(): void
+    {
+        $vacancy = $this->createInAdmissionVacancy();
+
+        $hired = $this->service->preRegisterEmployeeFromVacancy(
+            $vacancy,
+            [
+                'name' => 'Sem Contrato',
+                'cpf' => '98765432100',
+                'date_admission' => now()->toDateString(),
+            ],
+            $this->adminUser
+        );
+
+        // Nenhum EmploymentContract para este employee
+        if (class_exists(EmploymentContract::class)) {
+            $this->assertEquals(
+                0,
+                EmploymentContract::where('employee_id', $hired->id)->count()
+            );
+        }
+
+        // Nenhuma ExperienceEvaluation para este employee
+        if (class_exists(ExperienceEvaluation::class)) {
+            $this->assertEquals(
+                0,
+                ExperienceEvaluation::where('employee_id', $hired->id)->count()
+            );
+        }
+    }
+
+    public function test_vacancy_hired_employee_id_points_to_pre_registered_employee(): void
+    {
+        $vacancy = $this->createInAdmissionVacancy();
+
+        $hired = $this->service->preRegisterEmployeeFromVacancy(
+            $vacancy,
+            [
+                'name' => 'Apontamento',
+                'cpf' => '11122233344',
+                'date_admission' => now()->toDateString(),
+            ],
+            $this->adminUser
+        );
+
+        $fresh = $vacancy->fresh();
+        $this->assertEquals($hired->id, $fresh->hired_employee_id);
+        $this->assertEquals(VacancyStatus::FINALIZED->value, $fresh->status->value);
+        $this->assertNotNull($fresh->effective_sla_days);
+    }
+
+    public function test_finalizing_vacancy_requires_name_cpf_and_date_admission(): void
+    {
+        $vacancy = $this->createInAdmissionVacancy();
+
+        $this->expectException(ValidationException::class);
+        $this->service->preRegisterEmployeeFromVacancy(
+            $vacancy,
+            ['name' => '', 'cpf' => '', 'date_admission' => ''],
+            $this->adminUser
+        );
+    }
+
+    public function test_cpf_uniqueness_is_validated_during_pre_registration(): void
+    {
+        $vacancy = $this->createInAdmissionVacancy();
+        // Employee com CPF já existente
+        $existingCpf = $this->employee->cpf ?: '55544433322';
+        Employee::where('id', $this->employee->id)->update(['cpf' => $existingCpf]);
+
+        $this->expectException(ValidationException::class);
+        $this->service->preRegisterEmployeeFromVacancy(
+            $vacancy,
+            ['name' => 'Duplicata', 'cpf' => $existingCpf, 'date_admission' => now()->toDateString()],
+            $this->adminUser
+        );
+    }
+
+    public function test_cannot_finalize_vacancy_in_open_status(): void
+    {
+        // Vaga em status=open não pode ir direto para finalized
+        $vacancy = Vacancy::create([
+            'store_id' => $this->store->code,
+            'position_id' => 1,
+            'request_type' => VacancyRequestType::HEADCOUNT_INCREASE->value,
+            'status' => VacancyStatus::OPEN->value,
+            'predicted_sla_days' => 30,
+            'delivery_forecast' => now()->addDays(30),
+            'created_by_user_id' => $this->adminUser->id,
+        ]);
+
+        $this->expectException(ValidationException::class);
+        $this->service->preRegisterEmployeeFromVacancy(
+            $vacancy,
+            ['name' => 'X', 'cpf' => '77788899900', 'date_admission' => now()->toDateString()],
+            $this->adminUser
+        );
+    }
+
+    // ------------------------------------------------------------------
+
+    protected function createInAdmissionVacancy(): Vacancy
+    {
+        return Vacancy::create([
+            'store_id' => $this->store->code,
+            'position_id' => 1,
+            'request_type' => VacancyRequestType::HEADCOUNT_INCREASE->value,
+            'status' => VacancyStatus::IN_ADMISSION->value,
+            'recruiter_id' => $this->supportUser->id,
+            'predicted_sla_days' => 30,
+            'delivery_forecast' => now()->addDays(30),
+            'created_by_user_id' => $this->adminUser->id,
+        ]);
+    }
+}

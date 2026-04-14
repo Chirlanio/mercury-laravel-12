@@ -143,10 +143,12 @@ class CentralNavigationSeeder extends Seeder
             '/movements' => 'movements',
             '/vacations' => 'vacations',
             '/personnel-movements' => 'personnel_movements',
+            '/vacancies' => 'vacancies',
             '/trainings' => 'training',
             '/my-trainings' => 'training',
             '/training-reports' => 'training',
             '/experience-tracker' => 'experience-tracker',
+            '/helpdesk/departamento-pessoal' => 'helpdesk',
         ];
 
         $pages = [
@@ -190,12 +192,14 @@ class CentralNavigationSeeder extends Seeder
             ['route' => '/movements', 'page_name' => 'Movimentações', 'icon' => 'fas fa-arrows-alt'],
             ['route' => '/vacations', 'page_name' => 'Férias', 'icon' => 'fas fa-umbrella-beach'],
             ['route' => '/personnel-movements', 'page_name' => 'Movimentação de Pessoal', 'icon' => 'fas fa-people-arrows'],
+            ['route' => '/vacancies', 'page_name' => 'Abertura de Vagas', 'icon' => 'fas fa-briefcase'],
             ['route' => '/trainings', 'page_name' => 'Treinamentos', 'icon' => 'fas fa-graduation-cap'],
             ['route' => '/my-trainings', 'page_name' => 'Meus Treinamentos', 'icon' => 'fas fa-book-reader'],
             ['route' => '/training-reports', 'page_name' => 'Relatórios de Treinamento', 'icon' => 'fas fa-chart-bar'],
             ['route' => '/experience-tracker', 'page_name' => 'Avaliação de Experiência', 'icon' => 'fas fa-clipboard-check'],
             ['route' => '/config/stock-audit-cycles', 'page_name' => 'Ciclos de Auditoria', 'icon' => 'fas fa-cog'],
             ['route' => '/config/stock-audit-vendors', 'page_name' => 'Empresas Auditoras', 'icon' => 'fas fa-cog'],
+            ['route' => '/helpdesk/departamento-pessoal', 'page_name' => 'Solicitações DP', 'icon' => 'fa-solid fa-headset'],
             ['route' => '/logout', 'page_name' => 'Sair', 'icon' => 'fas fa-sign-out-alt', 'is_public' => true],
         ];
 
@@ -270,12 +274,14 @@ class CentralNavigationSeeder extends Seeder
             '/movements' => 'Comercial',
             '/vacations' => 'RH',
             '/personnel-movements' => 'RH',
+            '/vacancies' => 'RH',
             '/trainings' => 'RH',
             '/my-trainings' => 'RH',
             '/training-reports' => 'RH',
             '/experience-tracker' => 'RH',
             '/config/stock-audit-cycles' => 'Configurações',
             '/config/stock-audit-vendors' => 'Configurações',
+            '/helpdesk/departamento-pessoal' => 'Departamento Pessoal',
             '/logout' => 'Sair',
         ];
 
@@ -291,10 +297,12 @@ class CentralNavigationSeeder extends Seeder
             '/user-sessions', '/work-shifts', '/work-schedules', '/activity-logs',
             '/store-goals', '/movements', '/vacations', '/stock-audits',
             '/personnel-movements',
+            '/vacancies',
             '/trainings',
             '/my-trainings',
             '/training-reports',
             '/experience-tracker',
+            '/helpdesk/departamento-pessoal',
         ];
 
         $userRoutes = ['/dashboard', '/logout', '/my-trainings', '/trainings'];

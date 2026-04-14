@@ -73,6 +73,7 @@ use App\Http\Controllers\MovementController;
 use App\Http\Controllers\OrderPaymentController;
 use App\Http\Controllers\OvertimeRecordController;
 use App\Http\Controllers\PersonnelMovementController;
+use App\Http\Controllers\VacancyController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SaleController;
@@ -888,6 +889,33 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ==========================================
+    // Vacancies (Abertura de Vagas)
+    // ==========================================
+    Route::middleware(['tenant.module:vacancies', 'permission:'.Permission::VIEW_VACANCIES->value])->group(function () {
+        Route::get('/vacancies', [VacancyController::class, 'index'])->name('vacancies.index');
+        Route::get('/vacancies/statistics', [VacancyController::class, 'statistics'])->name('vacancies.statistics');
+        Route::get('/vacancies/eligible-employees', [VacancyController::class, 'eligibleEmployeesForSubstitution'])->name('vacancies.eligible-employees');
+        Route::get('/vacancies/recruiters', [VacancyController::class, 'availableRecruiters'])->name('vacancies.recruiters');
+        Route::get('/vacancies/{vacancy}', [VacancyController::class, 'show'])->whereNumber('vacancy')->name('vacancies.show');
+
+        Route::middleware('permission:'.Permission::CREATE_VACANCIES->value)->group(function () {
+            Route::post('/vacancies', [VacancyController::class, 'store'])->name('vacancies.store');
+        });
+
+        Route::middleware('permission:'.Permission::EDIT_VACANCIES->value)->group(function () {
+            Route::put('/vacancies/{vacancy}', [VacancyController::class, 'update'])->whereNumber('vacancy')->name('vacancies.update');
+        });
+
+        Route::middleware('permission:'.Permission::MANAGE_VACANCIES->value)->group(function () {
+            Route::post('/vacancies/{vacancy}/transition', [VacancyController::class, 'transition'])->whereNumber('vacancy')->name('vacancies.transition');
+        });
+
+        Route::middleware('permission:'.Permission::DELETE_VACANCIES->value)->group(function () {
+            Route::delete('/vacancies/{vacancy}', [VacancyController::class, 'destroy'])->whereNumber('vacancy')->name('vacancies.destroy');
+        });
+    });
+
+    // ==========================================
     // Trainings (Treinamentos)
     // ==========================================
     Route::middleware(['tenant.module:training', 'permission:'.Permission::VIEW_TRAININGS->value])->group(function () {
@@ -1055,6 +1083,20 @@ Route::middleware(['auth'])->group(function () {
     // ==========================================
     Route::middleware(['tenant.module:helpdesk', 'permission:'.Permission::VIEW_HELPDESK->value])->group(function () {
         Route::get('/helpdesk', [HelpdeskController::class, 'index'])->name('helpdesk.index');
+
+        // Shortcut "Solicitações DP" — resolves the DP department id at
+        // runtime (per tenant) and redirects to the unified helpdesk view
+        // with the department filter pre-applied. Registered as a separate
+        // page in the central navigation so it can live under the
+        // "Departamento Pessoal" sidebar menu.
+        Route::get('/helpdesk/departamento-pessoal', function () {
+            $dp = \App\Models\HdDepartment::where('name', 'DP')->first();
+            if (! $dp) {
+                return redirect()->route('helpdesk.index');
+            }
+            return redirect()->route('helpdesk.index', ['department_id' => $dp->id]);
+        })->name('helpdesk.dp-requests');
+
         Route::get('/helpdesk/statistics', [HelpdeskController::class, 'statistics'])->name('helpdesk.statistics');
         Route::get('/helpdesk/departments/{department}/categories', [HelpdeskController::class, 'categories'])->name('helpdesk.categories');
         Route::get('/helpdesk/departments/{department}/technicians', [HelpdeskController::class, 'technicians'])->name('helpdesk.technicians');

@@ -128,6 +128,13 @@ export const PERMISSIONS = {
     EDIT_PERSONNEL_MOVEMENTS: 'personnel_movements.edit',
     DELETE_PERSONNEL_MOVEMENTS: 'personnel_movements.delete',
 
+    // Abertura de Vagas
+    VIEW_VACANCIES: 'vacancies.view',
+    CREATE_VACANCIES: 'vacancies.create',
+    EDIT_VACANCIES: 'vacancies.edit',
+    DELETE_VACANCIES: 'vacancies.delete',
+    MANAGE_VACANCIES: 'vacancies.manage',
+
     // Treinamentos
     VIEW_TRAININGS: 'trainings.view',
     CREATE_TRAININGS: 'trainings.create',

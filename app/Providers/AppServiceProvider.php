@@ -7,6 +7,8 @@ use App\Events\Helpdesk\TicketAssignedEvent;
 use App\Events\Helpdesk\TicketCommentEvent;
 use App\Events\Helpdesk\TicketCreatedEvent;
 use App\Events\Helpdesk\TicketStatusChangedEvent;
+use App\Events\PersonnelMovementCreated;
+use App\Listeners\CreateSubstitutionVacancyFromDismissal;
 use App\Listeners\Helpdesk\DispatchCsatSurveyListener;
 use App\Listeners\Helpdesk\DispatchWhatsappReplyListener;
 use App\Listeners\Helpdesk\SendTicketAssignedNotifications;
@@ -62,6 +64,7 @@ class AppServiceProvider extends ServiceProvider
 
         $this->configureRateLimiting();
         $this->registerHelpdeskListeners();
+        $this->registerHrListeners();
     }
 
     protected function registerHelpdeskListeners(): void
@@ -74,6 +77,14 @@ class AppServiceProvider extends ServiceProvider
         // CSAT pipeline: when a ticket transitions to RESOLVED, fire off
         // the satisfaction survey job (one per ticket, idempotent).
         Event::listen(TicketStatusChangedEvent::class, DispatchCsatSurveyListener::class);
+    }
+
+    protected function registerHrListeners(): void
+    {
+        // When a PersonnelMovement of type=dismissal with open_vacancy=true is
+        // created, auto-generate a substitution vacancy in draft (status=open)
+        // pre-filled with origin_movement_id and replaced_employee.
+        Event::listen(PersonnelMovementCreated::class, CreateSubstitutionVacancyFromDismissal::class);
     }
 
     protected function configureRateLimiting(): void

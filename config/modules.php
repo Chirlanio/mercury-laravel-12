@@ -185,6 +185,13 @@ return [
         'icon' => 'ArrowsUpDownIcon',
         'dependencies' => ['employees'],
     ],
+    'vacancies' => [
+        'name' => 'Abertura de Vagas',
+        'description' => 'Gestão de vagas abertas: substituição, aumento de quadro e volante. Ciclo completo até pré-cadastro do contratado.',
+        'routes' => ['vacancies.*'],
+        'icon' => 'BriefcaseIcon',
+        'dependencies' => ['employees', 'personnel_movements'],
+    ],
     'training' => [
         'name' => 'Treinamentos',
         'description' => 'Gestão de treinamentos, eventos de capacitação, facilitadores e certificados.',

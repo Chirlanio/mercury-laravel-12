@@ -125,6 +125,12 @@ enum Role: string
                 Permission::CREATE_PERSONNEL_MOVEMENTS->value,
                 Permission::EDIT_PERSONNEL_MOVEMENTS->value,
                 Permission::DELETE_PERSONNEL_MOVEMENTS->value,
+                // Abertura de Vagas (todas)
+                Permission::VIEW_VACANCIES->value,
+                Permission::CREATE_VACANCIES->value,
+                Permission::EDIT_VACANCIES->value,
+                Permission::DELETE_VACANCIES->value,
+                Permission::MANAGE_VACANCIES->value,
                 // Treinamentos (todas)
                 Permission::VIEW_TRAININGS->value,
                 Permission::CREATE_TRAININGS->value,
@@ -253,6 +259,12 @@ enum Role: string
                 Permission::CREATE_PERSONNEL_MOVEMENTS->value,
                 Permission::EDIT_PERSONNEL_MOVEMENTS->value,
                 Permission::DELETE_PERSONNEL_MOVEMENTS->value,
+                // Abertura de Vagas (todas)
+                Permission::VIEW_VACANCIES->value,
+                Permission::CREATE_VACANCIES->value,
+                Permission::EDIT_VACANCIES->value,
+                Permission::DELETE_VACANCIES->value,
+                Permission::MANAGE_VACANCIES->value,
                 // Treinamentos (todas)
                 Permission::VIEW_TRAININGS->value,
                 Permission::CREATE_TRAININGS->value,
@@ -333,6 +345,11 @@ enum Role: string
                 Permission::VIEW_PERSONNEL_MOVEMENTS->value,
                 Permission::CREATE_PERSONNEL_MOVEMENTS->value,
                 Permission::EDIT_PERSONNEL_MOVEMENTS->value,
+                // Abertura de Vagas (view + create + edit + manage, sem delete)
+                Permission::VIEW_VACANCIES->value,
+                Permission::CREATE_VACANCIES->value,
+                Permission::EDIT_VACANCIES->value,
+                Permission::MANAGE_VACANCIES->value,
                 // Treinamentos (view + presença)
                 Permission::VIEW_TRAININGS->value,
                 Permission::MANAGE_TRAINING_ATTENDANCE->value,

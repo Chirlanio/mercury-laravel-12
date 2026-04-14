@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\PersonnelMovementCreated;
 use App\Models\DismissalFollowUp;
 use App\Models\DismissalReason;
 use App\Models\Employee;
@@ -137,6 +138,11 @@ class PersonnelMovementController extends Controller
             auth()->id(),
             'Movimentação criada'
         );
+
+        // Disparar evento (consumido por CreateSubstitutionVacancyFromDismissal:
+        // cria automaticamente uma vaga de substituição quando for
+        // desligamento com open_vacancy=true).
+        PersonnelMovementCreated::dispatch($movement);
 
         return redirect()->route('personnel-movements.index')
             ->with('success', 'Movimentação de pessoal criada com sucesso.');

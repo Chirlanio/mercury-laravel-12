@@ -130,6 +130,13 @@ enum Permission: string
     case EDIT_PERSONNEL_MOVEMENTS = 'personnel_movements.edit';
     case DELETE_PERSONNEL_MOVEMENTS = 'personnel_movements.delete';
 
+    // Abertura de Vagas (VacancyOpening)
+    case VIEW_VACANCIES = 'vacancies.view';
+    case CREATE_VACANCIES = 'vacancies.create';
+    case EDIT_VACANCIES = 'vacancies.edit';
+    case DELETE_VACANCIES = 'vacancies.delete';
+    case MANAGE_VACANCIES = 'vacancies.manage';
+
     // Treinamentos
     case VIEW_TRAININGS = 'trainings.view';
     case CREATE_TRAININGS = 'trainings.create';
@@ -287,6 +294,11 @@ enum Permission: string
             self::CREATE_PERSONNEL_MOVEMENTS => 'Criar movimentações de pessoal',
             self::EDIT_PERSONNEL_MOVEMENTS => 'Editar movimentações de pessoal',
             self::DELETE_PERSONNEL_MOVEMENTS => 'Deletar movimentações de pessoal',
+            self::VIEW_VACANCIES => 'Visualizar vagas',
+            self::CREATE_VACANCIES => 'Criar vagas',
+            self::EDIT_VACANCIES => 'Editar vagas',
+            self::DELETE_VACANCIES => 'Excluir vagas',
+            self::MANAGE_VACANCIES => 'Gerenciar vagas (transições, recrutador)',
 
             self::VIEW_TRAININGS => 'Visualizar treinamentos',
             self::CREATE_TRAININGS => 'Criar treinamentos',
@@ -435,6 +447,11 @@ enum Permission: string
             self::CREATE_PERSONNEL_MOVEMENTS => 'Permite criar movimentações de pessoal (desligamento, promoção, transferência, reativação)',
             self::EDIT_PERSONNEL_MOVEMENTS => 'Permite editar e transicionar movimentações de pessoal',
             self::DELETE_PERSONNEL_MOVEMENTS => 'Permite excluir movimentações de pessoal',
+            self::VIEW_VACANCIES => 'Permite visualizar vagas abertas e seu histórico',
+            self::CREATE_VACANCIES => 'Permite abrir vagas. Gestores de loja só podem abrir vagas para sua própria loja',
+            self::EDIT_VACANCIES => 'Permite editar dados de vagas (recrutador, SLA, entrevistas, observações)',
+            self::DELETE_VACANCIES => 'Permite excluir vagas. Exige motivo de exclusão',
+            self::MANAGE_VACANCIES => 'Permite transicionar status de vagas, atribuir recrutador e finalizar com pré-cadastro de funcionário',
 
             self::VIEW_TRAININGS => 'Permite visualizar treinamentos e eventos de capacitação',
             self::CREATE_TRAININGS => 'Permite criar novos treinamentos e eventos',
