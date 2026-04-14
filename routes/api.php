@@ -13,6 +13,7 @@
 use App\Http\Controllers\Api\AsaasWebhookController;
 use App\Http\Controllers\Api\IntegrationApiController;
 use App\Http\Controllers\Api\IntegrationWebhookController;
+use App\Http\Controllers\Api\PostmarkInboundWebhookController;
 use App\Http\Controllers\Api\WhatsappWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,6 +28,13 @@ Route::post('/asaas/webhook', [AsaasWebhookController::class, 'handle'])
 Route::post('/webhooks/whatsapp/{tenant}', [WhatsappWebhookController::class, 'handle'])
     ->middleware('throttle:webhooks')
     ->name('api.whatsapp.webhook');
+
+// Postmark Inbound (email) — one endpoint per tenant, verified by
+// POSTMARK_INBOUND_WEBHOOK_TOKEN (accepted as Basic Auth username or the
+// x-mercury-webhook-token header). Always returns 202 once queued.
+Route::post('/webhooks/helpdesk/email/{tenant}', [PostmarkInboundWebhookController::class, 'handle'])
+    ->middleware('throttle:webhooks')
+    ->name('api.helpdesk.email.webhook');
 
 Route::prefix('v1')->group(function () {
     // Webhook receiver - external systems push data to Mercury

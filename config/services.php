@@ -18,6 +18,21 @@ return [
         'token' => env('POSTMARK_TOKEN'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Postmark Inbound (helpdesk email-to-ticket)
+    |--------------------------------------------------------------------------
+    |
+    | Webhook endpoint is POST /api/webhooks/helpdesk/email/{tenant}. Postmark
+    | doesn't HMAC-sign inbound payloads, so we authenticate via a shared
+    | token set here. The token can be sent as HTTP Basic Auth username or
+    | the x-mercury-webhook-token header — Postmark's dashboard supports both.
+    |
+    */
+    'postmark_inbound' => [
+        'webhook_token' => env('POSTMARK_INBOUND_WEBHOOK_TOKEN'),
+    ],
+
     'resend' => [
         'key' => env('RESEND_KEY'),
     ],

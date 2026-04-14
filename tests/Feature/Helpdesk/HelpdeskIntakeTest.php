@@ -97,12 +97,16 @@ class HelpdeskIntakeTest extends TestCase
 
     public function test_inactive_channel_is_rejected(): void
     {
-        HdChannel::create([
-            'slug' => 'email',
-            'name' => 'E-mail',
-            'driver' => 'email',
-            'is_active' => false,
-        ]);
+        // The email channel is seeded by migration 2026_04_17_100001; reuse
+        // it and flip it inactive for this test.
+        HdChannel::updateOrCreate(
+            ['slug' => 'email'],
+            [
+                'name' => 'E-mail',
+                'driver' => 'email',
+                'is_active' => false,
+            ],
+        );
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches('/inativo/');

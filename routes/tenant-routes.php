@@ -12,6 +12,7 @@ use App\Http\Controllers\ChatGroupController;
 use App\Http\Controllers\HdArticleController;
 use App\Http\Controllers\HdCsatController;
 use App\Http\Controllers\HdDepartmentSettingsController;
+use App\Http\Controllers\HdEmailAccountsController;
 use App\Http\Controllers\HdIntakeTemplateController;
 use App\Http\Controllers\HdPermissionController;
 use App\Http\Controllers\HdReplyTemplateController;
@@ -1172,6 +1173,18 @@ Route::middleware(['auth'])->group(function () {
                 ->name('helpdesk.intake-templates.update');
             Route::delete('/helpdesk/admin/intake-templates/{template}', [HdIntakeTemplateController::class, 'destroy'])
                 ->name('helpdesk.intake-templates.destroy');
+
+            // Email (IMAP) accounts — the mailboxes polled by helpdesk:imap-fetch
+            Route::get('/helpdesk/admin/email-accounts', [HdEmailAccountsController::class, 'index'])
+                ->name('helpdesk.email-accounts.index');
+            Route::post('/helpdesk/admin/email-accounts', [HdEmailAccountsController::class, 'store'])
+                ->name('helpdesk.email-accounts.store');
+            Route::put('/helpdesk/admin/email-accounts/{id}', [HdEmailAccountsController::class, 'update'])
+                ->name('helpdesk.email-accounts.update');
+            Route::delete('/helpdesk/admin/email-accounts/{id}', [HdEmailAccountsController::class, 'destroy'])
+                ->name('helpdesk.email-accounts.destroy');
+            Route::post('/helpdesk/admin/email-accounts/{id}/test', [HdEmailAccountsController::class, 'test'])
+                ->name('helpdesk.email-accounts.test');
 
             // Knowledge Base admin CRUD
             Route::get('/helpdesk/admin/articles', [HdArticleController::class, 'index'])

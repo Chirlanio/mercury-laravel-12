@@ -72,6 +72,8 @@ class HelpdeskController extends Controller
                 'csatOverview' => $this->reportService->csatOverview($reportFilters),
                 'csatByTechnician' => $this->reportService->csatByTechnician($reportFilters, 1, 5),
                 'csatByDepartment' => $this->reportService->csatByDepartment($reportFilters),
+                'deflectionStats' => $this->reportService->deflectionStats($reportFilters),
+                'aiAccuracy' => $this->reportService->aiAccuracy($reportFilters),
             ];
         }
 

@@ -2,6 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\HdAiClassificationCorrection;
+use App\Models\HdArticle;
+use App\Models\HdArticleView;
+use App\Models\HdCategory;
+use App\Models\HdDepartment;
 use App\Models\HdSatisfactionSurvey;
 use App\Models\HdTicket;
 use Illuminate\Support\Facades\DB;
@@ -297,6 +302,260 @@ class HelpdeskReportService
             'average' => 0.0,
             'distribution' => [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0],
             'nps_like' => ['promoters' => 0, 'passives' => 0, 'detractors' => 0],
+        ];
+    }
+
+    // ------------------------------------------------------------------
+    // Knowledge Base deflection
+    // ------------------------------------------------------------------
+
+    /**
+     * Deflection analytics from `hd_article_views`. A "deflection" is a
+     * log row with `action = 'deflected'` — the user declared the article
+     * solved their problem and opted NOT to open a ticket. Views with
+     * `action = 'viewed'` are the denominator: everyone who saw the
+     * article in an intake context.
+     *
+     * Returns:
+     *   [
+     *     'total_views'      => int,   // every view within the window
+     *     'total_deflected'  => int,   // subset with action='deflected'
+     *     'deflection_rate'  => float, // percentage
+     *     'by_source'        => [ ['source'=>..., 'views'=>int, 'deflected'=>int, 'rate'=>float], ...],
+     *     'top_articles'     => [ ['article_id'=>int, 'title'=>string, 'deflected'=>int], ... top 10 ],
+     *   ]
+     */
+    public function deflectionStats(array $filters = []): array
+    {
+        if (! Schema::hasTable('hd_article_views')) {
+            return $this->emptyDeflection();
+        }
+
+        $base = HdArticleView::query();
+
+        if (! empty($filters['date_from'])) {
+            $base->whereDate('created_at', '>=', $filters['date_from']);
+        }
+        if (! empty($filters['date_to'])) {
+            $base->whereDate('created_at', '<=', $filters['date_to']);
+        }
+
+        // Department filter joins through hd_articles.department_id — the
+        // view row itself has no department column.
+        if (! empty($filters['department_id']) && Schema::hasTable('hd_articles')) {
+            $base->whereIn('article_id', HdArticle::query()
+                ->where('department_id', (int) $filters['department_id'])
+                ->pluck('id'));
+        }
+
+        $rows = (clone $base)->get(['article_id', 'source', 'action']);
+
+        $totalViews = $rows->count();
+        if ($totalViews === 0) {
+            return $this->emptyDeflection();
+        }
+
+        $totalDeflected = $rows->where('action', 'deflected')->count();
+        $rate = $totalViews > 0 ? round(($totalDeflected / $totalViews) * 100, 1) : 0.0;
+
+        $bySource = $rows->groupBy('source')->map(function ($group, $source) {
+            $views = $group->count();
+            $deflected = $group->where('action', 'deflected')->count();
+
+            return [
+                'source' => $source ?: 'direct_link',
+                'views' => $views,
+                'deflected' => $deflected,
+                'rate' => $views > 0 ? round(($deflected / $views) * 100, 1) : 0.0,
+            ];
+        })->values()->sortByDesc('deflected')->values()->all();
+
+        // Top articles by absolute deflection count. Only include articles
+        // that actually deflected at least once — viewed-only rows would
+        // clutter the ranking.
+        $topArticleIds = $rows
+            ->where('action', 'deflected')
+            ->groupBy('article_id')
+            ->map->count()
+            ->sortDesc()
+            ->take(10);
+
+        $articleLookup = Schema::hasTable('hd_articles')
+            ? HdArticle::whereIn('id', $topArticleIds->keys())->pluck('title', 'id')
+            : collect();
+
+        $topArticles = [];
+        foreach ($topArticleIds as $articleId => $count) {
+            $topArticles[] = [
+                'article_id' => (int) $articleId,
+                'title' => $articleLookup[$articleId] ?? "#{$articleId}",
+                'deflected' => (int) $count,
+            ];
+        }
+
+        return [
+            'total_views' => $totalViews,
+            'total_deflected' => $totalDeflected,
+            'deflection_rate' => $rate,
+            'by_source' => $bySource,
+            'top_articles' => $topArticles,
+        ];
+    }
+
+    protected function emptyDeflection(): array
+    {
+        return [
+            'total_views' => 0,
+            'total_deflected' => 0,
+            'deflection_rate' => 0.0,
+            'by_source' => [],
+            'top_articles' => [],
+        ];
+    }
+
+    // ------------------------------------------------------------------
+    // AI classification accuracy
+    // ------------------------------------------------------------------
+
+    /**
+     * AI classification accuracy report. Mirrors HelpdeskAiAccuracyReportCommand
+     * but exposed as a structured array for the dashboard UI.
+     *
+     * Measures tickets that had an AI suggestion (ai_category_id and
+     * ai_classified_at populated). A ticket where the human kept the AI's
+     * suggested category counts as "kept"; one that differs is "corrected".
+     * Priority is reported separately over tickets with ai_priority set.
+     *
+     * Returns:
+     *   [
+     *     'total'             => int,   // tickets with an AI suggestion
+     *     'category_kept'     => int,
+     *     'category_corrected'=> int,
+     *     'category_accuracy' => float, // percentage
+     *     'priority_relevant' => int,   // tickets with ai_priority set
+     *     'priority_accuracy' => float,
+     *     'avg_confidence'    => float, // 0..1
+     *     'by_department'     => [ ['department_id'=>int, 'department_name'=>string, 'total'=>int, 'kept'=>int, 'corrected'=>int, 'accuracy'=>float], ... ],
+     *     'top_corrected'     => [ ['category_id'=>int, 'category_name'=>string, 'times'=>int], ... top 5 ],
+     *   ]
+     */
+    public function aiAccuracy(array $filters = []): array
+    {
+        if (! Schema::hasTable('hd_tickets')) {
+            return $this->emptyAiAccuracy();
+        }
+
+        $query = HdTicket::query()
+            ->whereNotNull('ai_category_id')
+            ->whereNotNull('ai_classified_at');
+
+        if (! empty($filters['department_id'])) {
+            $query->where('department_id', (int) $filters['department_id']);
+        }
+        if (! empty($filters['date_from'])) {
+            $query->whereDate('created_at', '>=', $filters['date_from']);
+        }
+        if (! empty($filters['date_to'])) {
+            $query->whereDate('created_at', '<=', $filters['date_to']);
+        }
+
+        $tickets = $query->get([
+            'id', 'department_id', 'category_id', 'ai_category_id',
+            'priority', 'ai_priority', 'ai_confidence',
+        ]);
+
+        $total = $tickets->count();
+        if ($total === 0) {
+            return $this->emptyAiAccuracy();
+        }
+
+        $categoryKept = $tickets->filter(fn ($t) => $t->category_id === $t->ai_category_id)->count();
+        $categoryCorrected = $total - $categoryKept;
+        $categoryAccuracy = round(($categoryKept / $total) * 100, 1);
+
+        $priorityRelevant = $tickets->filter(fn ($t) => $t->ai_priority !== null)->count();
+        $priorityKept = $tickets->filter(fn ($t) => $t->ai_priority !== null && $t->priority === $t->ai_priority)->count();
+        $priorityAccuracy = $priorityRelevant > 0 ? round(($priorityKept / $priorityRelevant) * 100, 1) : 0.0;
+
+        $avgConfidence = round((float) ($tickets->avg('ai_confidence') ?? 0), 2);
+
+        // Per-department breakdown, sorted by volume desc.
+        $deptNames = HdDepartment::whereIn('id', $tickets->pluck('department_id')->unique())
+            ->pluck('name', 'id');
+
+        $byDepartment = [];
+        foreach ($tickets->groupBy('department_id') as $deptId => $deptTickets) {
+            $deptTotal = $deptTickets->count();
+            $deptKept = $deptTickets->filter(fn ($t) => $t->category_id === $t->ai_category_id)->count();
+            $byDepartment[] = [
+                'department_id' => (int) $deptId,
+                'department_name' => $deptNames[$deptId] ?? "#{$deptId}",
+                'total' => $deptTotal,
+                'kept' => $deptKept,
+                'corrected' => $deptTotal - $deptKept,
+                'accuracy' => $deptTotal > 0 ? round(($deptKept / $deptTotal) * 100, 1) : 0.0,
+            ];
+        }
+        usort($byDepartment, fn ($a, $b) => $b['total'] <=> $a['total']);
+
+        // Top corrected categories — only those whose AI suggestion was
+        // actually changed by a human. Derived from the corrections log
+        // (hd_ai_classification_corrections) so direction is unambiguous.
+        $topCorrected = [];
+        if (Schema::hasTable('hd_ai_classification_corrections')) {
+            $correctionsQuery = HdAiClassificationCorrection::query()
+                ->whereNotNull('original_ai_category_id')
+                ->whereColumn('corrected_category_id', '!=', 'original_ai_category_id');
+
+            if (! empty($filters['date_from'])) {
+                $correctionsQuery->whereDate('created_at', '>=', $filters['date_from']);
+            }
+            if (! empty($filters['date_to'])) {
+                $correctionsQuery->whereDate('created_at', '<=', $filters['date_to']);
+            }
+
+            $counts = $correctionsQuery
+                ->get(['original_ai_category_id'])
+                ->groupBy('original_ai_category_id')
+                ->map->count()
+                ->sortDesc()
+                ->take(5);
+
+            $catNames = HdCategory::whereIn('id', $counts->keys())->pluck('name', 'id');
+            foreach ($counts as $catId => $count) {
+                $topCorrected[] = [
+                    'category_id' => (int) $catId,
+                    'category_name' => $catNames[$catId] ?? "#{$catId}",
+                    'times' => (int) $count,
+                ];
+            }
+        }
+
+        return [
+            'total' => $total,
+            'category_kept' => $categoryKept,
+            'category_corrected' => $categoryCorrected,
+            'category_accuracy' => $categoryAccuracy,
+            'priority_relevant' => $priorityRelevant,
+            'priority_accuracy' => $priorityAccuracy,
+            'avg_confidence' => $avgConfidence,
+            'by_department' => $byDepartment,
+            'top_corrected' => $topCorrected,
+        ];
+    }
+
+    protected function emptyAiAccuracy(): array
+    {
+        return [
+            'total' => 0,
+            'category_kept' => 0,
+            'category_corrected' => 0,
+            'category_accuracy' => 0.0,
+            'priority_relevant' => 0,
+            'priority_accuracy' => 0.0,
+            'avg_confidence' => 0.0,
+            'by_department' => [],
+            'top_corrected' => [],
         ];
     }
 }

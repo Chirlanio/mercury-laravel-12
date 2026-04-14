@@ -36,3 +36,11 @@ Schedule::command('helpdesk:sla-monitor')
     ->everyTenMinutes()
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/helpdesk-sla.log'));
+
+// Helpdesk email intake (IMAP poll): every minute.
+// Uses ->withoutOverlapping() so a slow fetch doesn't queue up; the
+// command finishes in a few seconds for typical mailbox sizes.
+Schedule::command('helpdesk:imap-fetch')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/helpdesk-imap.log'));

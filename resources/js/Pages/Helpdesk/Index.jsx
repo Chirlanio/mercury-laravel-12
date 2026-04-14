@@ -146,6 +146,8 @@ const CHART_COLORS = ['#4f46e5', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#0
 function ReportsPanel({ reports, departments, filters, onFilterChange, onApplyFilter }) {
     const sla = reports?.slaCompliance;
     const csat = reports?.csatOverview;
+    const deflection = reports?.deflectionStats;
+    const aiAccuracy = reports?.aiAccuracy;
     const reportCards = [
         {
             label: 'Taxa SLA',
@@ -163,6 +165,20 @@ function ReportsPanel({ reports, departments, filters, onFilterChange, onApplyFi
             sub: csat?.total_submitted > 0 ? `${csat.total_submitted} avaliações · ${csat.response_rate}% resposta` : null,
             icon: StarIcon,
             color: csat?.average >= 4 ? 'green' : csat?.average >= 3 ? 'yellow' : 'red',
+        },
+        {
+            label: 'Deflexão KB',
+            value: deflection?.total_views > 0 ? `${deflection.deflection_rate}%` : '—',
+            sub: deflection?.total_views > 0 ? `${deflection.total_deflected}/${deflection.total_views} visualizações` : null,
+            icon: BookOpenIcon,
+            color: (deflection?.deflection_rate ?? 0) >= 30 ? 'green' : (deflection?.deflection_rate ?? 0) >= 10 ? 'yellow' : 'gray',
+        },
+        {
+            label: 'Acurácia IA',
+            value: aiAccuracy?.total > 0 ? `${aiAccuracy.category_accuracy}%` : '—',
+            sub: aiAccuracy?.total > 0 ? `${aiAccuracy.category_kept}/${aiAccuracy.total} categorias · confiança ${aiAccuracy.avg_confidence}` : null,
+            icon: SparklesIcon,
+            color: (aiAccuracy?.category_accuracy ?? 0) >= 75 ? 'green' : (aiAccuracy?.category_accuracy ?? 0) >= 50 ? 'yellow' : 'red',
         },
     ];
 
@@ -331,6 +347,148 @@ function ReportsPanel({ reports, departments, filters, onFilterChange, onApplyFi
                                 </ul>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* 5. Deflexão KB — tickets evitados porque o artigo resolveu o
+                   problema do usuário. Só aparece quando houve ao menos um
+                   view registrado no intake no período filtrado. */}
+            {deflection && deflection.total_views > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mt-4 sm:mt-6">
+                    <div className="bg-white shadow-sm rounded-lg p-4 sm:p-6">
+                        <h3 className="text-sm font-semibold text-gray-900 mb-3 sm:mb-4">
+                            Deflexão por origem
+                        </h3>
+                        {deflection.by_source.length > 0 ? (
+                            <ul className="space-y-2">
+                                {deflection.by_source.map(s => (
+                                    <li key={s.source} className="flex items-center gap-2">
+                                        <span className="text-xs font-medium text-gray-700 w-28 shrink-0 truncate">
+                                            {s.source}
+                                        </span>
+                                        <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                                            <div
+                                                className={`h-full rounded-full ${
+                                                    s.rate >= 30 ? 'bg-green-500'
+                                                    : s.rate >= 10 ? 'bg-yellow-500'
+                                                    : 'bg-gray-400'
+                                                }`}
+                                                style={{ width: `${Math.min(100, s.rate)}%` }}
+                                            />
+                                        </div>
+                                        <span className="text-xs text-gray-500 w-24 text-right shrink-0">
+                                            {s.deflected}/{s.views} ({s.rate}%)
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-sm text-gray-400 text-center py-8">Sem dados ainda.</p>
+                        )}
+                    </div>
+
+                    <div className="bg-white shadow-sm rounded-lg p-4 sm:p-6">
+                        <h3 className="text-sm font-semibold text-gray-900 mb-3 sm:mb-4">
+                            Top artigos que resolveram
+                        </h3>
+                        {deflection.top_articles.length > 0 ? (
+                            <ul className="space-y-2">
+                                {deflection.top_articles.map(a => (
+                                    <li key={a.article_id} className="flex items-center justify-between gap-2 py-1.5 border-b border-gray-100 last:border-0">
+                                        <span className="text-sm text-gray-800 truncate">{a.title}</span>
+                                        <span className="text-sm font-semibold text-green-600 shrink-0">
+                                            {a.deflected}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-sm text-gray-400 text-center py-8">Nenhuma deflexão registrada ainda.</p>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* 6. Acurácia IA — mede o quanto a classificação automática está
+                   acertando. Painel só aparece quando existem tickets
+                   classificados por IA no período filtrado. */}
+            {aiAccuracy && aiAccuracy.total > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mt-4 sm:mt-6">
+                    <div className="bg-white shadow-sm rounded-lg p-4 sm:p-6">
+                        <h3 className="text-sm font-semibold text-gray-900 mb-3 sm:mb-4">
+                            Acurácia da IA por departamento
+                        </h3>
+                        {aiAccuracy.by_department.length > 0 ? (
+                            <ul className="space-y-2">
+                                {aiAccuracy.by_department.map(d => (
+                                    <li key={d.department_id} className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-700 w-32 shrink-0 truncate">
+                                            {d.department_name}
+                                        </span>
+                                        <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                                            <div
+                                                className={`h-full rounded-full ${
+                                                    d.accuracy >= 75 ? 'bg-green-500'
+                                                    : d.accuracy >= 50 ? 'bg-yellow-500'
+                                                    : 'bg-red-500'
+                                                }`}
+                                                style={{ width: `${Math.min(100, d.accuracy)}%` }}
+                                            />
+                                        </div>
+                                        <span className="text-xs text-gray-500 w-24 text-right shrink-0">
+                                            {d.kept}/{d.total} ({d.accuracy}%)
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-sm text-gray-400 text-center py-8">Sem dados.</p>
+                        )}
+                        <div className="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-500">
+                            <div className="grid grid-cols-3 gap-2 text-center">
+                                <div>
+                                    <div className="font-semibold text-gray-900">{aiAccuracy.category_accuracy}%</div>
+                                    <div>Categoria</div>
+                                </div>
+                                <div>
+                                    <div className="font-semibold text-gray-900">
+                                        {aiAccuracy.priority_relevant > 0 ? `${aiAccuracy.priority_accuracy}%` : '—'}
+                                    </div>
+                                    <div>Prioridade</div>
+                                </div>
+                                <div>
+                                    <div className="font-semibold text-gray-900">{aiAccuracy.avg_confidence}</div>
+                                    <div>Confiança</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white shadow-sm rounded-lg p-4 sm:p-6">
+                        <h3 className="text-sm font-semibold text-gray-900 mb-3 sm:mb-4">
+                            Categorias mais corrigidas
+                        </h3>
+                        {aiAccuracy.top_corrected.length > 0 ? (
+                            <ul className="space-y-2">
+                                {aiAccuracy.top_corrected.map(c => (
+                                    <li key={c.category_id} className="flex items-center justify-between gap-2 py-1.5 border-b border-gray-100 last:border-0">
+                                        <span className="text-sm text-gray-800 truncate">{c.category_name}</span>
+                                        <span className="text-sm font-semibold text-red-600 shrink-0">
+                                            {c.times}×
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-sm text-gray-400 text-center py-8">
+                                Nenhuma correção registrada no período.
+                            </p>
+                        )}
+                        <p className="text-xs text-gray-400 mt-3">
+                            Baseado no log de correções (hd_ai_classification_corrections).
+                            Indica onde a IA está sistematicamente errando.
+                        </p>
                     </div>
                 </div>
             )}
@@ -871,6 +1029,16 @@ export default function Index({
                                                     >
                                                         <DocumentTextIcon className="w-4 h-4 text-indigo-500" />
                                                         Templates de Intake
+                                                    </a>
+                                                )}
+                                                {canManageHdDepartments && (
+                                                    <a
+                                                        href={route('helpdesk.email-accounts.index')}
+                                                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                        onClick={() => setShowAdminMenu(false)}
+                                                    >
+                                                        <EnvelopeIcon className="w-4 h-4 text-indigo-500" />
+                                                        Contas de E-mail
                                                     </a>
                                                 )}
                                                 {canManageHdDepartments && (

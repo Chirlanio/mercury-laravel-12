@@ -20,6 +20,8 @@ class HelpdeskReportController extends Controller
             'slaCompliance' => $this->reportService->slaCompliance($filters),
             'distributionByDepartment' => $this->reportService->distributionByDepartment($filters),
             'averageResolutionTime' => $this->reportService->averageResolutionTime($filters),
+            'deflectionStats' => $this->reportService->deflectionStats($filters),
+            'aiAccuracy' => $this->reportService->aiAccuracy($filters),
             'departments' => HdDepartment::active()->ordered()->get(['id', 'name']),
             'filters' => $filters,
         ]);
