@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\CentralMenuPageDefault;
+use App\Models\CentralRole;
+use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 
@@ -34,24 +36,80 @@ class CentralMenuResolver
     }
 
     /**
-     * Clear cached menu for a role/tenant combination.
+     * Clear cached menu entries for a given role/tenant combination.
+     *
+     * Behavior matrix:
+     *  - Both args given: forget exactly "central_menu:{role}:{tenant}".
+     *  - Only $roleSlug:  forget that role for every known tenant + "none".
+     *  - Only $tenantId:  forget every known role for that specific tenant.
+     *  - No args:         forget every (role, tenant) combination + "none".
+     *
+     * Roles are read from the central_roles table (source of truth), so
+     * DB-only roles like `store_manager` or `drivers` — added via the SaaS
+     * admin UI — are covered. Falls back to the enum default set if the
+     * central DB is unreachable. Tenant IDs come from the central Tenant
+     * model (plus the literal 'none' sentinel used when resolving the menu
+     * outside any tenant context).
      */
     public function clearCache(?string $roleSlug = null, ?string $tenantId = null): void
     {
         $cache = Cache::store('file');
 
+        // Targeted single-key invalidation — no DB reads needed.
         if ($roleSlug && $tenantId) {
             $cache->forget("central_menu:{$roleSlug}:{$tenantId}");
 
             return;
         }
 
-        // Clear all combinations
-        $roles = ['super_admin', 'admin', 'support', 'user'];
+        $roles = $roleSlug
+            ? [$roleSlug]
+            : $this->resolveKnownRoles();
+
+        $tenantIds = $tenantId
+            ? [$tenantId]
+            : $this->resolveKnownTenantIds();
+
         foreach ($roles as $role) {
-            $cache->forget("central_menu:{$role}:{$tenantId}");
-            $cache->forget("central_menu:{$role}:none");
+            foreach ($tenantIds as $tid) {
+                $cache->forget("central_menu:{$role}:{$tid}");
+            }
         }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function resolveKnownRoles(): array
+    {
+        try {
+            $fromDb = CentralRole::on('mysql')->pluck('name')->all();
+            if (! empty($fromDb)) {
+                return $fromDb;
+            }
+        } catch (\Exception $e) {
+            // Central DB unreachable — fall through to defaults.
+        }
+
+        return ['super_admin', 'admin', 'support', 'user', 'drivers', 'store_manager'];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function resolveKnownTenantIds(): array
+    {
+        try {
+            $ids = Tenant::on('mysql')->pluck('id')->all();
+        } catch (\Exception $e) {
+            $ids = [];
+        }
+
+        // Always include the 'none' sentinel used when getMenuForUser()
+        // runs without a tenant context (local dev, tests, central admin).
+        $ids[] = 'none';
+
+        return array_values(array_unique($ids));
     }
 
     protected function resolveMenu(string $roleSlug, $tenant): array
