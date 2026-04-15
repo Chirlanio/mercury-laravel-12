@@ -92,6 +92,7 @@ foreach ($centralDomains as $domain) {
             // Navigation management
             Route::get('/navigation', [NavigationController::class, 'index'])->name('navigation.index');
             Route::post('/navigation/menus', [NavigationController::class, 'storeMenu'])->name('navigation.menus.store');
+            Route::put('/navigation/menus/reorder', [NavigationController::class, 'reorderMenus'])->name('navigation.menus.reorder');
             Route::put('/navigation/menus/{menu}', [NavigationController::class, 'updateMenu'])->name('navigation.menus.update');
             Route::delete('/navigation/menus/{menu}', [NavigationController::class, 'destroyMenu'])->name('navigation.menus.destroy');
             Route::post('/navigation/pages', [NavigationController::class, 'storePage'])->name('navigation.pages.store');
@@ -101,6 +102,11 @@ foreach ($centralDomains as $domain) {
             Route::put('/navigation/page-groups/{pageGroup}', [NavigationController::class, 'updatePageGroup'])->name('navigation.pageGroups.update');
             Route::delete('/navigation/page-groups/{pageGroup}', [NavigationController::class, 'destroyPageGroup'])->name('navigation.pageGroups.destroy');
             Route::put('/navigation/defaults', [NavigationController::class, 'updateDefaults'])->name('navigation.defaults.update');
+            Route::post('/navigation/defaults', [NavigationController::class, 'storeDefault'])->name('navigation.defaults.store');
+            Route::put('/navigation/defaults/reorder', [NavigationController::class, 'reorderDefaults'])->name('navigation.defaults.reorder');
+            Route::patch('/navigation/defaults/{default}/toggle', [NavigationController::class, 'togglePermission'])->name('navigation.defaults.toggle');
+            Route::delete('/navigation/defaults/{default}', [NavigationController::class, 'destroyDefault'])->name('navigation.defaults.destroy');
+            Route::delete('/navigation/defaults/menu/{menu}/page/{page}', [NavigationController::class, 'destroyAllDefaultsForPage'])->name('navigation.defaults.destroyAllForPage');
 
             // Roles & Permissions management
             Route::get('/roles', [RolePermissionController::class, 'index'])->name('roles.index');

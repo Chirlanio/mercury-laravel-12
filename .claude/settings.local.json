@@ -91,7 +91,21 @@
       "Bash(curl -s \"https://raw.githubusercontent.com/EvolutionAPI/evolution-api/2.3.7/CHANGELOG.md\")",
       "Bash(curl -s \"https://api.github.com/repos/EvolutionAPI/evolution-api/contents/src/api/integrations/event/webhook?ref=2.3.7\")",
       "Bash(curl:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(git:*)",
+      "Bash(xargs -I {} bash -c 'echo \"=== {} ===\" && grep -E \"public function|class \" {} | head -15')",
+      "Bash(C:/wamp64/bin/php/php8.4.0/php.exe:*)",
+      "Bash(\"C:/wamp64/bin/php/php8.4.0/php.exe\" artisan:*)",
+      "Read(//c/xampp/php/**)",
+      "Bash(\"C:/xampp/php/php.exe\" -r \"echo 'XAMPP PHP ' . PHP_VERSION . ' | pdo_pgsql: ' . \\(extension_loaded\\('pdo_pgsql'\\) ? 'YES' : 'NO'\\) . ' | pgsql: ' . \\(extension_loaded\\('pgsql'\\) ? 'YES' : 'NO'\\) . PHP_EOL;\")",
+      "Read(//c/wamp64/bin/apache/apache2.4.62.1/conf/**)",
+      "Read(//c/wamp64/bin/apache/apache2.4.62.1/conf/extra/**)",
+      "Read(//c/wamp64/bin/php/php8.3.14/**)",
+      "Bash(\"C:/wamp64/bin/php/php8.3.14/php.exe\" -r \"echo 'php '.PHP_VERSION.' ini:'.php_ini_loaded_file\\(\\).PHP_EOL;\")",
+      "Read(//c/wamp64/bin/php/php8.4.0/**)",
+      "Bash(\"C:/wamp64/bin/php/php8.3.14/php.exe\" -r \"echo \\(extension_loaded\\('pdo_pgsql'\\) ? 'YES' : 'NO'\\).PHP_EOL;\")",
+      "Bash(C:\\\\\\\\Users\\\\\\\\MSDEV\\\\\\\\php84\\\\\\\\php.exe artisan:*)",
+      "Bash('C:/Users/MSDEV/php84/php.exe' artisan:*)"
     ],
     "deny": [],
     "ask": []

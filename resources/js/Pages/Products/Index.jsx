@@ -328,7 +328,8 @@ export default function Index({ products, filters, stats, cigamAvailable, active
                 show={modals.sync}
                 onClose={() => closeModal('sync')}
                 onCompleted={reload}
-                activeSyncLog={activeSyncLog}
+                onStarted={(log) => setLiveSync(log)}
+                activeSyncLog={liveSync || activeSyncLog}
             />
 
             <ProductSyncLogsModal

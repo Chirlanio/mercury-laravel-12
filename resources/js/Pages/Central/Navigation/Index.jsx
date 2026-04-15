@@ -1,6 +1,8 @@
 import { Head, useForm, router } from '@inertiajs/react';
 import CentralLayout from '@/Layouts/CentralLayout';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
+import { useConfirm } from '@/Hooks/useConfirm';
 import {
     PlusIcon,
     PencilIcon,
@@ -9,6 +11,10 @@ import {
     XCircleIcon,
     ChevronRightIcon,
     MagnifyingGlassIcon,
+    ArrowUpIcon,
+    ArrowDownIcon,
+    LinkIcon,
+    NoSymbolIcon,
 } from '@heroicons/react/24/outline';
 
 const TABS = [
@@ -165,19 +171,113 @@ function FaIconPicker({ value, onChange }) {
 function MenusTab({ menus }) {
     const [showCreate, setShowCreate] = useState(false);
     const [editing, setEditing] = useState(null);
+    const [reordering, setReordering] = useState(false);
+    // Local copy of menus for optimistic reordering. Synced from props
+    // whenever the server pushes a new snapshot (create/edit/delete).
+    const [localMenus, setLocalMenus] = useState(menus);
+    const { confirm, ConfirmDialogComponent } = useConfirm();
+
+    useEffect(() => {
+        setLocalMenus(menus);
+    }, [menus]);
+
+    const handleDelete = async (menu) => {
+        const ok = await confirm({
+            title: 'Excluir menu',
+            message: `Deseja excluir o menu "${menu.name}"? Esta ação é irreversível.`,
+            confirmText: 'Excluir',
+            cancelText: 'Cancelar',
+            type: 'danger',
+        });
+        if (!ok) return;
+        router.delete(`/admin/navigation/menus/${menu.id}`, { preserveScroll: true });
+    };
+
+    // Swap positions optimistically, then persist via Inertia's router
+    // with preserveState/preserveScroll — this keeps the component
+    // mounted (no remount, no visual reload) while Inertia handles
+    // CSRF/session for the central admin guard. On failure, revert
+    // local state and surface a toast.
+    const swapOrder = (scope, indexA, indexB, parentId = null) => {
+        // `scope` is either 'parent' (reordering top-level menus) or a
+        // parent menu id (reordering children of that parent). We only
+        // mutate the affected slice so unrelated menu state stays put.
+        const isParentScope = scope === 'parent';
+        const list = isParentScope
+            ? localMenus
+            : (localMenus.find((m) => m.id === scope)?.children || []);
+
+        if (indexA < 0 || indexB < 0 || indexA >= list.length || indexB >= list.length) return;
+
+        const previous = localMenus;
+        const reordered = [...list];
+        [reordered[indexA], reordered[indexB]] = [reordered[indexB], reordered[indexA]];
+
+        // Rebuild localMenus with the new order applied to the right scope.
+        const next = isParentScope
+            ? reordered.map((m, i) => ({ ...m, order: i }))
+            : localMenus.map((m) =>
+                  m.id === scope
+                      ? { ...m, children: reordered.map((c, i) => ({ ...c, order: i })) }
+                      : m
+              );
+
+        setLocalMenus(next);
+        setReordering(true);
+
+        const items = reordered.map((m, i) => ({
+            id: m.id,
+            order: i,
+            parent_id: parentId,
+        }));
+
+        router.put('/admin/navigation/menus/reorder', { items }, {
+            preserveState: true,
+            preserveScroll: true,
+            onSuccess: () => toast.success('Ordem atualizada', { autoClose: 1500 }),
+            onError: () => {
+                setLocalMenus(previous);
+                toast.error('Erro ao salvar ordem. Tente novamente.');
+            },
+            onFinish: () => setReordering(false),
+        });
+    };
 
     return (
         <div>
             <div className="flex justify-between items-center mb-4">
-                <p className="text-sm text-gray-500">{menus.length} menus principais</p>
+                <p className="text-sm text-gray-500">
+                    {localMenus.length} menus principais
+                    {reordering && <span className="ml-2 text-indigo-500">• salvando ordem...</span>}
+                </p>
                 <BtnCreate onClick={() => setShowCreate(true)}>Novo Menu</BtnCreate>
             </div>
 
             <div className="bg-white shadow rounded-lg divide-y">
-                {menus.map((menu) => (
+                {localMenus.map((menu, idx) => (
                     <div key={menu.id}>
                         <div className="px-6 py-4 flex items-center justify-between">
                             <div className="flex items-center gap-3">
+                                <div className="flex flex-col gap-0.5">
+                                    <button
+                                        type="button"
+                                        disabled={idx === 0 || reordering}
+                                        onClick={() => swapOrder('parent', idx, idx - 1, null)}
+                                        title="Mover para cima"
+                                        className="p-0.5 text-gray-400 hover:text-indigo-600 disabled:opacity-20 disabled:cursor-not-allowed"
+                                    >
+                                        <ArrowUpIcon className="h-3 w-3" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={idx === localMenus.length - 1 || reordering}
+                                        onClick={() => swapOrder('parent', idx, idx + 1, null)}
+                                        title="Mover para baixo"
+                                        className="p-0.5 text-gray-400 hover:text-indigo-600 disabled:opacity-20 disabled:cursor-not-allowed"
+                                    >
+                                        <ArrowDownIcon className="h-3 w-3" />
+                                    </button>
+                                </div>
                                 {menu.icon && (
                                     <span className="flex items-center justify-center w-8 h-8 rounded bg-gray-100 text-gray-500">
                                         <i className={`${menu.icon} text-sm`} />
@@ -185,6 +285,7 @@ function MenusTab({ menus }) {
                                 )}
                                 <div>
                                     <div className="flex items-center gap-2">
+                                        <span className="text-xs font-mono text-gray-300">#{menu.order}</span>
                                         <span className="text-sm font-medium text-gray-900">{menu.name}</span>
                                         <span className={`inline-flex rounded px-1.5 py-0.5 text-xs font-medium ${
                                             menu.type === 'system' ? 'bg-red-50 text-red-700' :
@@ -201,16 +302,36 @@ function MenusTab({ menus }) {
                                 <div className="flex gap-1">
                                     <BtnEdit onClick={() => setEditing(menu)} />
                                     {menu.pages_count === 0 && menu.children.length === 0 && (
-                                        <BtnDelete onClick={() => { if (confirm(`Excluir menu "${menu.name}"?`)) router.delete(`/admin/navigation/menus/${menu.id}`); }} />
+                                        <BtnDelete onClick={() => handleDelete(menu)} />
                                     )}
                                 </div>
                             </div>
                         </div>
                         {menu.children.length > 0 && (
                             <div className="bg-gray-50 pl-16 pr-4 divide-y divide-gray-100">
-                                {menu.children.map((child) => (
+                                {menu.children.map((child, childIdx) => (
                                     <div key={child.id} className="py-3 flex items-center justify-between gap-3">
                                         <div className="flex items-center gap-2 min-w-0">
+                                            <div className="flex flex-col gap-0.5">
+                                                <button
+                                                    type="button"
+                                                    disabled={childIdx === 0 || reordering}
+                                                    onClick={() => swapOrder(menu.id, childIdx, childIdx - 1, menu.id)}
+                                                    title="Mover para cima"
+                                                    className="p-0.5 text-gray-300 hover:text-indigo-600 disabled:opacity-20 disabled:cursor-not-allowed"
+                                                >
+                                                    <ArrowUpIcon className="h-3 w-3" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    disabled={childIdx === menu.children.length - 1 || reordering}
+                                                    onClick={() => swapOrder(menu.id, childIdx, childIdx + 1, menu.id)}
+                                                    title="Mover para baixo"
+                                                    className="p-0.5 text-gray-300 hover:text-indigo-600 disabled:opacity-20 disabled:cursor-not-allowed"
+                                                >
+                                                    <ArrowDownIcon className="h-3 w-3" />
+                                                </button>
+                                            </div>
                                             <ChevronRightIcon className="h-3 w-3 text-gray-300 flex-shrink-0" />
                                             {child.icon && <i className={`${child.icon} text-xs text-gray-400 flex-shrink-0`} />}
                                             <span className="text-sm text-gray-700">{child.name}</span>
@@ -228,6 +349,8 @@ function MenusTab({ menus }) {
 
             {showCreate && <MenuFormModal parentMenus={menus} onClose={() => setShowCreate(false)} />}
             {editing && <MenuFormModal menu={editing} parentMenus={menus} onClose={() => setEditing(null)} />}
+
+            <ConfirmDialogComponent />
         </div>
     );
 }
@@ -300,6 +423,19 @@ function PagesTab({ pages, pageGroups, allModules }) {
     const [showCreate, setShowCreate] = useState(false);
     const [editing, setEditing] = useState(null);
     const [search, setSearch] = useState('');
+    const { confirm, ConfirmDialogComponent } = useConfirm();
+
+    const handleDelete = async (page) => {
+        const ok = await confirm({
+            title: 'Excluir página',
+            message: `Deseja excluir a página "${page.page_name}"? Todos os vínculos com menus serão removidos.`,
+            confirmText: 'Excluir',
+            cancelText: 'Cancelar',
+            type: 'danger',
+        });
+        if (!ok) return;
+        router.delete(`/admin/navigation/pages/${page.id}`, { preserveScroll: true });
+    };
 
     const filtered = search
         ? pages.filter(p => p.page_name.toLowerCase().includes(search.toLowerCase()) || (p.route && p.route.toLowerCase().includes(search.toLowerCase())))
@@ -351,7 +487,7 @@ function PagesTab({ pages, pageGroups, allModules }) {
                                 <td className="px-4 py-3 text-right">
                                     <div className="flex justify-end gap-1">
                                         <BtnEdit onClick={() => setEditing(page)} />
-                                        <BtnDelete onClick={() => { if (confirm(`Excluir "${page.page_name}"?`)) router.delete(`/admin/navigation/pages/${page.id}`); }} />
+                                        <BtnDelete onClick={() => handleDelete(page)} />
                                     </div>
                                 </td>
                             </tr>
@@ -365,6 +501,8 @@ function PagesTab({ pages, pageGroups, allModules }) {
 
             {showCreate && <PageFormModal pageGroups={pageGroups} allModules={allModules} onClose={() => setShowCreate(false)} />}
             {editing && <PageFormModal page={editing} pageGroups={pageGroups} allModules={allModules} onClose={() => setEditing(null)} />}
+
+            <ConfirmDialogComponent />
         </div>
     );
 }
@@ -453,10 +591,23 @@ function PageFormModal({ page, pageGroups, allModules, onClose }) {
 
 function GroupsTab({ pageGroups }) {
     const { data, setData, post, processing, reset } = useForm({ name: '' });
+    const { confirm, ConfirmDialogComponent } = useConfirm();
 
     const submit = (e) => {
         e.preventDefault();
         post('/admin/navigation/page-groups', { onSuccess: () => reset() });
+    };
+
+    const handleDelete = async (group) => {
+        const ok = await confirm({
+            title: 'Excluir grupo',
+            message: `Deseja excluir o grupo "${group.name}"?`,
+            confirmText: 'Excluir',
+            cancelText: 'Cancelar',
+            type: 'danger',
+        });
+        if (!ok) return;
+        router.delete(`/admin/navigation/page-groups/${group.id}`, { preserveScroll: true });
     };
 
     return (
@@ -479,11 +630,13 @@ function GroupsTab({ pageGroups }) {
                             <span className="ml-2 text-xs text-gray-400">{group.pages_count} páginas</span>
                         </div>
                         {group.pages_count === 0 && (
-                            <BtnDelete onClick={() => { if (confirm(`Excluir "${group.name}"?`)) router.delete(`/admin/navigation/page-groups/${group.id}`); }} />
+                            <BtnDelete onClick={() => handleDelete(group)} />
                         )}
                     </div>
                 ))}
             </div>
+
+            <ConfirmDialogComponent />
         </div>
     );
 }
@@ -492,77 +645,518 @@ function GroupsTab({ pageGroups }) {
 
 function DefaultsTab({ menus, pages, defaults, allRoles }) {
     const roleEntries = Object.entries(allRoles);
+    const [showAssign, setShowAssign] = useState(false);
+    const [busy, setBusy] = useState(false);
+    // Local copy of defaults for optimistic reordering. Synced from
+    // props whenever the server pushes a new snapshot (create, delete,
+    // toggle). Reorder operations mutate this copy directly and persist
+    // via a silent axios call so the page never reloads.
+    const [localDefaults, setLocalDefaults] = useState(defaults);
+    // Track drag state across all menu cards. `drag.menuId` scopes the
+    // hover highlight so rows from a different menu don't light up.
+    const [drag, setDrag] = useState({ menuId: null, fromIndex: null, overIndex: null });
+    const { confirm, ConfirmDialogComponent } = useConfirm();
 
-    const menuPages = menus.filter(m => {
-        const menuDefaults = defaults[m.id];
-        return menuDefaults && Object.keys(menuDefaults).length > 0;
-    });
+    useEffect(() => {
+        setLocalDefaults(defaults);
+    }, [defaults]);
+
+    // Flatten: for each (menu, page) pair, collect the defaults indexed by role.
+    // This lets us render the matrix menu-by-menu, row=page, column=role.
+    // Pages within each menu are sorted by their canonical order (min of
+    // the `order` column across role rows), so the matrix mirrors what
+    // the tenant actually sees in the sidebar.
+    const menuPages = menus.map((menu) => {
+        const menuDefaults = localDefaults[menu.id] || {};
+        const allRows = Object.values(menuDefaults).flat();
+        const uniquePageIds = [...new Set(allRows.map((d) => d.central_page_id))];
+
+        // pageEntries: one per unique page, carrying min order + all role rows.
+        // We use MIN across roles as the canonical rank — if a reorder sync
+        // ever diverges per-role, MIN keeps the display deterministic.
+        const pageEntries = uniquePageIds.map((pid) => {
+            const rows = allRows.filter((r) => r.central_page_id === pid);
+            const minOrder = rows.reduce((acc, r) => Math.min(acc, r.order ?? 0), Infinity);
+            return { pageId: pid, minOrder: minOrder === Infinity ? 0 : minOrder, rows };
+        }).sort((a, b) => a.minOrder - b.minOrder);
+
+        return { menu, menuDefaults, pageEntries };
+    }).filter((m) => m.pageEntries.length > 0);
+
+    // Toggle permission on an existing default row (optimistic UX).
+    const togglePermission = (defaultId) => {
+        setBusy(true);
+        router.patch(`/admin/navigation/defaults/${defaultId}/toggle`, {}, {
+            preserveScroll: true,
+            onFinish: () => setBusy(false),
+        });
+    };
+
+    // Delete a menu↔page↔role assignment entirely.
+    const removeDefault = async (defaultId, pageName, roleLabel) => {
+        const ok = await confirm({
+            title: 'Remover vínculo',
+            message: `Deseja remover a página "${pageName}" do menu para a role "${roleLabel}"? A role deixará de ver a página na sidebar.`,
+            confirmText: 'Remover',
+            cancelText: 'Cancelar',
+            type: 'danger',
+        });
+        if (!ok) return;
+
+        setBusy(true);
+        router.delete(`/admin/navigation/defaults/${defaultId}`, {
+            preserveScroll: true,
+            onFinish: () => setBusy(false),
+        });
+    };
+
+    // Remove ALL role assignments of a page from a menu in one shot.
+    // Much cleaner than clicking the per-cell trash icon once per role
+    // when the admin just wants to detach a page from a menu entirely.
+    const removeAllForPage = async (menuId, menuName, pageId, pageName) => {
+        const ok = await confirm({
+            title: 'Remover página do menu',
+            message: `Deseja remover "${pageName}" do menu "${menuName}" para TODAS as roles? Nenhum usuário verá mais esta página neste menu.`,
+            confirmText: 'Remover de todas',
+            cancelText: 'Cancelar',
+            type: 'danger',
+        });
+        if (!ok) return;
+
+        setBusy(true);
+        router.delete(`/admin/navigation/defaults/menu/${menuId}/page/${pageId}`, {
+            preserveScroll: true,
+            onFinish: () => setBusy(false),
+        });
+    };
+
+    // Create a new assignment via the modal.
+    const findDefault = (menuDefaults, pageId, roleSlug) => {
+        const roleRows = menuDefaults[roleSlug] || [];
+        return roleRows.find((d) => d.central_page_id === pageId);
+    };
+
+    // Generalized reorder: move a page from fromIndex to toIndex within
+    // a menu card. Used by both the ↑↓ buttons (adjacent swap) and the
+    // drag-and-drop handler (arbitrary move).
+    //
+    // Strategy: update localDefaults optimistically (the matrix rerenders
+    // instantly) and persist via Inertia's router with preserveState,
+    // which keeps the React component mounted — no remount, no visual
+    // reload — while still going through Inertia's CSRF/session pipeline.
+    // On error, revert and surface a toast.
+    const reorderPages = (menuId, pageEntries, fromIndex, toIndex) => {
+        if (fromIndex === toIndex) return;
+        if (fromIndex < 0 || toIndex < 0 || fromIndex >= pageEntries.length || toIndex >= pageEntries.length) return;
+
+        const reordered = [...pageEntries];
+        const [moved] = reordered.splice(fromIndex, 1);
+        reordered.splice(toIndex, 0, moved);
+
+        // Build {id: newOrder} lookup for every row that needs updating.
+        const orderById = new Map();
+        const items = [];
+        reordered.forEach((entry, position) => {
+            entry.rows.forEach((row) => {
+                if (row.order !== position) {
+                    orderById.set(row.id, position);
+                    items.push({ id: row.id, order: position });
+                }
+            });
+        });
+
+        if (items.length === 0) return;
+
+        // Optimistic local mutation: rewrite every row's `order` in
+        // localDefaults. Preserves the grouping shape {menuId: {roleSlug: [rows]}}
+        // so the downstream flattening logic keeps working.
+        const previous = localDefaults;
+        const nextMenuDefaults = { ...(localDefaults[menuId] || {}) };
+        Object.keys(nextMenuDefaults).forEach((roleSlug) => {
+            nextMenuDefaults[roleSlug] = nextMenuDefaults[roleSlug].map((row) =>
+                orderById.has(row.id) ? { ...row, order: orderById.get(row.id) } : row
+            );
+        });
+        setLocalDefaults({ ...localDefaults, [menuId]: nextMenuDefaults });
+
+        setBusy(true);
+        router.put('/admin/navigation/defaults/reorder', { items }, {
+            preserveState: true,
+            preserveScroll: true,
+            onSuccess: () => toast.success('Ordem atualizada', { autoClose: 1500 }),
+            onError: () => {
+                setLocalDefaults(previous);
+                toast.error('Erro ao salvar ordem. Tente novamente.');
+            },
+            onFinish: () => setBusy(false),
+        });
+    };
+
+    // Native HTML5 drag-and-drop handlers. We don't rely on dataTransfer
+    // payloads — React state is cleaner and avoids the browser's quirky
+    // default drop behavior on tables.
+    const handleDragStart = (menuId, index) => (e) => {
+        setDrag({ menuId, fromIndex: index, overIndex: index });
+        // dataTransfer must be set or Firefox refuses to start the drag.
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(index));
+    };
+
+    const handleDragOver = (menuId, index) => (e) => {
+        e.preventDefault(); // required to allow drop
+        e.dataTransfer.dropEffect = 'move';
+        // Only update overIndex when the row actually changes, to avoid
+        // state churn on every pixel of movement.
+        if (drag.menuId === menuId && drag.overIndex !== index) {
+            setDrag((prev) => ({ ...prev, overIndex: index }));
+        }
+    };
+
+    const handleDrop = (menuId, targetIndex, pageEntries) => (e) => {
+        e.preventDefault();
+        if (drag.menuId !== menuId || drag.fromIndex === null) {
+            setDrag({ menuId: null, fromIndex: null, overIndex: null });
+            return;
+        }
+        reorderPages(menuId, pageEntries, drag.fromIndex, targetIndex);
+        setDrag({ menuId: null, fromIndex: null, overIndex: null });
+    };
+
+    const handleDragEnd = () => {
+        setDrag({ menuId: null, fromIndex: null, overIndex: null });
+    };
 
     return (
         <div>
-            <p className="text-sm text-gray-500 mb-4">
-                Matriz de permissões padrão: define quais páginas cada role pode acessar ao provisionar um novo tenant.
-                Alterações aqui afetam apenas <strong>novos tenants</strong> — tenants existentes mantêm suas configurações.
-            </p>
+            <div className="flex justify-between items-start mb-4 gap-4">
+                <p className="text-sm text-gray-500 flex-1">
+                    Matriz de permissões: cada linha é uma página dentro de um menu, cada coluna é uma role.
+                    Clique nos ícones para <strong>liberar</strong> (verde) ou <strong>bloquear</strong> (vermelho) o acesso.
+                    <strong>Arraste as linhas</strong> (ou use as setas ↑↓) para definir a ordem das páginas na sidebar. Células vazias significam que a página não está vinculada ao menu para aquela role.
+                </p>
+                <BtnCreate onClick={() => setShowAssign(true)}>Atribuir página</BtnCreate>
+            </div>
 
             <div className="space-y-6">
-                {menuPages.map((menu) => {
-                    const menuDefaults = defaults[menu.id] || {};
-                    const pageIds = [...new Set(Object.values(menuDefaults).flat().map(d => d.central_page_id))];
-
-                    return (
-                        <div key={menu.id} className="bg-white shadow rounded-lg overflow-hidden">
-                            <div className="px-4 py-3 bg-gray-50 border-b flex items-center gap-2">
-                                {menu.icon && <i className={`${menu.icon} text-sm text-gray-400`} />}
-                                <h4 className="text-sm font-semibold text-gray-900">{menu.name}</h4>
-                                <span className="text-xs text-gray-400">({pageIds.length} páginas)</span>
-                            </div>
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full">
-                                    <thead>
-                                        <tr className="border-b">
-                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Página</th>
-                                            {roleEntries.map(([value, label]) => (
-                                                <th key={value} className="px-3 py-2 text-center text-xs font-medium text-gray-500">{label}</th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                        {pageIds.map((pageId) => {
-                                            const pageName = pages.find(p => p.id === pageId)?.page_name || `#${pageId}`;
-                                            return (
-                                                <tr key={pageId}>
-                                                    <td className="px-4 py-2 text-sm text-gray-700">{pageName}</td>
-                                                    {roleEntries.map(([roleSlug]) => {
-                                                        const roleDefaults = menuDefaults[roleSlug] || [];
-                                                        const hasAccess = roleDefaults.some(d => d.central_page_id === pageId && d.permission);
-                                                        return (
-                                                            <td key={roleSlug} className="px-3 py-2 text-center">
-                                                                {hasAccess ? (
-                                                                    <CheckCircleIcon className="h-4 w-4 text-green-500 mx-auto" />
-                                                                ) : (
-                                                                    <span className="text-gray-200">-</span>
-                                                                )}
-                                                            </td>
-                                                        );
-                                                    })}
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
+                {menuPages.map(({ menu, menuDefaults, pageEntries }) => (
+                    <div key={menu.id} className="bg-white shadow rounded-lg overflow-hidden">
+                        <div className="px-4 py-3 bg-gray-50 border-b flex items-center gap-2">
+                            {menu.icon && <i className={`${menu.icon} text-sm text-gray-400`} />}
+                            <h4 className="text-sm font-semibold text-gray-900">{menu.name}</h4>
+                            <span className="text-xs text-gray-400">({pageEntries.length} páginas)</span>
                         </div>
-                    );
-                })}
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full">
+                                <thead>
+                                    <tr className="border-b">
+                                        <th className="px-2 py-2 text-center text-xs font-medium text-gray-400 w-8">Ordem</th>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Página</th>
+                                        <th className="px-2 py-2 text-center text-xs font-medium text-gray-400">Módulo</th>
+                                        {roleEntries.map(([value, label]) => (
+                                            <th key={value} className="px-3 py-2 text-center text-xs font-medium text-gray-500">{label}</th>
+                                        ))}
+                                        <th className="px-3 py-2 text-right text-xs font-medium text-gray-400">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {pageEntries.map(({ pageId, minOrder }, pageIdx) => {
+                                        const page = pages.find((p) => p.id === pageId);
+                                        const pageName = page?.page_name || `#${pageId}`;
+                                        const moduleTag = page?.module?.name;
+
+                                        // Drag state for this specific row
+                                        const isDragging = drag.menuId === menu.id && drag.fromIndex === pageIdx;
+                                        const isDropTarget = drag.menuId === menu.id && drag.overIndex === pageIdx && drag.fromIndex !== pageIdx;
+                                        const dropAbove = isDropTarget && drag.fromIndex > pageIdx;
+                                        const dropBelow = isDropTarget && drag.fromIndex < pageIdx;
+
+                                        return (
+                                            <tr
+                                                key={pageId}
+                                                draggable={!busy}
+                                                onDragStart={handleDragStart(menu.id, pageIdx)}
+                                                onDragOver={handleDragOver(menu.id, pageIdx)}
+                                                onDrop={handleDrop(menu.id, pageIdx, pageEntries)}
+                                                onDragEnd={handleDragEnd}
+                                                className={`transition-colors ${
+                                                    isDragging ? 'opacity-40 bg-indigo-50' : ''
+                                                } ${
+                                                    dropAbove ? 'border-t-2 border-t-indigo-500' : ''
+                                                } ${
+                                                    dropBelow ? 'border-b-2 border-b-indigo-500' : ''
+                                                }`}
+                                            >
+                                                <td className="px-2 py-2 text-center">
+                                                    <div className="flex flex-col items-center gap-0.5">
+                                                        <button
+                                                            type="button"
+                                                            disabled={pageIdx === 0 || busy}
+                                                            onClick={() => reorderPages(menu.id, pageEntries, pageIdx, pageIdx - 1)}
+                                                            title="Mover para cima"
+                                                            className="p-0.5 text-gray-300 hover:text-indigo-600 disabled:opacity-20 disabled:cursor-not-allowed"
+                                                        >
+                                                            <ArrowUpIcon className="h-3 w-3" />
+                                                        </button>
+                                                        <span
+                                                            className="text-[10px] font-mono text-gray-400 cursor-grab select-none"
+                                                            title="Arraste a linha para reordenar"
+                                                        >
+                                                            ⋮⋮
+                                                        </span>
+                                                        <span className="text-[9px] font-mono text-gray-300">{minOrder}</span>
+                                                        <button
+                                                            type="button"
+                                                            disabled={pageIdx === pageEntries.length - 1 || busy}
+                                                            onClick={() => reorderPages(menu.id, pageEntries, pageIdx, pageIdx + 1)}
+                                                            title="Mover para baixo"
+                                                            className="p-0.5 text-gray-300 hover:text-indigo-600 disabled:opacity-20 disabled:cursor-not-allowed"
+                                                        >
+                                                            <ArrowDownIcon className="h-3 w-3" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-2 text-sm text-gray-700">
+                                                    <div className="flex items-center gap-2">
+                                                        {page?.icon && <i className={`${page.icon} text-xs text-gray-400`} />}
+                                                        <span>{pageName}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-2 py-2 text-center">
+                                                    {moduleTag
+                                                        ? <span className="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">{moduleTag}</span>
+                                                        : <span className="text-[10px] text-gray-300">—</span>
+                                                    }
+                                                </td>
+                                                {roleEntries.map(([roleSlug, roleLabel]) => {
+                                                    const row = findDefault(menuDefaults, pageId, roleSlug);
+                                                    return (
+                                                        <td key={roleSlug} className="px-3 py-2 text-center">
+                                                            {row ? (
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={busy}
+                                                                    onClick={() => togglePermission(row.id)}
+                                                                    title={row.permission ? `Clique para bloquear (${roleLabel})` : `Clique para liberar (${roleLabel})`}
+                                                                    className="inline-flex disabled:opacity-50"
+                                                                >
+                                                                    {row.permission
+                                                                        ? <CheckCircleIcon className="h-5 w-5 text-green-500 hover:text-green-600" />
+                                                                        : <NoSymbolIcon className="h-5 w-5 text-red-400 hover:text-red-500" />
+                                                                    }
+                                                                </button>
+                                                            ) : (
+                                                                <span className="text-gray-200">·</span>
+                                                            )}
+                                                        </td>
+                                                    );
+                                                })}
+                                                <td className="px-3 py-2 text-right">
+                                                    <button
+                                                        type="button"
+                                                        disabled={busy}
+                                                        onClick={() => removeAllForPage(menu.id, menu.name, pageId, pageName)}
+                                                        title={`Remover "${pageName}" do menu "${menu.name}" (todas as roles)`}
+                                                        className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-700 disabled:opacity-50"
+                                                    >
+                                                        <TrashIcon className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ))}
 
                 {menuPages.length === 0 && (
                     <div className="bg-white shadow rounded-lg p-8 text-center text-sm text-gray-500">
-                        Nenhuma permissão padrão configurada. Execute o seeder CentralNavigationSeeder para popular os dados iniciais.
+                        Nenhum vínculo configurado. Clique em <strong>Atribuir página</strong> para criar o primeiro.
                     </div>
                 )}
             </div>
+
+            {showAssign && (
+                <AssignPageModal
+                    menus={menus}
+                    pages={pages}
+                    defaults={defaults}
+                    allRoles={allRoles}
+                    onClose={() => setShowAssign(false)}
+                />
+            )}
+
+            <ConfirmDialogComponent />
         </div>
+    );
+}
+
+// Modal: create a new menu↔page↔role assignment.
+// Allows bulk selecting multiple roles at once to avoid repetitive submits.
+function AssignPageModal({ menus, pages, defaults, allRoles, onClose }) {
+    const flatMenus = menus.flatMap((m) => [
+        { id: m.id, name: m.name, icon: m.icon },
+        ...m.children.map((c) => ({ id: c.id, name: `${m.name} → ${c.name}`, icon: c.icon })),
+    ]);
+    const activePages = pages.filter((p) => p.is_active);
+    const roleEntries = Object.entries(allRoles);
+
+    const [menuId, setMenuId] = useState('');
+    const [pageId, setPageId] = useState('');
+    const [selectedRoles, setSelectedRoles] = useState([]);
+    const [dropdown, setDropdown] = useState(false);
+    const [libMenu, setLibMenu] = useState(true);
+    const [permission, setPermission] = useState(true);
+    const [processing, setProcessing] = useState(false);
+
+    const selectedPage = activePages.find((p) => p.id === Number(pageId));
+    const hasModule = !!selectedPage?.module;
+
+    // Detect if the selected page is already assigned to another menu.
+    // Business rule (enforced on the backend): a page lives in exactly
+    // one menu. If the admin picks a page that's elsewhere, we warn
+    // that assigning here will MOVE it — not duplicate.
+    const existingMenuName = (() => {
+        if (!pageId) return null;
+        const pageIdNum = Number(pageId);
+        const targetMenuId = menuId ? Number(menuId) : null;
+
+        for (const [mid, byRole] of Object.entries(defaults || {})) {
+            if (targetMenuId && Number(mid) === targetMenuId) continue;
+            const rows = Object.values(byRole).flat();
+            if (rows.some((r) => r.central_page_id === pageIdNum)) {
+                const found = flatMenus.find((fm) => fm.id === Number(mid));
+                return found?.name || `Menu #${mid}`;
+            }
+        }
+        return null;
+    })();
+
+    const toggleRole = (slug) => {
+        setSelectedRoles((prev) =>
+            prev.includes(slug) ? prev.filter((r) => r !== slug) : [...prev, slug]
+        );
+    };
+
+    const submit = async (e) => {
+        e.preventDefault();
+        if (!menuId || !pageId || selectedRoles.length === 0) return;
+
+        setProcessing(true);
+
+        // Inertia's router.post doesn't batch — we sequence these so they
+        // share the redirect/flash message pipeline cleanly.
+        for (const roleSlug of selectedRoles) {
+            await new Promise((resolve) => {
+                router.post('/admin/navigation/defaults', {
+                    central_menu_id: menuId,
+                    central_page_id: pageId,
+                    role_slug: roleSlug,
+                    permission,
+                    dropdown,
+                    lib_menu: libMenu,
+                }, {
+                    preserveScroll: true,
+                    preserveState: true,
+                    onFinish: resolve,
+                });
+            });
+        }
+
+        setProcessing(false);
+        onClose();
+    };
+
+    return (
+        <Modal title="Atribuir página a menu" onClose={onClose}>
+            <form onSubmit={submit} className="flex flex-col flex-1 min-h-0">
+                <div className="p-6 space-y-4 overflow-y-auto flex-1">
+                    <Field label="Menu *" help="Menu da sidebar onde a página será exibida.">
+                        <select value={menuId} onChange={(e) => setMenuId(e.target.value)} required className="block w-full rounded-md border-gray-300 shadow-sm text-sm">
+                            <option value="">Selecione...</option>
+                            {flatMenus.map((m) => (
+                                <option key={m.id} value={m.id}>{m.name}</option>
+                            ))}
+                        </select>
+                    </Field>
+
+                    <Field label="Página *" help="Página a ser exibida dentro do menu selecionado.">
+                        <select value={pageId} onChange={(e) => setPageId(e.target.value)} required className="block w-full rounded-md border-gray-300 shadow-sm text-sm">
+                            <option value="">Selecione...</option>
+                            {activePages.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                    {p.page_name}{p.route ? ` (${p.route})` : ''}
+                                </option>
+                            ))}
+                        </select>
+                    </Field>
+
+                    {hasModule && (
+                        <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800 flex items-start gap-2">
+                            <LinkIcon className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                            <div>
+                                Esta página está vinculada ao módulo <strong>{selectedPage.module.name}</strong>.
+                                Apenas tenants cujo plano inclui esse módulo verão a página no menu.
+                            </div>
+                        </div>
+                    )}
+
+                    {existingMenuName && (
+                        <div className="rounded-md bg-orange-50 border border-orange-200 p-3 text-xs text-orange-800 flex items-start gap-2">
+                            <LinkIcon className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                            <div>
+                                Esta página já está no menu <strong>{existingMenuName}</strong>.
+                                Cada página pode estar em apenas um menu — ao confirmar, ela será <strong>movida</strong> para o menu selecionado (todas as roles do menu anterior serão removidas).
+                            </div>
+                        </div>
+                    )}
+
+                    <Field label="Roles *" help="Selecione uma ou mais roles que terão acesso a esta página neste menu.">
+                        <div className="grid grid-cols-2 gap-2 p-2 border rounded-md bg-gray-50">
+                            {roleEntries.map(([slug, label]) => (
+                                <label key={slug} className="flex items-center gap-2 cursor-pointer text-sm hover:bg-white rounded px-2 py-1">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedRoles.includes(slug)}
+                                        onChange={() => toggleRole(slug)}
+                                        className="rounded border-gray-300 text-indigo-600"
+                                    />
+                                    <span className="text-gray-700">{label}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </Field>
+
+                    <div className="flex gap-6 pt-2 border-t">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={permission} onChange={(e) => setPermission(e.target.checked)} className="rounded border-gray-300 text-indigo-600" />
+                            <span className="text-sm text-gray-700">Acesso liberado</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={libMenu} onChange={(e) => setLibMenu(e.target.checked)} className="rounded border-gray-300 text-indigo-600" />
+                            <span className="text-sm text-gray-700">Exibir na sidebar</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={dropdown} onChange={(e) => setDropdown(e.target.checked)} className="rounded border-gray-300 text-indigo-600" />
+                            <span className="text-sm text-gray-700">Item de dropdown</span>
+                        </label>
+                    </div>
+                </div>
+                <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-lg shrink-0">
+                    <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                        Cancelar
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={processing || !menuId || !pageId || selectedRoles.length === 0}
+                        className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                        {processing ? 'Salvando...' : `Atribuir (${selectedRoles.length} role${selectedRoles.length !== 1 ? 's' : ''})`}
+                    </button>
+                </div>
+            </form>
+        </Modal>
     );
 }
 

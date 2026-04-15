@@ -18,7 +18,7 @@ const SYNC_TYPES = [
     { value: 'prices_only', label: 'Apenas Preços', description: 'Atualiza preços de venda e custo' },
 ];
 
-export default function ProductSyncModal({ show, onClose, onCompleted, activeSyncLog }) {
+export default function ProductSyncModal({ show, onClose, onCompleted, onStarted, activeSyncLog }) {
     const [phase, setPhase] = useState('configuring');
     const [syncType, setSyncType] = useState('full');
     const [dateStart, setDateStart] = useState('');
@@ -99,6 +99,7 @@ export default function ProductSyncModal({ show, onClose, onCompleted, activeSyn
             setLogId(initData.log.id);
             setCurrentPhase(initData.log.current_phase || 'initializing');
             setProgress(prev => ({ ...prev, total: initData.log.total_records || 0 }));
+            onStarted?.(initData.log);
             startPolling(initData.log.id);
         } catch (err) {
             setPhase('error');

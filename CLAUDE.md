@@ -11,7 +11,8 @@ Mercury Laravel is a business management system for Grupo Meia Sola, migrated fr
 ### Development
 
 ```bash
-composer dev          # Starts Laravel server, queue worker, Pail logs, and Vite dev server concurrently
+composer dev          # Starts server, queue, reverb, schedule, and Vite concurrently (uses WampServer PHP)
+                      # Note: Pail is not included — it requires pcntl, which is not available on Windows PHP
 php artisan serve     # Laravel server only
 npm run dev           # Vite dev server only
 npm run build         # Production build
@@ -138,7 +139,7 @@ resources/js/
 
 ### Frontend Component Standards (OBRIGATÓRIO)
 
-**Todas as novas paginas e módulos DEVEM usar os componentes compartilhados listados abaixo.** Nao crie componentes específico para um único módulo quando ja existe um componente genérico reutilizável. O objetivo e manter o layout e a experiencia do usuário padronizados em toda a aplicação.
+**Todas as novas paginas e módulos DEVEM usar os componentes compartilhados listados abaixo.** Nao crie componentes específico para um único módulo quando ja existe um componente genérico reutilizável. O objetivo e manter o layout e a experiencia do usuário padronizados em toda a aplicação, não remova acentuação das palavras, usaremos português brasileiro como padrão.
 
 #### Componentes Compartilhados (`Components/Shared/`)
 

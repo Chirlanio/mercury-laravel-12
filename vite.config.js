@@ -10,4 +10,12 @@ export default defineConfig({
         }),
         react(),
     ],
+    server: {
+        // Força IPv4. Sem isto, o Vite no Windows bind em [::1] e o browser
+        // trava tentando carregar módulos JS de http://[::1]:5173 (IPv6).
+        host: '127.0.0.1',
+        hmr: {
+            host: '127.0.0.1',
+        },
+    },
 });
