@@ -916,6 +916,60 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ==========================================
+    // PurchaseOrders (Ordens de Compra)
+    // ==========================================
+    Route::middleware(['tenant.module:purchase_orders', 'permission:'.Permission::VIEW_PURCHASE_ORDERS->value])->group(function () {
+        Route::get('/purchase-orders', [\App\Http\Controllers\PurchaseOrderController::class, 'index'])->name('purchase-orders.index');
+        Route::get('/purchase-orders/dashboard', [\App\Http\Controllers\PurchaseOrderController::class, 'dashboard'])->name('purchase-orders.dashboard');
+
+        // Import — declarado ANTES do {purchaseOrder} pra não conflitar com o pattern numérico
+        Route::middleware('permission:'.Permission::IMPORT_PURCHASE_ORDERS->value)->group(function () {
+            Route::get('/purchase-orders/import', [\App\Http\Controllers\PurchaseOrderController::class, 'importPage'])->name('purchase-orders.import.page');
+            Route::post('/purchase-orders/import/preview', [\App\Http\Controllers\PurchaseOrderController::class, 'importPreview'])->name('purchase-orders.import.preview');
+            Route::post('/purchase-orders/import', [\App\Http\Controllers\PurchaseOrderController::class, 'importStore'])->name('purchase-orders.import.store');
+        });
+
+        // Export
+        Route::middleware('permission:'.Permission::EXPORT_PURCHASE_ORDERS->value)->group(function () {
+            Route::get('/purchase-orders/export', [\App\Http\Controllers\PurchaseOrderController::class, 'export'])->name('purchase-orders.export');
+        });
+
+        Route::get('/purchase-orders/{purchaseOrder}', [\App\Http\Controllers\PurchaseOrderController::class, 'show'])->whereNumber('purchaseOrder')->name('purchase-orders.show');
+
+        Route::middleware('permission:'.Permission::CREATE_PURCHASE_ORDERS->value)->group(function () {
+            Route::post('/purchase-orders', [\App\Http\Controllers\PurchaseOrderController::class, 'store'])->name('purchase-orders.store');
+            Route::post('/purchase-orders/{purchaseOrder}/items', [\App\Http\Controllers\PurchaseOrderController::class, 'storeItems'])->whereNumber('purchaseOrder')->name('purchase-orders.items.store');
+        });
+
+        Route::middleware('permission:'.Permission::EDIT_PURCHASE_ORDERS->value)->group(function () {
+            Route::put('/purchase-orders/{purchaseOrder}', [\App\Http\Controllers\PurchaseOrderController::class, 'update'])->whereNumber('purchaseOrder')->name('purchase-orders.update');
+            Route::delete('/purchase-orders/{purchaseOrder}/items/{item}', [\App\Http\Controllers\PurchaseOrderController::class, 'destroyItem'])->whereNumber('purchaseOrder')->whereNumber('item')->name('purchase-orders.items.destroy');
+        });
+
+        // Transições de status — cada uma tem sua permission checada pelo service,
+        // mas aqui exigimos ao menos EDIT como gate mínimo de entrada na rota.
+        Route::middleware('permission:'.Permission::EDIT_PURCHASE_ORDERS->value)->group(function () {
+            Route::post('/purchase-orders/{purchaseOrder}/transition', [\App\Http\Controllers\PurchaseOrderController::class, 'transition'])->whereNumber('purchaseOrder')->name('purchase-orders.transition');
+        });
+
+        // Recebimentos (manual + matcher CIGAM)
+        Route::middleware('permission:'.Permission::RECEIVE_PURCHASE_ORDERS->value)->group(function () {
+            Route::post('/purchase-orders/{purchaseOrder}/receipts', [\App\Http\Controllers\PurchaseOrderController::class, 'storeReceipt'])->whereNumber('purchaseOrder')->name('purchase-orders.receipts.store');
+            Route::post('/purchase-orders/{purchaseOrder}/match-cigam', [\App\Http\Controllers\PurchaseOrderController::class, 'matchCigam'])->whereNumber('purchaseOrder')->name('purchase-orders.match-cigam');
+        });
+
+        // Códigos de barras (Fase 4)
+        Route::post('/purchase-orders/{purchaseOrder}/generate-barcodes', [\App\Http\Controllers\PurchaseOrderController::class, 'generateBarcodes'])
+            ->whereNumber('purchaseOrder')
+            ->middleware('permission:'.Permission::EDIT_PURCHASE_ORDERS->value)
+            ->name('purchase-orders.generate-barcodes');
+
+        Route::middleware('permission:'.Permission::DELETE_PURCHASE_ORDERS->value)->group(function () {
+            Route::delete('/purchase-orders/{purchaseOrder}', [\App\Http\Controllers\PurchaseOrderController::class, 'destroy'])->whereNumber('purchaseOrder')->name('purchase-orders.destroy');
+        });
+    });
+
+    // ==========================================
     // Trainings (Treinamentos)
     // ==========================================
     Route::middleware(['tenant.module:training', 'permission:'.Permission::VIEW_TRAININGS->value])->group(function () {

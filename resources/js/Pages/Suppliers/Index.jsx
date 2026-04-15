@@ -2,7 +2,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
-import { maskCpfCnpj, maskPhone } from '@/Hooks/useMasks';
+import { maskCpfCnpj, maskPhone, maskCep } from '@/Hooks/useMasks';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import StatusBadge from '@/Components/Shared/StatusBadge';
@@ -15,7 +15,8 @@ import TextInput from '@/Components/TextInput';
 import { formatDateTime } from '@/Utils/dateHelpers';
 import {
     PlusIcon, MagnifyingGlassIcon, XMarkIcon, PencilSquareIcon,
-    BuildingOfficeIcon, EnvelopeIcon, ClockIcon,
+    BuildingOfficeIcon, EnvelopeIcon, ClockIcon, MapPinIcon,
+    CurrencyDollarIcon, DocumentTextIcon,
 } from '@heroicons/react/24/outline';
 
 export default function Index({ suppliers, filters = {} }) {
@@ -188,6 +189,12 @@ function SupplierFormModal({ show, supplier = null, onClose }) {
         cnpj: supplier ? maskCpfCnpj(supplier.cnpj || '') : '',
         contact: supplier ? maskPhone(supplier.contact || '') : '',
         email: supplier?.email || '',
+        payment_terms_default: supplier?.payment_terms_default || '',
+        address: supplier?.address || '',
+        city: supplier?.city || '',
+        state: supplier?.state || '',
+        zip: supplier ? maskCep(supplier.zip || '') : '',
+        notes: supplier?.notes || '',
         is_active: supplier?.is_active ?? true,
     });
 
@@ -258,6 +265,63 @@ function SupplierFormModal({ show, supplier = null, onClose }) {
                     <InputError message={form.errors.email} className="mt-1" />
                 </div>
             </FormSection>
+
+            <FormSection title="Endereço" cols={4}>
+                <div className="col-span-4 sm:col-span-1">
+                    <InputLabel value="CEP" />
+                    <TextInput className="mt-1 w-full" value={form.data.zip}
+                        onChange={e => form.setData('zip', maskCep(e.target.value))}
+                        placeholder="00000-000" />
+                    <InputError message={form.errors.zip} className="mt-1" />
+                </div>
+                <div className="col-span-4 sm:col-span-3">
+                    <InputLabel value="Logradouro" />
+                    <TextInput className="mt-1 w-full" value={form.data.address}
+                        onChange={e => form.setData('address', e.target.value)}
+                        placeholder="Rua, número, bairro..." />
+                    <InputError message={form.errors.address} className="mt-1" />
+                </div>
+                <div className="col-span-4 sm:col-span-3">
+                    <InputLabel value="Cidade" />
+                    <TextInput className="mt-1 w-full" value={form.data.city}
+                        onChange={e => form.setData('city', e.target.value)} />
+                    <InputError message={form.errors.city} className="mt-1" />
+                </div>
+                <div className="col-span-4 sm:col-span-1">
+                    <InputLabel value="UF" />
+                    <TextInput className="mt-1 w-full uppercase" value={form.data.state}
+                        onChange={e => form.setData('state', e.target.value.toUpperCase().slice(0, 2))}
+                        maxLength={2} placeholder="SP" />
+                    <InputError message={form.errors.state} className="mt-1" />
+                </div>
+            </FormSection>
+
+            <FormSection title="Condições Comerciais" cols={1}>
+                <div>
+                    <InputLabel value="Prazos de pagamento padrão" />
+                    <TextInput className="mt-1 w-full" value={form.data.payment_terms_default}
+                        onChange={e => form.setData('payment_terms_default', e.target.value)}
+                        placeholder="Ex: 30/60/90" />
+                    <p className="mt-1 text-xs text-gray-500">
+                        Prazos em dias separados por barra. Usado como padrão ao criar ordens de compra.
+                    </p>
+                    <InputError message={form.errors.payment_terms_default} className="mt-1" />
+                </div>
+            </FormSection>
+
+            <FormSection title="Observações" cols={1}>
+                <div>
+                    <InputLabel value="Notas" />
+                    <textarea
+                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        rows={3}
+                        value={form.data.notes}
+                        onChange={e => form.setData('notes', e.target.value)}
+                        placeholder="Informações adicionais sobre o fornecedor..."
+                    />
+                    <InputError message={form.errors.notes} className="mt-1" />
+                </div>
+            </FormSection>
         </StandardModal>
     );
 }
@@ -296,6 +360,33 @@ function SupplierViewModal({ supplier, onClose }) {
                     <StandardModal.Field label="E-mail" value={supplier.email} />
                 </div>
             </StandardModal.Section>
+
+            {(supplier.address || supplier.city || supplier.state || supplier.zip) && (
+                <StandardModal.Section title="Endereço" icon={<MapPinIcon className="h-4 w-4" />}>
+                    <div className="grid grid-cols-4 gap-4">
+                        <StandardModal.Field label="CEP" value={supplier.zip ? maskCep(supplier.zip) : null} />
+                        <div className="col-span-3">
+                            <StandardModal.Field label="Logradouro" value={supplier.address} />
+                        </div>
+                        <div className="col-span-3">
+                            <StandardModal.Field label="Cidade" value={supplier.city} />
+                        </div>
+                        <StandardModal.Field label="UF" value={supplier.state} />
+                    </div>
+                </StandardModal.Section>
+            )}
+
+            {supplier.payment_terms_default && (
+                <StandardModal.Section title="Condições Comerciais" icon={<CurrencyDollarIcon className="h-4 w-4" />}>
+                    <StandardModal.Field label="Prazos de pagamento padrão" value={supplier.payment_terms_default} />
+                </StandardModal.Section>
+            )}
+
+            {supplier.notes && (
+                <StandardModal.Section title="Observações" icon={<DocumentTextIcon className="h-4 w-4" />}>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{supplier.notes}</p>
+                </StandardModal.Section>
+            )}
 
             <StandardModal.Section title="Registro" icon={<ClockIcon className="h-4 w-4" />}>
                 <div className="grid grid-cols-2 gap-4">

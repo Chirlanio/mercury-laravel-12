@@ -68,6 +68,13 @@ return [
         'routes' => ['suppliers.*'],
         'icon' => 'TruckIcon',
     ],
+    'purchase_orders' => [
+        'name' => 'Ordens de Compra',
+        'description' => 'Gestão de ordens de compra de coleções com state machine, recebimento e integração com estoque.',
+        'routes' => ['purchase-orders.*'],
+        'icon' => 'ShoppingCartIcon',
+        'dependencies' => ['suppliers', 'stores'],
+    ],
     'checklists' => [
         'name' => 'Checklists',
         'description' => 'Checklists de qualidade.',

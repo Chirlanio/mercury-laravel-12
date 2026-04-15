@@ -58,6 +58,15 @@ export function maskCpfCnpj(value) {
 }
 
 /**
+ * Format as Brazilian ZIP code (CEP): 00000-000
+ */
+export function maskCep(value) {
+    const v = String(value).replace(/\D/g, '').slice(0, 8);
+    if (v.length > 5) return v.replace(/(\d{5})(\d{1,3})/, '$1-$2');
+    return v;
+}
+
+/**
  * Format as phone: (00) 00000-0000 or (00) 0000-0000
  */
 export function maskPhone(value) {

@@ -131,6 +131,7 @@ class CentralNavigationSeeder extends Seeder
             '/stock-audits' => 'stock_audits',
             '/order-payments' => 'order_payments',
             '/suppliers' => 'suppliers',
+            '/purchase-orders' => 'purchase_orders',
             '/medical-certificates' => 'medical_certificates',
             '/absences' => 'absences',
             '/overtime-records' => 'overtime',
@@ -169,6 +170,7 @@ class CentralNavigationSeeder extends Seeder
             ['route' => '/stock-adjustments', 'page_name' => 'Ajustes de Estoque', 'icon' => 'fas fa-clipboard-check'],
             ['route' => '/stock-audits', 'page_name' => 'Auditoria de Estoque', 'icon' => 'fas fa-clipboard-list'],
             ['route' => '/order-payments', 'page_name' => 'Ordens de Pagamento', 'icon' => 'fas fa-money-bill-wave'],
+            ['route' => '/purchase-orders', 'page_name' => 'Ordens de Compra', 'icon' => 'fas fa-shopping-cart'],
             ['route' => '/suppliers', 'page_name' => 'Fornecedores', 'icon' => 'fas fa-truck'],
             ['route' => '/medical-certificates', 'page_name' => 'Atestados Médicos', 'icon' => 'fas fa-file-medical'],
             ['route' => '/absences', 'page_name' => 'Faltas', 'icon' => 'fas fa-user-times'],
@@ -251,6 +253,7 @@ class CentralNavigationSeeder extends Seeder
             '/stock-adjustments' => 'Operações',
             '/stock-audits' => 'Operações',
             '/order-payments' => 'Financeiro',
+            '/purchase-orders' => 'Financeiro',
             '/suppliers' => 'Configurações',
             '/medical-certificates' => 'RH',
             '/absences' => 'RH',
@@ -292,7 +295,7 @@ class CentralNavigationSeeder extends Seeder
         // super_admin: everything | admin: everything except system management | support: view-only | user: dashboard only
         $viewOnlyRoutes = [
             '/dashboard', '/sales', '/products', '/stores', '/employees',
-            '/transfers', '/stock-adjustments', '/order-payments', '/suppliers',
+            '/transfers', '/stock-adjustments', '/order-payments', '/purchase-orders', '/suppliers',
             '/checklists', '/medical-certificates', '/absences', '/overtime-records',
             '/user-sessions', '/work-shifts', '/work-schedules', '/activity-logs',
             '/store-goals', '/movements', '/vacations', '/stock-audits',

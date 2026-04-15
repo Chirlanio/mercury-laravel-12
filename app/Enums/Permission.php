@@ -71,6 +71,18 @@ enum Permission: string
     case EDIT_SUPPLIERS = 'suppliers.edit';
     case DELETE_SUPPLIERS = 'suppliers.delete';
 
+    // Ordens de Compra (PurchaseOrders)
+    case VIEW_PURCHASE_ORDERS = 'purchase_orders.view';
+    case CREATE_PURCHASE_ORDERS = 'purchase_orders.create';
+    case EDIT_PURCHASE_ORDERS = 'purchase_orders.edit';
+    case DELETE_PURCHASE_ORDERS = 'purchase_orders.delete';
+    case APPROVE_PURCHASE_ORDERS = 'purchase_orders.approve';
+    case CANCEL_PURCHASE_ORDERS = 'purchase_orders.cancel';
+    case RECEIVE_PURCHASE_ORDERS = 'purchase_orders.receive';
+    case IMPORT_PURCHASE_ORDERS = 'purchase_orders.import';
+    case EXPORT_PURCHASE_ORDERS = 'purchase_orders.export';
+    case MANAGE_PURCHASE_ORDERS = 'purchase_orders.manage';
+
     // Checklists de qualidade
     case VIEW_CHECKLISTS = 'checklists.view';
     case CREATE_CHECKLISTS = 'checklists.create';
@@ -245,6 +257,17 @@ enum Permission: string
             self::EDIT_SUPPLIERS => 'Editar fornecedores',
             self::DELETE_SUPPLIERS => 'Deletar fornecedores',
 
+            self::VIEW_PURCHASE_ORDERS => 'Visualizar ordens de compra',
+            self::CREATE_PURCHASE_ORDERS => 'Criar ordens de compra',
+            self::EDIT_PURCHASE_ORDERS => 'Editar ordens de compra',
+            self::DELETE_PURCHASE_ORDERS => 'Excluir ordens de compra',
+            self::APPROVE_PURCHASE_ORDERS => 'Faturar ordens de compra',
+            self::CANCEL_PURCHASE_ORDERS => 'Cancelar ordens de compra',
+            self::RECEIVE_PURCHASE_ORDERS => 'Registrar recebimento de ordens',
+            self::IMPORT_PURCHASE_ORDERS => 'Importar ordens de compra (planilha)',
+            self::EXPORT_PURCHASE_ORDERS => 'Exportar ordens de compra',
+            self::MANAGE_PURCHASE_ORDERS => 'Gerenciar ordens de compra (todas as lojas)',
+
             self::VIEW_CHECKLISTS => 'Visualizar checklists',
             self::CREATE_CHECKLISTS => 'Criar checklists',
             self::EDIT_CHECKLISTS => 'Editar checklists',
@@ -397,6 +420,17 @@ enum Permission: string
             self::CREATE_SUPPLIERS => 'Permite cadastrar novos fornecedores',
             self::EDIT_SUPPLIERS => 'Permite editar dados de fornecedores',
             self::DELETE_SUPPLIERS => 'Permite excluir fornecedores',
+
+            self::VIEW_PURCHASE_ORDERS => 'Permite visualizar ordens de compra. Sem MANAGE_PURCHASE_ORDERS, o usuário só vê ordens da sua loja',
+            self::CREATE_PURCHASE_ORDERS => 'Permite criar novas ordens de compra. Sem MANAGE_PURCHASE_ORDERS, só pode criar para a própria loja',
+            self::EDIT_PURCHASE_ORDERS => 'Permite editar dados da ordem enquanto ela estiver em Pendente',
+            self::DELETE_PURCHASE_ORDERS => 'Permite excluir ordens de compra. Bloqueia se houver ordens de pagamento vinculadas',
+            self::APPROVE_PURCHASE_ORDERS => 'Permite transicionar Pendente → Faturado / Faturado Parcial (confirmar NF do fornecedor)',
+            self::CANCEL_PURCHASE_ORDERS => 'Permite cancelar ordens em qualquer estado não terminal e reabrir ordens canceladas',
+            self::RECEIVE_PURCHASE_ORDERS => 'Permite registrar recebimento de mercadoria (gera movimento de estoque automaticamente)',
+            self::IMPORT_PURCHASE_ORDERS => 'Permite importar ordens via planilha (XLSX/CSV) com upsert por número da ordem',
+            self::EXPORT_PURCHASE_ORDERS => 'Permite exportar ordens para Excel ou PDF',
+            self::MANAGE_PURCHASE_ORDERS => 'Permite gerenciar ordens de todas as lojas (sem filtro de store scoping)',
 
             self::VIEW_CHECKLISTS => 'Permite visualizar checklists de qualidade',
             self::CREATE_CHECKLISTS => 'Permite criar novos checklists de qualidade',

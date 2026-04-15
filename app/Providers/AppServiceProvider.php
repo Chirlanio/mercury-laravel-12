@@ -8,7 +8,9 @@ use App\Events\Helpdesk\TicketCommentEvent;
 use App\Events\Helpdesk\TicketCreatedEvent;
 use App\Events\Helpdesk\TicketStatusChangedEvent;
 use App\Events\PersonnelMovementCreated;
+use App\Events\PurchaseOrderStatusChanged;
 use App\Listeners\CreateSubstitutionVacancyFromDismissal;
+use App\Listeners\NotifyPurchaseOrderStakeholders;
 use App\Listeners\Helpdesk\DispatchCsatSurveyListener;
 use App\Listeners\Helpdesk\DispatchWhatsappReplyListener;
 use App\Listeners\Helpdesk\SendTicketAssignedNotifications;
@@ -65,6 +67,15 @@ class AppServiceProvider extends ServiceProvider
         $this->configureRateLimiting();
         $this->registerHelpdeskListeners();
         $this->registerHrListeners();
+        $this->registerPurchaseOrderListeners();
+    }
+
+    protected function registerPurchaseOrderListeners(): void
+    {
+        // Notifica gerentes/aprovadores quando uma ordem de compra muda de
+        // status. Database notification (sino do frontend) — sem mail pra
+        // não inundar caixa postal.
+        Event::listen(PurchaseOrderStatusChanged::class, NotifyPurchaseOrderStakeholders::class);
     }
 
     protected function registerHelpdeskListeners(): void

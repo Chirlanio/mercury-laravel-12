@@ -44,3 +44,16 @@ Schedule::command('helpdesk:imap-fetch')
     ->everyMinute()
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/helpdesk-imap.log'));
+
+// Purchase Orders — CIGAM matcher: every 15 min, depois do movements:sync.
+// Idempotente; pula movements já vinculados a receipts existentes.
+Schedule::command('purchase-orders:cigam-match')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/purchase-orders-cigam.log'));
+
+// Purchase Orders — alerta de ordens atrasadas: dailyAt 09:00.
+Schedule::command('purchase-orders:late-alert')
+    ->dailyAt('09:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/purchase-orders-late.log'));

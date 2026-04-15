@@ -16,6 +16,7 @@ class OrderPayment extends Model
         'cost_center_id',
         'brand_id',
         'supplier_id',
+        'purchase_order_id',
         'store_id',
         'manager_id',
         'description',
@@ -123,6 +124,11 @@ class OrderPayment extends Model
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    public function purchaseOrder(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseOrder::class);
     }
 
     public function manager(): BelongsTo

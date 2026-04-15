@@ -29,6 +29,8 @@ class SupplierController extends Controller
             'contact' => $s->contact,
             'contact_formatted' => $s->formatted_contact,
             'email' => $s->email,
+            'city' => $s->city,
+            'state' => $s->state,
             'is_active' => $s->is_active,
             'created_at' => $s->created_at->format('d/m/Y H:i'),
         ]);
@@ -47,11 +49,23 @@ class SupplierController extends Controller
             'cnpj' => 'required|string|max:20',
             'contact' => 'required|string|max:20',
             'email' => 'required|email|max:255',
+            'payment_terms_default' => 'nullable|string|max:150',
+            'address' => 'nullable|string|max:255',
+            'city' => 'nullable|string|max:120',
+            'state' => 'nullable|string|size:2',
+            'zip' => 'nullable|string|max:10',
+            'notes' => 'nullable|string',
         ]);
 
-        // Clean masks — store only digits for cnpj and contact
+        // Clean masks — store only digits for cnpj, contact and zip
         $validated['cnpj'] = preg_replace('/\D/', '', $validated['cnpj']);
         $validated['contact'] = preg_replace('/\D/', '', $validated['contact']);
+        if (! empty($validated['zip'])) {
+            $validated['zip'] = preg_replace('/\D/', '', $validated['zip']);
+        }
+        if (! empty($validated['state'])) {
+            $validated['state'] = strtoupper($validated['state']);
+        }
         $validated['is_active'] = true;
 
         // Check CNPJ/CPF uniqueness
@@ -76,6 +90,12 @@ class SupplierController extends Controller
             'contact' => $supplier->contact,
             'contact_formatted' => $supplier->formatted_contact,
             'email' => $supplier->email,
+            'payment_terms_default' => $supplier->payment_terms_default,
+            'address' => $supplier->address,
+            'city' => $supplier->city,
+            'state' => $supplier->state,
+            'zip' => $supplier->zip,
+            'notes' => $supplier->notes,
             'is_active' => $supplier->is_active,
             'created_at' => $supplier->created_at->format('d/m/Y H:i'),
             'updated_at' => $supplier->updated_at->format('d/m/Y H:i'),
@@ -90,11 +110,23 @@ class SupplierController extends Controller
             'cnpj' => 'required|string|max:20',
             'contact' => 'required|string|max:20',
             'email' => 'required|email|max:255',
+            'payment_terms_default' => 'nullable|string|max:150',
+            'address' => 'nullable|string|max:255',
+            'city' => 'nullable|string|max:120',
+            'state' => 'nullable|string|size:2',
+            'zip' => 'nullable|string|max:10',
+            'notes' => 'nullable|string',
             'is_active' => 'boolean',
         ]);
 
         $validated['cnpj'] = preg_replace('/\D/', '', $validated['cnpj']);
         $validated['contact'] = preg_replace('/\D/', '', $validated['contact']);
+        if (! empty($validated['zip'])) {
+            $validated['zip'] = preg_replace('/\D/', '', $validated['zip']);
+        }
+        if (! empty($validated['state'])) {
+            $validated['state'] = strtoupper($validated['state']);
+        }
 
         // Check CNPJ uniqueness excluding current record
         $exists = Supplier::where('cnpj', $validated['cnpj'])

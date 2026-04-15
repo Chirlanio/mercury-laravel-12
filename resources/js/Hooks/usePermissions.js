@@ -72,6 +72,18 @@ export const PERMISSIONS = {
     EDIT_ORDER_PAYMENTS: 'order_payments.edit',
     DELETE_ORDER_PAYMENTS: 'order_payments.delete',
 
+    // Ordens de Compra
+    VIEW_PURCHASE_ORDERS: 'purchase_orders.view',
+    CREATE_PURCHASE_ORDERS: 'purchase_orders.create',
+    EDIT_PURCHASE_ORDERS: 'purchase_orders.edit',
+    DELETE_PURCHASE_ORDERS: 'purchase_orders.delete',
+    APPROVE_PURCHASE_ORDERS: 'purchase_orders.approve',
+    CANCEL_PURCHASE_ORDERS: 'purchase_orders.cancel',
+    RECEIVE_PURCHASE_ORDERS: 'purchase_orders.receive',
+    IMPORT_PURCHASE_ORDERS: 'purchase_orders.import',
+    EXPORT_PURCHASE_ORDERS: 'purchase_orders.export',
+    MANAGE_PURCHASE_ORDERS: 'purchase_orders.manage',
+
     // Checklists de qualidade
     VIEW_CHECKLISTS: 'checklists.view',
     CREATE_CHECKLISTS: 'checklists.create',

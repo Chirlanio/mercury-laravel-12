@@ -6,10 +6,11 @@ use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Supplier extends Model
 {
-    use Auditable;
+    use Auditable, SoftDeletes;
 
     protected $fillable = [
         'codigo_for',
@@ -18,6 +19,12 @@ class Supplier extends Model
         'nome_fantasia',
         'contact',
         'email',
+        'payment_terms_default',
+        'address',
+        'city',
+        'state',
+        'zip',
+        'notes',
         'is_active',
     ];
 
