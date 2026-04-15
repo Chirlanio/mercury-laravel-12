@@ -21,6 +21,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -495,23 +496,73 @@ class PurchaseOrderController extends Controller
     public function importPreview(Request $request): JsonResponse
     {
         $request->validate([
-            'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
+            // extensions rule (Laravel 11+) verifica só a extensão do nome,
+            // sem depender de detecção de MIME via finfo — que falha
+            // frequentemente em arquivos .xlsx no Windows (MIME detectado
+            // como application/zip ou application/octet-stream em vez do
+            // tipo oficial MS Office). Combinado com o filtro `accept`
+            // do <input type="file"> no frontend é suficiente pra uso
+            // interno autenticado.
+            'file' => 'required|file|extensions:xlsx,xls,csv,txt|max:20480',
         ]);
 
-        $path = $request->file('file')->getRealPath();
-        $preview = $this->importService->preview($path, limit: 10);
+        $uploaded = $request->file('file');
+        $path = $uploaded->getRealPath();
 
-        return response()->json($preview);
+        try {
+            // Aumenta memory_limit pontualmente pro request de preview —
+            // maatwebsite/excel/PhpSpreadsheet carrega a planilha inteira
+            // em memória pra parsing, e planilhas v1 com ~50k linhas podem
+            // facilmente estourar os 512M padrão do php.ini
+            ini_set('memory_limit', '1024M');
+
+            $preview = $this->importService->preview($path, limit: 10);
+            return response()->json($preview);
+        } catch (\Throwable $e) {
+            Log::error('PurchaseOrder import preview failed', [
+                'file_name' => $uploaded->getClientOriginalName(),
+                'file_size' => $uploaded->getSize(),
+                'file_mime' => $uploaded->getClientMimeType(),
+                'error_class' => get_class($e),
+                'error' => $e->getMessage(),
+                'trace' => collect($e->getTrace())->take(10)->toArray(),
+            ]);
+
+            return response()->json([
+                'message' => 'Falha ao ler a planilha: ' . $e->getMessage(),
+                'error_class' => class_basename($e),
+            ], 500);
+        }
     }
 
     public function importStore(Request $request): RedirectResponse
     {
         $request->validate([
-            'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
+            'file' => 'required|file|extensions:xlsx,xls,csv,txt|max:20480',
         ]);
 
-        $path = $request->file('file')->getRealPath();
-        $stats = $this->importService->import($path, $request->user());
+        $uploaded = $request->file('file');
+        $path = $uploaded->getRealPath();
+
+        try {
+            // Aumenta limites pontualmente — planilhas v1 grandes
+            // consomem bastante memória no PhpSpreadsheet
+            ini_set('memory_limit', '1024M');
+            set_time_limit(600);
+
+            $stats = $this->importService->import($path, $request->user());
+        } catch (\Throwable $e) {
+            Log::error('PurchaseOrder import store failed', [
+                'file_name' => $uploaded->getClientOriginalName(),
+                'file_size' => $uploaded->getSize(),
+                'error_class' => get_class($e),
+                'error' => $e->getMessage(),
+                'trace' => collect($e->getTrace())->take(10)->toArray(),
+            ]);
+
+            return redirect()->route('purchase-orders.import.page')
+                ->with('error', 'Falha na importação: ' . $e->getMessage());
+        }
 
         $msg = "Import: {$stats['orders_created']} ordens criadas, {$stats['orders_updated']} atualizadas, "
              . "{$stats['items_created']} itens novos, {$stats['items_updated']} atualizados";

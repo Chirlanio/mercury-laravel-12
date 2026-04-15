@@ -974,6 +974,17 @@ Route::middleware(['auth'])->group(function () {
             Route::delete('/purchase-orders/size-mappings/{sizeMapping}', [\App\Http\Controllers\PurchaseOrderSizeMappingController::class, 'destroy'])->whereNumber('sizeMapping')->name('purchase-orders.size-mappings.destroy');
         });
 
+        // Aliases de marcas (CRUD) — resolve diferenças de nome entre planilha
+        // histórica e product_brands sincronizado do CIGAM
+        Route::middleware('permission:'.Permission::MANAGE_PURCHASE_ORDER_BRAND_ALIASES->value)->group(function () {
+            Route::get('/purchase-orders/brand-aliases', [\App\Http\Controllers\PurchaseOrderBrandAliasController::class, 'index'])->name('purchase-orders.brand-aliases.index');
+            Route::post('/purchase-orders/brand-aliases', [\App\Http\Controllers\PurchaseOrderBrandAliasController::class, 'store'])->name('purchase-orders.brand-aliases.store');
+            Route::post('/purchase-orders/brand-aliases/auto-detect', [\App\Http\Controllers\PurchaseOrderBrandAliasController::class, 'autoDetect'])->name('purchase-orders.brand-aliases.auto-detect');
+            Route::post('/purchase-orders/brand-aliases/create-manual-brand', [\App\Http\Controllers\PurchaseOrderBrandAliasController::class, 'createManualBrand'])->name('purchase-orders.brand-aliases.create-manual-brand');
+            Route::put('/purchase-orders/brand-aliases/{brandAlias}', [\App\Http\Controllers\PurchaseOrderBrandAliasController::class, 'update'])->whereNumber('brandAlias')->name('purchase-orders.brand-aliases.update');
+            Route::delete('/purchase-orders/brand-aliases/{brandAlias}', [\App\Http\Controllers\PurchaseOrderBrandAliasController::class, 'destroy'])->whereNumber('brandAlias')->name('purchase-orders.brand-aliases.destroy');
+        });
+
         Route::middleware('permission:'.Permission::DELETE_PURCHASE_ORDERS->value)->group(function () {
             Route::delete('/purchase-orders/{purchaseOrder}', [\App\Http\Controllers\PurchaseOrderController::class, 'destroy'])->whereNumber('purchaseOrder')->name('purchase-orders.destroy');
         });

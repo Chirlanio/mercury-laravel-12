@@ -10,7 +10,9 @@ use App\Models\PurchaseOrderStatusHistory;
 use App\Models\Store;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Support\Facades\Log;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Reader\Csv as CsvReader;
 
 /**
  * Importa ordens de compra a partir de planilha XLSX/CSV no formato
@@ -47,6 +49,7 @@ class PurchaseOrderImportService
 {
     public function __construct(
         protected PurchaseOrderSizeMappingService $sizeMapping,
+        protected PurchaseOrderBrandAliasService $brandAliasService,
     ) {}
 
     /** @var array<int, string> nomes normalizados das colunas fixas */
@@ -81,7 +84,9 @@ class PurchaseOrderImportService
      *     missing_columns: array<int, string>,
      *     brands_detected: array<int, array{name: string, product_brand_id: ?int, is_known: bool}>,
      *     sizes_pending: array<int, string>,
-     *     can_import: bool
+     *     can_import: bool,
+     *     header_line: int,
+     *     headers_detected: array<int, string>
      * }
      */
     public function preview(string $filePath, int $limit = 10): array
@@ -89,6 +94,7 @@ class PurchaseOrderImportService
         $parsed = $this->readSpreadsheet($filePath);
         $rows = $parsed['rows'];
         $sizeColumns = $this->detectSizeColumns($parsed['headers']);
+        $ignoredColumns = $this->detectIgnoredColumns($parsed['headers']);
         $missing = $this->detectMissingColumns($parsed['headers']);
 
         // Detecta marcas únicas da planilha
@@ -99,20 +105,43 @@ class PurchaseOrderImportService
             ->values()
             ->all();
 
-        // Resolve cada marca contra product_brands
-        $knownBrands = ProductBrand::all()
-            ->mapWithKeys(fn ($b) => [mb_strtolower(trim($b->name)) => $b->id])
-            ->all();
+        // Garante que marcas novas (não conhecidas nem com alias) aparecem
+        // no CRUD como pendentes — assim o usuário pode criar aliases direto
+        $this->brandAliasService->ensureNamesExist($brandNames);
 
-        $brandsDetected = array_map(function ($name) use ($knownBrands) {
-            $key = mb_strtolower($name);
-            $id = $knownBrands[$key] ?? null;
-            return [
-                'name' => $name,
-                'product_brand_id' => $id,
-                'is_known' => $id !== null,
+        // Classifica marcas em 3 grupos: known (match direto), aliased
+        // (resolvidas via alias), unknown (sem match)
+        $brandClassification = $this->brandAliasService->classify($brandNames);
+
+        // Mantém o formato antigo brandsDetected pra compatibilidade com UI
+        $brandsDetected = [];
+        foreach ($brandClassification['known'] as $b) {
+            $brandsDetected[] = [
+                'name' => $b['name'],
+                'product_brand_id' => $b['product_brand_id'],
+                'is_known' => true,
+                'resolved_via' => 'direct',
             ];
-        }, $brandNames);
+        }
+        foreach ($brandClassification['aliased'] as $b) {
+            $brandsDetected[] = [
+                'name' => $b['name'],
+                'product_brand_id' => $b['product_brand_id'],
+                'product_brand_name' => $b['product_brand_name'],
+                'is_known' => true, // considerado "resolvido" pela UI
+                'resolved_via' => 'alias',
+                // Alias pra UI que já usa esse nome
+                'resolved_to_name' => $b['product_brand_name'],
+            ];
+        }
+        foreach ($brandClassification['unknown'] as $name) {
+            $brandsDetected[] = [
+                'name' => $name,
+                'product_brand_id' => null,
+                'is_known' => false,
+                'resolved_via' => null,
+            ];
+        }
 
         // Ensure labels de tamanho existam no de-para (cria pendentes pra
         // o CRUD ser descobrível). E classifica resolvido vs pendente.
@@ -120,6 +149,7 @@ class PurchaseOrderImportService
         $sizeClassification = $this->sizeMapping->classify($sizeColumns);
 
         $unknownBrands = array_values(array_filter($brandsDetected, fn ($b) => ! $b['is_known']));
+        $aliasedBrands = array_values(array_filter($brandsDetected, fn ($b) => ($b['resolved_via'] ?? null) === 'alias'));
         $pendingSizes = $sizeClassification['pending'];
 
         // Bloqueia import se há marca desconhecida OU se NENHUMA coluna de
@@ -134,10 +164,16 @@ class PurchaseOrderImportService
             'rows' => array_slice($rows, 0, $limit),
             'total' => count($rows),
             'size_columns' => array_values($sizeColumns),
+            'ignored_columns' => array_values($ignoredColumns),
             'missing_columns' => $missing,
             'brands_detected' => array_values($brandsDetected),
+            'brands_aliased' => $aliasedBrands,
             'sizes_pending' => $pendingSizes,
             'can_import' => $canImport,
+            'header_line' => $parsed['header_line'] ?? 1,
+            'headers_detected' => array_values($parsed['headers']),
+            'sheet_name' => $parsed['sheet_name'] ?? null,
+            'sheet_names' => $parsed['sheet_names'] ?? [],
         ];
     }
 
@@ -167,16 +203,21 @@ class PurchaseOrderImportService
             'rejected' => [],
         ];
 
-        // Garante que labels da planilha existam no de-para (pra aparecerem
-        // no CRUD) antes de começar a processar.
+        // Garante que labels e nomes de marca da planilha existam nos
+        // CRUDs (pra aparecerem como pendentes) antes de começar a processar.
         $this->sizeMapping->ensureLabelsExist($sizeColumns);
+
+        $uniqueBrandNames = collect($rows)
+            ->map(fn ($r) => trim((string) ($r['marca'] ?? '')))
+            ->filter(fn ($n) => $n !== '')
+            ->unique()
+            ->values()
+            ->all();
+        $this->brandAliasService->ensureNamesExist($uniqueBrandNames);
 
         // Caches de lookup
         $storesByCode = Store::pluck('code', 'code')->all();
         $storesByName = Store::all()->mapWithKeys(fn ($s) => [mb_strtolower($s->name ?? '') => $s->code])->all();
-        $brandsByName = ProductBrand::all()
-            ->mapWithKeys(fn ($b) => [mb_strtolower(trim($b->name)) => $b->id])
-            ->all();
 
         // Agrupa por Nr Pedido
         $byOrder = [];
@@ -211,12 +252,14 @@ class PurchaseOrderImportService
                 continue;
             }
 
-            $brandId = $brandsByName[mb_strtolower($marcaName)] ?? null;
+            // Resolve via BrandAliasService: tenta match direto em
+            // product_brands primeiro, depois alias ativo resolvido
+            $brandId = $this->brandAliasService->resolve($marcaName);
             if ($brandId === null) {
                 $stats['rows_rejected'] += count($group);
                 $stats['rejected'][] = [
                     'row_number' => $refLine,
-                    'reason' => "Marca '{$marcaName}' não cadastrada. Execute o sync do CIGAM.",
+                    'reason' => "Marca '{$marcaName}' não cadastrada e sem alias resolvido. Configure em Configurações → Aliases de Marca.",
                     'data' => $headerData,
                 ];
                 continue;
@@ -370,18 +413,107 @@ class PurchaseOrderImportService
     // ------------------------------------------------------------------
 
     /**
-     * @return array{headers: array<int, string>, rows: array<int, array<string, mixed>>}
+     * @return array{headers: array<int, string>, rows: array<int, array<string, mixed>>, header_line: int, sheet_name: ?string, sheet_names: array<int, string>}
      */
     protected function readSpreadsheet(string $filePath): array
     {
-        $sheets = Excel::toArray(new class {}, $filePath);
-        $sheet = $sheets[0] ?? [];
-        if (empty($sheet)) {
-            return ['headers' => [], 'rows' => []];
+        // Usa PhpSpreadsheet direto (não via maatwebsite/excel) pra ter
+        // comportamento previsível e controle total sobre a leitura.
+        try {
+            $reader = IOFactory::createReaderForFile($filePath);
+
+            if ($reader instanceof CsvReader) {
+                $reader->setInputEncoding('UTF-8');
+            }
+
+            $reader->setReadDataOnly(true); // ignora formatação, mais rápido
+            $spreadsheet = $reader->load($filePath);
+        } catch (\Throwable $e) {
+            Log::error('PurchaseOrder readSpreadsheet failed', [
+                'file' => $filePath,
+                'error' => $e->getMessage(),
+            ]);
+            return [
+                'headers' => [], 'rows' => [], 'header_line' => 0,
+                'sheet_name' => null, 'sheet_names' => [],
+            ];
         }
 
-        $rawHeaders = array_map(fn ($h) => $this->normalizeHeader((string) $h), $sheet[0]);
-        $dataRows = array_slice($sheet, 1);
+        // Planilhas corporativas frequentemente têm múltiplas abas (pivot de
+        // resumo, gráficos, dados brutos). Em vez de usar getActiveSheet()
+        // cegamente, varremos TODAS as abas procurando aquela cujo header
+        // bate melhor com as FIXED_COLUMNS (score = quantas colunas reconhecidas).
+        $sheetNames = $spreadsheet->getSheetNames();
+
+        $bestSheet = null;
+        $bestSheetName = null;
+        $bestHeaderIdx = 0;
+        $bestScore = 0;
+
+        foreach ($sheetNames as $name) {
+            $ws = $spreadsheet->getSheetByName($name);
+            if ($ws === null) {
+                continue;
+            }
+            $rows = $ws->toArray(null, true, true, false);
+            if (empty($rows)) {
+                continue;
+            }
+
+            // Procura a melhor linha de header nas primeiras 10 linhas da aba
+            $maxCheck = min(10, count($rows));
+            for ($i = 0; $i < $maxCheck; $i++) {
+                if ($this->isRowEmpty($rows[$i])) {
+                    continue;
+                }
+                $normalized = array_map(fn ($h) => $this->normalizeHeader((string) $h), $rows[$i]);
+                $score = count(array_intersect($normalized, self::FIXED_COLUMNS));
+
+                if ($score > $bestScore) {
+                    $bestScore = $score;
+                    $bestSheet = $rows;
+                    $bestSheetName = $name;
+                    $bestHeaderIdx = $i;
+                }
+            }
+        }
+
+        // Se nenhuma aba bateu o threshold (>= 3 colunas reconhecidas),
+        // usa a aba ativa como fallback
+        if ($bestSheet === null || $bestScore < 3) {
+            $active = $spreadsheet->getActiveSheet();
+            $bestSheet = $active->toArray(null, true, true, false);
+            $bestSheetName = $active->getTitle();
+            $bestHeaderIdx = 0;
+        }
+
+        if (empty($bestSheet)) {
+            Log::warning('PurchaseOrder readSpreadsheet: empty workbook', ['file' => $filePath]);
+            return [
+                'headers' => [], 'rows' => [], 'header_line' => 0,
+                'sheet_name' => $bestSheetName, 'sheet_names' => $sheetNames,
+            ];
+        }
+
+        $rawHeaders = array_map(fn ($h) => $this->normalizeHeader((string) $h), $bestSheet[$bestHeaderIdx] ?? []);
+        $dataRows = array_slice($bestSheet, $bestHeaderIdx + 1);
+
+        // Debug: se score final continua baixo, loga amostra pra diagnóstico
+        if ($bestScore < 5) {
+            Log::warning('PurchaseOrder readSpreadsheet: few recognized headers', [
+                'file' => $filePath,
+                'sheet_name' => $bestSheetName,
+                'all_sheet_names' => $sheetNames,
+                'total_rows' => count($bestSheet),
+                'header_line' => $bestHeaderIdx + 1,
+                'recognized_fixed_columns' => $bestScore,
+                'first_5_rows_preview' => array_map(
+                    fn ($row) => array_slice(array_map(fn ($c) => mb_substr((string) $c, 0, 40), $row ?? []), 0, 30),
+                    array_slice($bestSheet, 0, 5)
+                ),
+                'normalized_headers' => array_values($rawHeaders),
+            ]);
+        }
 
         $structured = [];
         foreach ($dataRows as $row) {
@@ -398,7 +530,47 @@ class PurchaseOrderImportService
             $structured[] = $assoc;
         }
 
-        return ['headers' => array_filter($rawHeaders), 'rows' => $structured];
+        return [
+            'headers' => array_filter($rawHeaders),
+            'rows' => $structured,
+            'header_line' => $bestHeaderIdx + 1, // 1-indexed pra usuário
+            'sheet_name' => $bestSheetName,
+            'sheet_names' => $sheetNames,
+        ];
+    }
+
+    /**
+     * Detecta qual linha da planilha é o header real, procurando pela
+     * primeira linha (nas primeiras 10) que contém pelo menos 3 colunas
+     * conhecidas da lista FIXED_COLUMNS.
+     *
+     * Se nenhuma linha bater o threshold, retorna 0 (comportamento legacy
+     * — usa a primeira linha).
+     */
+    protected function detectHeaderLine(array $sheet): int
+    {
+        $maxCheck = min(10, count($sheet));
+        $bestIdx = 0;
+        $bestScore = 0;
+
+        for ($i = 0; $i < $maxCheck; $i++) {
+            if (empty($sheet[$i]) || $this->isRowEmpty($sheet[$i])) {
+                continue;
+            }
+
+            $normalized = array_map(fn ($h) => $this->normalizeHeader((string) $h), $sheet[$i]);
+            $score = count(array_intersect($normalized, self::FIXED_COLUMNS));
+
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestIdx = $i;
+            }
+        }
+
+        // Exige pelo menos 3 colunas conhecidas pra trocar o default.
+        // Abaixo disso, fica na linha 0 e deixa a lógica de missing_columns
+        // avisar o usuário com clareza.
+        return $bestScore >= 3 ? $bestIdx : 0;
     }
 
     protected function normalizeHeader(string $raw): string
@@ -440,6 +612,17 @@ class PurchaseOrderImportService
     }
 
     /**
+     * Detecta colunas de tamanho no header. Precisa satisfazer 2 condições:
+     *  1. NÃO estar na lista FIXED_COLUMNS (não é campo de cabeçalho conhecido)
+     *  2. Passar no looksLikeSizeLabel() — o label precisa parecer com um
+     *     tamanho válido (PP, M, 33, 33.5, 33/34, 70, etc)
+     *
+     * Labels fora desses dois critérios (ex: "Observação", "Fornecedor",
+     * "FATURADO" — se aparecem como colunas por causa de layout exótico da
+     * planilha) são ignoradas silenciosamente em vez de virarem "tamanhos
+     * pendentes" no de-para. Isso evita poluir o CRUD com labels que não
+     * são tamanhos de verdade.
+     *
      * @param  array<int|string, string>  $headers
      * @return array<int, string>
      */
@@ -447,7 +630,81 @@ class PurchaseOrderImportService
     {
         $headers = array_values(array_filter($headers));
         $fixed = array_flip(self::FIXED_COLUMNS);
-        return array_values(array_filter($headers, fn ($h) => ! isset($fixed[$h])));
+
+        return array_values(array_filter($headers, function ($h) use ($fixed) {
+            if (isset($fixed[$h])) {
+                return false; // campo fixo conhecido, não é tamanho
+            }
+            return $this->looksLikeSizeLabel($h);
+        }));
+    }
+
+    /**
+     * Retorna as colunas que não são FIXED nem tamanhos válidos. Útil pra
+     * preview exibir "essas colunas da planilha foram ignoradas" e dar
+     * transparência do parsing.
+     *
+     * @param  array<int|string, string>  $headers
+     * @return array<int, string>
+     */
+    protected function detectIgnoredColumns(array $headers): array
+    {
+        $headers = array_values(array_filter($headers));
+        $fixed = array_flip(self::FIXED_COLUMNS);
+
+        return array_values(array_filter($headers, function ($h) use ($fixed) {
+            if (isset($fixed[$h])) {
+                return false; // campo fixo é usado, não ignorado
+            }
+            return ! $this->looksLikeSizeLabel($h);
+        }));
+    }
+
+    /**
+     * Valida se um label parece um tamanho de produto legítimo.
+     *
+     * Aceita:
+     *  - Vestuário: PP, P, M, G, GG, XG, XGG, XXG, XXGG, XXGGG
+     *  - Legado: 01
+     *  - Numéricos: 33, 40, 70, 105 (1-3 dígitos)
+     *  - Meio-tamanhos: 33.5, 34.5, 35.5, 36.5
+     *  - Duplos: 33/34, 35/36, 37/38, 39/40
+     *
+     * Rejeita: FATURADO, ENTREGUE, CANCELADO, Observação, etc.
+     */
+    protected function looksLikeSizeLabel(string $label): bool
+    {
+        $upper = mb_strtoupper(trim($label));
+        if ($upper === '') {
+            return false;
+        }
+
+        // Vestuário: PP, P, M, G, GG, XG, XXG, XGG, XXGG
+        if (preg_match('/^X{0,2}(P{1,2}|M|G{1,2})$/', $upper)) {
+            return true;
+        }
+
+        // Legado numérico pequeno: "01"
+        if ($upper === '01') {
+            return true;
+        }
+
+        // Numérico puro: 32, 33, 40, 70, 105 (1 a 3 dígitos)
+        if (preg_match('/^\d{1,3}$/', $upper)) {
+            return true;
+        }
+
+        // Meio-tamanho: 33.5, 34.5 (com ponto ou vírgula decimal)
+        if (preg_match('/^\d{1,3}[.,]\d$/', $upper)) {
+            return true;
+        }
+
+        // Numérico duplo: 33/34, 35/36
+        if (preg_match('/^\d{1,3}\/\d{1,3}$/', $upper)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

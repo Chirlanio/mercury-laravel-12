@@ -5,9 +5,11 @@ namespace Tests\Feature;
 use App\Models\ProductBrand;
 use App\Models\ProductSize;
 use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderBrandAlias;
 use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseOrderSizeMapping;
 use App\Models\Store;
+use App\Services\PurchaseOrderBrandAliasService;
 use App\Services\PurchaseOrderImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -302,6 +304,260 @@ class PurchaseOrderImportTest extends TestCase
 
         $this->assertNotEmpty($preview['missing_columns']);
         $this->assertFalse($preview['can_import']);
+    }
+
+    public function test_header_detection_skips_title_and_empty_rows(): void
+    {
+        // Planilha corporativa com linha de título + linha em branco antes do header real
+        $file = $this->makeCsv([
+            ['PEDIDO DE COMPRA - LUIZA BARCELOS INVERNO 2021'],
+            [],
+            $this->headerV1(), // header real na linha 3
+            $this->rowV1(ref: 'REF-H', marca: 'LUIZA BARCELOS', nrPedido: 'PO-HEADER', sizes: ['33' => 2]),
+        ]);
+
+        $preview = app(PurchaseOrderImportService::class)->preview($file);
+
+        // Detectou o header na linha 3
+        $this->assertEquals(3, $preview['header_line']);
+
+        // E conseguiu ler as colunas corretamente
+        $this->assertContains('referencia', $preview['headers_detected']);
+        $this->assertContains('nr_pedido', $preview['headers_detected']);
+        $this->assertEmpty($preview['missing_columns']);
+    }
+
+    public function test_header_detection_falls_back_to_first_line_when_no_match(): void
+    {
+        // Planilha com linhas que não parecem header algum — cai no fallback (linha 1)
+        $file = $this->makeCsv([
+            ['col1', 'col2', 'col3'],
+            ['data1', 'data2', 'data3'],
+        ]);
+
+        $preview = app(PurchaseOrderImportService::class)->preview($file);
+
+        $this->assertEquals(1, $preview['header_line']);
+        // E avisa que colunas estão faltando (comportamento esperado)
+        $this->assertNotEmpty($preview['missing_columns']);
+    }
+
+    public function test_preview_ignores_non_size_columns(): void
+    {
+        // Header com colunas extras que não são FIXED nem tamanhos reais
+        // (ex: resultado de planilha com layout pivot ou colunas auxiliares)
+        $header = array_merge($this->headerV1(), [
+            'FATURADO',        // status, não é tamanho
+            'ENTREGUE',        // status, não é tamanho
+            'OBSERVAÇÃO',      // texto livre, não é tamanho
+            'FORNECEDOR',      // campo fora do padrão
+        ]);
+        $row = $this->rowV1(ref: 'REF-1', marca: 'LUIZA BARCELOS', nrPedido: 'PO-IGN', sizes: ['33' => 2]);
+        // Fill the extra columns with values
+        $row = array_merge($row, ['sim', 'nao', 'qualquer', 'ABC Ltda']);
+
+        $file = $this->makeCsv([$header, $row]);
+
+        $preview = app(PurchaseOrderImportService::class)->preview($file);
+
+        // Colunas de status/observação/fornecedor NÃO viram size columns
+        $this->assertNotContains('faturado', $preview['size_columns']);
+        $this->assertNotContains('entregue', $preview['size_columns']);
+        $this->assertNotContains('observacao', $preview['size_columns']);
+        $this->assertNotContains('fornecedor', $preview['size_columns']);
+
+        // E tamanhos reais continuam sendo detectados
+        $this->assertContains('33', $preview['size_columns']);
+
+        // Essas colunas aparecem em ignored_columns (transparência pro usuário)
+        $this->assertContains('faturado', $preview['ignored_columns']);
+        $this->assertContains('entregue', $preview['ignored_columns']);
+        $this->assertContains('observacao', $preview['ignored_columns']);
+        $this->assertContains('fornecedor', $preview['ignored_columns']);
+
+        // E sizes_pending não deve ter lixo nenhum
+        $this->assertNotContains('FATURADO', $preview['sizes_pending']);
+        $this->assertNotContains('ENTREGUE', $preview['sizes_pending']);
+    }
+
+    public function test_selects_correct_sheet_from_multi_sheet_xlsx(): void
+    {
+        // Cria um XLSX real com 2 abas: uma pivot na primeira (ativa)
+        // e dados brutos com header válido na segunda
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+
+        // Aba 1: "Resumo" com layout de pivot table (sem header válido)
+        $sheet1 = $spreadsheet->getActiveSheet();
+        $sheet1->setTitle('Resumo');
+        $sheet1->fromArray([
+            ['Soma de Qtd Pedido', 'Rótulos de Coluna'],
+            ['Rótulos de Linha', 'Sapatos', 'Bolsas', 'Total Geral'],
+            ['VERÃO 2026', 13434, 2639, 16073],
+        ], null, 'A1');
+
+        // Aba 2: "Dados" com header v1 válido
+        $sheet2 = $spreadsheet->createSheet();
+        $sheet2->setTitle('Dados');
+        $sheet2->fromArray([
+            $this->headerV1(),
+            $this->rowV1(ref: 'REF-1', marca: 'LUIZA BARCELOS', nrPedido: 'PO-MULTI', sizes: ['33' => 2]),
+        ], null, 'A1');
+
+        // Salva como XLSX
+        $path = tempnam(sys_get_temp_dir(), 'po_multi_') . '.xlsx';
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $writer->save($path);
+
+        $preview = app(PurchaseOrderImportService::class)->preview($path);
+
+        // Deve ter escolhido a aba "Dados", não a "Resumo"
+        $this->assertEquals('Dados', $preview['sheet_name']);
+        $this->assertEquals(['Resumo', 'Dados'], $preview['sheet_names']);
+        $this->assertEmpty($preview['missing_columns']);
+        $this->assertContains('referencia', $preview['headers_detected']);
+        $this->assertContains('nr_pedido', $preview['headers_detected']);
+
+        // E consegue importar a linha
+        $result = app(PurchaseOrderImportService::class)->import($path, $this->adminUser);
+        $this->assertEquals(1, $result['orders_created']);
+        $this->assertEquals(1, $result['items_created']);
+    }
+
+    public function test_import_resolves_brand_via_alias(): void
+    {
+        // Cadastra a marca oficial "MS FACCINE" no product_brands
+        $msFaccine = ProductBrand::create([
+            'cigam_code' => 'MSF01',
+            'name' => 'MS FACCINE',
+            'is_active' => true,
+        ]);
+
+        // Cria alias: "FACCINE" (planilha) → MS FACCINE (CIGAM)
+        PurchaseOrderBrandAlias::create([
+            'source_name' => 'FACCINE',
+            'product_brand_id' => $msFaccine->id,
+            'is_active' => true,
+            'auto_detected' => false,
+        ]);
+
+        // Planilha usa "FACCINE" sem o prefixo MS
+        $file = $this->makeCsv([
+            $this->headerV1(),
+            $this->rowV1(ref: 'REF-FAC', marca: 'FACCINE', nrPedido: 'PO-FAC', sizes: ['33' => 3]),
+        ]);
+
+        $result = app(PurchaseOrderImportService::class)->import($file, $this->adminUser);
+
+        $this->assertEquals(1, $result['orders_created']);
+        $this->assertEquals(0, $result['rows_rejected']);
+
+        $order = PurchaseOrder::where('order_number', 'PO-FAC')->first();
+        $this->assertEquals($msFaccine->id, $order->brand_id);
+    }
+
+    public function test_import_rejects_brand_without_match_or_alias(): void
+    {
+        $file = $this->makeCsv([
+            $this->headerV1(),
+            $this->rowV1(ref: 'REF-X', marca: 'MARCA FANTASMA INEXISTENTE', nrPedido: 'PO-X', sizes: ['33' => 1]),
+        ]);
+
+        $result = app(PurchaseOrderImportService::class)->import($file, $this->adminUser);
+
+        $this->assertEquals(0, $result['orders_created']);
+        $this->assertEquals(1, $result['rows_rejected']);
+        $this->assertStringContainsString('sem alias resolvido', $result['rejected'][0]['reason']);
+    }
+
+    public function test_preview_classifies_brands_as_known_aliased_unknown(): void
+    {
+        $msFaccine = ProductBrand::create(['cigam_code' => 'MSF', 'name' => 'MS FACCINE', 'is_active' => true]);
+        PurchaseOrderBrandAlias::create([
+            'source_name' => 'FACCINE',
+            'product_brand_id' => $msFaccine->id,
+            'is_active' => true,
+        ]);
+
+        $file = $this->makeCsv([
+            $this->headerV1(),
+            $this->rowV1(ref: 'REF-1', marca: 'LUIZA BARCELOS', nrPedido: 'PO-K', sizes: ['33' => 1]), // known
+            $this->rowV1(ref: 'REF-2', marca: 'FACCINE', nrPedido: 'PO-A', sizes: ['33' => 1]),       // aliased
+            $this->rowV1(ref: 'REF-3', marca: 'MARCA NOVA', nrPedido: 'PO-U', sizes: ['33' => 1]),    // unknown
+        ]);
+
+        $preview = app(PurchaseOrderImportService::class)->preview($file);
+
+        // brands_detected deve ter 3 registros
+        $this->assertCount(3, $preview['brands_detected']);
+
+        // brands_aliased tem apenas "FACCINE"
+        $this->assertCount(1, $preview['brands_aliased']);
+        $this->assertEquals('FACCINE', $preview['brands_aliased'][0]['name']);
+        $this->assertEquals('MS FACCINE', $preview['brands_aliased'][0]['product_brand_name']);
+
+        // can_import é false porque há unknown
+        $this->assertFalse($preview['can_import']);
+    }
+
+    public function test_auto_detect_ms_prefix_resolves_pending_aliases(): void
+    {
+        // Cadastra marcas "MS FACCINE" e "MS VICENZA" em product_brands
+        $msFaccine = ProductBrand::create(['cigam_code' => 'MSF', 'name' => 'MS FACCINE', 'is_active' => true]);
+        $msVicenza = ProductBrand::create(['cigam_code' => 'MSV', 'name' => 'MS VICENZA', 'is_active' => true]);
+
+        // Cria 2 aliases pendentes (sem product_brand_id)
+        PurchaseOrderBrandAlias::create(['source_name' => 'FACCINE', 'product_brand_id' => null, 'auto_detected' => true]);
+        PurchaseOrderBrandAlias::create(['source_name' => 'VICENZA NOVA', 'product_brand_id' => null, 'auto_detected' => true]);
+
+        $service = app(PurchaseOrderBrandAliasService::class);
+        $result = $service->autoDetectMsPrefix();
+
+        // FACCINE → MS FACCINE detectado (VICENZA NOVA não tem MS, skipa)
+        $this->assertEquals(1, $result['detected']);
+        $this->assertEquals(1, $result['skipped']);
+
+        $faccineAlias = PurchaseOrderBrandAlias::where('source_name', 'FACCINE')->first();
+        $this->assertEquals($msFaccine->id, $faccineAlias->product_brand_id);
+    }
+
+    public function test_create_manual_brand_with_alias(): void
+    {
+        $service = app(PurchaseOrderBrandAliasService::class);
+        $result = $service->createManualBrandWithAlias(
+            sourceName: 'ROSA DO CAMPO',
+            brandName: 'Rosa do Campo',
+            userId: $this->adminUser->id,
+        );
+
+        // ProductBrand criado com cigam_code prefixado MANUAL-
+        $this->assertStringStartsWith('MANUAL-', $result['product_brand']->cigam_code);
+        $this->assertEquals('Rosa do Campo', $result['product_brand']->name);
+        $this->assertTrue($result['product_brand']->is_active);
+
+        // Alias apontando pra ele, não auto-detected
+        $this->assertEquals('ROSA DO CAMPO', $result['alias']->source_name);
+        $this->assertEquals($result['product_brand']->id, $result['alias']->product_brand_id);
+        $this->assertFalse($result['alias']->auto_detected);
+    }
+
+    public function test_looks_like_size_label_accepts_common_patterns(): void
+    {
+        // Testa casos reais que devem passar
+        $file = $this->makeCsv([
+            array_merge($this->headerV1(), ['XGG', '42', '33,5', '41/42']),
+            array_merge(
+                $this->rowV1(ref: 'REF-X', marca: 'LUIZA BARCELOS', nrPedido: 'PO-X', sizes: ['33' => 1]),
+                ['2', '3', '1', '4']
+            ),
+        ]);
+
+        $preview = app(PurchaseOrderImportService::class)->preview($file);
+
+        // Todos esses são padrões de tamanho válidos — devem virar size columns
+        $this->assertContains('xgg', $preview['size_columns']);
+        $this->assertContains('42', $preview['size_columns']);
+        $this->assertContains('33,5', $preview['size_columns']);
+        $this->assertContains('41/42', $preview['size_columns']);
     }
 
     // ------------------------------------------------------------------

@@ -32,11 +32,31 @@ export default function Import() {
             headers: {
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
                 'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
             },
         })
-            .then((r) => r.ok ? r.json() : Promise.reject(r))
+            .then(async (r) => {
+                if (r.ok) return r.json();
+
+                // 422 = validation error. Laravel retorna { message, errors: {file: [...]} }
+                if (r.status === 422) {
+                    const body = await r.json().catch(() => null);
+                    const fileErrors = body?.errors?.file || [];
+                    const msg = fileErrors.length
+                        ? fileErrors.join(' ')
+                        : (body?.message || 'Arquivo inválido.');
+                    throw new Error(msg);
+                }
+
+                // Outros erros: tenta ler o corpo pra dar contexto
+                const text = await r.text().catch(() => '');
+                throw new Error(`Erro ${r.status} ao ler planilha${text ? ': ' + text.slice(0, 200) : ''}`);
+            })
             .then((data) => { setPreview(data); setPreviewing(false); })
-            .catch(() => { setError('Falha ao ler a planilha. Verifique o formato.'); setPreviewing(false); });
+            .catch((err) => {
+                setError(err.message || 'Falha ao ler a planilha.');
+                setPreviewing(false);
+            });
     };
 
     const handleConfirmImport = () => {
@@ -63,7 +83,8 @@ export default function Import() {
     };
 
     const unknownBrands = preview?.brands_detected?.filter((b) => !b.is_known) || [];
-    const knownBrands = preview?.brands_detected?.filter((b) => b.is_known) || [];
+    const knownBrands = preview?.brands_detected?.filter((b) => b.is_known && (b.resolved_via ?? 'direct') === 'direct') || [];
+    const aliasedBrands = preview?.brands_aliased || [];
     const pendingSizes = preview?.sizes_pending || [];
     const missingColumns = preview?.missing_columns || [];
     const canImport = preview?.can_import || false;
@@ -166,6 +187,36 @@ export default function Import() {
 
                     {preview && (
                         <>
+                            {/* Info sobre o header detectado — ajuda a debugar */}
+                            {preview.header_line && preview.headers_detected && (
+                                <div className="mb-4 bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs">
+                                    {preview.sheet_names && preview.sheet_names.length > 1 && (
+                                        <div className="mb-2">
+                                            <span className="font-medium text-gray-700">Abas do arquivo:</span>
+                                            <div className="mt-1 flex flex-wrap gap-1">
+                                                {preview.sheet_names.map((name, i) => (
+                                                    <span key={i} className={`px-2 py-0.5 rounded font-mono ${name === preview.sheet_name ? 'bg-green-100 text-green-800 font-semibold' : 'bg-gray-200 text-gray-700'}`}>
+                                                        {name === preview.sheet_name ? '✓ ' : ''}{name}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div>
+                                        <span className="font-medium text-gray-700">
+                                            Header detectado
+                                            {preview.sheet_name && preview.sheet_names?.length > 1 && ` na aba "${preview.sheet_name}"`}
+                                            {' '}linha {preview.header_line}:
+                                        </span>
+                                        <div className="mt-1 font-mono text-gray-600 break-words">
+                                            {preview.headers_detected.length > 0
+                                                ? preview.headers_detected.join(' | ')
+                                                : <em className="text-red-600">Nenhum header encontrado — planilha pode estar vazia ou mal formatada</em>}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Pendências bloqueantes */}
                             {missingColumns.length > 0 && (
                                 <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
@@ -176,9 +227,18 @@ export default function Import() {
                                             <p className="text-xs text-red-700 mt-1">
                                                 {missingColumns.join(', ')}
                                             </p>
-                                            <p className="text-xs text-red-600 mt-2">
-                                                Verifique o header da planilha — é necessário ter todas as colunas obrigatórias.
-                                            </p>
+                                            {preview.sheet_names && preview.sheet_names.length > 1 ? (
+                                                <p className="text-xs text-red-600 mt-2">
+                                                    O arquivo tem <strong>{preview.sheet_names.length} abas</strong>. O sistema escolheu <code className="bg-red-100 px-1 rounded">{preview.sheet_name}</code> por ser a que mais se aproxima do formato esperado, mas não encontrou as colunas obrigatórias. Verifique se a aba com os dados brutos da planilha está presente no arquivo — talvez a aba visível quando você abriu o Excel seja uma <strong>tabela dinâmica/resumo</strong>, e os dados estejam em outra aba.
+                                                </p>
+                                            ) : (
+                                                <p className="text-xs text-red-600 mt-2">
+                                                    Verifique o header da planilha — é necessário ter todas as colunas obrigatórias.
+                                                    O header deve estar na primeira linha com dados não-vazios. Se houver linhas
+                                                    de título ou em branco antes do header, o sistema tenta detectar automaticamente,
+                                                    mas pode falhar em layouts incomuns.
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -189,9 +249,17 @@ export default function Import() {
                                     <div className="flex items-start">
                                         <TagIcon className="h-5 w-5 text-red-600 mr-2 flex-shrink-0 mt-0.5" />
                                         <div className="flex-1">
-                                            <h3 className="text-sm font-medium text-red-900">
-                                                {unknownBrands.length} marca(s) não cadastrada(s) no catálogo CIGAM
-                                            </h3>
+                                            <div className="flex justify-between items-start">
+                                                <h3 className="text-sm font-medium text-red-900">
+                                                    {unknownBrands.length} marca(s) não cadastrada(s) e sem alias
+                                                </h3>
+                                                <Link
+                                                    href={route('purchase-orders.brand-aliases.index')}
+                                                    className="text-xs text-red-700 hover:text-red-900 underline"
+                                                >
+                                                    Configurar aliases →
+                                                </Link>
+                                            </div>
                                             <div className="mt-2 flex flex-wrap gap-1">
                                                 {unknownBrands.map((b, i) => (
                                                     <span key={i} className="inline-flex items-center bg-red-100 text-red-800 text-xs px-2 py-0.5 rounded">
@@ -200,9 +268,13 @@ export default function Import() {
                                                 ))}
                                             </div>
                                             <p className="text-xs text-red-700 mt-3">
-                                                O catálogo de marcas (<code className="bg-red-100 px-1 rounded">product_brands</code>) é sincronizado do CIGAM.
-                                                Execute o sync ou cadastre essas marcas no ERP antes de importar. Ordens com marca desconhecida são <strong>rejeitadas</strong>.
+                                                O catálogo de marcas (<code className="bg-red-100 px-1 rounded">product_brands</code>) é sincronizado do CIGAM. Pra resolver:
                                             </p>
+                                            <ul className="text-xs text-red-700 mt-1 ml-4 list-disc space-y-0.5">
+                                                <li>Se a marca existe no CIGAM com <strong>nome diferente</strong> (ex: "FACCINE" vs "MS FACCINE"), crie um <strong>alias</strong> na tela de Aliases</li>
+                                                <li>Se a marca é <strong>histórica/descontinuada</strong> (não existe mais no CIGAM), use "Criar Marca Manual" na mesma tela</li>
+                                                <li>Ordens com marca não resolvida são <strong>rejeitadas</strong> no import</li>
+                                            </ul>
                                         </div>
                                     </div>
                                 </div>
@@ -240,13 +312,47 @@ export default function Import() {
                                 </div>
                             )}
 
+                            {/* Marcas resolvidas via alias */}
+                            {aliasedBrands.length > 0 && (
+                                <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <div className="flex items-start">
+                                        <TagIcon className="h-5 w-5 text-blue-600 mr-2 flex-shrink-0 mt-0.5" />
+                                        <div className="flex-1">
+                                            <div className="flex justify-between items-start">
+                                                <h3 className="text-sm font-medium text-blue-900">
+                                                    {aliasedBrands.length} marca(s) resolvida(s) via alias
+                                                </h3>
+                                                <Link
+                                                    href={route('purchase-orders.brand-aliases.index')}
+                                                    className="text-xs text-blue-700 hover:text-blue-900 underline"
+                                                >
+                                                    Gerenciar aliases →
+                                                </Link>
+                                            </div>
+                                            <div className="mt-2 space-y-1 text-xs">
+                                                {aliasedBrands.map((b, i) => (
+                                                    <div key={i} className="flex items-center text-blue-800">
+                                                        <span className="font-mono bg-blue-100 px-2 py-0.5 rounded">{b.name}</span>
+                                                        <span className="mx-2">→</span>
+                                                        <span className="font-medium">{b.resolved_to_name || b.product_brand_name}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <p className="text-xs text-blue-700 mt-2">
+                                                Essas marcas da planilha foram mapeadas para marcas oficiais do catálogo via aliases cadastrados. Ordens serão criadas apontando para as marcas oficiais correspondentes.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Marcas reconhecidas */}
                             {knownBrands.length > 0 && unknownBrands.length === 0 && (
                                 <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-green-900">
                                     <div className="flex items-center">
                                         <CheckCircleIcon className="h-4 w-4 mr-2" />
                                         <span className="font-medium">
-                                            {knownBrands.length} marca(s) reconhecida(s):
+                                            {knownBrands.length} marca(s) reconhecida(s) diretamente:
                                         </span>
                                         <span className="ml-2 text-xs">
                                             {knownBrands.slice(0, 8).map((b) => b.name).join(', ')}
