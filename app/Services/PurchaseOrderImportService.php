@@ -3,12 +3,11 @@
 namespace App\Services;
 
 use App\Enums\PurchaseOrderStatus;
-use App\Models\Brand;
+use App\Models\ProductBrand;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseOrderStatusHistory;
 use App\Models\Store;
-use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
@@ -17,38 +16,39 @@ use Maatwebsite\Excel\Facades\Excel;
  * Importa ordens de compra a partir de planilha XLSX/CSV no formato
  * legacy v1 (Meia Sola).
  *
- * Formato da planilha:
+ * ARQUITETURA (alinhada com v1 após feedback operacional):
  *
- * Colunas fixas (nesta ordem, mas posicionalmente flexível — lookup é por nome):
+ *  - FORNECEDOR não é parte da ordem de compra. O v1 também não tem
+ *    (a tabela `adms_purchase_order_controls` não tem supplier_id).
+ *    Fornecedor só aparece em `order_payments`. Uma ordem de compra vira
+ *    1+ order_payments vinculados a fornecedores (possivelmente diferentes).
+ *
+ *  - MARCA é obrigatória e vem de `product_brands` (sincronizado do CIGAM).
+ *    Se a marca da planilha não existe em product_brands, a ordem inteira
+ *    é rejeitada. NÃO criamos marcas automaticamente — o sync do CIGAM é
+ *    a única fonte legítima.
+ *
+ *  - TAMANHOS usam de-para (PurchaseOrderSizeMapping) para traduzir labels
+ *    da planilha (PP, 33, 33/34, 33.5) em product_sizes oficiais. Labels
+ *    sem mapping fazem rejeitar o item individual (não a ordem inteira).
+ *    Labels novos detectados durante import são auto-criados como pendentes
+ *    no de-para (ensureLabelsExist) pra aparecer no CRUD.
+ *
+ * Formato da planilha (25 colunas fixas em PT-BR + N colunas de tamanho):
  *   Referência | Descrição | Material | Cor | Tipo | Grupo | Subgrupo |
  *   Marca | Estação | Coleção | Custo Unit | Preço Venda | Precif |
  *   Qtd Pedido | Custo total | Venda total | Nr Pedido | Status | Destino |
  *   Dt Pedido | Previsão | Pagamento | Nota fiscal | Emissão Nf | Confirmação
  *
- * Colunas de tamanho (qualquer nome que não esteja na lista fixa): PP, P, M, G, GG,
- * 01, 33–40, 33/34, 35/36, 37/38, 39/40, 33.5–39.5, 70–105, etc.
- *
  * Cada LINHA = 1 referência × N tamanhos (matriz horizontal).
  * Múltiplas linhas com o mesmo Nr Pedido são agrupadas em uma ordem única.
- *
- * Regras de import:
- *  - Cabeçalho da ordem: usa dados da primeira linha não-cancelada do grupo
- *  - Status: mais frequente entre as linhas do grupo (mapeado PT → enum)
- *  - Fornecedor: exige $defaultSupplierId no upload (planilha v1 não tem fornecedor)
- *  - Loja: lookup por code OU name (case-insensitive)
- *  - Marca: lookup por name; se não achar, marca fica null (não rejeita)
- *  - Datas: parser tolerante — dd/mm/yyyy, ISO, ou Excel serial
- *  - Valores: aceita "172,90" (BR) ou "172.90"
- *
- * Upsert por:
- *  - Cabeçalho: (order_number)
- *  - Item: (purchase_order_id, reference, size) — UNIQUE index da Fase 1
- *
- * Headers são lidos brutos (sem slug formatter) pra preservar colunas
- * tipo "33/34" e "33.5" que o slug quebraria.
  */
 class PurchaseOrderImportService
 {
+    public function __construct(
+        protected PurchaseOrderSizeMappingService $sizeMapping,
+    ) {}
+
     /** @var array<int, string> nomes normalizados das colunas fixas */
     private const FIXED_COLUMNS = [
         'referencia', 'descricao', 'material', 'cor',
@@ -71,23 +71,73 @@ class PurchaseOrderImportService
     ];
 
     /**
-     * Preview — retorna as primeiras N linhas estruturadas sem persistir.
+     * Preview — retorna metadados da planilha sem persistir nada.
+     * Detecta brands e size labels pra que a UI mostre o que precisa ser
+     * resolvido antes de permitir o import.
      *
-     * @return array{rows: array, total: int, size_columns: array, missing_columns: array}
+     * @return array{
+     *     rows: array, total: int,
+     *     size_columns: array<int, string>,
+     *     missing_columns: array<int, string>,
+     *     brands_detected: array<int, array{name: string, product_brand_id: ?int, is_known: bool}>,
+     *     sizes_pending: array<int, string>,
+     *     can_import: bool
+     * }
      */
     public function preview(string $filePath, int $limit = 10): array
     {
         $parsed = $this->readSpreadsheet($filePath);
         $rows = $parsed['rows'];
-
         $sizeColumns = $this->detectSizeColumns($parsed['headers']);
         $missing = $this->detectMissingColumns($parsed['headers']);
+
+        // Detecta marcas únicas da planilha
+        $brandNames = collect($rows)
+            ->map(fn ($r) => trim((string) ($r['marca'] ?? '')))
+            ->filter(fn ($n) => $n !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        // Resolve cada marca contra product_brands
+        $knownBrands = ProductBrand::all()
+            ->mapWithKeys(fn ($b) => [mb_strtolower(trim($b->name)) => $b->id])
+            ->all();
+
+        $brandsDetected = array_map(function ($name) use ($knownBrands) {
+            $key = mb_strtolower($name);
+            $id = $knownBrands[$key] ?? null;
+            return [
+                'name' => $name,
+                'product_brand_id' => $id,
+                'is_known' => $id !== null,
+            ];
+        }, $brandNames);
+
+        // Ensure labels de tamanho existam no de-para (cria pendentes pra
+        // o CRUD ser descobrível). E classifica resolvido vs pendente.
+        $this->sizeMapping->ensureLabelsExist($sizeColumns);
+        $sizeClassification = $this->sizeMapping->classify($sizeColumns);
+
+        $unknownBrands = array_values(array_filter($brandsDetected, fn ($b) => ! $b['is_known']));
+        $pendingSizes = $sizeClassification['pending'];
+
+        // Bloqueia import se há marca desconhecida OU se NENHUMA coluna de
+        // tamanho é resolvida (nada pra importar nesse caso). Se tem algumas
+        // pendentes mas outras resolvidas, permite (itens pendentes serão
+        // rejeitados individualmente).
+        $canImport = empty($unknownBrands)
+            && ! empty($sizeClassification['resolved'])
+            && empty($missing);
 
         return [
             'rows' => array_slice($rows, 0, $limit),
             'total' => count($rows),
             'size_columns' => array_values($sizeColumns),
             'missing_columns' => $missing,
+            'brands_detected' => array_values($brandsDetected),
+            'sizes_pending' => $pendingSizes,
+            'can_import' => $canImport,
         ];
     }
 
@@ -96,10 +146,11 @@ class PurchaseOrderImportService
      *     orders_created: int, orders_updated: int,
      *     items_created: int, items_updated: int,
      *     rows_processed: int, rows_rejected: int,
+     *     items_rejected: int,
      *     rejected: array<int, array{row_number: int, reason: string, data: array}>
      * }
      */
-    public function import(string $filePath, User $actor, ?int $defaultSupplierId = null): array
+    public function import(string $filePath, User $actor): array
     {
         $parsed = $this->readSpreadsheet($filePath);
         $rows = $parsed['rows'];
@@ -112,27 +163,22 @@ class PurchaseOrderImportService
             'items_updated' => 0,
             'rows_processed' => 0,
             'rows_rejected' => 0,
+            'items_rejected' => 0,
             'rejected' => [],
         ];
 
-        // Valida que temos fornecedor default (planilha v1 não traz fornecedor)
-        $supplier = $defaultSupplierId ? Supplier::find($defaultSupplierId) : null;
-        if (! $supplier) {
-            $stats['rejected'][] = [
-                'row_number' => 0,
-                'reason' => 'Fornecedor padrão não informado ou inválido. Selecione um fornecedor antes de importar.',
-                'data' => [],
-            ];
-            $stats['rows_rejected'] = count($rows);
-            return $stats;
-        }
+        // Garante que labels da planilha existam no de-para (pra aparecerem
+        // no CRUD) antes de começar a processar.
+        $this->sizeMapping->ensureLabelsExist($sizeColumns);
 
         // Caches de lookup
         $storesByCode = Store::pluck('code', 'code')->all();
         $storesByName = Store::all()->mapWithKeys(fn ($s) => [mb_strtolower($s->name ?? '') => $s->code])->all();
-        $brandsByName = Brand::all()->mapWithKeys(fn ($b) => [mb_strtolower($b->name ?? '') => $b->id])->all();
+        $brandsByName = ProductBrand::all()
+            ->mapWithKeys(fn ($b) => [mb_strtolower(trim($b->name)) => $b->id])
+            ->all();
 
-        // Agrupa por Nr Pedido (order_number)
+        // Agrupa por Nr Pedido
         $byOrder = [];
         foreach ($rows as $idx => $row) {
             $orderNumber = trim((string) ($row['nr_pedido'] ?? ''));
@@ -149,17 +195,35 @@ class PurchaseOrderImportService
         }
 
         foreach ($byOrder as $orderNumber => $group) {
-            // Escolhe linha de referência: primeira não-cancelada, ou primeira
             $headerRow = $this->pickHeaderRow($group);
             $headerData = $headerRow['data'];
             $refLine = $headerRow['row_number'];
 
+            // Resolve marca — OBRIGATÓRIA. Se não existe em product_brands, rejeita.
+            $marcaName = trim((string) ($headerData['marca'] ?? ''));
+            if ($marcaName === '') {
+                $stats['rows_rejected'] += count($group);
+                $stats['rejected'][] = [
+                    'row_number' => $refLine,
+                    'reason' => 'Marca vazia — coluna "Marca" obrigatória',
+                    'data' => $headerData,
+                ];
+                continue;
+            }
+
+            $brandId = $brandsByName[mb_strtolower($marcaName)] ?? null;
+            if ($brandId === null) {
+                $stats['rows_rejected'] += count($group);
+                $stats['rejected'][] = [
+                    'row_number' => $refLine,
+                    'reason' => "Marca '{$marcaName}' não cadastrada. Execute o sync do CIGAM.",
+                    'data' => $headerData,
+                ];
+                continue;
+            }
+
             // Resolve loja
-            $storeCode = $this->resolveStore(
-                $headerData['destino'] ?? null,
-                $storesByCode,
-                $storesByName
-            );
+            $storeCode = $this->resolveStore($headerData['destino'] ?? null, $storesByCode, $storesByName);
             if (! $storeCode) {
                 $stats['rows_rejected'] += count($group);
                 $stats['rejected'][] = [
@@ -170,19 +234,12 @@ class PurchaseOrderImportService
                 continue;
             }
 
-            // Resolve marca (opcional — se não achar, fica null)
-            $brandId = null;
-            $marcaName = trim((string) ($headerData['marca'] ?? ''));
-            if ($marcaName !== '') {
-                $brandId = $brandsByName[mb_strtolower($marcaName)] ?? null;
-            }
-
             // Status do grupo: mais frequente
             $orderStatus = $this->resolveGroupStatus($group);
 
             try {
                 DB::transaction(function () use (
-                    $orderNumber, $headerData, $group, $supplier, $storeCode, $brandId,
+                    $orderNumber, $headerData, $group, $brandId, $storeCode,
                     $orderStatus, $actor, $sizeColumns, &$stats
                 ) {
                     $existing = PurchaseOrder::where('order_number', $orderNumber)->first();
@@ -192,7 +249,7 @@ class PurchaseOrderImportService
                         'season' => trim((string) ($headerData['estacao'] ?? 'Sem estação')),
                         'collection' => trim((string) ($headerData['colecao'] ?? 'Sem coleção')),
                         'release_name' => 'Importação v1',
-                        'supplier_id' => $supplier->id,
+                        'supplier_id' => null, // alinhado com v1 — supplier só em order_payments
                         'store_id' => $storeCode,
                         'brand_id' => $brandId,
                         'order_date' => $this->parseDate($headerData['dt_pedido'] ?? null) ?? now()->toDateString(),
@@ -208,7 +265,6 @@ class PurchaseOrderImportService
                     ];
 
                     if ($existing) {
-                        // Só reatualiza cabeçalho se ainda pendente
                         if ($existing->status === PurchaseOrderStatus::PENDING) {
                             $existing->update($payload);
                             $stats['orders_updated']++;
@@ -231,7 +287,7 @@ class PurchaseOrderImportService
                         $stats['orders_created']++;
                     }
 
-                    // Expande cada linha do grupo em N items (1 por tamanho com qty > 0)
+                    // Expande cada linha do grupo em items, um por tamanho com qty > 0
                     foreach ($group as $entry) {
                         $row = $entry['data'];
                         $reference = trim((string) ($row['referencia'] ?? ''));
@@ -259,6 +315,18 @@ class PurchaseOrderImportService
                                 continue;
                             }
 
+                            // Resolve label via de-para. Se pendente, rejeita o item.
+                            $productSizeId = $this->sizeMapping->resolve($sizeLabel);
+                            if ($productSizeId === null) {
+                                $stats['items_rejected']++;
+                                $stats['rejected'][] = [
+                                    'row_number' => $entry['row_number'],
+                                    'reason' => "Tamanho '{$sizeLabel}' sem mapeamento. Configure em Configurações → Tamanhos.",
+                                    'data' => ['reference' => $reference, 'size' => $sizeLabel, 'qty' => $qty],
+                                ];
+                                continue;
+                            }
+
                             $existingItem = PurchaseOrderItem::where('purchase_order_id', $order->id)
                                 ->where('reference', $reference)
                                 ->where('size', $sizeLabel)
@@ -266,6 +334,7 @@ class PurchaseOrderImportService
 
                             $itemData = array_merge($itemCommon, [
                                 'quantity_ordered' => $qty,
+                                'product_size_id' => $productSizeId,
                             ]);
 
                             if ($existingItem) {
@@ -305,13 +374,7 @@ class PurchaseOrderImportService
      */
     protected function readSpreadsheet(string $filePath): array
     {
-        // Usa Excel::toArray com importer anônimo — pega a matriz bruta
-        // sem passar pelo HeadingRowFormatter do WithHeadingRow (que quebraria
-        // "33/34" → "3334")
-        $sheets = Excel::toArray(new class {
-            // Marker class vazio
-        }, $filePath);
-
+        $sheets = Excel::toArray(new class {}, $filePath);
         $sheet = $sheets[0] ?? [];
         if (empty($sheet)) {
             return ['headers' => [], 'rows' => []];
@@ -338,14 +401,6 @@ class PurchaseOrderImportService
         return ['headers' => array_filter($rawHeaders), 'rows' => $structured];
     }
 
-    /**
-     * Normaliza um header:
-     *  - remove acentos
-     *  - lowercase
-     *  - trim
-     *  - espaços → underscore
-     *  - preserva / e . (necessário pra tamanhos tipo "33/34" e "33.5")
-     */
     protected function normalizeHeader(string $raw): string
     {
         $raw = trim($raw);
@@ -353,16 +408,13 @@ class PurchaseOrderImportService
             return '';
         }
 
-        // Remove acentos (iconv pode falhar em chars não-mapeáveis — fallback manual)
         $noAccents = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $raw);
         if ($noAccents === false || $noAccents === '') {
             $noAccents = $this->stripAccents($raw);
         }
 
         $lower = strtolower($noAccents);
-        // Limpa caracteres bizarros do iconv (~^'` etc)
         $lower = preg_replace('/["\'`^~]/', '', $lower);
-        // Espaços viram underscore
         $lower = preg_replace('/\s+/', '_', trim($lower));
 
         return $lower;
@@ -388,8 +440,6 @@ class PurchaseOrderImportService
     }
 
     /**
-     * Retorna os nomes das colunas de tamanho (tudo que não está em FIXED_COLUMNS).
-     *
      * @param  array<int|string, string>  $headers
      * @return array<int, string>
      */
@@ -401,13 +451,11 @@ class PurchaseOrderImportService
     }
 
     /**
-     * Retorna quais colunas fixas essenciais estão faltando no header.
-     *
      * @return array<int, string>
      */
     protected function detectMissingColumns(array $headers): array
     {
-        $required = ['referencia', 'descricao', 'estacao', 'colecao', 'nr_pedido', 'destino', 'dt_pedido'];
+        $required = ['referencia', 'descricao', 'marca', 'estacao', 'colecao', 'nr_pedido', 'destino', 'dt_pedido'];
         $present = array_flip(array_values(array_filter($headers)));
         return array_values(array_filter($required, fn ($col) => ! isset($present[$col])));
     }
@@ -416,10 +464,6 @@ class PurchaseOrderImportService
     // Row-level helpers
     // ------------------------------------------------------------------
 
-    /**
-     * Seleciona a linha que representa melhor o cabeçalho do grupo.
-     * Preferência: primeira linha não-cancelada; fallback: primeira.
-     */
     protected function pickHeaderRow(array $group): array
     {
         foreach ($group as $entry) {
@@ -431,10 +475,6 @@ class PurchaseOrderImportService
         return $group[0];
     }
 
-    /**
-     * Status da ordem = mais frequente do grupo, mapeado PT → enum.
-     * Empate vai pro primeiro encontrado.
-     */
     protected function resolveGroupStatus(array $group): PurchaseOrderStatus
     {
         $counts = [];
@@ -448,7 +488,6 @@ class PurchaseOrderImportService
             }
         }
 
-        // Ordena por count desc, depois por first-seen asc (estabilidade)
         uksort($counts, function ($a, $b) use ($counts, $firstSeen) {
             if ($counts[$a] !== $counts[$b]) {
                 return $counts[$b] - $counts[$a];
@@ -467,12 +506,10 @@ class PurchaseOrderImportService
             return null;
         }
 
-        // Match exato por code (ex: "Z424")
         if (isset($byCode[$val])) {
             return $byCode[$val];
         }
 
-        // Match por name (case-insensitive, ex: "CD MEIA SOLA")
         $lower = mb_strtolower($val);
         return $byName[$lower] ?? null;
     }
@@ -483,7 +520,6 @@ class PurchaseOrderImportService
             return null;
         }
 
-        // Serial numeric do Excel
         if (is_numeric($value)) {
             try {
                 return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($value)
@@ -498,7 +534,6 @@ class PurchaseOrderImportService
             return null;
         }
 
-        // Formato brasileiro dd/mm/yyyy
         if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/', $str, $m)) {
             $day = (int) $m[1];
             $month = (int) $m[2];
@@ -512,7 +547,6 @@ class PurchaseOrderImportService
             return null;
         }
 
-        // ISO ou outros formatos reconhecíveis pelo Carbon
         try {
             return \Carbon\Carbon::parse($str)->toDateString();
         } catch (\Throwable $e) {
@@ -531,10 +565,9 @@ class PurchaseOrderImportService
 
         $str = trim((string) $value);
 
-        // Formato BR com vírgula decimal: "1.234,56" ou "172,90"
         if (preg_match('/,\d{1,2}$/', $str)) {
-            $str = str_replace('.', '', $str); // remove separador de milhar
-            $str = str_replace(',', '.', $str); // vírgula → ponto decimal
+            $str = str_replace('.', '', $str);
+            $str = str_replace(',', '.', $str);
         }
 
         return (float) $str;
@@ -552,9 +585,6 @@ class PurchaseOrderImportService
         return $str === '' ? 0 : (int) $str;
     }
 
-    /**
-     * "Precif" = "OK" significa que o preço foi confirmado → pricing_locked=true.
-     */
     protected function parsePricing($value): bool
     {
         if ($value === null) {
@@ -564,11 +594,6 @@ class PurchaseOrderImportService
         return in_array($str, ['ok', 'sim', 'yes', '1', 'true'], true);
     }
 
-    /**
-     * "Pagamento" na planilha v1 costuma ser um único número de dias ("120")
-     * ou uma lista separada por barra/espaço. Preservamos a string como está
-     * — o PaymentTermsParser (Fase 3) consome esse formato na auto-geração.
-     */
     protected function parsePaymentTerms($value): ?string
     {
         if ($value === null || $value === '') {

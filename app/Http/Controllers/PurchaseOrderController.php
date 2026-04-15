@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\Permission;
 use App\Enums\PurchaseOrderStatus;
-use App\Models\Brand;
+use App\Models\ProductBrand;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\Store;
@@ -112,7 +112,7 @@ class PurchaseOrderController extends Controller
                 'suppliers' => Supplier::active()
                     ->orderBy('nome_fantasia')
                     ->get(['id', 'nome_fantasia', 'razao_social', 'payment_terms_default']),
-                'brands' => Brand::orderBy('name')->get(['id', 'name']),
+                'brands' => ProductBrand::active()->orderBy('name')->get(['id', 'name']),
             ],
         ]);
     }
@@ -130,7 +130,7 @@ class PurchaseOrderController extends Controller
             'release_name' => 'required|string|max:120',
             'supplier_id' => 'required|exists:suppliers,id',
             'store_id' => 'required|string|max:10|exists:stores,code',
-            'brand_id' => 'nullable|exists:brands,id',
+            'brand_id' => 'nullable|exists:product_brands,id',
             'order_date' => 'required|date',
             'predict_date' => 'nullable|date',
             'payment_terms_raw' => 'nullable|string|max:150',
@@ -182,7 +182,7 @@ class PurchaseOrderController extends Controller
             'collection' => 'required|string|max:120',
             'release_name' => 'required|string|max:120',
             'supplier_id' => 'required|exists:suppliers,id',
-            'brand_id' => 'nullable|exists:brands,id',
+            'brand_id' => 'nullable|exists:product_brands,id',
             'order_date' => 'required|date',
             'predict_date' => 'nullable|date',
             'payment_terms_raw' => 'nullable|string|max:150',
@@ -437,9 +437,9 @@ class PurchaseOrderController extends Controller
         // Top 5 marcas
         $topBrands = (clone $base)
             ->whereNotNull('brand_id')
-            ->join('brands', 'purchase_orders.brand_id', '=', 'brands.id')
-            ->selectRaw('brands.id, brands.name, COUNT(*) as count')
-            ->groupBy('brands.id', 'brands.name')
+            ->join('product_brands', 'purchase_orders.brand_id', '=', 'product_brands.id')
+            ->selectRaw('product_brands.id, product_brands.name, COUNT(*) as count')
+            ->groupBy('product_brands.id', 'product_brands.name')
             ->orderByDesc('count')
             ->limit(5)
             ->get()
@@ -489,11 +489,7 @@ class PurchaseOrderController extends Controller
 
     public function importPage(): Response
     {
-        return Inertia::render('PurchaseOrders/Import', [
-            'suppliers' => Supplier::where('is_active', true)
-                ->orderBy('nome_fantasia')
-                ->get(['id', 'nome_fantasia', 'razao_social']),
-        ]);
+        return Inertia::render('PurchaseOrders/Import');
     }
 
     public function importPreview(Request $request): JsonResponse
@@ -512,20 +508,15 @@ class PurchaseOrderController extends Controller
     {
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
-            'default_supplier_id' => 'required|integer|exists:suppliers,id',
         ]);
 
         $path = $request->file('file')->getRealPath();
-        $stats = $this->importService->import(
-            $path,
-            $request->user(),
-            (int) $request->input('default_supplier_id')
-        );
+        $stats = $this->importService->import($path, $request->user());
 
         $msg = "Import: {$stats['orders_created']} ordens criadas, {$stats['orders_updated']} atualizadas, "
              . "{$stats['items_created']} itens novos, {$stats['items_updated']} atualizados";
-        if ($stats['rows_rejected'] > 0) {
-            $msg .= " · {$stats['rows_rejected']} linhas rejeitadas";
+        if ($stats['rows_rejected'] > 0 || $stats['items_rejected'] > 0) {
+            $msg .= " · {$stats['rows_rejected']} linhas + {$stats['items_rejected']} itens rejeitados";
         }
 
         return redirect()->route('purchase-orders.import.page')

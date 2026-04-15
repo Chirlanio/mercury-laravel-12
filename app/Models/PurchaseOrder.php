@@ -188,7 +188,7 @@ class PurchaseOrder extends Model
 
     public function brand(): BelongsTo
     {
-        return $this->belongsTo(Brand::class);
+        return $this->belongsTo(ProductBrand::class, 'brand_id');
     }
 
     public function createdBy(): BelongsTo

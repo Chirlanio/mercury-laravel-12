@@ -19,6 +19,7 @@ class PurchaseOrderItem extends Model
         'product_id',
         'reference',
         'size',
+        'product_size_id',
         'description',
         'material',
         'color',
@@ -69,6 +70,11 @@ class PurchaseOrderItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function productSize(): BelongsTo
+    {
+        return $this->belongsTo(ProductSize::class);
     }
 
     public function receiptItems(): HasMany

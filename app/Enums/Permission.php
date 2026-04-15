@@ -82,6 +82,7 @@ enum Permission: string
     case IMPORT_PURCHASE_ORDERS = 'purchase_orders.import';
     case EXPORT_PURCHASE_ORDERS = 'purchase_orders.export';
     case MANAGE_PURCHASE_ORDERS = 'purchase_orders.manage';
+    case MANAGE_PURCHASE_ORDER_SIZE_MAPPINGS = 'purchase_orders.manage_size_mappings';
 
     // Checklists de qualidade
     case VIEW_CHECKLISTS = 'checklists.view';
@@ -267,6 +268,7 @@ enum Permission: string
             self::IMPORT_PURCHASE_ORDERS => 'Importar ordens de compra (planilha)',
             self::EXPORT_PURCHASE_ORDERS => 'Exportar ordens de compra',
             self::MANAGE_PURCHASE_ORDERS => 'Gerenciar ordens de compra (todas as lojas)',
+            self::MANAGE_PURCHASE_ORDER_SIZE_MAPPINGS => 'Gerenciar mapeamento de tamanhos de importação',
 
             self::VIEW_CHECKLISTS => 'Visualizar checklists',
             self::CREATE_CHECKLISTS => 'Criar checklists',
@@ -431,6 +433,7 @@ enum Permission: string
             self::IMPORT_PURCHASE_ORDERS => 'Permite importar ordens via planilha (XLSX/CSV) com upsert por número da ordem',
             self::EXPORT_PURCHASE_ORDERS => 'Permite exportar ordens para Excel ou PDF',
             self::MANAGE_PURCHASE_ORDERS => 'Permite gerenciar ordens de todas as lojas (sem filtro de store scoping)',
+            self::MANAGE_PURCHASE_ORDER_SIZE_MAPPINGS => 'Permite cadastrar e editar o de-para de tamanhos usados na importação de planilhas de ordens de compra',
 
             self::VIEW_CHECKLISTS => 'Permite visualizar checklists de qualidade',
             self::CREATE_CHECKLISTS => 'Permite criar novos checklists de qualidade',

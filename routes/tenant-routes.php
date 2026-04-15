@@ -964,6 +964,16 @@ Route::middleware(['auth'])->group(function () {
             ->middleware('permission:'.Permission::EDIT_PURCHASE_ORDERS->value)
             ->name('purchase-orders.generate-barcodes');
 
+        // De-para de tamanhos (CRUD) — habilita UI de configuração do mapeamento
+        // planilha → product_sizes oficial
+        Route::middleware('permission:'.Permission::MANAGE_PURCHASE_ORDER_SIZE_MAPPINGS->value)->group(function () {
+            Route::get('/purchase-orders/size-mappings', [\App\Http\Controllers\PurchaseOrderSizeMappingController::class, 'index'])->name('purchase-orders.size-mappings.index');
+            Route::post('/purchase-orders/size-mappings', [\App\Http\Controllers\PurchaseOrderSizeMappingController::class, 'store'])->name('purchase-orders.size-mappings.store');
+            Route::post('/purchase-orders/size-mappings/auto-detect', [\App\Http\Controllers\PurchaseOrderSizeMappingController::class, 'autoDetect'])->name('purchase-orders.size-mappings.auto-detect');
+            Route::put('/purchase-orders/size-mappings/{sizeMapping}', [\App\Http\Controllers\PurchaseOrderSizeMappingController::class, 'update'])->whereNumber('sizeMapping')->name('purchase-orders.size-mappings.update');
+            Route::delete('/purchase-orders/size-mappings/{sizeMapping}', [\App\Http\Controllers\PurchaseOrderSizeMappingController::class, 'destroy'])->whereNumber('sizeMapping')->name('purchase-orders.size-mappings.destroy');
+        });
+
         Route::middleware('permission:'.Permission::DELETE_PURCHASE_ORDERS->value)->group(function () {
             Route::delete('/purchase-orders/{purchaseOrder}', [\App\Http\Controllers\PurchaseOrderController::class, 'destroy'])->whereNumber('purchaseOrder')->name('purchase-orders.destroy');
         });
