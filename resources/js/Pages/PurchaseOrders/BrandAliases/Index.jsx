@@ -71,26 +71,30 @@ export default function Index({ aliases, filters = {}, stats = {}, productBrands
             <Head title="Aliases de Marca" />
 
             <div className="py-12">
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="mb-6 flex items-center gap-3">
-                        <Link href={route('purchase-orders.index')}>
-                            <Button variant="outline" size="sm" icon={ArrowLeftIcon}>Voltar</Button>
-                        </Link>
-                        <div className="flex-1">
-                            <h1 className="text-2xl font-bold text-gray-900">Aliases de Marca</h1>
-                            <p className="text-sm text-gray-600">
-                                Resolve diferenças entre nomes de marca da planilha de importação e o catálogo oficial (CIGAM)
-                            </p>
+                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="mb-6">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h1 className="text-3xl font-bold text-gray-900">Aliases de Marca</h1>
+                                <p className="mt-1 text-sm text-gray-600">
+                                    Resolve diferenças entre nomes de marca da planilha de importação e o catálogo oficial (CIGAM)
+                                </p>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button variant="outline" onClick={handleAutoDetect} icon={SparklesIcon}>
+                                    Auto-detectar MS
+                                </Button>
+                                <Button variant="outline" onClick={() => setShowManualBrand(true)} icon={TagIcon}>
+                                    Criar Marca Manual
+                                </Button>
+                                <Button variant="primary" onClick={openCreate} icon={PlusIcon}>
+                                    Novo Alias
+                        </Button>
+                                <Link href={route('purchase-orders.import.page')}>
+                                    <Button variant="outline" size="sm" icon={ArrowLeftIcon}>Voltar</Button>
+                                </Link>
+                            </div>
                         </div>
-                        <Button variant="outline" onClick={handleAutoDetect} icon={SparklesIcon}>
-                            Auto-detectar MS
-                        </Button>
-                        <Button variant="outline" onClick={() => setShowManualBrand(true)} icon={TagIcon}>
-                            Criar Marca Manual
-                        </Button>
-                        <Button variant="primary" onClick={openCreate} icon={PlusIcon}>
-                            Novo Alias
-                        </Button>
                     </div>
 
                     <div className="mb-6">

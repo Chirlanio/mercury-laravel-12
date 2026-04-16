@@ -474,13 +474,23 @@ class PurchaseOrderController extends Controller
     // Barcodes (Fase 4 — EAN-13 interno)
     // ------------------------------------------------------------------
 
-    public function generateBarcodes(PurchaseOrder $purchaseOrder, Request $request): RedirectResponse
+    public function generateBarcodes(PurchaseOrder $purchaseOrder, Request $request)
     {
         $this->ensureCanView($request->user(), $purchaseOrder);
 
         $result = $this->barcodeService->ensureForOrder($purchaseOrder);
 
         $msg = "Códigos de barras: {$result['generated']} novo(s), {$result['existing']} já existente(s).";
+
+        // Se AJAX (chamado do modal de detalhe), retorna JSON pra atualizar in-place
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => $msg,
+                'generated' => $result['generated'],
+                'existing' => $result['existing'],
+            ]);
+        }
+
         return redirect()->route('purchase-orders.index')->with('success', $msg);
     }
 
@@ -761,6 +771,8 @@ class PurchaseOrderController extends Controller
                 'total_cost' => $item->total_cost,
                 'total_selling' => $item->total_selling,
                 'invoice_number' => $item->invoice_number,
+                'invoice_emission_date' => $item->invoice_emission_date?->toDateString(),
+                'confirmation_date' => $item->confirmation_date?->toDateString(),
                 'is_fully_received' => $item->is_fully_received,
                 'barcode' => $barcodeMap[$item->reference . '|' . $item->size] ?? null,
             ])->values(),

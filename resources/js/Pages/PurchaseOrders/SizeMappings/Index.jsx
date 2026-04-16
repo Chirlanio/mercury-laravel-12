@@ -81,24 +81,28 @@ export default function Index({ mappings, filters = {}, stats = {}, productSizes
             <Head title="Mapeamento de Tamanhos" />
 
             <div className="py-12">
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
                     {/* Header */}
-                    <div className="mb-6 flex items-center gap-3">
-                        <Link href={route('purchase-orders.index')}>
-                            <Button variant="outline" size="sm" icon={ArrowLeftIcon}>Voltar</Button>
-                        </Link>
-                        <div className="flex-1">
-                            <h1 className="text-2xl font-bold text-gray-900">Mapeamento de Tamanhos</h1>
-                            <p className="text-sm text-gray-600">
-                                De-para entre labels de tamanho da planilha de importação e tamanhos oficiais do catálogo (CIGAM)
-                            </p>
+                    <div className="mb-6">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h1 className="text-3xl font-bold text-gray-900">Mapeamento de Tamanhos</h1>
+                                <p className="mt-1 text-sm text-gray-600">
+                                    De-para entre labels de tamanho da planilha de importação e tamanhos oficiais do catálogo (CIGAM)
+                                </p>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button variant="outline" onClick={handleAutoDetect} icon={ArrowPathIcon}>
+                                    Auto-detectar
+                                </Button>
+                                <Button variant="primary" onClick={openCreate} icon={PlusIcon}>
+                                    Novo Mapeamento
+                                </Button>
+                                <Link href={route('purchase-orders.import.page')}>
+                                    <Button variant="outline" size="sm" icon={ArrowLeftIcon}>Voltar</Button>
+                                </Link>
+                            </div>
                         </div>
-                        <Button variant="outline" onClick={handleAutoDetect} icon={ArrowPathIcon}>
-                            Auto-detectar
-                        </Button>
-                        <Button variant="primary" onClick={openCreate} icon={PlusIcon}>
-                            Novo Mapeamento
-                        </Button>
                     </div>
 
                     {/* KPIs */}

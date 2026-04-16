@@ -200,7 +200,10 @@ class PurchaseOrderImportService
             'rows_processed' => 0,
             'rows_rejected' => 0,
             'items_rejected' => 0,
+            // Lista detalhada — limitada a 100 pra não explodir session flash
             'rejected' => [],
+            // Agregado por motivo (essencial pra debug de imports grandes)
+            'rejected_reasons' => [], // ['motivo' => count]
         ];
 
         // Garante que labels e nomes de marca da planilha existam nos
@@ -219,17 +222,33 @@ class PurchaseOrderImportService
         $storesByCode = Store::pluck('code', 'code')->all();
         $storesByName = Store::all()->mapWithKeys(fn ($s) => [mb_strtolower($s->name ?? '') => $s->code])->all();
 
+        // Debug: loga as primeiras 5 linhas pra diagnóstico de imports
+        // que falham silenciosamente (0 criadas, N rejeitadas). Mostra
+        // o estado PÓS forward-fill pra confirmar que os campos de
+        // cabeçalho estão sendo propagados.
+        $debugSample = array_slice($rows, 0, min(5, count($rows)));
+        Log::info('PurchaseOrder import: first 5 rows after forward-fill', [
+            'total_rows' => count($rows),
+            'sample' => array_map(function ($row) {
+                return [
+                    'nr_pedido' => $row['nr_pedido'] ?? '(MISSING KEY)',
+                    'marca' => $row['marca'] ?? '(MISSING KEY)',
+                    'destino' => $row['destino'] ?? '(MISSING KEY)',
+                    'referencia' => $row['referencia'] ?? '(MISSING KEY)',
+                    'estacao' => $row['estacao'] ?? '(MISSING KEY)',
+                    'status' => $row['status'] ?? '(MISSING KEY)',
+                    'all_keys' => array_keys($row),
+                    'first_10_values' => array_slice(array_values($row), 0, 10),
+                ];
+            }, $debugSample),
+        ]);
+
         // Agrupa por Nr Pedido
         $byOrder = [];
         foreach ($rows as $idx => $row) {
             $orderNumber = trim((string) ($row['nr_pedido'] ?? ''));
             if ($orderNumber === '') {
-                $stats['rows_rejected']++;
-                $stats['rejected'][] = [
-                    'row_number' => $idx + 2,
-                    'reason' => 'Nr Pedido vazio',
-                    'data' => $row,
-                ];
+                $this->pushRejected($stats, $idx + 2, 'Nr Pedido vazio', $row);
                 continue;
             }
             $byOrder[$orderNumber][] = ['row_number' => $idx + 2, 'data' => $row];
@@ -243,12 +262,7 @@ class PurchaseOrderImportService
             // Resolve marca — OBRIGATÓRIA. Se não existe em product_brands, rejeita.
             $marcaName = trim((string) ($headerData['marca'] ?? ''));
             if ($marcaName === '') {
-                $stats['rows_rejected'] += count($group);
-                $stats['rejected'][] = [
-                    'row_number' => $refLine,
-                    'reason' => 'Marca vazia — coluna "Marca" obrigatória',
-                    'data' => $headerData,
-                ];
+                $this->pushRejected($stats, $refLine, 'Marca vazia — coluna "Marca" obrigatória', $headerData, count($group));
                 continue;
             }
 
@@ -256,24 +270,27 @@ class PurchaseOrderImportService
             // product_brands primeiro, depois alias ativo resolvido
             $brandId = $this->brandAliasService->resolve($marcaName);
             if ($brandId === null) {
-                $stats['rows_rejected'] += count($group);
-                $stats['rejected'][] = [
-                    'row_number' => $refLine,
-                    'reason' => "Marca '{$marcaName}' não cadastrada e sem alias resolvido. Configure em Configurações → Aliases de Marca.",
-                    'data' => $headerData,
-                ];
+                $this->pushRejected(
+                    $stats,
+                    $refLine,
+                    "Marca '{$marcaName}' não cadastrada e sem alias resolvido",
+                    $headerData,
+                    count($group)
+                );
                 continue;
             }
 
             // Resolve loja
             $storeCode = $this->resolveStore($headerData['destino'] ?? null, $storesByCode, $storesByName);
             if (! $storeCode) {
-                $stats['rows_rejected'] += count($group);
-                $stats['rejected'][] = [
-                    'row_number' => $refLine,
-                    'reason' => 'Destino não encontrado em stores: ' . ($headerData['destino'] ?? '(vazio)'),
-                    'data' => $headerData,
-                ];
+                $destinoStr = trim((string) ($headerData['destino'] ?? ''));
+                $this->pushRejected(
+                    $stats,
+                    $refLine,
+                    'Destino não encontrado em stores: ' . ($destinoStr ?: '(vazio)'),
+                    $headerData,
+                    count($group)
+                );
                 continue;
             }
 
@@ -362,11 +379,16 @@ class PurchaseOrderImportService
                             $productSizeId = $this->sizeMapping->resolve($sizeLabel);
                             if ($productSizeId === null) {
                                 $stats['items_rejected']++;
-                                $stats['rejected'][] = [
-                                    'row_number' => $entry['row_number'],
-                                    'reason' => "Tamanho '{$sizeLabel}' sem mapeamento. Configure em Configurações → Tamanhos.",
-                                    'data' => ['reference' => $reference, 'size' => $sizeLabel, 'qty' => $qty],
-                                ];
+                                $genericReason = 'Tamanho sem mapeamento';
+                                $stats['rejected_reasons'][$genericReason] =
+                                    ($stats['rejected_reasons'][$genericReason] ?? 0) + 1;
+                                if (count($stats['rejected']) < 100) {
+                                    $stats['rejected'][] = [
+                                        'row_number' => $entry['row_number'],
+                                        'reason' => "Tamanho '{$sizeLabel}' sem mapeamento",
+                                        'data' => ['reference' => $reference, 'size' => $sizeLabel, 'qty' => $qty],
+                                    ];
+                                }
                                 continue;
                             }
 
@@ -396,16 +418,58 @@ class PurchaseOrderImportService
                     }
                 });
             } catch (\Throwable $e) {
-                $stats['rows_rejected'] += count($group);
-                $stats['rejected'][] = [
-                    'row_number' => $refLine,
-                    'reason' => 'Erro: ' . $e->getMessage(),
-                    'data' => $headerData,
-                ];
+                $this->pushRejected(
+                    $stats,
+                    $refLine,
+                    'Erro: ' . $e->getMessage(),
+                    $headerData,
+                    count($group)
+                );
             }
         }
 
+        // Ordena rejected_reasons por contagem desc pra facilitar debug
+        arsort($stats['rejected_reasons']);
+
+        // Log do resumo pra diagnóstico
+        Log::info('PurchaseOrder import: finished', [
+            'orders_created' => $stats['orders_created'],
+            'orders_updated' => $stats['orders_updated'],
+            'items_created' => $stats['items_created'],
+            'rows_rejected' => $stats['rows_rejected'],
+            'items_rejected' => $stats['items_rejected'],
+            'rejected_reasons' => $stats['rejected_reasons'],
+            'byOrder_count' => count($byOrder),
+            'first_3_rejected' => array_slice($stats['rejected'], 0, 3),
+        ]);
+
         return $stats;
+    }
+
+    /**
+     * Normaliza adição de rejeição: incrementa contador agregado por
+     * motivo + mantém só as primeiras 100 no detail list pra economizar
+     * memória em imports grandes (planilhas históricas podem ter 20k+
+     * linhas rejeitadas).
+     */
+    protected function pushRejected(array &$stats, int $rowNumber, string $reason, array $data, int $count = 1): void
+    {
+        $stats['rows_rejected'] += $count;
+
+        // Agrupa por motivo normalizado (sem detalhes específicos de valor)
+        // pra ver "top reasons". Normaliza marca/loja específica numa chave genérica.
+        $genericReason = preg_replace('/\'([^\']+)\'/', '*', $reason);
+        $genericReason = preg_replace('/: .+$/', '', $genericReason);
+        $stats['rejected_reasons'][$genericReason] = ($stats['rejected_reasons'][$genericReason] ?? 0) + $count;
+
+        // Mantém só as primeiras 100 no detail pra session flash não estourar
+        if (count($stats['rejected']) < 100) {
+            $stats['rejected'][] = [
+                'row_number' => $rowNumber,
+                'reason' => $reason,
+                'data' => $data,
+            ];
+        }
     }
 
     // ------------------------------------------------------------------
@@ -498,6 +562,15 @@ class PurchaseOrderImportService
         $rawHeaders = array_map(fn ($h) => $this->normalizeHeader((string) $h), $bestSheet[$bestHeaderIdx] ?? []);
         $dataRows = array_slice($bestSheet, $bestHeaderIdx + 1);
 
+        // Forward fill: planilhas corporativas frequentemente usam merged
+        // cells OU deixam campos de cabeçalho vazios em linhas secundárias
+        // do mesmo pedido, assumindo que "herda" da linha anterior. O
+        // PhpSpreadsheet converte merged cells em valor na top-left +
+        // vazio nas demais. Aplicamos forward fill nos campos que
+        // tipicamente pertencem ao CABEÇALHO do pedido (não variam
+        // entre itens do mesmo Nr Pedido).
+        $dataRows = $this->forwardFillHeaderFields($dataRows, $rawHeaders);
+
         // Debug: se score final continua baixo, loga amostra pra diagnóstico
         if ($bestScore < 5) {
             Log::warning('PurchaseOrder readSpreadsheet: few recognized headers', [
@@ -537,6 +610,86 @@ class PurchaseOrderImportService
             'sheet_name' => $bestSheetName,
             'sheet_names' => $sheetNames,
         ];
+    }
+
+    /**
+     * Campos de cabeçalho do pedido que NÃO variam entre itens do mesmo
+     * Nr Pedido. Se uma linha tem valor vazio pra um desses campos, herda
+     * da linha anterior (forward fill).
+     *
+     * Campos NÃO incluídos (variam por item):
+     *  - referencia, descricao, material, cor — específicos do produto
+     *  - custo_unit, preco_venda, precif — específicos do item
+     *  - qtd_pedido, custo_total, venda_total — derivados do item
+     *  - Tamanhos (PP, 33, 34, etc) — quantidades por tamanho
+     */
+    private const FORWARD_FILL_FIELDS = [
+        'nr_pedido', 'status', 'destino',
+        'marca', 'estacao', 'colecao',
+        'dt_pedido', 'previsao', 'pagamento',
+        'tipo', 'grupo', 'subgrupo',
+        'nota_fiscal', 'emissao_nf', 'confirmacao',
+    ];
+
+    /**
+     * Aplica forward fill nos campos de cabeçalho do pedido. Planilhas
+     * corporativas frequentemente usam merged cells OU deixam campos de
+     * cabeçalho vazios em linhas secundárias do mesmo pedido, assumindo
+     * que "herda" da linha anterior. Sem este fill, a maioria das linhas
+     * seria rejeitada por "Nr Pedido vazio".
+     *
+     * @param  array<int, array>  $dataRows
+     * @param  array<int, string>  $rawHeaders
+     * @return array<int, array>
+     */
+    protected function forwardFillHeaderFields(array $dataRows, array $rawHeaders): array
+    {
+        if (empty($dataRows) || empty($rawHeaders)) {
+            return $dataRows;
+        }
+
+        // Mapeia nome do campo → índice da coluna
+        $fieldIndex = [];
+        foreach ($rawHeaders as $idx => $h) {
+            if ($h === '') {
+                continue;
+            }
+            $fieldIndex[$h] = $idx;
+        }
+
+        $forwardFillIndices = [];
+        foreach (self::FORWARD_FILL_FIELDS as $field) {
+            if (isset($fieldIndex[$field])) {
+                $forwardFillIndices[$field] = $fieldIndex[$field];
+            }
+        }
+
+        if (empty($forwardFillIndices)) {
+            return $dataRows;
+        }
+
+        // lastValues[$colIdx] = último valor não-vazio visto
+        $lastValues = [];
+
+        foreach ($dataRows as &$row) {
+            // Linha inteira vazia: resetar é arriscado (pode ser separador
+            // que não indica mudança de pedido). Deixa last como está.
+            if ($this->isRowEmpty($row)) {
+                continue;
+            }
+
+            foreach ($forwardFillIndices as $colIdx) {
+                $cell = $row[$colIdx] ?? null;
+                if ($cell !== null && trim((string) $cell) !== '') {
+                    $lastValues[$colIdx] = $cell;
+                } elseif (isset($lastValues[$colIdx])) {
+                    $row[$colIdx] = $lastValues[$colIdx];
+                }
+            }
+        }
+        unset($row);
+
+        return $dataRows;
     }
 
     /**
@@ -763,12 +916,45 @@ class PurchaseOrderImportService
             return null;
         }
 
+        // 1. Match exato por code (ex: "Z424")
         if (isset($byCode[$val])) {
             return $byCode[$val];
         }
 
+        // 2. Match exato por name (case-insensitive)
         $lower = mb_strtolower($val);
-        return $byName[$lower] ?? null;
+        if (isset($byName[$lower])) {
+            return $byName[$lower];
+        }
+
+        // 3. Match normalizado — remove hífens, pontuação e espaços extras.
+        //    Resolve variações tipo "CD MEIA SOLA" vs "CD - Meia Sola"
+        $normalized = $this->normalizeStoreName($val);
+        foreach ($byName as $name => $code) {
+            if ($this->normalizeStoreName($name) === $normalized) {
+                return $code;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Normaliza nome de loja pra comparação fuzzy:
+     * - lowercase
+     * - remove hífens, pontos, vírgulas
+     * - colapsa espaços múltiplos em um
+     * - trim
+     *
+     * "CD - Meia Sola" → "cd meia sola"
+     * "CD MEIA SOLA"   → "cd meia sola"
+     */
+    protected function normalizeStoreName(string $name): string
+    {
+        $name = mb_strtolower(trim($name));
+        $name = preg_replace('/[\-\.\,\/]/', ' ', $name); // remove pontuação
+        $name = preg_replace('/\s+/', ' ', $name);        // colapsa espaços
+        return trim($name);
     }
 
     protected function parseDate($value): ?string

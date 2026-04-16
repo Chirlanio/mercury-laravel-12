@@ -21,7 +21,7 @@ import EmptyState from '@/Components/Shared/EmptyState';
 import InputLabel from '@/Components/InputLabel';
 import InputError from '@/Components/InputError';
 import TextInput from '@/Components/TextInput';
-import { formatDateTime } from '@/Utils/dateHelpers';
+import { formatDate, formatDateTime } from '@/Utils/dateHelpers';
 
 const STATUS_VARIANT_MAP = {
     warning: 'warning',
@@ -121,10 +121,31 @@ export default function Index({
         });
     };
 
-    const handleGenerateBarcodes = (order) => {
-        router.post(route('purchase-orders.generate-barcodes', order.id), {}, {
-            preserveScroll: true,
-        });
+    const handleGenerateBarcodes = async (orderId) => {
+        try {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+            await fetch(route('purchase-orders.generate-barcodes', orderId), {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+            });
+            // Recarrega o detalhe da ordem pra mostrar os barcodes gerados
+            const res = await fetch(route('purchase-orders.show', orderId), {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            if (res.ok) {
+                const data = await res.json();
+                openModal('detail', data.order);
+            }
+        } catch (e) {
+            // Fallback: recarrega a página
+            router.reload();
+        }
     };
 
     const handleConfirmDelete = (reason) => {
@@ -303,11 +324,11 @@ export default function Index({
                                             <td className="px-3 py-3 text-sm text-gray-600">{o.supplier_name || '—'}</td>
                                             <td className="px-3 py-3 text-sm text-gray-600">{o.store_name || o.store_id}</td>
                                             <td className="px-3 py-3 text-sm text-center text-gray-700">{o.items_count || 0}</td>
-                                            <td className="px-3 py-3 text-sm text-gray-500">{o.order_date}</td>
+                                            <td className="px-3 py-3 text-sm text-gray-500">{formatDate(o.order_date)}</td>
                                             <td className="px-3 py-3 text-sm">
                                                 {o.predict_date ? (
                                                     <span className={o.is_overdue ? 'text-red-600 font-medium' : 'text-gray-500'}>
-                                                        {o.predict_date}
+                                                        {formatDate(o.predict_date)}
                                                         {o.is_overdue && <ExclamationTriangleIcon className="inline h-3 w-3 ml-1" />}
                                                     </span>
                                                 ) : '—'}
@@ -401,7 +422,7 @@ export default function Index({
                         <PurchaseOrderDetailModal
                             order={selected}
                             onClose={() => closeModal('detail')}
-                            onGenerateBarcodes={() => handleGenerateBarcodes(selected)}
+                            onGenerateBarcodes={() => handleGenerateBarcodes(selected.id)}
                             canEdit={canEdit}
                         />
                     )}
@@ -644,13 +665,13 @@ function PurchaseOrderDetailModal({ order, onClose, onGenerateBarcodes, canEdit 
                     type="button"
                     onClick={onGenerateBarcodes}
                     className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md bg-white/20 text-white hover:bg-white/30 transition-colors"
-                    title="Gerar EAN-13 internos para itens sem código"
+                    title="Gerar códigos de barras EAN-13 internos para itens sem código"
                 >
                     <QrCodeIcon className="h-4 w-4 mr-1" />
-                    Gerar barcodes ({itemsWithoutBarcode})
+                    Gerar Cód. Barras ({itemsWithoutBarcode})
                 </button>
             ) : null}
-            maxWidth="5xl"
+            maxWidth="7xl"
             footer={<StandardModal.Footer onCancel={onClose} cancelLabel="Fechar" />}
         >
             <StandardModal.Section title="Resumo" icon={<DocumentTextIcon className="h-4 w-4" />}>
@@ -667,9 +688,9 @@ function PurchaseOrderDetailModal({ order, onClose, onGenerateBarcodes, canEdit 
                     <StandardModal.Field label="Estação" value={order.season} />
                     <StandardModal.Field label="Coleção" value={order.collection} />
                     <StandardModal.Field label="Lançamento" value={order.release_name} />
-                    <StandardModal.Field label="Data do pedido" value={order.order_date} />
-                    <StandardModal.Field label="Previsão" value={order.predict_date} />
-                    <StandardModal.Field label="Entregue em" value={order.delivered_at} />
+                    <StandardModal.Field label="Data do pedido" value={formatDate(order.order_date)} />
+                    <StandardModal.Field label="Previsão" value={formatDate(order.predict_date)} />
+                    <StandardModal.Field label="Entregue em" value={order.delivered_at ? formatDateTime(order.delivered_at) : null} />
                     <StandardModal.Field label="Prazos pagamento" value={order.payment_terms_raw} />
                     <StandardModal.Field label="Loja destino" value={order.store_name || order.store_id} />
                     <StandardModal.Field label="Marca" value={order.brand_name} />
@@ -693,7 +714,7 @@ function PurchaseOrderDetailModal({ order, onClose, onGenerateBarcodes, canEdit 
                         <table className="min-w-full text-sm">
                             <thead className="bg-gray-50">
                                 <tr>
-                                    {['Ref.', 'Descrição', 'Tam.', 'EAN', 'Qtd', 'Recebido', 'Custo', 'Venda', 'Total'].map((h) => (
+                                    {['Ref.', 'Descrição', 'Tam.', 'Cód. Barras', 'NF', 'Emissão', 'Qtd', 'Recebido', 'Custo', 'Venda', 'Total'].map((h) => (
                                         <th key={h} className="px-2 py-2 text-left text-xs font-medium text-gray-500">{h}</th>
                                     ))}
                                 </tr>
@@ -715,6 +736,12 @@ function PurchaseOrderDetailModal({ order, onClose, onGenerateBarcodes, canEdit 
                                             ) : (
                                                 <span className="text-gray-300">—</span>
                                             )}
+                                        </td>
+                                        <td className="px-2 py-1 font-mono text-xs">
+                                            {item.invoice_number || <span className="text-gray-300">—</span>}
+                                        </td>
+                                        <td className="px-2 py-1 text-xs text-gray-500">
+                                            {formatDate(item.invoice_emission_date)}
                                         </td>
                                         <td className="px-2 py-1 text-center">{item.quantity_ordered}</td>
                                         <td className="px-2 py-1 text-center">
