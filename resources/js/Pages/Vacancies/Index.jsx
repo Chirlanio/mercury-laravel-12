@@ -423,7 +423,7 @@ export default function Index({
                         )}
                     </div>
 
-                    <DataTable data={vacancies.data} columns={columns} pagination={vacancies} />
+                    <DataTable data={vacancies} columns={columns} emptyMessage="Nenhuma vaga encontrada." />
                 </div>
             </div>
 
