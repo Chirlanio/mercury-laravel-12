@@ -91,7 +91,11 @@ class PurchaseOrderController extends Controller
             $query->whereDate('order_date', '<=', $request->date_to);
         }
 
-        $orders = $query->paginate(15)->through(fn ($o) => $this->formatOrder($o));
+        // withQueryString() preserva status/supplier/search/etc. nas URLs de
+        // cada página. Sem isso, clicar "página 2" volta pro default
+        // (whereNotIn cancelled/delivered) e o resultado vem vazio mesmo
+        // tendo last_page alto calculado sobre o total filtrado.
+        $orders = $query->paginate(15)->withQueryString()->through(fn ($o) => $this->formatOrder($o));
 
         $statistics = $this->buildStatistics($scopedStoreCode);
 

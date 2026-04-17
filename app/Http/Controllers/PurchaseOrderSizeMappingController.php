@@ -44,7 +44,7 @@ class PurchaseOrderSizeMappingController extends Controller
             }
         }
 
-        $mappings = $query->paginate(30)->through(fn ($m) => [
+        $mappings = $query->paginate(30)->withQueryString()->through(fn ($m) => [
             'id' => $m->id,
             'source_label' => $m->source_label,
             'product_size_id' => $m->product_size_id,

@@ -43,7 +43,7 @@ class PurchaseOrderBrandAliasController extends Controller
             }
         }
 
-        $aliases = $query->paginate(30)->through(fn ($a) => [
+        $aliases = $query->paginate(30)->withQueryString()->through(fn ($a) => [
             'id' => $a->id,
             'source_name' => $a->source_name,
             'product_brand_id' => $a->product_brand_id,
