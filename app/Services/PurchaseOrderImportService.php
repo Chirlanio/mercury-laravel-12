@@ -7,6 +7,7 @@ use App\Models\ProductBrand;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\PurchaseOrderStatusHistory;
+use App\Models\Product;
 use App\Models\Store;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -222,6 +223,25 @@ class PurchaseOrderImportService
         $storesByCode = Store::pluck('code', 'code')->all();
         $storesByName = Store::all()->mapWithKeys(fn ($s) => [mb_strtolower($s->name ?? '') => $s->code])->all();
 
+        // Cache de products por reference — vincula purchase_order_items ao catálogo.
+        // Coleta as references únicas da planilha pra fazer um único WHERE IN
+        // (em vez de carregar os 355k+ products inteiros em memória).
+        $uniqueRefs = collect($rows)
+            ->map(fn ($r) => trim((string) ($r['referencia'] ?? '')))
+            ->filter(fn ($r) => $r !== '')
+            ->unique()
+            ->values()
+            ->all();
+        // mapWithKeys com cast (string) evita que PHP converta references
+        // numéricas (ex: "103200") pra int como chave de array — quebra o
+        // lookup se a reference tiver hífen ("10330034-288") ou leading zeros.
+        $productsByRef = ! empty($uniqueRefs)
+            ? Product::whereIn('reference', $uniqueRefs)
+                ->get(['id', 'reference'])
+                ->mapWithKeys(fn ($p) => [(string) $p->reference => $p->id])
+                ->all()
+            : [];
+
         // Debug: loga as primeiras 5 linhas pra diagnóstico de imports
         // que falham silenciosamente (0 criadas, N rejeitadas). Mostra
         // o estado PÓS forward-fill pra confirmar que os campos de
@@ -367,6 +387,8 @@ class PurchaseOrderImportService
                             'invoice_number' => $row['nota_fiscal'] ?? null,
                             'invoice_emission_date' => $this->parseDate($row['emissao_nf'] ?? null),
                             'confirmation_date' => $this->parseDate($row['confirmacao'] ?? null),
+                            // Vincula ao catálogo de produtos por reference
+                            'product_id' => $productsByRef[$reference] ?? null,
                         ];
 
                         foreach ($sizeColumns as $sizeLabel) {

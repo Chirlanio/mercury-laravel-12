@@ -288,11 +288,14 @@ class PurchaseOrderReceiptTest extends TestCase
             'net_quantity' => 5,
         ]);
 
+        // O matcher agora aceita movements de qualquer loja — é comum o
+        // fornecedor entregar no CD (Z443) e não na loja destino da ordem.
+        // A ref_size é específica o suficiente pra limitar o resultado.
         $matcher = app(PurchaseOrderCigamMatcherService::class);
         $result = $matcher->matchOrder($this->order);
 
-        $this->assertEquals(0, $result['receipts_created']);
-        $this->assertEquals(0, $this->order->items()->where('reference', 'REF-001')->first()->quantity_received);
+        $this->assertEquals(1, $result['receipts_created']);
+        $this->assertEquals(5, $this->order->items()->where('reference', 'REF-001')->first()->quantity_received);
     }
 
     public function test_cigam_matcher_ignores_movement_already_matched(): void
@@ -390,5 +393,77 @@ class PurchaseOrderReceiptTest extends TestCase
 
         // Capou em 2 (saldo restante)
         $this->assertEquals(10, $item->fresh()->quantity_received);
+    }
+
+    // ------------------------------------------------------------------
+    // CIGAM matcher — barcode strategy
+    // ------------------------------------------------------------------
+
+    public function test_cigam_matcher_matches_via_catalog_barcode_as_ref_size(): void
+    {
+        // Cenário real: a referência da planilha (REF-001) é diferente
+        // do ref_size no CIGAM (HT66513023.0136). Mas o product_variant
+        // tem barcode = o mesmo valor que movements.ref_size no CIGAM.
+        //
+        // Cadeia: PO item → product_id → ProductVariant.barcode
+        //         → matches movements.ref_size
+
+        // 1. Cria product com variant cujo barcode = ref_size do CIGAM
+        $product = \App\Models\Product::create([
+            'reference' => 'REF-001',
+            'description' => 'Produto Teste',
+            'is_active' => true,
+        ]);
+
+        $productSize = \App\Models\ProductSize::create([
+            'name' => '36',
+            'cigam_code' => 'U36',
+            'is_active' => true,
+        ]);
+
+        \App\Models\ProductVariant::create([
+            'product_id' => $product->id,
+            'size_cigam_code' => 'U36',
+            'barcode' => 'HT66513023.0136', // = movements.ref_size (não é EAN!)
+            'is_active' => true,
+        ]);
+
+        // 2. Linka PO item ao produto
+        $item = $this->order->items()->where('reference', 'REF-001')->first();
+        $item->update([
+            'product_id' => $product->id,
+            'product_size_id' => $productSize->id,
+        ]);
+
+        // 3. Movement com ref_size = mesmo valor do variant.barcode
+        Movement::create([
+            'movement_date' => '2026-02-01',
+            'store_code' => $this->store->code,
+            'movement_code' => PurchaseOrderCigamMatcherService::CIGAM_PURCHASE_ENTRY_CODE,
+            'entry_exit' => 'E',
+            'invoice_number' => 'NF-CATALOG',
+            'ref_size' => 'HT66513023.0136', // = ProductVariant.barcode
+            'barcode' => '7165130230136',     // EAN numérico (não usado no match)
+            'quantity' => 6,
+            'cost_price' => 95.00,
+            'realized_value' => 570.00,
+            'sale_price' => 250.00,
+            'discount_value' => 0,
+            'net_value' => 570.00,
+            'net_quantity' => 6,
+        ]);
+
+        $matcher = app(PurchaseOrderCigamMatcherService::class);
+        $result = $matcher->matchOrder($this->order);
+
+        // Match via catalog barcode = movements.ref_size
+        $this->assertEquals(1, $result['receipts_created']);
+        $this->assertEquals(1, $result['items_matched']);
+        $this->assertEquals(6, $item->fresh()->quantity_received);
+
+        // Receipt linkado ao movement
+        $receipt = PurchaseOrderReceipt::where('invoice_number', 'NF-CATALOG')->first();
+        $this->assertNotNull($receipt);
+        $this->assertEquals('cigam_match', $receipt->source);
     }
 }
