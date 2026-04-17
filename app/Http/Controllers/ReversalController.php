@@ -490,11 +490,13 @@ class ReversalController extends Controller
 
         $total = (clone $base)->count();
 
+        // Alias `status_value` evita o cast automático do Reversal model
+        // (que converteria a string para enum e quebraria o keyBy).
         $byStatus = (clone $base)
-            ->selectRaw('status, COUNT(*) as count, COALESCE(SUM(amount_reversal), 0) as total_amount')
+            ->selectRaw('status as status_value, COUNT(*) as count, COALESCE(SUM(amount_reversal), 0) as total_amount')
             ->groupBy('status')
             ->get()
-            ->keyBy('status');
+            ->keyBy('status_value');
 
         $monthTotal = (clone $base)
             ->forMonth((int) now()->format('m'), (int) now()->format('Y'))
@@ -551,15 +553,18 @@ class ReversalController extends Controller
             ->values();
 
         // 3. Distribuição por status
+        // Usa alias `status_value` para evitar o cast automático que o
+        // Reversal model aplica em `status` → ReversalStatus enum.
         $byStatus = $baseQuery()
-            ->selectRaw('status, COUNT(*) as count, COALESCE(SUM(amount_reversal), 0) as total_amount')
+            ->selectRaw('status as status_value, COUNT(*) as count, COALESCE(SUM(amount_reversal), 0) as total_amount')
             ->groupBy('status')
             ->get()
             ->map(function ($r) {
-                $status = ReversalStatus::tryFrom($r->status);
+                $raw = is_string($r->status_value) ? $r->status_value : ($r->status_value?->value ?? (string) $r->status_value);
+                $status = ReversalStatus::tryFrom($raw);
                 return [
-                    'status' => $r->status,
-                    'label' => $status?->label() ?? $r->status,
+                    'status' => $raw,
+                    'label' => $status?->label() ?? $raw,
                     'color' => $status?->color() ?? 'gray',
                     'count' => (int) $r->count,
                     'total_amount' => (float) $r->total_amount,
