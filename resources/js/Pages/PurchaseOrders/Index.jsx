@@ -69,21 +69,37 @@ export default function Index({
     const [dateFrom, setDateFrom] = useState(filters.date_from || '');
     const [dateTo, setDateTo] = useState(filters.date_to || '');
 
-    const applyFilters = () => {
-        router.get(route('purchase-orders.index'), {
+    // Aplica filtros automaticamente — chamada por qualquer mudança de select/date.
+    // Pra busca de texto, aplica no Enter (pra não disparar a cada tecla).
+    const applyFilters = (overrides = {}) => {
+        const params = {
             search: search || undefined,
             status: statusFilter || undefined,
             supplier_id: supplierFilter || undefined,
             brand_id: brandFilter || undefined,
             date_from: dateFrom || undefined,
             date_to: dateTo || undefined,
-        }, { preserveState: true });
+            ...overrides,
+        };
+        // Remove undefined pra não poluir a URL
+        Object.keys(params).forEach((k) => params[k] === undefined && delete params[k]);
+        router.get(route('purchase-orders.index'), params, {
+            preserveState: true,
+            preserveScroll: true,
+        });
+    };
+
+    // Helpers pra filtros automáticos — seta estado + aplica imediatamente
+    const setAndApply = (setter, key) => (e) => {
+        const value = e.target.value;
+        setter(value);
+        applyFilters({ [key]: value || undefined });
     };
 
     const clearFilters = () => {
         setSearch(''); setStatusFilter(''); setSupplierFilter('');
         setBrandFilter(''); setDateFrom(''); setDateTo('');
-        router.get(route('purchase-orders.index'), {}, { preserveState: true });
+        router.get(route('purchase-orders.index'), {}, { preserveState: true, preserveScroll: true });
     };
 
     const hasActiveFilters = search || statusFilter || supplierFilter || brandFilter || dateFrom || dateTo;
@@ -117,6 +133,7 @@ export default function Index({
 
     const handleMatchCigam = (order) => {
         router.post(route('purchase-orders.match-cigam', order.id), {}, {
+            preserveState: true,
             preserveScroll: true,
         });
     };
@@ -153,6 +170,8 @@ export default function Index({
         setDeleting(true);
         router.delete(route('purchase-orders.destroy', deleteTarget.id), {
             data: { deleted_reason: reason },
+            preserveState: true,
+            preserveScroll: true,
             onSuccess: () => { setDeleteTarget(null); setDeleting(false); },
             onError: () => setDeleting(false),
         });
@@ -255,19 +274,21 @@ export default function Index({
                         <StatisticsGrid cards={statsCards} />
                     </div>
 
-                    {/* Filtros */}
+                    {/* Filtros — aplicados automaticamente ao mudar qualquer select/date.
+                        Busca de texto aplica com Enter (pra não disparar a cada tecla). */}
                     <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
-                        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-3 items-end">
+                        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-3 items-end">
                             <div className="md:col-span-2">
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Buscar</label>
                                 <input type="text" placeholder="Nº ordem, descrição, estação..."
                                     value={search} onChange={(e) => setSearch(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+                                    onBlur={() => { if (search !== (filters.search || '')) applyFilters(); }}
                                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-                                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+                                <select value={statusFilter} onChange={setAndApply(setStatusFilter, 'status')}
                                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                                     <option value="">Todos</option>
                                     {Object.entries(statusOptions).map(([value, label]) => (
@@ -277,7 +298,7 @@ export default function Index({
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Fornecedor</label>
-                                <select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)}
+                                <select value={supplierFilter} onChange={setAndApply(setSupplierFilter, 'supplier_id')}
                                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                                     <option value="">Todos</option>
                                     {selects.suppliers?.map((s) => (
@@ -287,17 +308,18 @@ export default function Index({
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Data de</label>
-                                <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+                                <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); applyFilters({ date_from: e.target.value || undefined }); }}
                                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Data até</label>
-                                <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+                                <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); applyFilters({ date_to: e.target.value || undefined }); }}
                                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
                             </div>
-                            <div className="md:col-span-3 lg:col-span-6 flex gap-2 justify-end pt-2">
-                                <Button variant="primary" size="sm" onClick={applyFilters} icon={MagnifyingGlassIcon}>Filtrar</Button>
-                                <Button variant="outline" size="sm" onClick={clearFilters} disabled={!hasActiveFilters} icon={XMarkIcon}>Limpar</Button>
+                            <div>
+                                <Button variant="outline" size="sm" onClick={clearFilters} disabled={!hasActiveFilters} icon={XMarkIcon} className="w-full">
+                                    Limpar
+                                </Button>
                             </div>
                         </div>
                     </div>
@@ -498,9 +520,9 @@ function PurchaseOrderFormModal({ show, order = null, onClose, selects, isStoreS
 
     const handleSubmit = () => {
         if (isEdit) {
-            form.put(route('purchase-orders.update', order.id), { onSuccess: onClose });
+            form.put(route('purchase-orders.update', order.id), { preserveState: true, preserveScroll: true, onSuccess: onClose });
         } else {
-            form.post(route('purchase-orders.store'), { onSuccess: onClose });
+            form.post(route('purchase-orders.store'), { preserveState: true, preserveScroll: true, onSuccess: onClose });
         }
     };
 
@@ -732,7 +754,12 @@ function PurchaseOrderDetailModal({ order, onClose, onGenerateBarcodes, canEdit 
                                         <td className="px-2 py-1 text-center">{item.size}</td>
                                         <td className="px-2 py-1 font-mono text-xs">
                                             {item.barcode ? (
-                                                <span title="EAN-13 interno">{item.barcode}</span>
+                                                <span title={item.barcode_source === 'catalog' ? 'Código do catálogo (CIGAM)' : 'EAN-13 interno'}>
+                                                    {item.barcode}
+                                                    {item.barcode_source === 'catalog' && (
+                                                        <span className="ml-1 text-[9px] text-green-600" title="Catálogo">●</span>
+                                                    )}
+                                                </span>
                                             ) : (
                                                 <span className="text-gray-300">—</span>
                                             )}
@@ -842,7 +869,7 @@ function PurchaseOrderTransitionModal({ order, statusTransitions, statusOptions,
     const form = useForm({ to_status: available[0] || '', note: '' });
 
     const handleSubmit = () => {
-        form.post(route('purchase-orders.transition', order.id), { onSuccess: onClose });
+        form.post(route('purchase-orders.transition', order.id), { preserveState: true, preserveScroll: true, onSuccess: onClose });
     };
 
     return (
@@ -943,6 +970,8 @@ function AddItemsModal({ order, onClose }) {
                 sizes: item.sizes,
             }],
         }, {
+            preserveState: true,
+            preserveScroll: true,
             onSuccess: () => { setProcessing(false); onClose(); },
             onError: (errs) => { setErrors(errs); setProcessing(false); },
         });
@@ -1052,7 +1081,17 @@ function AddItemsModal({ order, onClose }) {
 // ========================================================================
 
 function RegisterReceiptModal({ order, onClose, onMatchCigam }) {
-    const [invoice, setInvoice] = useState('');
+    // Pré-preenche o campo NF com a NF mais frequente dos itens da ordem
+    // (a planilha v1 importa invoice_number em cada item — aproveita esse dado)
+    const defaultNf = useMemo(() => {
+        const nfs = order.items?.map((i) => i.invoice_number).filter(Boolean) || [];
+        if (nfs.length === 0) return '';
+        const counts = {};
+        nfs.forEach((nf) => { counts[nf] = (counts[nf] || 0) + 1; });
+        return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+    }, [order]);
+
+    const [invoice, setInvoice] = useState(defaultNf);
     const [notes, setNotes] = useState('');
     // Map: itemId → quantidade a receber
     const [quantities, setQuantities] = useState({});
@@ -1095,6 +1134,8 @@ function RegisterReceiptModal({ order, onClose, onMatchCigam }) {
             notes: notes || null,
             items: itemsToSubmit,
         }, {
+            preserveState: true,
+            preserveScroll: true,
             onSuccess: () => {
                 setProcessing(false);
                 onClose();

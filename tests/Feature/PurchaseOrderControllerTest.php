@@ -73,7 +73,7 @@ class PurchaseOrderControllerTest extends TestCase
             'payment_terms_raw' => '30/60/90',
         ]);
 
-        $response->assertRedirect(route('purchase-orders.index'));
+        $response->assertRedirect();
         $this->assertDatabaseHas('purchase_orders', [
             'order_number' => 'PO-001',
             'supplier_id' => $this->supplier->id,
@@ -147,7 +147,7 @@ class PurchaseOrderControllerTest extends TestCase
             'short_description' => 'Atualizada',
         ]);
 
-        $response->assertRedirect(route('purchase-orders.index'));
+        $response->assertRedirect();
         $this->assertEquals('Atualizada', $order->fresh()->short_description);
     }
 
@@ -182,7 +182,7 @@ class PurchaseOrderControllerTest extends TestCase
             'to_status' => PurchaseOrderStatus::INVOICED->value,
         ]);
 
-        $response->assertRedirect(route('purchase-orders.index'));
+        $response->assertRedirect();
         $this->assertEquals('invoiced', $order->fresh()->status->value);
 
         // A transição cria uma linha no histórico

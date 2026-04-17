@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\Permission;
 use App\Enums\PurchaseOrderStatus;
 use App\Models\ProductBrand;
+use App\Models\ProductVariant;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use App\Models\Store;
@@ -151,7 +152,7 @@ class PurchaseOrderController extends Controller
             return redirect()->back()->withErrors($e->errors())->withInput();
         }
 
-        return redirect()->route('purchase-orders.index')
+        return redirect()->back()
             ->with('success', 'Ordem de compra criada com sucesso.');
     }
 
@@ -197,7 +198,7 @@ class PurchaseOrderController extends Controller
             return redirect()->back()->withErrors($e->errors())->withInput();
         }
 
-        return redirect()->route('purchase-orders.index')
+        return redirect()->back()
             ->with('success', 'Ordem de compra atualizada.');
     }
 
@@ -215,7 +216,7 @@ class PurchaseOrderController extends Controller
             return redirect()->back()->withErrors($e->errors());
         }
 
-        return redirect()->route('purchase-orders.index')
+        return redirect()->back()
             ->with('success', 'Ordem de compra excluída.');
     }
 
@@ -239,7 +240,7 @@ class PurchaseOrderController extends Controller
             return redirect()->back()->withErrors($e->errors());
         }
 
-        return redirect()->route('purchase-orders.index')
+        return redirect()->back()
             ->with('success', 'Status da ordem atualizado.');
     }
 
@@ -300,7 +301,7 @@ class PurchaseOrderController extends Controller
             }
         });
 
-        return redirect()->route('purchase-orders.index')
+        return redirect()->back()
             ->with('success', 'Itens adicionados à ordem.');
     }
 
@@ -320,7 +321,7 @@ class PurchaseOrderController extends Controller
 
         $item->delete();
 
-        return redirect()->route('purchase-orders.index')
+        return redirect()->back()
             ->with('success', 'Item removido.');
     }
 
@@ -356,7 +357,7 @@ class PurchaseOrderController extends Controller
             return redirect()->back()->withErrors($e->errors());
         }
 
-        return redirect()->route('purchase-orders.index')
+        return redirect()->back()
             ->with('success', 'Recebimento registrado com sucesso.');
     }
 
@@ -374,12 +375,79 @@ class PurchaseOrderController extends Controller
         }
 
         $result = $this->cigamMatcher->matchOrder($purchaseOrder);
+        $debug = $result['debug'] ?? [];
 
-        $message = $result['receipts_created'] > 0
-            ? "CIGAM: {$result['receipts_created']} recebimento(s) detectado(s) com {$result['items_matched']} item(ns)."
-            : "CIGAM: nenhum movimento novo encontrado para esta ordem.";
+        if ($result['receipts_created'] > 0) {
+            $message = "CIGAM: {$result['receipts_created']} recebimento(s) detectado(s) com {$result['items_matched']} item(ns).";
 
-        return redirect()->route('purchase-orders.index')->with('success', $message);
+            return redirect()->back()->with('success', $message);
+        }
+
+        // Monta mensagem diagnóstica quando não encontra nada
+        $message = 'CIGAM: nenhum movimento novo encontrado para esta ordem.';
+        $details = [];
+
+        if (! empty($debug['movements_by_invoice'])) {
+            $codeEntrada = collect($debug['movements_by_invoice'])
+                ->first(fn ($r) => $r['movement_code'] == 1 && $r['entry_exit'] === 'E');
+            $countCompra = $codeEntrada['count'] ?? 0;
+
+            if ($countCompra > 0) {
+                $details[] = "NF tem {$countCompra} mov. compra/entrada no DB";
+
+                // Mostra ref_sizes reais (code=1/E)
+                if (! empty($debug['sample_ref_sizes_in_db'])) {
+                    $samples = implode(', ', array_slice($debug['sample_ref_sizes_in_db'], 0, 3));
+                    $details[] = "ref_sizes no DB: {$samples}";
+                }
+
+                // Mostra barcodes reais (code=1/E)
+                if (! empty($debug['sample_barcodes_in_db'])) {
+                    $barSamples = implode(', ', array_slice(array_filter($debug['sample_barcodes_in_db']), 0, 3));
+                    if ($barSamples) {
+                        $details[] = "barcodes no DB: {$barSamples}";
+                    }
+                }
+            } else {
+                $total = array_sum(array_column($debug['movements_by_invoice'], 'count'));
+                $details[] = "NF tem {$total} mov. no DB mas nenhum é compra/entrada (code=1/E)";
+            }
+        }
+
+        // Info sobre catalog barcode strategy
+        $catalogCount = $debug['catalog_barcodes_as_ref_size'] ?? 0;
+        $itemsWithProduct = $debug['items_with_product_id'] ?? 0;
+        if ($catalogCount > 0) {
+            $details[] = "{$catalogCount} barcodes do catálogo adicionados como candidatas ref_size";
+        } elseif ($itemsWithProduct === 0) {
+            $details[] = 'itens sem product_id — match via catálogo indisponível';
+        } elseif ($itemsWithProduct > 0) {
+            $details[] = "{$itemsWithProduct} itens com product_id mas sem barcode no catálogo";
+        }
+
+        // Comparação detalhada
+        $comparison = $debug['barcode_comparison'] ?? [];
+        if (! empty($comparison)) {
+            if (! empty($comparison['catalog_sample'])) {
+                $cs = $comparison['catalog_sample'][0];
+                $details[] = "catálogo barcode: {$cs['catalog_barcode']}";
+            }
+            if (! empty($comparison['movement_sample'])) {
+                $ms = $comparison['movement_sample'][0];
+                $details[] = "movement ref_size: {$ms['ref_size']}";
+            }
+        }
+
+        if (! empty($details)) {
+            $message .= ' (' . implode(' · ', $details) . ')';
+        }
+
+        Log::info('CIGAM matcher diagnostic response', [
+            'order_id' => $purchaseOrder->id,
+            'debug' => $debug,
+        ]);
+
+        return redirect()->back()->with('warning', $message);
     }
 
     // ------------------------------------------------------------------
@@ -491,7 +559,7 @@ class PurchaseOrderController extends Controller
             ]);
         }
 
-        return redirect()->route('purchase-orders.index')->with('success', $msg);
+        return redirect()->back()->with('success', $msg);
     }
 
     // ------------------------------------------------------------------
@@ -651,6 +719,80 @@ class PurchaseOrderController extends Controller
     // Helpers
     // ------------------------------------------------------------------
 
+    /**
+     * Batch lookup de barcodes do catálogo (product_variants) para itens
+     * que têm product_id + product_size_id preenchidos.
+     *
+     * Tenta casar via product_id + size_cigam_code. Se o produto no
+     * catálogo é "tamanho único" (só 1 variant), usa o barcode dessa
+     * variant independente do tamanho do item.
+     *
+     * @param  \Illuminate\Support\Collection  $items
+     * @return array<string, string>  Mapa "product_id|product_size_id" => barcode
+     */
+    protected function lookupCatalogBarcodes($items): array
+    {
+        $productIds = $items->pluck('product_id')->filter()->unique()->values()->all();
+        if (empty($productIds)) {
+            return [];
+        }
+
+        // Carrega todas as variants dos products envolvidos
+        $variants = ProductVariant::whereIn('product_id', $productIds)->get();
+
+        // Agrupa por product_id
+        $variantsByProduct = $variants->groupBy('product_id');
+
+        // Carrega product_sizes pra mapear product_size_id → cigam_code
+        $productSizeIds = $items->pluck('product_size_id')->filter()->unique()->values()->all();
+        $sizeCigamMap = [];
+        if (! empty($productSizeIds)) {
+            $sizeCigamMap = \App\Models\ProductSize::whereIn('id', $productSizeIds)
+                ->pluck('cigam_code', 'id')
+                ->all();
+        }
+
+        $map = [];
+
+        foreach ($items as $item) {
+            if (! $item->product_id) {
+                continue;
+            }
+
+            $key = $item->product_id . '|' . $item->product_size_id;
+            $productVariants = $variantsByProduct[$item->product_id] ?? collect();
+
+            if ($productVariants->isEmpty()) {
+                continue;
+            }
+
+            // Tenta match por size_cigam_code
+            $cigamCode = $sizeCigamMap[$item->product_size_id] ?? null;
+            if ($cigamCode) {
+                $match = $productVariants->firstWhere('size_cigam_code', $cigamCode);
+                if ($match) {
+                    $map[$key] = $match->barcode;
+                    continue;
+                }
+            }
+
+            // Fallback: se produto tem só 1 variant (tamanho único), usa ela
+            if ($productVariants->count() === 1) {
+                $map[$key] = $productVariants->first()->barcode;
+                continue;
+            }
+
+            // Fallback: tenta match por barcode que contenha o tamanho
+            $sizeStr = $item->size;
+            $matchByName = $productVariants->first(fn ($v) => str_contains($v->barcode ?? '', $sizeStr));
+            if ($matchByName) {
+                $map[$key] = $matchByName->barcode;
+            }
+        }
+
+        return $map;
+    }
+
     protected function resolveScopedStoreCode(?User $user): ?string
     {
         if (! $user) {
@@ -736,8 +878,12 @@ class PurchaseOrderController extends Controller
 
     protected function formatOrderDetailed(PurchaseOrder $o): array
     {
-        // Lookup batch de barcodes pra evitar N queries no map abaixo
-        $barcodeMap = $this->barcodeService->lookupForItems($o->items);
+        // Lookup batch de barcodes EAN-13 internos (prefixo 2)
+        $internalBarcodeMap = $this->barcodeService->lookupForItems($o->items);
+
+        // Lookup batch de barcodes do catálogo (product_variants)
+        // Prioridade: barcode do catálogo > EAN-13 interno gerado
+        $catalogBarcodeMap = $this->lookupCatalogBarcodes($o->items);
 
         return array_merge($this->formatOrder($o), [
             'notes' => $o->notes,
@@ -753,29 +899,37 @@ class PurchaseOrderController extends Controller
                 'cnpj' => $o->supplier->formatted_cnpj,
                 'payment_terms_default' => $o->supplier->payment_terms_default,
             ] : null,
-            'items' => $o->items->map(fn ($item) => [
-                'id' => $item->id,
-                'reference' => $item->reference,
-                'size' => $item->size,
-                'description' => $item->description,
-                'material' => $item->material,
-                'color' => $item->color,
-                'group_name' => $item->group_name,
-                'subgroup_name' => $item->subgroup_name,
-                'unit_cost' => (float) $item->unit_cost,
-                'markup' => (float) $item->markup,
-                'selling_price' => (float) $item->selling_price,
-                'pricing_locked' => $item->pricing_locked,
-                'quantity_ordered' => $item->quantity_ordered,
-                'quantity_received' => $item->quantity_received,
-                'total_cost' => $item->total_cost,
-                'total_selling' => $item->total_selling,
-                'invoice_number' => $item->invoice_number,
-                'invoice_emission_date' => $item->invoice_emission_date?->toDateString(),
-                'confirmation_date' => $item->confirmation_date?->toDateString(),
-                'is_fully_received' => $item->is_fully_received,
-                'barcode' => $barcodeMap[$item->reference . '|' . $item->size] ?? null,
-            ])->values(),
+            'items' => $o->items->map(function ($item) use ($internalBarcodeMap, $catalogBarcodeMap) {
+                $key = $item->product_id . '|' . $item->product_size_id;
+                $catalogBarcode = $catalogBarcodeMap[$key] ?? null;
+                $internalBarcode = $internalBarcodeMap[$item->reference . '|' . $item->size] ?? null;
+
+                return [
+                    'id' => $item->id,
+                    'reference' => $item->reference,
+                    'size' => $item->size,
+                    'description' => $item->description,
+                    'material' => $item->material,
+                    'color' => $item->color,
+                    'group_name' => $item->group_name,
+                    'subgroup_name' => $item->subgroup_name,
+                    'unit_cost' => (float) $item->unit_cost,
+                    'markup' => (float) $item->markup,
+                    'selling_price' => (float) $item->selling_price,
+                    'pricing_locked' => $item->pricing_locked,
+                    'quantity_ordered' => $item->quantity_ordered,
+                    'quantity_received' => $item->quantity_received,
+                    'total_cost' => $item->total_cost,
+                    'total_selling' => $item->total_selling,
+                    'invoice_number' => $item->invoice_number,
+                    'invoice_emission_date' => $item->invoice_emission_date?->toDateString(),
+                    'confirmation_date' => $item->confirmation_date?->toDateString(),
+                    'is_fully_received' => $item->is_fully_received,
+                    // Prioridade: barcode do catálogo (produto cadastrado) > EAN-13 interno
+                    'barcode' => $catalogBarcode ?? $internalBarcode,
+                    'barcode_source' => $catalogBarcode ? 'catalog' : ($internalBarcode ? 'internal' : null),
+                ];
+            })->values(),
             'status_history' => $o->statusHistory->map(fn ($h) => [
                 'id' => $h->id,
                 'from_status' => $h->from_status,

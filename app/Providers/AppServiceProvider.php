@@ -11,6 +11,12 @@ use App\Events\PersonnelMovementCreated;
 use App\Events\PurchaseOrderStatusChanged;
 use App\Listeners\CreateSubstitutionVacancyFromDismissal;
 use App\Listeners\NotifyPurchaseOrderStakeholders;
+use App\Models\CentralMenu;
+use App\Models\CentralMenuPageDefault;
+use App\Models\CentralPage;
+use App\Observers\CentralMenuObserver;
+use App\Observers\CentralMenuPageDefaultObserver;
+use App\Observers\CentralPageObserver;
 use App\Listeners\Helpdesk\DispatchCsatSurveyListener;
 use App\Listeners\Helpdesk\DispatchWhatsappReplyListener;
 use App\Listeners\Helpdesk\SendTicketAssignedNotifications;
@@ -68,6 +74,7 @@ class AppServiceProvider extends ServiceProvider
         $this->registerHelpdeskListeners();
         $this->registerHrListeners();
         $this->registerPurchaseOrderListeners();
+        $this->registerNavigationObservers();
     }
 
     protected function registerPurchaseOrderListeners(): void
@@ -76,6 +83,16 @@ class AppServiceProvider extends ServiceProvider
         // status. Database notification (sino do frontend) — sem mail pra
         // não inundar caixa postal.
         Event::listen(PurchaseOrderStatusChanged::class, NotifyPurchaseOrderStakeholders::class);
+    }
+
+    protected function registerNavigationObservers(): void
+    {
+        // Auto-invalidate CentralMenuResolver cache whenever navigation
+        // structure changes in the SaaS admin. Without this, tenants see
+        // stale sidebars for up to 5 minutes after edits.
+        CentralMenu::observe(CentralMenuObserver::class);
+        CentralPage::observe(CentralPageObserver::class);
+        CentralMenuPageDefault::observe(CentralMenuPageDefaultObserver::class);
     }
 
     protected function registerHelpdeskListeners(): void
