@@ -132,15 +132,12 @@ class PurchaseOrderReceiptService
      *  - Todos os itens atingiram quantity_ordered → DELIVERED
      *  - Algum item recebeu (mas nem tudo) e ordem está PENDING/INVOICED → PARTIAL_INVOICED
      *
-     * O actor pode ser null (caminho do matcher CIGAM). Nesse caso usamos
-     * um "system user" implícito: passamos o created_by_user_id da ordem.
-     * Isto é necessário porque PurchaseOrderTransitionService::authorizeTransition
-     * verifica permissions do actor — e o matcher roda em background sem usuário.
-     *
-     * Para receipts automáticos (matcher), não disparamos transição se o
-     * actor for null e a transição exigir permissions específicas. Em vez
-     * disso, deixamos a ordem como está e a transição manual fica como
-     * caminho de confirmação.
+     * O actor pode ser null (caminho do matcher CIGAM rodando em background).
+     * Nesse caso usamos $order->createdBy como "system actor" — o
+     * PurchaseOrderTransitionService exige User não-nullable, e o criador
+     * da ordem geralmente tem RECEIVE_PURCHASE_ORDERS. Se não tiver,
+     * o try/catch absorve o erro e a ordem fica como está (confirmação
+     * manual continua como fallback).
      */
     protected function autoTransitionAfterReceipt(PurchaseOrder $order, ?User $actor): void
     {
@@ -151,9 +148,8 @@ class PurchaseOrderReceiptService
             return;
         }
 
-        // Sem actor (matcher CIGAM rodando em background): não força
-        // transição. O usuário pode confirmar manualmente depois.
-        if (! $actor) {
+        $effectiveActor = $actor ?? $order->createdBy;
+        if (! $effectiveActor) {
             return;
         }
 
@@ -164,8 +160,8 @@ class PurchaseOrderReceiptService
                     $this->transitionService->transition(
                         $order,
                         PurchaseOrderStatus::DELIVERED,
-                        $actor,
-                        'Recebimento total registrado'
+                        $effectiveActor,
+                        $actor ? 'Recebimento total registrado' : 'Recebimento total — confirmado automaticamente via CIGAM'
                     );
                 } catch (ValidationException $e) {
                     // Se a transição falhar (ex: usuário sem RECEIVE_PURCHASE_ORDERS),
@@ -184,8 +180,8 @@ class PurchaseOrderReceiptService
                 $this->transitionService->transition(
                     $order,
                     PurchaseOrderStatus::PARTIAL_INVOICED,
-                    $actor,
-                    'Recebimento parcial registrado'
+                    $effectiveActor,
+                    $actor ? 'Recebimento parcial registrado' : 'Recebimento parcial — detectado automaticamente via CIGAM'
                 );
             } catch (ValidationException $e) {
                 // mesma razão acima

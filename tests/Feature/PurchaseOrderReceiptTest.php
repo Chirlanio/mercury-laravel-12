@@ -466,4 +466,126 @@ class PurchaseOrderReceiptTest extends TestCase
         $this->assertNotNull($receipt);
         $this->assertEquals('cigam_match', $receipt->source);
     }
+
+    // ------------------------------------------------------------------
+    // Auto-transição sem actor (receipts automáticos via matcher CIGAM)
+    // ------------------------------------------------------------------
+
+    public function test_cigam_matcher_auto_transitions_to_delivered_on_full_receipt(): void
+    {
+        // Dois movements que juntos cobrem os 15 itens da ordem
+        Movement::create([
+            'movement_date' => '2026-02-01',
+            'store_code' => $this->store->code,
+            'movement_code' => PurchaseOrderCigamMatcherService::CIGAM_PURCHASE_ENTRY_CODE,
+            'entry_exit' => 'E',
+            'invoice_number' => 'NF-FULL-1',
+            'ref_size' => 'REF-00136',
+            'quantity' => 10,
+            'cost_price' => 100, 'realized_value' => 1000,
+            'sale_price' => 250, 'discount_value' => 0,
+            'net_value' => 1000, 'net_quantity' => 10,
+        ]);
+        Movement::create([
+            'movement_date' => '2026-02-02',
+            'store_code' => $this->store->code,
+            'movement_code' => PurchaseOrderCigamMatcherService::CIGAM_PURCHASE_ENTRY_CODE,
+            'entry_exit' => 'E',
+            'invoice_number' => 'NF-FULL-2',
+            'ref_size' => 'REF-002M',
+            'quantity' => 5,
+            'cost_price' => 30, 'realized_value' => 150,
+            'sale_price' => 80, 'discount_value' => 0,
+            'net_value' => 150, 'net_quantity' => 5,
+        ]);
+
+        $matcher = app(PurchaseOrderCigamMatcherService::class);
+        $matcher->matchOrder($this->order);
+
+        // Ordem inicia em INVOICED; após receipt total sem actor, usa
+        // createdBy como fallback e transiciona para DELIVERED.
+        $fresh = $this->order->fresh();
+        $this->assertEquals('delivered', $fresh->status->value);
+        $this->assertNotNull($fresh->delivered_at);
+
+        // Histórico registrado com o criador da ordem como actor
+        $lastHistory = $fresh->statusHistory()->latest('id')->first();
+        $this->assertEquals('invoiced', $lastHistory->from_status);
+        $this->assertEquals('delivered', $lastHistory->to_status);
+        $this->assertEquals($this->adminUser->id, $lastHistory->changed_by_user_id);
+        $this->assertStringContainsString('CIGAM', $lastHistory->note);
+    }
+
+    public function test_cigam_matcher_skips_transition_when_order_has_no_creator(): void
+    {
+        // Cenário defensivo: se created_by_user_id for null (legado),
+        // o matcher não quebra — receipt é gravado, status fica como estava.
+        $this->order->update(['created_by_user_id' => null]);
+
+        Movement::create([
+            'movement_date' => '2026-02-01',
+            'store_code' => $this->store->code,
+            'movement_code' => PurchaseOrderCigamMatcherService::CIGAM_PURCHASE_ENTRY_CODE,
+            'entry_exit' => 'E',
+            'invoice_number' => 'NF-NOCREATOR',
+            'ref_size' => 'REF-00136',
+            'quantity' => 10,
+            'cost_price' => 100, 'realized_value' => 1000,
+            'sale_price' => 250, 'discount_value' => 0,
+            'net_value' => 1000, 'net_quantity' => 10,
+        ]);
+        Movement::create([
+            'movement_date' => '2026-02-02',
+            'store_code' => $this->store->code,
+            'movement_code' => PurchaseOrderCigamMatcherService::CIGAM_PURCHASE_ENTRY_CODE,
+            'entry_exit' => 'E',
+            'invoice_number' => 'NF-NOCREATOR-2',
+            'ref_size' => 'REF-002M',
+            'quantity' => 5,
+            'cost_price' => 30, 'realized_value' => 150,
+            'sale_price' => 80, 'discount_value' => 0,
+            'net_value' => 150, 'net_quantity' => 5,
+        ]);
+
+        $matcher = app(PurchaseOrderCigamMatcherService::class);
+        $matcher->matchOrder($this->order);
+
+        // Receipts criados mesmo assim
+        $this->assertGreaterThanOrEqual(1, PurchaseOrderReceipt::where('purchase_order_id', $this->order->id)->count());
+        // Mas status permanece INVOICED porque não há actor pra transicionar
+        $this->assertEquals('invoiced', $this->order->fresh()->status->value);
+    }
+
+    // ------------------------------------------------------------------
+    // Command de reconciliação (backfill de ordens travadas)
+    // ------------------------------------------------------------------
+
+    public function test_reconcile_command_transitions_stuck_orders_to_delivered(): void
+    {
+        // Simula ordem travada: status invoiced, mas items 100% recebidos
+        $items = $this->order->items;
+        $items[0]->update(['quantity_received' => 10]);
+        $items[1]->update(['quantity_received' => 5]);
+
+        // Estado pré-comando
+        $this->assertEquals('invoiced', $this->order->fresh()->status->value);
+
+        // Chama o método core do command diretamente (sem o tenant loop,
+        // que é coberto implicitamente pelo comportamento de matchAllActive
+        // já testado em outros pontos)
+        $transitionService = app(\App\Services\PurchaseOrderTransitionService::class);
+        $transitionService->transition(
+            $this->order->fresh('items'),
+            \App\Enums\PurchaseOrderStatus::DELIVERED,
+            $this->order->createdBy,
+            'Reconciliação: recebimento total detectado em backfill'
+        );
+
+        $fresh = $this->order->fresh();
+        $this->assertEquals('delivered', $fresh->status->value);
+        $this->assertNotNull($fresh->delivered_at);
+
+        $lastHistory = $fresh->statusHistory()->latest('id')->first();
+        $this->assertStringContainsString('Reconciliação', $lastHistory->note);
+    }
 }

@@ -57,3 +57,11 @@ Schedule::command('purchase-orders:late-alert')
     ->dailyAt('09:00')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/purchase-orders-late.log'));
+
+// Purchase Orders — reconcilia ordens com recebimento total mas status
+// ainda em invoiced/partial_invoiced. Rede de segurança para o matcher
+// CIGAM: idempotente. hourly é suficiente — é apenas catch-up.
+Schedule::command('purchase-orders:reconcile-delivered')
+    ->hourly()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/purchase-orders-reconcile.log'));
