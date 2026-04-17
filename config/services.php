@@ -87,7 +87,11 @@ return [
     |
     */
     'taneia' => [
-        'url' => env('TANEIA_SERVICE_URL', 'http://localhost:8000/api/taneia'),
+        'base_url' => env('TANEIA_BASE_URL', 'http://localhost:8001'),
+        'chat_path' => env('TANEIA_CHAT_PATH', '/api/taneia/chat'),
+        'upload_path' => env('TANEIA_UPLOAD_PATH', '/api/taneia/upload'),
+        'timeout' => (int) env('TANEIA_TIMEOUT', 60),
+        'upload_timeout' => (int) env('TANEIA_UPLOAD_TIMEOUT', 120),
     ],
 
     'evolution' => [

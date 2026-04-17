@@ -20,6 +20,7 @@ use App\Models\CentralPage;
 use App\Observers\CentralMenuObserver;
 use App\Observers\CentralMenuPageDefaultObserver;
 use App\Observers\CentralPageObserver;
+use App\Services\TaneiaClient;
 use App\Listeners\Helpdesk\DispatchCsatSurveyListener;
 use App\Listeners\Helpdesk\DispatchWhatsappReplyListener;
 use App\Listeners\Helpdesk\SendTicketAssignedNotifications;
@@ -43,7 +44,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // TaneiaClient constructor takes scalars (url/path/timeout) that the
+        // container can't autowire — bind via the static factory that reads
+        // from config('services.taneia').
+        $this->app->singleton(TaneiaClient::class, fn () => TaneiaClient::fromConfig());
     }
 
     /**

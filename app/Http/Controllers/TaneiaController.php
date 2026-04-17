@@ -4,17 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\TaneiaConversation;
 use App\Models\TaneiaMessage;
-use Illuminate\Http\RedirectResponse;
+use App\Services\TaneiaClient;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
+use RuntimeException;
 
 class TaneiaController extends Controller
 {
+    public function __construct(private readonly TaneiaClient $taneia) {}
+
     /**
      * Render the TaneIA assistant page with the user's conversation history.
      */
@@ -30,6 +30,7 @@ class TaneiaController extends Controller
             'conversations' => $conversations,
             'activeConversationId' => null,
             'messages' => [],
+            'taneiaApi' => $this->taneiaApiConfig(),
         ]);
     }
 
@@ -45,19 +46,34 @@ class TaneiaController extends Controller
             ->get(['id', 'title', 'updated_at']);
 
         $messages = $conversation->messages()
-            ->get(['id', 'role', 'content', 'created_at']);
+            ->get(['id', 'role', 'content', 'sources', 'rating', 'created_at']);
 
         return Inertia::render('Taneia/Index', [
             'conversations' => $conversations,
             'activeConversationId' => $conversation->id,
             'messages' => $messages,
+            'taneiaApi' => $this->taneiaApiConfig(),
         ]);
+    }
+
+    /**
+     * Config do microservico Python exposta ao frontend para streaming direto.
+     * O frontend usa esta URL + tenant_id para chamar o FastAPI sem passar
+     * pelo proxy do Laravel durante o streaming (o save posterior eh via Laravel).
+     */
+    private function taneiaApiConfig(): array
+    {
+        return [
+            'chat_url' => rtrim((string) config('services.taneia.base_url'), '/')
+                .'/'.ltrim((string) config('services.taneia.chat_path'), '/'),
+            'tenant_id' => (string) (tenant()?->id ?? 'default'),
+        ];
     }
 
     /**
      * Create a new (empty) conversation and redirect to it.
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request)
     {
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
@@ -68,88 +84,114 @@ class TaneiaController extends Controller
             'title' => $validated['title'] ?? 'Nova conversa',
         ]);
 
+        // AJAX/JSON fetch recebe o ID direto; Inertia/full page segue o redirect.
+        if ($request->wantsJson()) {
+            return response()->json([
+                'conversation' => $conversation->only(['id', 'title', 'updated_at']),
+            ], 201);
+        }
+
         return redirect()->route('taneia.show', $conversation);
     }
 
     /**
-     * Persist a user message, forward it to the Python microservice and
-     * persist the assistant reply. Returns the two new messages as JSON so
-     * the frontend can append them optimistically.
+     * Silent save apos o streaming ter terminado no cliente.
+     *
+     * O streaming (React -> FastAPI direto) eh efemero. Esta rota persiste
+     * o par (pergunta do usuario, resposta acumulada) atomicamente, gera
+     * titulo automatico na primeira mensagem e devolve os objetos com os
+     * ids/timestamps reais para substituir os otimistas no frontend.
      */
     public function sendMessage(Request $request, TaneiaConversation $conversation)
     {
         $this->authorizeConversation($request, $conversation);
 
         $validated = $request->validate([
-            'content' => ['required', 'string', 'max:5000'],
+            'user_content' => ['required', 'string', 'max:5000'],
+            'assistant_content' => ['required', 'string', 'max:50000'],
+            'sources' => ['nullable', 'array'],
+            'sources.*.filename' => ['required_with:sources', 'string', 'max:255'],
+            // Page nullable: planilhas nao tem pagina, PDFs tem (1-indexed).
+            'sources.*.page' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        [$userMessage, $assistantMessage] = DB::transaction(function () use ($conversation, $validated) {
-            $userMessage = $conversation->messages()->create([
-                'role' => TaneiaMessage::ROLE_USER,
-                'content' => $validated['content'],
-            ]);
+        $userMessage = $conversation->messages()->create([
+            'role' => TaneiaMessage::ROLE_USER,
+            'content' => $validated['user_content'],
+        ]);
 
-            // Auto-title the conversation from the first user message
-            if (blank($conversation->title) || $conversation->title === 'Nova conversa') {
-                $conversation->title = Str::limit($validated['content'], 60, '...');
-            }
-
-            $assistantReply = $this->callTaneiaService($conversation, $validated['content']);
-
-            $assistantMessage = $conversation->messages()->create([
-                'role' => TaneiaMessage::ROLE_ASSISTANT,
-                'content' => $assistantReply,
-            ]);
-
-            $conversation->touch();
+        if (blank($conversation->title) || $conversation->title === 'Nova conversa') {
+            $conversation->title = Str::limit($validated['user_content'], 60, '...');
             $conversation->save();
+        }
 
-            return [$userMessage, $assistantMessage];
-        });
+        $assistantMessage = $conversation->messages()->create([
+            'role' => TaneiaMessage::ROLE_ASSISTANT,
+            'content' => $validated['assistant_content'],
+            'sources' => $validated['sources'] ?? null,
+        ]);
+
+        $conversation->touch();
 
         return response()->json([
             'user_message' => $userMessage->only(['id', 'role', 'content', 'created_at']),
-            'assistant_message' => $assistantMessage->only(['id', 'role', 'content', 'created_at']),
+            'assistant_message' => $assistantMessage->only(['id', 'role', 'content', 'sources', 'rating', 'created_at']),
             'conversation' => $conversation->only(['id', 'title', 'updated_at']),
         ]);
     }
 
     /**
-     * Forward the user prompt to the Python microservice. When the service
-     * is unreachable (or not yet implemented), returns a mocked reply so the
-     * UI can be exercised end-to-end during development.
+     * Registra avaliacao (+1 / -1 / null) em uma mensagem do assistente.
+     * Usado para curar o dataset de fine-tuning.
      */
-    private function callTaneiaService(TaneiaConversation $conversation, string $prompt): string
+    public function rateMessage(Request $request, TaneiaMessage $message)
     {
-        $endpoint = config('services.taneia.url', 'http://localhost:8000/api/taneia');
+        abort_unless(
+            $message->conversation->user_id === $request->user()->id,
+            403,
+            'Voce nao pode avaliar mensagens de outra conversa.'
+        );
+
+        abort_if(
+            $message->role !== TaneiaMessage::ROLE_ASSISTANT,
+            422,
+            'Apenas respostas da TaneIA podem ser avaliadas.'
+        );
+
+        $validated = $request->validate([
+            'rating' => ['nullable', 'integer', 'in:-1,1'],
+        ]);
+
+        $message->update(['rating' => $validated['rating'] ?? null]);
+
+        return response()->json([
+            'id' => $message->id,
+            'rating' => $message->rating,
+        ]);
+    }
+
+    /**
+     * Envia um PDF para o microservico indexar no ChromaDB (RAG).
+     * Retorna JSON com metadados para o frontend exibir feedback.
+     */
+    public function uploadDocument(Request $request)
+    {
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'mimes:pdf,csv,xlsx,txt', 'max:10240'], // 10MB
+        ]);
 
         try {
-            $response = Http::timeout(30)
-                ->acceptJson()
-                ->post($endpoint, [
-                    'conversation_id' => $conversation->id,
-                    'user_id' => $conversation->user_id,
-                    'prompt' => $prompt,
-                ]);
-
-            if ($response->successful() && $response->json('reply')) {
-                return (string) $response->json('reply');
-            }
-
-            Log::warning('TaneIA service returned a non-success response', [
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
-        } catch (\Throwable $e) {
-            Log::warning('TaneIA service unreachable, returning mock reply', [
-                'error' => $e->getMessage(),
-            ]);
+            $result = $this->taneia->uploadDocument($validated['file']);
+        } catch (RuntimeException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 502);
         }
 
-        // Mocked fallback so the UI can be tested before the Python service is ready.
-        return "Olá! Sou a TaneIA. Recebi sua mensagem: \"{$prompt}\". "
-            .'Ainda estou conectando-me ao meu cérebro de IA, mas em breve poderei responder com respostas reais.';
+        return response()->json([
+            'message' => 'Documento indexado com sucesso.',
+            'document' => $result,
+        ]);
     }
 
     /**

@@ -17,6 +17,13 @@ class TaneiaMessage extends Model
         'taneia_conversation_id',
         'role',
         'content',
+        'sources',
+        'rating',
+    ];
+
+    protected $casts = [
+        'sources' => 'array',
+        'rating' => 'integer',
     ];
 
     public function conversation(): BelongsTo
