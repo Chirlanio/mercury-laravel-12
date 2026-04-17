@@ -9,8 +9,11 @@ use App\Events\Helpdesk\TicketCreatedEvent;
 use App\Events\Helpdesk\TicketStatusChangedEvent;
 use App\Events\PersonnelMovementCreated;
 use App\Events\PurchaseOrderStatusChanged;
+use App\Events\ReversalStatusChanged;
 use App\Listeners\CreateSubstitutionVacancyFromDismissal;
 use App\Listeners\NotifyPurchaseOrderStakeholders;
+use App\Listeners\NotifyReversalStakeholders;
+use App\Listeners\OpenHelpdeskTicketForReversal;
 use App\Models\CentralMenu;
 use App\Models\CentralMenuPageDefault;
 use App\Models\CentralPage;
@@ -74,6 +77,7 @@ class AppServiceProvider extends ServiceProvider
         $this->registerHelpdeskListeners();
         $this->registerHrListeners();
         $this->registerPurchaseOrderListeners();
+        $this->registerReversalListeners();
         $this->registerNavigationObservers();
     }
 
@@ -83,6 +87,18 @@ class AppServiceProvider extends ServiceProvider
         // status. Database notification (sino do frontend) — sem mail pra
         // não inundar caixa postal.
         Event::listen(PurchaseOrderStatusChanged::class, NotifyPurchaseOrderStakeholders::class);
+    }
+
+    protected function registerReversalListeners(): void
+    {
+        // Notificações database (sino) em cada transição de estorno.
+        Event::listen(ReversalStatusChanged::class, NotifyReversalStakeholders::class);
+
+        // Hook opcional: abre ticket no Helpdesk Financeiro quando estorno
+        // transita para pending_authorization. Fail-safe — se módulo helpdesk
+        // não estiver instalado ou departamento "Financeiro" não existir,
+        // apenas loga e segue.
+        Event::listen(ReversalStatusChanged::class, OpenHelpdeskTicketForReversal::class);
     }
 
     protected function registerNavigationObservers(): void

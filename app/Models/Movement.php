@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Movement extends Model
 {
@@ -33,6 +34,11 @@ class Movement extends Model
     public function movementType(): BelongsTo
     {
         return $this->belongsTo(MovementType::class, 'movement_code', 'code');
+    }
+
+    public function reversalItems(): HasMany
+    {
+        return $this->hasMany(ReversalItem::class);
     }
 
     // Scopes

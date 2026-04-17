@@ -53,6 +53,7 @@ use App\Http\Controllers\Config\ProductSizeController as ConfigProductSizeContro
 use App\Http\Controllers\Config\ProductSubcollectionController as ConfigProductSubcollectionController;
 use App\Http\Controllers\Config\SectorController as ConfigSectorController;
 use App\Http\Controllers\Config\StatusController as ConfigStatusController;
+use App\Http\Controllers\Config\ReversalReasonController as ConfigReversalReasonController;
 use App\Http\Controllers\Config\StockAdjustmentReasonController as ConfigStockAdjustmentReasonController;
 use App\Http\Controllers\Config\StockAdjustmentStatusController as ConfigStockAdjustmentStatusController;
 use App\Http\Controllers\Config\StockAuditCycleController as ConfigStockAuditCycleController;
@@ -370,6 +371,7 @@ Route::middleware(['auth', 'tenant.module:config', 'permission:'.Permission::MAN
     Route::resource('drivers', ConfigDriverController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('stock-adjustment-statuses', ConfigStockAdjustmentStatusController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('stock-adjustment-reasons', ConfigStockAdjustmentReasonController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('reversal-reasons', ConfigReversalReasonController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('transfer-statuses', ConfigTransferStatusController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('order-payment-statuses', ConfigOrderPaymentStatusController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('management-reasons', ConfigManagementReasonController::class)->only(['index', 'store', 'update', 'destroy']);
@@ -991,6 +993,48 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ==========================================
+    // Reversals (Estornos)
+    // ==========================================
+    Route::middleware(['tenant.module:reversals', 'permission:'.Permission::VIEW_REVERSALS->value])->group(function () {
+        Route::get('/reversals', [\App\Http\Controllers\ReversalController::class, 'index'])->name('reversals.index');
+        Route::get('/reversals/dashboard', [\App\Http\Controllers\ReversalController::class, 'dashboard'])->name('reversals.dashboard');
+        Route::get('/reversals/statistics', [\App\Http\Controllers\ReversalController::class, 'statistics'])->name('reversals.statistics');
+        Route::get('/reversals/lookup-invoice', [\App\Http\Controllers\ReversalController::class, 'lookupInvoice'])->name('reversals.lookup-invoice');
+
+        // Export (Excel + PDF individual) — rotas sem {reversal} vêm antes
+        // para não colidir com o pattern numérico.
+        Route::middleware('permission:'.Permission::EXPORT_REVERSALS->value)->group(function () {
+            Route::get('/reversals/export', [\App\Http\Controllers\ReversalController::class, 'export'])->name('reversals.export');
+            Route::get('/reversals/{reversal}/pdf', [\App\Http\Controllers\ReversalController::class, 'exportPdf'])->whereNumber('reversal')->name('reversals.pdf');
+        });
+
+        // Import — endpoint de preview + persist (XLSX/CSV)
+        Route::middleware('permission:'.Permission::IMPORT_REVERSALS->value)->group(function () {
+            Route::post('/reversals/import/preview', [\App\Http\Controllers\ReversalController::class, 'importPreview'])->name('reversals.import.preview');
+            Route::post('/reversals/import', [\App\Http\Controllers\ReversalController::class, 'importStore'])->name('reversals.import.store');
+        });
+
+        Route::get('/reversals/{reversal}', [\App\Http\Controllers\ReversalController::class, 'show'])->whereNumber('reversal')->name('reversals.show');
+
+        Route::middleware('permission:'.Permission::CREATE_REVERSALS->value)->group(function () {
+            Route::post('/reversals', [\App\Http\Controllers\ReversalController::class, 'store'])->name('reversals.store');
+        });
+
+        Route::middleware('permission:'.Permission::EDIT_REVERSALS->value)->group(function () {
+            Route::put('/reversals/{reversal}', [\App\Http\Controllers\ReversalController::class, 'update'])->whereNumber('reversal')->name('reversals.update');
+            Route::delete('/reversals/{reversal}/files/{file}', [\App\Http\Controllers\ReversalController::class, 'destroyFile'])->whereNumber('reversal')->whereNumber('file')->name('reversals.files.destroy');
+
+            // Transições de status — a permission específica por transição
+            // é checada pelo ReversalTransitionService.
+            Route::post('/reversals/{reversal}/transition', [\App\Http\Controllers\ReversalController::class, 'transition'])->whereNumber('reversal')->name('reversals.transition');
+        });
+
+        Route::middleware('permission:'.Permission::DELETE_REVERSALS->value)->group(function () {
+            Route::delete('/reversals/{reversal}', [\App\Http\Controllers\ReversalController::class, 'destroy'])->whereNumber('reversal')->name('reversals.destroy');
+        });
+    });
+
+    // ==========================================
     // Trainings (Treinamentos)
     // ==========================================
     Route::middleware(['tenant.module:training', 'permission:'.Permission::VIEW_TRAININGS->value])->group(function () {
@@ -1332,6 +1376,11 @@ Route::middleware(['auth'])->group(function () {
             Route::middleware('permission:'.Permission::SEND_TANEIA_MESSAGES->value)->group(function () {
                 Route::post('/conversations', [TaneiaController::class, 'store'])->name('store');
                 Route::post('/conversations/{conversation}/messages', [TaneiaController::class, 'sendMessage'])->name('send-message');
+                Route::patch('/messages/{message}/rating', [TaneiaController::class, 'rateMessage'])->name('messages.rate');
+            });
+
+            Route::middleware('permission:'.Permission::MANAGE_TANEIA->value)->group(function () {
+                Route::post('/documents', [TaneiaController::class, 'uploadDocument'])->name('documents.upload');
             });
         });
 

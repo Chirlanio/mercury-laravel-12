@@ -185,6 +185,17 @@ enum Role: string
                 Permission::VIEW_TANEIA->value,
                 Permission::SEND_TANEIA_MESSAGES->value,
                 Permission::MANAGE_TANEIA->value,
+                // Estornos (todas)
+                Permission::VIEW_REVERSALS->value,
+                Permission::CREATE_REVERSALS->value,
+                Permission::EDIT_REVERSALS->value,
+                Permission::DELETE_REVERSALS->value,
+                Permission::APPROVE_REVERSALS->value,
+                Permission::PROCESS_REVERSALS->value,
+                Permission::MANAGE_REVERSALS->value,
+                Permission::IMPORT_REVERSALS->value,
+                Permission::EXPORT_REVERSALS->value,
+                Permission::MANAGE_REVERSAL_REASONS->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -332,6 +343,17 @@ enum Role: string
                 Permission::VIEW_TANEIA->value,
                 Permission::SEND_TANEIA_MESSAGES->value,
                 Permission::MANAGE_TANEIA->value,
+                // Estornos (todas)
+                Permission::VIEW_REVERSALS->value,
+                Permission::CREATE_REVERSALS->value,
+                Permission::EDIT_REVERSALS->value,
+                Permission::DELETE_REVERSALS->value,
+                Permission::APPROVE_REVERSALS->value,
+                Permission::PROCESS_REVERSALS->value,
+                Permission::MANAGE_REVERSALS->value,
+                Permission::IMPORT_REVERSALS->value,
+                Permission::EXPORT_REVERSALS->value,
+                Permission::MANAGE_REVERSAL_REASONS->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -414,6 +436,14 @@ enum Role: string
                 // TaneIA (view + send)
                 Permission::VIEW_TANEIA->value,
                 Permission::SEND_TANEIA_MESSAGES->value,
+                // Estornos (view + create + edit + approve + process + export, sem delete e
+                // sem manage — fica com store scoping automático por ausência de MANAGE_REVERSALS)
+                Permission::VIEW_REVERSALS->value,
+                Permission::CREATE_REVERSALS->value,
+                Permission::EDIT_REVERSALS->value,
+                Permission::APPROVE_REVERSALS->value,
+                Permission::PROCESS_REVERSALS->value,
+                Permission::EXPORT_REVERSALS->value,
             ],
             self::USER => [
                 // Apenas próprio perfil

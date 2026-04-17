@@ -189,6 +189,18 @@ export const PERMISSIONS = {
     VIEW_TANEIA: 'taneia.view',
     SEND_TANEIA_MESSAGES: 'taneia.send',
     MANAGE_TANEIA: 'taneia.manage',
+
+    // Estornos (Reversals)
+    VIEW_REVERSALS: 'reversals.view',
+    CREATE_REVERSALS: 'reversals.create',
+    EDIT_REVERSALS: 'reversals.edit',
+    DELETE_REVERSALS: 'reversals.delete',
+    APPROVE_REVERSALS: 'reversals.approve',
+    PROCESS_REVERSALS: 'reversals.process',
+    MANAGE_REVERSALS: 'reversals.manage',
+    IMPORT_REVERSALS: 'reversals.import',
+    EXPORT_REVERSALS: 'reversals.export',
+    MANAGE_REVERSAL_REASONS: 'reversals.manage_reasons',
 };
 
 export const ROLES = {

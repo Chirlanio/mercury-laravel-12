@@ -132,6 +132,7 @@ class CentralNavigationSeeder extends Seeder
             '/order-payments' => 'order_payments',
             '/suppliers' => 'suppliers',
             '/purchase-orders' => 'purchase_orders',
+            '/reversals' => 'reversals',
             '/medical-certificates' => 'medical_certificates',
             '/absences' => 'absences',
             '/overtime-records' => 'overtime',
@@ -171,6 +172,7 @@ class CentralNavigationSeeder extends Seeder
             ['route' => '/stock-audits', 'page_name' => 'Auditoria de Estoque', 'icon' => 'fas fa-clipboard-list'],
             ['route' => '/order-payments', 'page_name' => 'Ordens de Pagamento', 'icon' => 'fas fa-money-bill-wave'],
             ['route' => '/purchase-orders', 'page_name' => 'Ordens de Compra', 'icon' => 'fas fa-shopping-cart'],
+            ['route' => '/reversals', 'page_name' => 'Estornos', 'icon' => 'fas fa-undo-alt'],
             ['route' => '/suppliers', 'page_name' => 'Fornecedores', 'icon' => 'fas fa-truck'],
             ['route' => '/medical-certificates', 'page_name' => 'Atestados Médicos', 'icon' => 'fas fa-file-medical'],
             ['route' => '/absences', 'page_name' => 'Faltas', 'icon' => 'fas fa-user-times'],
@@ -201,6 +203,7 @@ class CentralNavigationSeeder extends Seeder
             ['route' => '/experience-tracker', 'page_name' => 'Avaliação de Experiência', 'icon' => 'fas fa-clipboard-check'],
             ['route' => '/config/stock-audit-cycles', 'page_name' => 'Ciclos de Auditoria', 'icon' => 'fas fa-cog'],
             ['route' => '/config/stock-audit-vendors', 'page_name' => 'Empresas Auditoras', 'icon' => 'fas fa-cog'],
+            ['route' => '/config/reversal-reasons', 'page_name' => 'Motivos de Estorno', 'icon' => 'fas fa-cog'],
             ['route' => '/helpdesk/departamento-pessoal', 'page_name' => 'Solicitações DP', 'icon' => 'fa-solid fa-headset'],
             ['route' => '/logout', 'page_name' => 'Sair', 'icon' => 'fas fa-sign-out-alt', 'is_public' => true],
         ];
@@ -254,6 +257,7 @@ class CentralNavigationSeeder extends Seeder
             '/stock-audits' => 'Operações',
             '/order-payments' => 'Financeiro',
             '/purchase-orders' => 'Financeiro',
+            '/reversals' => 'Financeiro',
             '/suppliers' => 'Configurações',
             '/medical-certificates' => 'RH',
             '/absences' => 'RH',
@@ -284,6 +288,7 @@ class CentralNavigationSeeder extends Seeder
             '/experience-tracker' => 'RH',
             '/config/stock-audit-cycles' => 'Configurações',
             '/config/stock-audit-vendors' => 'Configurações',
+            '/config/reversal-reasons' => 'Configurações',
             '/helpdesk/departamento-pessoal' => 'Departamento Pessoal',
             '/logout' => 'Sair',
         ];
@@ -295,7 +300,7 @@ class CentralNavigationSeeder extends Seeder
         // super_admin: everything | admin: everything except system management | support: view-only | user: dashboard only
         $viewOnlyRoutes = [
             '/dashboard', '/sales', '/products', '/stores', '/employees',
-            '/transfers', '/stock-adjustments', '/order-payments', '/purchase-orders', '/suppliers',
+            '/transfers', '/stock-adjustments', '/order-payments', '/purchase-orders', '/reversals', '/suppliers',
             '/checklists', '/medical-certificates', '/absences', '/overtime-records',
             '/user-sessions', '/work-shifts', '/work-schedules', '/activity-logs',
             '/store-goals', '/movements', '/vacations', '/stock-audits',

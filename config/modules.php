@@ -241,4 +241,11 @@ return [
         'icon' => 'SparklesIcon',
         'dependencies' => ['users'],
     ],
+    'reversals' => [
+        'name' => 'Estornos',
+        'description' => 'Solicitações de estorno de vendas (total ou parcial) com workflow de aprovação, integração CIGAM e hook Helpdesk.',
+        'routes' => ['reversals.*'],
+        'icon' => 'ArrowUturnLeftIcon',
+        'dependencies' => ['movements', 'stores'],
+    ],
 ];

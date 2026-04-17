@@ -201,6 +201,18 @@ enum Permission: string
     case SEND_TANEIA_MESSAGES = 'taneia.send';
     case MANAGE_TANEIA = 'taneia.manage';
 
+    // Estornos (Reversals)
+    case VIEW_REVERSALS = 'reversals.view';
+    case CREATE_REVERSALS = 'reversals.create';
+    case EDIT_REVERSALS = 'reversals.edit';
+    case DELETE_REVERSALS = 'reversals.delete';
+    case APPROVE_REVERSALS = 'reversals.approve';
+    case PROCESS_REVERSALS = 'reversals.process';
+    case MANAGE_REVERSALS = 'reversals.manage';
+    case IMPORT_REVERSALS = 'reversals.import';
+    case EXPORT_REVERSALS = 'reversals.export';
+    case MANAGE_REVERSAL_REASONS = 'reversals.manage_reasons';
+
     public function label(): string
     {
         return match ($this) {
@@ -364,6 +376,17 @@ enum Permission: string
             self::VIEW_TANEIA => 'Visualizar TaneIA',
             self::SEND_TANEIA_MESSAGES => 'Conversar com a TaneIA',
             self::MANAGE_TANEIA => 'Gerenciar TaneIA',
+            // Estornos
+            self::VIEW_REVERSALS => 'Visualizar estornos',
+            self::CREATE_REVERSALS => 'Criar solicitações de estorno',
+            self::EDIT_REVERSALS => 'Editar solicitações de estorno',
+            self::DELETE_REVERSALS => 'Excluir solicitações de estorno',
+            self::APPROVE_REVERSALS => 'Autorizar estornos',
+            self::PROCESS_REVERSALS => 'Processar estornos (financeiro)',
+            self::MANAGE_REVERSALS => 'Gerenciar estornos (todas as lojas)',
+            self::IMPORT_REVERSALS => 'Importar estornos (planilha)',
+            self::EXPORT_REVERSALS => 'Exportar estornos',
+            self::MANAGE_REVERSAL_REASONS => 'Gerenciar motivos de estorno',
         };
     }
 
@@ -530,6 +553,17 @@ enum Permission: string
             self::VIEW_TANEIA => 'Permite acessar o módulo da assistente virtual TaneIA',
             self::SEND_TANEIA_MESSAGES => 'Permite criar conversas e enviar mensagens para a TaneIA',
             self::MANAGE_TANEIA => 'Permite gerenciar configurações e histórico global da TaneIA',
+            // Estornos
+            self::VIEW_REVERSALS => 'Permite visualizar estornos. Sem MANAGE_REVERSALS, o usuário só vê estornos da sua loja',
+            self::CREATE_REVERSALS => 'Permite abrir solicitações de estorno a partir de NF/cupom fiscal',
+            self::EDIT_REVERSALS => 'Permite editar dados do estorno enquanto estiver em Aguardando Estorno ou Aguardando Autorização',
+            self::DELETE_REVERSALS => 'Permite excluir estornos (soft delete). Exige motivo',
+            self::APPROVE_REVERSALS => 'Permite autorizar estornos (Aguardando Autorização → Autorizado) e cancelar em qualquer estado não terminal',
+            self::PROCESS_REVERSALS => 'Permite registrar execução financeira do estorno (Aguardando Financeira → Estornado)',
+            self::MANAGE_REVERSALS => 'Permite gerenciar estornos de todas as lojas (sem filtro de store scoping)',
+            self::IMPORT_REVERSALS => 'Permite importar estornos via planilha (XLSX/CSV) — usado na migração de dados históricos',
+            self::EXPORT_REVERSALS => 'Permite exportar estornos para Excel ou comprovante PDF',
+            self::MANAGE_REVERSAL_REASONS => 'Permite cadastrar e editar motivos de estorno no catálogo',
         };
     }
 

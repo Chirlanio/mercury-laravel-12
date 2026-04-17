@@ -65,3 +65,18 @@ Schedule::command('purchase-orders:reconcile-delivered')
     ->hourly()
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/purchase-orders-reconcile.log'));
+
+// Reversals — marca estornos executados como sincronizados com o CIGAM.
+// Idempotente: pula registros com synced_to_cigam_at já preenchido.
+// Mesmo slot do matcher CIGAM (every 15 min) para consistência.
+Schedule::command('reversals:cigam-push')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/reversals-cigam.log'));
+
+// Reversals — alerta diário de estornos aguardando autorização há mais
+// de 3 dias. Consolidado por aprovador/loja para evitar flood.
+Schedule::command('reversals:stale-alert')
+    ->dailyAt('09:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/reversals-stale.log'));
