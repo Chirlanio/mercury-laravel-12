@@ -122,36 +122,77 @@ Os usuarios sao completamente independentes. Um usuario do tenant nao consegue a
 ```
 app/
 ├── Http/Controllers/
-│   ├── Central/         # Admin SaaS (tenants, plans)
-│   ├── Config/          # 21 config modules (extend ConfigController)
+│   ├── Central/         # 9 admin SaaS controllers (tenants, plans)
+│   ├── Config/          # 39 config modules (extend ConfigController)
 │   ├── Admin/           # Email settings
 │   ├── Api/             # Integration API + Webhooks
-│   └── *.php            # Module controllers
-├── Models/              # 81 Eloquent models
-├── Services/            # 18 service classes
-├── Enums/               # Role.php, Permission.php (60+ permissions)
-└── Http/Middleware/      # 12 middlewares
+│   └── *.php            # 61 module controllers
+├── Models/              # 198 Eloquent models
+├── Services/            # 77 service classes
+├── Enums/               # Role.php, Permission.php (70+ permissions)
+└── Http/Middleware/      # Tenant, auth, RBAC, permission, etc.
 
 resources/js/
-├── Pages/               # 54 React pages
+├── Pages/               # 45 page directories (~100 JSX pages)
 │   ├── Central/         # Admin SaaS pages
-│   ├── Config/Index.jsx # Generic page for 21 config modules
-│   └── ...              # Module pages
-├── Components/          # 73 reusable components
+│   ├── Config/Index.jsx # Generic page for 39 config modules
+│   └── ...              # Module pages (PurchaseOrders, Reversals, Vacancies, etc.)
+├── Components/          # 68 reusable components + Shared/
 ├── Layouts/             # 3 layouts (Authenticated, Guest, Central)
-└── Hooks/               # 4 hooks (usePermissions, useConfirm, etc.)
+└── Hooks/               # usePermissions, useConfirm, useModalManager, useMasks, useTenant
+
+database/
+├── migrations/          # 10 central + 227 tenant migrations
+└── seeders/             # TenantPlanSeeder, CentralNavigationSeeder, etc.
 
 routes/
 ├── web.php              # Central routes (tenant management)
 ├── tenant-routes.php    # Tenant routes (full application)
 ├── tenant.php           # Tenant middleware + resolution
 ├── api.php              # API routes
-└── auth.php             # Auth routes
+├── auth.php             # Auth routes
+└── console.php          # Scheduled commands (cigam-sync, reversals push, late alerts, etc.)
 ```
+
+## Modulos Implementados
+
+### Principais (37)
+Auth · Users · Employees · Stores · Sales · Products · WorkShifts · WorkSchedules ·
+Transfers · StockAdjustments · OrderPayments · Suppliers · **PurchaseOrders** ·
+**Reversals** · Checklists · MedicalCertificates · Absences · OvertimeRecords ·
+StoreGoals · Movements · Vacations · StockAudits · PersonnelMovements ·
+**Vacancies** · Training (LMS completo) · ExperienceTracker · Deliveries ·
+DeliveryRoutes · Chat · Helpdesk · TaneIA · ActivityLogs · EmailSettings ·
+Profile · Dashboard · LGPD · UserSessions · Integrations
+
+### Config (39)
+Position, PositionLevel, Sector, Gender, EducationLevel, EmployeeStatus,
+EmployeeEventType, TypeMoviment, EmploymentRelationship, Manager, Network,
+Status, PageStatus, Bank, CostCenter, Driver, PaymentType, OrderPaymentStatus,
+StockAdjustmentStatus, StockAdjustmentReason, TransferStatus, ManagementReason,
+ProductBrand, ProductCategory, ProductCollection, ProductSubcollection,
+ProductColor, ProductMaterial, ProductSize, ProductArticleComplement,
+ProductLookupConfig, ProductLookupGroup, StockAuditCycle, StockAuditVendor,
+DismissalReason, DeliveryReturnReason, PercentageAward, **ReversalReason**
+
+### Destaques recentes
+
+- **Reversals** (abr/2026) — Estornos de vendas com state machine 6 estados,
+  lookup direto em `movements`, dedup via service, hook Helpdesk fail-safe,
+  dashboard recharts, import XLSX + export PDF. 62 tests / 184 assertions.
+- **PurchaseOrders** (abr/2026) — Ordens de compra de coleção com size matrix,
+  matcher CIGAM, auto-geração de parcelas em order_payments, EAN-13 interno.
+  81 tests / 293 assertions.
+- **Vacancies + PersonnelRequests** (abr/2026) — Abertura de vagas com SLA
+  automático por nível de cargo + integração bidirecional com PersonnelMovement
+  via events. PersonnelRequests acopla ao Helpdesk (não é módulo separado).
+- **Helpdesk** (abr/2026) — Sistema de chamados com SLA business-hours,
+  WhatsApp inbound/outbound (Evolution API), AI classifier (Groq), KB,
+  CSAT, email intake (IMAP + Postmark).
 
 ## RBAC
 
-4 roles hierarquicos com 60+ permissions:
+4 roles hierarquicos com 70+ permissions:
 
 | Role | Level | Descricao |
 |------|-------|-----------|
@@ -173,6 +214,7 @@ routes/
 | `docs/TESTING_STRATEGY.md` | Estrategia de testes |
 | `docs/DEPLOYMENT.md` | Guia de deploy |
 | `docs/CONTRIBUTING.md` | Guia de contribuicao |
+| `docs/ANALISE_MODULO_REVERSALS.md` | Modulo de Estornos (v2) — 6 fases, 62 testes |
 
 ## Deploy (VPS)
 

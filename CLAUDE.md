@@ -73,18 +73,25 @@ vendor/bin/pint        # Laravel Pint (PHP code style fixer)
 
 **Config Module Pattern:**
 - `app/Http/Controllers/ConfigController.php` is an abstract base for CRUD modules with minimal boilerplate
-- 13 config controllers in `app/Http/Controllers/Config/` extend it (Position, Sector, Gender, etc.)
+- 39 config controllers in `app/Http/Controllers/Config/` extend it (Position, Sector, Gender, ReversalReason, etc.)
 - Subclasses define: `modelClass()`, `viewTitle()`, `columns()`, `formFields()`, `validationRules()`
 - All render to a single generic page: `resources/js/Pages/Config/Index.jsx`
 - Routes: `/config/{module}` protected by `MANAGE_SETTINGS` permission
 
-**Services** (`app/Services/`):
+**Services** (`app/Services/` — 77 services):
 - `AuditLogService` — activity tracking (used via `Auditable` trait on models)
 - `CigamSyncService` — syncs sales from CIGAM PostgreSQL (`msl_fmovimentodiario_` table)
 - `ImageUploadService` — avatar/image handling with `intervention/image`
 - `CentralMenuResolver` — sidebar menu from central DB tables, filtered by user role + tenant's active modules
 - `CentralRoleResolver` — resolves role permissions from central DB with enum fallback and caching
 - `TenantRoleService` — filters allowed roles per tenant settings
+
+**Module Services Pattern** (PurchaseOrders, Reversals, Vacancies, etc.):
+- `{Module}Service` — CRUD + business rules (validation, snapshot, dedup)
+- `{Module}TransitionService` — single point of state mutation, enforces permissions per transition, records `{module}_status_histories`
+- `{Module}LookupService` (where applicable) — AJAX lookups, external data resolution
+- `{Module}ExportService` + `{Module}ImportService` — XLSX/PDF export, XLSX/CSV import with upsert
+- Events dispatched post-commit; listeners handle notifications and integrations (e.g. Helpdesk hooks)
 
 ### Frontend Structure
 
