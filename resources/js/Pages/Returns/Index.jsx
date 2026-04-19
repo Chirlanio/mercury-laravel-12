@@ -814,17 +814,11 @@ export default function Index({
                 headerBadges={
                     selected
                         ? [
+                              { text: selected.status_label, className: 'bg-white/20 text-white' },
+                              { text: selected.type_label, className: 'bg-white/20 text-white' },
                               {
-                                  label: selected.status_label,
-                                  variant: COLOR_MAP[selected.status_color] || 'gray',
-                              },
-                              {
-                                  label: selected.type_label,
-                                  variant: COLOR_MAP[selected.type_color] || 'gray',
-                              },
-                              {
-                                  label: selected.reason_category_label,
-                                  variant: COLOR_MAP[selected.reason_category_color] || 'gray',
+                                  text: selected.reason_category_label,
+                                  className: 'bg-white/20 text-white',
                               },
                           ]
                         : []

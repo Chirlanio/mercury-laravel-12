@@ -1096,15 +1096,8 @@ export default function Index({
                 headerBadges={
                     selected
                         ? [
-                              {
-                                  label: selected.status_label,
-                                  variant: COLOR_MAP[selected.status_color] || 'gray',
-                              },
-                              {
-                                  label: selected.type_label,
-                                  variant:
-                                      selected.type === 'total' ? 'danger' : 'warning',
-                              },
+                              { text: selected.status_label, className: 'bg-white/20 text-white' },
+                              { text: selected.type_label, className: 'bg-white/20 text-white' },
                           ]
                         : []
                 }
