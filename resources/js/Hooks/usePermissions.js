@@ -201,6 +201,19 @@ export const PERMISSIONS = {
     IMPORT_REVERSALS: 'reversals.import',
     EXPORT_REVERSALS: 'reversals.export',
     MANAGE_REVERSAL_REASONS: 'reversals.manage_reasons',
+
+    // Devoluções / Trocas (Returns)
+    VIEW_RETURNS: 'returns.view',
+    CREATE_RETURNS: 'returns.create',
+    EDIT_RETURNS: 'returns.edit',
+    APPROVE_RETURNS: 'returns.approve',
+    PROCESS_RETURNS: 'returns.process',
+    CANCEL_RETURNS: 'returns.cancel',
+    DELETE_RETURNS: 'returns.delete',
+    MANAGE_RETURNS: 'returns.manage',
+    IMPORT_RETURNS: 'returns.import',
+    EXPORT_RETURNS: 'returns.export',
+    MANAGE_RETURN_REASONS: 'returns.manage_reasons',
 };
 
 export const ROLES = {

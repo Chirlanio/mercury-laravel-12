@@ -19,7 +19,7 @@ class TenantPlanSeeder extends Seeder
             'overtime', 'color_themes', 'activity_logs', 'user_sessions',
             'config', 'integrations', 'store_goals', 'movements',
             'vacations', 'stock_audits', 'personnel_movements',
-            'training', 'experience-tracker', 'delivery', 'reversals',
+            'training', 'experience-tracker', 'delivery', 'reversals', 'returns',
         ];
 
         // Essential modules for Starter plan

@@ -41,6 +41,11 @@ class Movement extends Model
         return $this->hasMany(ReversalItem::class);
     }
 
+    public function returnOrderItems(): HasMany
+    {
+        return $this->hasMany(ReturnOrderItem::class);
+    }
+
     // Scopes
 
     public function scopeForDate(Builder $query, string $date): Builder

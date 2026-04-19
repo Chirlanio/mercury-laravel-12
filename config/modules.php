@@ -248,4 +248,11 @@ return [
         'icon' => 'ArrowUturnLeftIcon',
         'dependencies' => ['movements', 'stores'],
     ],
+    'returns' => [
+        'name' => 'Devoluções',
+        'description' => 'Solicitações de troca, devolução e crédito do e-commerce. Workflow de 6 estados com logística reversa.',
+        'routes' => ['returns.*'],
+        'icon' => 'ArrowPathRoundedSquareIcon',
+        'dependencies' => ['movements', 'stores'],
+    ],
 ];

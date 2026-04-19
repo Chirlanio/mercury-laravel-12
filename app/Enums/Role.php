@@ -196,6 +196,18 @@ enum Role: string
                 Permission::IMPORT_REVERSALS->value,
                 Permission::EXPORT_REVERSALS->value,
                 Permission::MANAGE_REVERSAL_REASONS->value,
+                // Devoluções / Trocas (todas)
+                Permission::VIEW_RETURNS->value,
+                Permission::CREATE_RETURNS->value,
+                Permission::EDIT_RETURNS->value,
+                Permission::APPROVE_RETURNS->value,
+                Permission::PROCESS_RETURNS->value,
+                Permission::CANCEL_RETURNS->value,
+                Permission::DELETE_RETURNS->value,
+                Permission::MANAGE_RETURNS->value,
+                Permission::IMPORT_RETURNS->value,
+                Permission::EXPORT_RETURNS->value,
+                Permission::MANAGE_RETURN_REASONS->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -354,6 +366,18 @@ enum Role: string
                 Permission::IMPORT_REVERSALS->value,
                 Permission::EXPORT_REVERSALS->value,
                 Permission::MANAGE_REVERSAL_REASONS->value,
+                // Devoluções / Trocas (todas)
+                Permission::VIEW_RETURNS->value,
+                Permission::CREATE_RETURNS->value,
+                Permission::EDIT_RETURNS->value,
+                Permission::APPROVE_RETURNS->value,
+                Permission::PROCESS_RETURNS->value,
+                Permission::CANCEL_RETURNS->value,
+                Permission::DELETE_RETURNS->value,
+                Permission::MANAGE_RETURNS->value,
+                Permission::IMPORT_RETURNS->value,
+                Permission::EXPORT_RETURNS->value,
+                Permission::MANAGE_RETURN_REASONS->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -444,6 +468,15 @@ enum Role: string
                 Permission::APPROVE_REVERSALS->value,
                 Permission::PROCESS_REVERSALS->value,
                 Permission::EXPORT_REVERSALS->value,
+                // Devoluções / Trocas (view + create + edit + approve + process + cancel +
+                // export, sem delete e sem manage — store scoping automático)
+                Permission::VIEW_RETURNS->value,
+                Permission::CREATE_RETURNS->value,
+                Permission::EDIT_RETURNS->value,
+                Permission::APPROVE_RETURNS->value,
+                Permission::PROCESS_RETURNS->value,
+                Permission::CANCEL_RETURNS->value,
+                Permission::EXPORT_RETURNS->value,
             ],
             self::USER => [
                 // Apenas próprio perfil

@@ -213,6 +213,19 @@ enum Permission: string
     case EXPORT_REVERSALS = 'reversals.export';
     case MANAGE_REVERSAL_REASONS = 'reversals.manage_reasons';
 
+    // Devoluções / Trocas (Returns — e-commerce)
+    case VIEW_RETURNS = 'returns.view';
+    case CREATE_RETURNS = 'returns.create';
+    case EDIT_RETURNS = 'returns.edit';
+    case APPROVE_RETURNS = 'returns.approve';
+    case PROCESS_RETURNS = 'returns.process';
+    case CANCEL_RETURNS = 'returns.cancel';
+    case DELETE_RETURNS = 'returns.delete';
+    case MANAGE_RETURNS = 'returns.manage';
+    case IMPORT_RETURNS = 'returns.import';
+    case EXPORT_RETURNS = 'returns.export';
+    case MANAGE_RETURN_REASONS = 'returns.manage_reasons';
+
     public function label(): string
     {
         return match ($this) {
@@ -387,6 +400,18 @@ enum Permission: string
             self::IMPORT_REVERSALS => 'Importar estornos (planilha)',
             self::EXPORT_REVERSALS => 'Exportar estornos',
             self::MANAGE_REVERSAL_REASONS => 'Gerenciar motivos de estorno',
+            // Devoluções / Trocas
+            self::VIEW_RETURNS => 'Visualizar devoluções',
+            self::CREATE_RETURNS => 'Criar solicitações de devolução',
+            self::EDIT_RETURNS => 'Editar devoluções',
+            self::APPROVE_RETURNS => 'Aprovar devoluções',
+            self::PROCESS_RETURNS => 'Processar devoluções (marcar como concluída)',
+            self::CANCEL_RETURNS => 'Cancelar devoluções',
+            self::DELETE_RETURNS => 'Excluir devoluções',
+            self::MANAGE_RETURNS => 'Gerenciar devoluções (todas as lojas)',
+            self::IMPORT_RETURNS => 'Importar devoluções (planilha)',
+            self::EXPORT_RETURNS => 'Exportar devoluções',
+            self::MANAGE_RETURN_REASONS => 'Gerenciar motivos de devolução',
         };
     }
 
@@ -564,6 +589,18 @@ enum Permission: string
             self::IMPORT_REVERSALS => 'Permite importar estornos via planilha (XLSX/CSV) — usado na migração de dados históricos',
             self::EXPORT_REVERSALS => 'Permite exportar estornos para Excel ou comprovante PDF',
             self::MANAGE_REVERSAL_REASONS => 'Permite cadastrar e editar motivos de estorno no catálogo',
+            // Devoluções / Trocas
+            self::VIEW_RETURNS => 'Permite visualizar devoluções. Sem MANAGE_RETURNS, o usuário só vê devoluções da sua loja',
+            self::CREATE_RETURNS => 'Permite abrir solicitações de devolução a partir de NF/cupom fiscal',
+            self::EDIT_RETURNS => 'Permite editar dados da devolução enquanto estiver em Pendente ou Aprovado',
+            self::APPROVE_RETURNS => 'Permite aprovar devoluções (Pendente → Aprovado) e cancelar em qualquer estado não terminal',
+            self::PROCESS_RETURNS => 'Permite movimentar devoluções para Processando e Completo após recebimento do produto',
+            self::CANCEL_RETURNS => 'Permite cancelar devoluções (alias granular de APPROVE_RETURNS)',
+            self::DELETE_RETURNS => 'Permite excluir devoluções (soft delete). Exige motivo',
+            self::MANAGE_RETURNS => 'Permite gerenciar devoluções de todas as lojas (sem filtro de store scoping)',
+            self::IMPORT_RETURNS => 'Permite importar devoluções via planilha — usado na migração de dados históricos v1',
+            self::EXPORT_RETURNS => 'Permite exportar devoluções para Excel ou comprovante PDF',
+            self::MANAGE_RETURN_REASONS => 'Permite cadastrar e editar motivos de devolução no catálogo',
         };
     }
 

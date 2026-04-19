@@ -9,9 +9,11 @@ use App\Events\Helpdesk\TicketCreatedEvent;
 use App\Events\Helpdesk\TicketStatusChangedEvent;
 use App\Events\PersonnelMovementCreated;
 use App\Events\PurchaseOrderStatusChanged;
+use App\Events\ReturnOrderStatusChanged;
 use App\Events\ReversalStatusChanged;
 use App\Listeners\CreateSubstitutionVacancyFromDismissal;
 use App\Listeners\NotifyPurchaseOrderStakeholders;
+use App\Listeners\NotifyReturnOrderStakeholders;
 use App\Listeners\NotifyReversalStakeholders;
 use App\Listeners\OpenHelpdeskTicketForReversal;
 use App\Models\CentralMenu;
@@ -82,6 +84,7 @@ class AppServiceProvider extends ServiceProvider
         $this->registerHrListeners();
         $this->registerPurchaseOrderListeners();
         $this->registerReversalListeners();
+        $this->registerReturnListeners();
         $this->registerNavigationObservers();
     }
 
@@ -103,6 +106,13 @@ class AppServiceProvider extends ServiceProvider
         // não estiver instalado ou departamento "Financeiro" não existir,
         // apenas loga e segue.
         Event::listen(ReversalStatusChanged::class, OpenHelpdeskTicketForReversal::class);
+    }
+
+    protected function registerReturnListeners(): void
+    {
+        // Notificações database (sino) em cada transição de devolução.
+        // Matriz de destinatários no listener (criador + aprovadores/processadores).
+        Event::listen(ReturnOrderStatusChanged::class, NotifyReturnOrderStakeholders::class);
     }
 
     protected function registerNavigationObservers(): void

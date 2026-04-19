@@ -80,3 +80,11 @@ Schedule::command('reversals:stale-alert')
     ->dailyAt('09:00')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/reversals-stale.log'));
+
+// Returns — alerta diário de devoluções em awaiting_product (aguardando
+// o cliente postar o produto) há mais de 7 dias. Consolidado por
+// processador/loja para evitar flood.
+Schedule::command('returns:stale-alert')
+    ->dailyAt('09:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/returns-stale.log'));

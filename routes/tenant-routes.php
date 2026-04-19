@@ -53,6 +53,7 @@ use App\Http\Controllers\Config\ProductSizeController as ConfigProductSizeContro
 use App\Http\Controllers\Config\ProductSubcollectionController as ConfigProductSubcollectionController;
 use App\Http\Controllers\Config\SectorController as ConfigSectorController;
 use App\Http\Controllers\Config\StatusController as ConfigStatusController;
+use App\Http\Controllers\Config\ReturnReasonController as ConfigReturnReasonController;
 use App\Http\Controllers\Config\ReversalReasonController as ConfigReversalReasonController;
 use App\Http\Controllers\Config\StockAdjustmentReasonController as ConfigStockAdjustmentReasonController;
 use App\Http\Controllers\Config\StockAdjustmentStatusController as ConfigStockAdjustmentStatusController;
@@ -372,6 +373,7 @@ Route::middleware(['auth', 'tenant.module:config', 'permission:'.Permission::MAN
     Route::resource('stock-adjustment-statuses', ConfigStockAdjustmentStatusController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('stock-adjustment-reasons', ConfigStockAdjustmentReasonController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('reversal-reasons', ConfigReversalReasonController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('return-reasons', ConfigReturnReasonController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('transfer-statuses', ConfigTransferStatusController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('order-payment-statuses', ConfigOrderPaymentStatusController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('management-reasons', ConfigManagementReasonController::class)->only(['index', 'store', 'update', 'destroy']);
@@ -1031,6 +1033,46 @@ Route::middleware(['auth'])->group(function () {
 
         Route::middleware('permission:'.Permission::DELETE_REVERSALS->value)->group(function () {
             Route::delete('/reversals/{reversal}', [\App\Http\Controllers\ReversalController::class, 'destroy'])->whereNumber('reversal')->name('reversals.destroy');
+        });
+    });
+
+    // ==========================================
+    // Returns (Devoluções / Trocas — E-commerce)
+    // ==========================================
+    Route::middleware(['tenant.module:returns', 'permission:'.Permission::VIEW_RETURNS->value])->group(function () {
+        Route::get('/returns', [\App\Http\Controllers\ReturnOrderController::class, 'index'])->name('returns.index');
+        Route::get('/returns/dashboard', [\App\Http\Controllers\ReturnOrderController::class, 'dashboard'])->name('returns.dashboard');
+        Route::get('/returns/statistics', [\App\Http\Controllers\ReturnOrderController::class, 'statistics'])->name('returns.statistics');
+        Route::get('/returns/lookup-invoice', [\App\Http\Controllers\ReturnOrderController::class, 'lookupInvoice'])->name('returns.lookup-invoice');
+
+        // Export (Excel + PDF individual) — rotas sem {returnOrder} antes do pattern numérico
+        Route::middleware('permission:'.Permission::EXPORT_RETURNS->value)->group(function () {
+            Route::get('/returns/export', [\App\Http\Controllers\ReturnOrderController::class, 'export'])->name('returns.export');
+            Route::get('/returns/{returnOrder}/pdf', [\App\Http\Controllers\ReturnOrderController::class, 'exportPdf'])->whereNumber('returnOrder')->name('returns.pdf');
+        });
+
+        // Import (preview + persist)
+        Route::middleware('permission:'.Permission::IMPORT_RETURNS->value)->group(function () {
+            Route::post('/returns/import/preview', [\App\Http\Controllers\ReturnOrderController::class, 'importPreview'])->name('returns.import.preview');
+            Route::post('/returns/import', [\App\Http\Controllers\ReturnOrderController::class, 'importStore'])->name('returns.import.store');
+        });
+
+        Route::get('/returns/{returnOrder}', [\App\Http\Controllers\ReturnOrderController::class, 'show'])->whereNumber('returnOrder')->name('returns.show');
+
+        Route::middleware('permission:'.Permission::CREATE_RETURNS->value)->group(function () {
+            Route::post('/returns', [\App\Http\Controllers\ReturnOrderController::class, 'store'])->name('returns.store');
+        });
+
+        Route::middleware('permission:'.Permission::EDIT_RETURNS->value)->group(function () {
+            Route::put('/returns/{returnOrder}', [\App\Http\Controllers\ReturnOrderController::class, 'update'])->whereNumber('returnOrder')->name('returns.update');
+            Route::delete('/returns/{returnOrder}/files/{file}', [\App\Http\Controllers\ReturnOrderController::class, 'destroyFile'])->whereNumber('returnOrder')->whereNumber('file')->name('returns.files.destroy');
+
+            // Transições — permission específica por transição checada no service
+            Route::post('/returns/{returnOrder}/transition', [\App\Http\Controllers\ReturnOrderController::class, 'transition'])->whereNumber('returnOrder')->name('returns.transition');
+        });
+
+        Route::middleware('permission:'.Permission::DELETE_RETURNS->value)->group(function () {
+            Route::delete('/returns/{returnOrder}', [\App\Http\Controllers\ReturnOrderController::class, 'destroy'])->whereNumber('returnOrder')->name('returns.destroy');
         });
     });
 
