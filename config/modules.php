@@ -274,4 +274,11 @@ return [
         'icon' => 'FolderOpenIcon',
         'dependencies' => ['accounting_classes', 'cost_centers'],
     ],
+    'budgets' => [
+        'name' => 'Orçamentos',
+        'description' => 'Orçamento anual por escopo com versionamento e consumo previsto × realizado.',
+        'routes' => ['budgets.*'],
+        'icon' => 'BanknotesIcon',
+        'dependencies' => ['accounting_classes', 'management_classes', 'cost_centers'],
+    ],
 ];

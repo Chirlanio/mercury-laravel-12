@@ -253,6 +253,15 @@ enum Permission: string
     case IMPORT_MANAGEMENT_CLASSES = 'management_classes.import';
     case EXPORT_MANAGEMENT_CLASSES = 'management_classes.export';
 
+    // Orçamentos (Budgets)
+    case VIEW_BUDGETS = 'budgets.view';
+    case UPLOAD_BUDGETS = 'budgets.upload';
+    case DOWNLOAD_BUDGETS = 'budgets.download';
+    case DELETE_BUDGETS = 'budgets.delete';
+    case MANAGE_BUDGETS = 'budgets.manage';
+    case EXPORT_BUDGETS = 'budgets.export';
+    case VIEW_BUDGET_CONSUMPTION = 'budgets.view_consumption';
+
     public function label(): string
     {
         return match ($this) {
@@ -463,6 +472,14 @@ enum Permission: string
             self::MANAGE_MANAGEMENT_CLASSES => 'Gerenciar plano de contas gerencial (estrutura completa)',
             self::IMPORT_MANAGEMENT_CLASSES => 'Importar plano de contas gerencial (planilha)',
             self::EXPORT_MANAGEMENT_CLASSES => 'Exportar plano de contas gerencial',
+            // Orçamentos
+            self::VIEW_BUDGETS => 'Visualizar orçamentos',
+            self::UPLOAD_BUDGETS => 'Enviar planilhas de orçamento',
+            self::DOWNLOAD_BUDGETS => 'Baixar planilha original do orçamento',
+            self::DELETE_BUDGETS => 'Excluir versões de orçamento (não-ativas)',
+            self::MANAGE_BUDGETS => 'Gerenciar orçamentos de todos os escopos',
+            self::EXPORT_BUDGETS => 'Exportar orçamento consolidado (com consumo realizado)',
+            self::VIEW_BUDGET_CONSUMPTION => 'Visualizar dashboard de consumo previsto × realizado',
         };
     }
 
@@ -676,6 +693,14 @@ enum Permission: string
             self::MANAGE_MANAGEMENT_CLASSES => 'Permite gerenciar toda a estrutura do plano gerencial (hierarquia e vínculos com contábil)',
             self::IMPORT_MANAGEMENT_CLASSES => 'Permite importar plano gerencial via planilha',
             self::EXPORT_MANAGEMENT_CLASSES => 'Permite exportar plano gerencial para Excel',
+            // Orçamentos
+            self::VIEW_BUDGETS => 'Permite visualizar orçamentos cadastrados, com filtros por ano/escopo/versão',
+            self::UPLOAD_BUDGETS => 'Permite enviar novas planilhas de orçamento (Excel). Aciona o fluxo de preview + reconciliação de FKs',
+            self::DOWNLOAD_BUDGETS => 'Permite baixar a planilha xlsx original armazenada (para auditoria ou re-upload)',
+            self::DELETE_BUDGETS => 'Permite excluir versões não-ativas. A versão ativa nunca pode ser excluída diretamente — só desativada por uma nova versão',
+            self::MANAGE_BUDGETS => 'Permite gerenciar orçamentos de todos os escopos (sem filtro de área)',
+            self::EXPORT_BUDGETS => 'Permite exportar orçamento consolidado em Excel (com colunas de previsto × realizado lado a lado)',
+            self::VIEW_BUDGET_CONSUMPTION => 'Permite acessar o dashboard de consumo previsto × realizado, com alertas de utilização',
         };
     }
 

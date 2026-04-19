@@ -232,6 +232,14 @@ enum Role: string
                 Permission::MANAGE_MANAGEMENT_CLASSES->value,
                 Permission::IMPORT_MANAGEMENT_CLASSES->value,
                 Permission::EXPORT_MANAGEMENT_CLASSES->value,
+                // Orçamentos (todas)
+                Permission::VIEW_BUDGETS->value,
+                Permission::UPLOAD_BUDGETS->value,
+                Permission::DOWNLOAD_BUDGETS->value,
+                Permission::DELETE_BUDGETS->value,
+                Permission::MANAGE_BUDGETS->value,
+                Permission::EXPORT_BUDGETS->value,
+                Permission::VIEW_BUDGET_CONSUMPTION->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -426,6 +434,14 @@ enum Role: string
                 Permission::MANAGE_MANAGEMENT_CLASSES->value,
                 Permission::IMPORT_MANAGEMENT_CLASSES->value,
                 Permission::EXPORT_MANAGEMENT_CLASSES->value,
+                // Orçamentos (todas)
+                Permission::VIEW_BUDGETS->value,
+                Permission::UPLOAD_BUDGETS->value,
+                Permission::DOWNLOAD_BUDGETS->value,
+                Permission::DELETE_BUDGETS->value,
+                Permission::MANAGE_BUDGETS->value,
+                Permission::EXPORT_BUDGETS->value,
+                Permission::VIEW_BUDGET_CONSUMPTION->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -534,6 +550,12 @@ enum Role: string
                 // Plano Gerencial (view + export apenas)
                 Permission::VIEW_MANAGEMENT_CLASSES->value,
                 Permission::EXPORT_MANAGEMENT_CLASSES->value,
+                // Orçamentos (view + consumption dashboard — gestão precisa ver
+                // saldo antes de aprovar OP; sem upload/delete/manage)
+                Permission::VIEW_BUDGETS->value,
+                Permission::DOWNLOAD_BUDGETS->value,
+                Permission::EXPORT_BUDGETS->value,
+                Permission::VIEW_BUDGET_CONSUMPTION->value,
             ],
             self::USER => [
                 // Apenas próprio perfil
