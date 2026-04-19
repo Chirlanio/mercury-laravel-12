@@ -101,6 +101,7 @@ class MovementController extends Controller
         $movements = $query->paginate(50)->through(fn ($m) => [
             'id' => $m->id,
             'movement_date' => $m->movement_date->format('d/m/Y'),
+            'movement_date_iso' => $m->movement_date->format('Y-m-d'),
             'movement_time' => $m->movement_time ? substr($m->movement_time, 0, 8) : '-',
             'store_code' => $m->store_code,
             'invoice_number' => $m->invoice_number,
@@ -193,9 +194,9 @@ class MovementController extends Controller
     // INVOICE (nota fiscal) — lista itens + export XLSX/PDF
     // =============================================
 
-    public function invoice(string $storeCode, string $invoiceNumber)
+    public function invoice(string $storeCode, string $invoiceNumber, string $movementDate)
     {
-        $data = app(MovementInvoiceService::class)->find($storeCode, $invoiceNumber);
+        $data = app(MovementInvoiceService::class)->find($storeCode, $invoiceNumber, $movementDate);
 
         if (! $data) {
             return response()->json(['message' => 'Nota fiscal não encontrada.'], 404);
@@ -208,14 +209,14 @@ class MovementController extends Controller
         ]);
     }
 
-    public function invoiceXlsx(string $storeCode, string $invoiceNumber)
+    public function invoiceXlsx(string $storeCode, string $invoiceNumber, string $movementDate)
     {
-        return app(MovementInvoiceService::class)->exportXlsx($storeCode, $invoiceNumber);
+        return app(MovementInvoiceService::class)->exportXlsx($storeCode, $invoiceNumber, $movementDate);
     }
 
-    public function invoicePdf(string $storeCode, string $invoiceNumber)
+    public function invoicePdf(string $storeCode, string $invoiceNumber, string $movementDate)
     {
-        return app(MovementInvoiceService::class)->exportPdf($storeCode, $invoiceNumber);
+        return app(MovementInvoiceService::class)->exportPdf($storeCode, $invoiceNumber, $movementDate);
     }
 
     // =============================================

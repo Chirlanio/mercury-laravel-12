@@ -218,7 +218,11 @@ export default function Index({ movements, stores, movementTypes, filters, cigam
                                                         type="button"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            openModal('invoice', { store_code: m.store_code, invoice_number: m.invoice_number });
+                                                            openModal('invoice', {
+                                                                store_code: m.store_code,
+                                                                invoice_number: m.invoice_number,
+                                                                movement_date_iso: m.movement_date_iso,
+                                                            });
                                                         }}
                                                         className="text-indigo-600 hover:text-indigo-800 hover:underline font-medium"
                                                         title="Ver todos os itens desta NF"
@@ -306,6 +310,7 @@ export default function Index({ movements, stores, movementTypes, filters, cigam
                 onClose={() => closeModal('invoice')}
                 storeCode={selected?.store_code}
                 invoiceNumber={selected?.invoice_number}
+                movementDate={selected?.movement_date_iso}
             />
         </>
     );

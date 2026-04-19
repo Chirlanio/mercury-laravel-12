@@ -133,21 +133,21 @@ class MovementControllerTest extends TestCase
 
     public function test_invoice_returns_404_when_not_found(): void
     {
-        $response = $this->actingAs($this->adminUser)->get('/movements/invoice/Z001/99999');
+        $response = $this->actingAs($this->adminUser)->get('/movements/invoice/Z001/99999/2026-04-15');
 
         $response->assertStatus(404);
     }
 
     public function test_invoice_returns_header_items_and_totals(): void
     {
-        Movement::factory()->sale()->forInvoice('5000', 'Z001')->create([
+        Movement::factory()->sale()->forInvoice('5000', 'Z001')->forDate('2026-04-15')->create([
             'realized_value' => 150, 'quantity' => 1,
         ]);
-        Movement::factory()->sale()->forInvoice('5000', 'Z001')->create([
+        Movement::factory()->sale()->forInvoice('5000', 'Z001')->forDate('2026-04-15')->create([
             'realized_value' => 250, 'quantity' => 2,
         ]);
 
-        $response = $this->actingAs($this->adminUser)->get('/movements/invoice/Z001/5000');
+        $response = $this->actingAs($this->adminUser)->get('/movements/invoice/Z001/5000/2026-04-15');
 
         $response->assertStatus(200);
         $response->assertJsonStructure([
@@ -161,9 +161,9 @@ class MovementControllerTest extends TestCase
 
     public function test_invoice_xlsx_download_returns_200(): void
     {
-        Movement::factory()->sale()->forInvoice('5001', 'Z001')->create();
+        Movement::factory()->sale()->forInvoice('5001', 'Z001')->forDate('2026-04-15')->create();
 
-        $response = $this->actingAs($this->adminUser)->get('/movements/invoice/Z001/5001/xlsx');
+        $response = $this->actingAs($this->adminUser)->get('/movements/invoice/Z001/5001/2026-04-15/xlsx');
 
         $response->assertStatus(200);
         $this->assertStringContainsString('.xlsx', $response->headers->get('Content-Disposition') ?? '');
@@ -171,9 +171,9 @@ class MovementControllerTest extends TestCase
 
     public function test_invoice_pdf_download_returns_200(): void
     {
-        Movement::factory()->sale()->forInvoice('5002', 'Z001')->create();
+        Movement::factory()->sale()->forInvoice('5002', 'Z001')->forDate('2026-04-15')->create();
 
-        $response = $this->actingAs($this->adminUser)->get('/movements/invoice/Z001/5002/pdf');
+        $response = $this->actingAs($this->adminUser)->get('/movements/invoice/Z001/5002/2026-04-15/pdf');
 
         $response->assertStatus(200);
         $this->assertStringContainsString('application/pdf', $response->headers->get('Content-Type') ?? '');

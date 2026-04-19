@@ -26,15 +26,17 @@ class MovementInvoiceService
 {
     /**
      * Busca todos os movements de uma NF. Retorna null se não encontrar nada.
+     * NF é chave composta (store_code + invoice_number + movement_date) porque
+     * número de cupom/NF reseta por ano e pode repetir entre lojas.
      *
      * @return array{header: array, items: Collection, totals: array}|null
      */
-    public function find(string $storeCode, string $invoiceNumber): ?array
+    public function find(string $storeCode, string $invoiceNumber, string $movementDate): ?array
     {
         $items = Movement::query()
             ->where('store_code', $storeCode)
             ->where('invoice_number', $invoiceNumber)
-            ->orderBy('movement_date')
+            ->where('movement_date', $movementDate)
             ->orderBy('movement_time')
             ->orderBy('id')
             ->get();
@@ -97,9 +99,9 @@ class MovementInvoiceService
         ];
     }
 
-    public function exportXlsx(string $storeCode, string $invoiceNumber): BinaryFileResponse
+    public function exportXlsx(string $storeCode, string $invoiceNumber, string $movementDate): BinaryFileResponse
     {
-        $data = $this->find($storeCode, $invoiceNumber);
+        $data = $this->find($storeCode, $invoiceNumber, $movementDate);
 
         if (! $data) {
             abort(404, 'Nota fiscal não encontrada.');
@@ -192,18 +194,19 @@ class MovementInvoiceService
         };
 
         $filename = sprintf(
-            'nota-fiscal-%s-%s-%s.xlsx',
+            'nota-fiscal-%s-%s-%s-%s.xlsx',
             preg_replace('/[^A-Za-z0-9_-]/', '', $storeCode),
             preg_replace('/[^A-Za-z0-9_-]/', '', $invoiceNumber),
+            $movementDate,
             now()->format('Y-m-d-His')
         );
 
         return ExcelFacade::download($export, $filename, Excel::XLSX);
     }
 
-    public function exportPdf(string $storeCode, string $invoiceNumber): Response
+    public function exportPdf(string $storeCode, string $invoiceNumber, string $movementDate): Response
     {
-        $data = $this->find($storeCode, $invoiceNumber);
+        $data = $this->find($storeCode, $invoiceNumber, $movementDate);
 
         if (! $data) {
             abort(404, 'Nota fiscal não encontrada.');
@@ -217,9 +220,10 @@ class MovementInvoiceService
         ])->setPaper('a4', 'portrait');
 
         $filename = sprintf(
-            'nota-fiscal-%s-%s-%s.pdf',
+            'nota-fiscal-%s-%s-%s-%s.pdf',
             preg_replace('/[^A-Za-z0-9_-]/', '', $storeCode),
             preg_replace('/[^A-Za-z0-9_-]/', '', $invoiceNumber),
+            $movementDate,
             now()->format('Y-m-d')
         );
 

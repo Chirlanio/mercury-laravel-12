@@ -434,14 +434,14 @@ Route::middleware(['auth', 'tenant.module:movements', 'permission:'.Permission::
     Route::get('/movements/sync-logs', [MovementController::class, 'syncLogs'])->name('movements.sync-logs');
     Route::get('/movements/export/xlsx', [MovementController::class, 'exportXlsx'])->name('movements.export.xlsx');
     Route::get('/movements/export/pdf', [MovementController::class, 'exportPdf'])->name('movements.export.pdf');
-    Route::get('/movements/invoice/{storeCode}/{invoiceNumber}', [MovementController::class, 'invoice'])
-        ->where(['storeCode' => '[A-Za-z0-9]+', 'invoiceNumber' => '[A-Za-z0-9]+'])
+    Route::get('/movements/invoice/{storeCode}/{invoiceNumber}/{movementDate}', [MovementController::class, 'invoice'])
+        ->where(['storeCode' => '[A-Za-z0-9]+', 'invoiceNumber' => '[A-Za-z0-9]+', 'movementDate' => '\d{4}-\d{2}-\d{2}'])
         ->name('movements.invoice');
-    Route::get('/movements/invoice/{storeCode}/{invoiceNumber}/xlsx', [MovementController::class, 'invoiceXlsx'])
-        ->where(['storeCode' => '[A-Za-z0-9]+', 'invoiceNumber' => '[A-Za-z0-9]+'])
+    Route::get('/movements/invoice/{storeCode}/{invoiceNumber}/{movementDate}/xlsx', [MovementController::class, 'invoiceXlsx'])
+        ->where(['storeCode' => '[A-Za-z0-9]+', 'invoiceNumber' => '[A-Za-z0-9]+', 'movementDate' => '\d{4}-\d{2}-\d{2}'])
         ->name('movements.invoice.xlsx');
-    Route::get('/movements/invoice/{storeCode}/{invoiceNumber}/pdf', [MovementController::class, 'invoicePdf'])
-        ->where(['storeCode' => '[A-Za-z0-9]+', 'invoiceNumber' => '[A-Za-z0-9]+'])
+    Route::get('/movements/invoice/{storeCode}/{invoiceNumber}/{movementDate}/pdf', [MovementController::class, 'invoicePdf'])
+        ->where(['storeCode' => '[A-Za-z0-9]+', 'invoiceNumber' => '[A-Za-z0-9]+', 'movementDate' => '\d{4}-\d{2}-\d{2}'])
         ->name('movements.invoice.pdf');
     Route::get('/movements', [MovementController::class, 'index'])->name('movements.index');
 

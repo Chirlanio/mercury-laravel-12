@@ -18,26 +18,26 @@ const fmtNumber = (val, decimals = 3) =>
         maximumFractionDigits: decimals,
     }).format(val || 0);
 
-export default function InvoiceDetailModal({ show, onClose, storeCode, invoiceNumber }) {
+export default function InvoiceDetailModal({ show, onClose, storeCode, invoiceNumber, movementDate }) {
     const [loading, setLoading] = useState(false);
     const [data, setData] = useState(null);
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        if (show && storeCode && invoiceNumber) {
+        if (show && storeCode && invoiceNumber && movementDate) {
             fetchInvoice();
         }
         if (!show) {
             setData(null);
             setError(null);
         }
-    }, [show, storeCode, invoiceNumber]);
+    }, [show, storeCode, invoiceNumber, movementDate]);
 
     const fetchInvoice = async () => {
         setLoading(true);
         setError(null);
         try {
-            const res = await axios.get(`/movements/invoice/${storeCode}/${invoiceNumber}`);
+            const res = await axios.get(`/movements/invoice/${storeCode}/${invoiceNumber}/${movementDate}`);
             setData(res.data);
         } catch (e) {
             setError(e.response?.data?.message || 'Erro ao carregar nota fiscal.');
@@ -47,11 +47,11 @@ export default function InvoiceDetailModal({ show, onClose, storeCode, invoiceNu
     };
 
     const downloadXlsx = () => {
-        window.location.href = `/movements/invoice/${storeCode}/${invoiceNumber}/xlsx`;
+        window.location.href = `/movements/invoice/${storeCode}/${invoiceNumber}/${movementDate}/xlsx`;
     };
 
     const downloadPdf = () => {
-        window.location.href = `/movements/invoice/${storeCode}/${invoiceNumber}/pdf`;
+        window.location.href = `/movements/invoice/${storeCode}/${invoiceNumber}/${movementDate}/pdf`;
     };
 
     const header = data?.header;
