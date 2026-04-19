@@ -1135,6 +1135,8 @@ Route::middleware(['auth'])->group(function () {
 
         Route::middleware('permission:'.Permission::UPLOAD_BUDGETS->value)->group(function () {
             Route::post('/budgets', [\App\Http\Controllers\BudgetController::class, 'store'])->name('budgets.store');
+            Route::post('/budgets/preview', [\App\Http\Controllers\BudgetController::class, 'preview'])->name('budgets.preview');
+            Route::post('/budgets/import', [\App\Http\Controllers\BudgetController::class, 'import'])->name('budgets.import');
             Route::put('/budgets/{budget}', [\App\Http\Controllers\BudgetController::class, 'update'])->whereNumber('budget')->name('budgets.update');
         });
 

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Enums\BudgetUploadType;
+use App\Http\Requests\Budget\ImportBudgetRequest;
+use App\Http\Requests\Budget\PreviewBudgetRequest;
 use App\Http\Requests\Budget\StoreBudgetRequest;
 use App\Http\Requests\Budget\UpdateBudgetMetaRequest;
 use App\Models\AccountingClass;
@@ -11,6 +13,7 @@ use App\Models\CostCenter;
 use App\Models\ManagementClass;
 use App\Models\Store;
 use App\Services\BudgetFileStorageService;
+use App\Services\BudgetImportService;
 use App\Services\BudgetService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -25,6 +28,7 @@ class BudgetController extends Controller
     public function __construct(
         private BudgetService $service,
         private BudgetFileStorageService $storage,
+        private BudgetImportService $importService,
     ) {}
 
     public function index(Request $request): Response
@@ -180,6 +184,84 @@ class BudgetController extends Controller
         return redirect()
             ->route('budgets.index')
             ->with('success', 'Versão excluída.');
+    }
+
+    /**
+     * Passo 1 do upload — analisa o xlsx, retorna diagnóstico com
+     * linhas válidas/pendentes/rejeitadas + sugestões fuzzy para
+     * códigos ausentes. Não persiste nada.
+     */
+    public function preview(PreviewBudgetRequest $request): JsonResponse
+    {
+        try {
+            $result = $this->importService->preview(
+                $request->file('file')->getRealPath()
+            );
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Erro ao processar a planilha: '.$e->getMessage(),
+            ], 422);
+        }
+
+        return response()->json($result);
+    }
+
+    /**
+     * Passo 2 do upload — recebe o arquivo + mapping de reconciliação
+     * feito pelo usuário, produz items[] final e persiste via
+     * BudgetService::create().
+     */
+    public function import(ImportBudgetRequest $request): RedirectResponse
+    {
+        $data = $request->validated();
+        $mapping = $data['mapping'] ?? [];
+        $file = $request->file('file');
+
+        try {
+            $resolution = $this->importService->resolveItems(
+                $file->getRealPath(),
+                $mapping
+            );
+        } catch (\Throwable $e) {
+            return back()->withErrors([
+                'file' => 'Erro ao processar planilha: '.$e->getMessage(),
+            ]);
+        }
+
+        if (empty($resolution['items'])) {
+            return back()->withErrors([
+                'file' => 'Nenhuma linha válida para importar. Verifique o mapping de códigos ausentes.',
+            ]);
+        }
+
+        try {
+            $upload = $this->service->create(
+                [
+                    'year' => $data['year'],
+                    'scope_label' => $data['scope_label'],
+                    'upload_type' => $data['upload_type'],
+                    'notes' => $data['notes'] ?? null,
+                ],
+                $resolution['items'],
+                $file,
+                $request->user()
+            );
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors())->withInput();
+        }
+
+        $msg = sprintf(
+            '%d linhas importadas (%d ignoradas) — v%s, total R$ %s',
+            $resolution['stats']['imported'],
+            $resolution['stats']['skipped'],
+            $upload->version_label,
+            number_format((float) $upload->total_year, 2, ',', '.')
+        );
+
+        return redirect()
+            ->route('budgets.index')
+            ->with('success', $msg)
+            ->with('import_stats', $resolution['stats']);
     }
 
     /**
