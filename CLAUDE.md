@@ -73,12 +73,12 @@ vendor/bin/pint        # Laravel Pint (PHP code style fixer)
 
 **Config Module Pattern:**
 - `app/Http/Controllers/ConfigController.php` is an abstract base for CRUD modules with minimal boilerplate
-- 39 config controllers in `app/Http/Controllers/Config/` extend it (Position, Sector, Gender, ReversalReason, etc.)
+- 40 config controllers in `app/Http/Controllers/Config/` extend it (Position, Sector, Gender, ReversalReason, ReturnReason, etc.)
 - Subclasses define: `modelClass()`, `viewTitle()`, `columns()`, `formFields()`, `validationRules()`
 - All render to a single generic page: `resources/js/Pages/Config/Index.jsx`
 - Routes: `/config/{module}` protected by `MANAGE_SETTINGS` permission
 
-**Services** (`app/Services/` — 77 services):
+**Services** (`app/Services/` — 87 services):
 - `AuditLogService` — activity tracking (used via `Auditable` trait on models)
 - `CigamSyncService` — syncs sales from CIGAM PostgreSQL (`msl_fmovimentodiario_` table)
 - `ImageUploadService` — avatar/image handling with `intervention/image`
@@ -86,7 +86,7 @@ vendor/bin/pint        # Laravel Pint (PHP code style fixer)
 - `CentralRoleResolver` — resolves role permissions from central DB with enum fallback and caching
 - `TenantRoleService` — filters allowed roles per tenant settings
 
-**Module Services Pattern** (PurchaseOrders, Reversals, Vacancies, etc.):
+**Module Services Pattern** (PurchaseOrders, Reversals, Returns, Vacancies, etc.):
 - `{Module}Service` — CRUD + business rules (validation, snapshot, dedup)
 - `{Module}TransitionService` — single point of state mutation, enforces permissions per transition, records `{module}_status_histories`
 - `{Module}LookupService` (where applicable) — AJAX lookups, external data resolution

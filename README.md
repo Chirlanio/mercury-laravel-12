@@ -55,6 +55,96 @@ C:\Users\MSDEV\php84\php.exe artisan test
 C:\Users\MSDEV\php84\php.exe artisan test --filter=SaleControllerTest
 ```
 
+## Fine-Tuning (TaneIA)
+
+A TaneIA armazena conversas tenant-scoped e permite exportar o dataset de treino em formato JSONL (compatível com Llama 3.1 / Unsloth / OpenAI conversations). O rating dado pelos usuários (+1 / -1) alimenta o filtro de qualidade — apenas conversas com pelo menos um `assistant` aprovado e nenhuma reprovação entram por padrão.
+
+### Comando principal
+
+```bash
+# Export default (apenas conversas aprovadas, rating=1 sem nenhum -1)
+php artisan taneia:export-training --tenant=meia-sola
+
+# Export completo, sem filtro de rating (debug / baseline)
+php artisan taneia:export-training --tenant=meia-sola --all
+
+# Limitar quantidade e exigir minimo de turnos (pares user/assistant)
+php artisan taneia:export-training --tenant=meia-sola --limit=500 --min-turns=2
+
+# Saida customizada
+php artisan taneia:export-training --tenant=meia-sola --out=taneia-training/custom.jsonl
+```
+
+**Opcoes:**
+
+| Flag | Descricao |
+|------|-----------|
+| `--tenant=ID` | ID do tenant (obrigatorio no contexto central; dispensavel em `tenants:run`) |
+| `--all` | Ignora o filtro de rating e exporta todas as conversas |
+| `--min-turns=N` | Numero minimo de pares user/assistant por conversa (default: `1`) |
+| `--limit=N` | Maximo de conversas exportadas, `0` = sem limite (default: `0`) |
+| `--out=PATH` | Caminho do arquivo `.jsonl` (default: `storage/app/taneia-training/{tenant}-{timestamp}.jsonl`) |
+
+O arquivo gerado fica em `storage/app/taneia-training/` dentro do disco local do tenant.
+
+### Data augmentation (dataset pequeno)
+
+Quando o historico de conversas reais e curto, use `taneia:augment-training` para multiplicar o dataset via paraphrase das mensagens do usuario (resposta do assistente preservada). Requer `GROQ_API_KEY` no `.env` — reusa a mesma configuracao do classifier do Helpdesk.
+
+```bash
+# Estimar quantos exemplos seriam gerados (sem chamar a API)
+php artisan taneia:augment-training --tenant=meia-sola --dry-run --variations=5
+
+# Gerar 3 variacoes por par user/assistant (apenas conversas aprovadas)
+php artisan taneia:augment-training --tenant=meia-sola --variations=3
+
+# Augmentar tudo (sem filtro de rating), 5 variacoes, limitando 50 conversas
+php artisan taneia:augment-training --tenant=meia-sola --all --variations=5 --limit=50
+```
+
+**Opcoes:**
+
+| Flag | Descricao |
+|------|-----------|
+| `--tenant=ID` | Contexto tenant (ou use via `tenants:run`) |
+| `--variations=N` | Numero de reformulacoes por mensagem de usuario (default: `3`) |
+| `--all` | Ignora rating e augmenta todas as conversas |
+| `--min-turns=N` | Minimo de pares user/assistant por conversa (default: `1`) |
+| `--limit=N` | Maximo de conversas, `0` = sem limite (default: `0`) |
+| `--out=PATH` | Caminho do `.jsonl` (default: `taneia-training/augmented-{tenant}-{timestamp}.jsonl`) |
+| `--dry-run` | Nao chama a API — apenas imprime a estimativa |
+
+O arquivo gerado contem o par **original + N variacoes** no mesmo formato chat (system/user/assistant). Cada variacao varia estilo (formal/informal), ordem de informacoes, nivel de detalhe e erros leves de digitacao — tudo em pt-BR. Concatene com o arquivo do `taneia:export-training` antes de subir para o Colab:
+
+```bash
+cat storage/app/taneia-training/meia-sola-*.jsonl \
+    storage/app/taneia-training/augmented-meia-sola-*.jsonl \
+    > dataset-final.jsonl
+```
+
+### Comandos auxiliares
+
+```bash
+# Rodar export ja no contexto tenant (dispensa --tenant)
+php artisan tenants:run taneia:export-training --tenants=meia-sola
+
+# Exportar para todos os tenants de uma vez
+php artisan tenants:run taneia:export-training
+
+# Gerenciamento de tenants
+php artisan tenants:list                # Lista tenants ativos
+php artisan tenant:create               # Cria tenant + banco + seed
+php artisan tenant:backup {tenant}      # Backup SQL do tenant
+php artisan tenant:restore {tenant}     # Restore a partir de dump
+php artisan tenant:export-data {tenant} # Export LGPD (JSON consolidado)
+```
+
+### Proximos passos (treino)
+
+1. Colete o `.jsonl` gerado do diretorio `storage/app/taneia-training/`.
+2. Siga o guia em `taneia-backend/finetune/README.md` para treinar via Unsloth no Colab.
+3. Cada linha do arquivo segue o formato chat da OpenAI (`{"messages":[{"role":"system"},{"role":"user"},{"role":"assistant"}]}`), aceito nativamente pelo `standardize_sharegpt` + `apply_chat_template` do Llama 3.1.
+
 ## Acessando o Sistema
 
 O Mercury opera em dois contextos: **Central** (admin SaaS) e **Tenant** (aplicacao por empresa).
@@ -123,19 +213,19 @@ Os usuarios sao completamente independentes. Um usuario do tenant nao consegue a
 app/
 ├── Http/Controllers/
 │   ├── Central/         # 9 admin SaaS controllers (tenants, plans)
-│   ├── Config/          # 39 config modules (extend ConfigController)
+│   ├── Config/          # 40 config modules (extend ConfigController)
 │   ├── Admin/           # Email settings
 │   ├── Api/             # Integration API + Webhooks
-│   └── *.php            # 61 module controllers
-├── Models/              # 198 Eloquent models
-├── Services/            # 77 service classes
-├── Enums/               # Role.php, Permission.php (70+ permissions)
+│   └── *.php            # 62 module controllers
+├── Models/              # 200+ Eloquent models
+├── Services/            # 87 service classes
+├── Enums/               # Role.php, Permission.php (80+ permissions)
 └── Http/Middleware/      # Tenant, auth, RBAC, permission, etc.
 
 resources/js/
-├── Pages/               # 45 page directories (~100 JSX pages)
+├── Pages/               # 46 page directories (~100 JSX pages)
 │   ├── Central/         # Admin SaaS pages
-│   ├── Config/Index.jsx # Generic page for 39 config modules
+│   ├── Config/Index.jsx # Generic page for 40 config modules
 │   └── ...              # Module pages (PurchaseOrders, Reversals, Vacancies, etc.)
 ├── Components/          # 68 reusable components + Shared/
 ├── Layouts/             # 3 layouts (Authenticated, Guest, Central)
@@ -156,16 +246,16 @@ routes/
 
 ## Modulos Implementados
 
-### Principais (37)
+### Principais (38)
 Auth · Users · Employees · Stores · Sales · Products · WorkShifts · WorkSchedules ·
 Transfers · StockAdjustments · OrderPayments · Suppliers · **PurchaseOrders** ·
-**Reversals** · Checklists · MedicalCertificates · Absences · OvertimeRecords ·
-StoreGoals · Movements · Vacations · StockAudits · PersonnelMovements ·
-**Vacancies** · Training (LMS completo) · ExperienceTracker · Deliveries ·
-DeliveryRoutes · Chat · Helpdesk · TaneIA · ActivityLogs · EmailSettings ·
-Profile · Dashboard · LGPD · UserSessions · Integrations
+**Reversals** · **Returns** · Checklists · MedicalCertificates · Absences ·
+OvertimeRecords · StoreGoals · Movements · Vacations · StockAudits ·
+PersonnelMovements · **Vacancies** · Training (LMS completo) · ExperienceTracker ·
+Deliveries · DeliveryRoutes · Chat · Helpdesk · TaneIA · ActivityLogs ·
+EmailSettings · Profile · Dashboard · LGPD · UserSessions · Integrations
 
-### Config (39)
+### Config (40)
 Position, PositionLevel, Sector, Gender, EducationLevel, EmployeeStatus,
 EmployeeEventType, TypeMoviment, EmploymentRelationship, Manager, Network,
 Status, PageStatus, Bank, CostCenter, Driver, PaymentType, OrderPaymentStatus,
@@ -173,10 +263,16 @@ StockAdjustmentStatus, StockAdjustmentReason, TransferStatus, ManagementReason,
 ProductBrand, ProductCategory, ProductCollection, ProductSubcollection,
 ProductColor, ProductMaterial, ProductSize, ProductArticleComplement,
 ProductLookupConfig, ProductLookupGroup, StockAuditCycle, StockAuditVendor,
-DismissalReason, DeliveryReturnReason, PercentageAward, **ReversalReason**
+DismissalReason, DeliveryReturnReason, PercentageAward, **ReversalReason**,
+**ReturnReason**
 
 ### Destaques recentes
 
+- **Returns** (abr/2026) — Devoluções/trocas do e-commerce (loja Z441),
+  state machine 6 estados com logística reversa, quantidade parcial por item,
+  motivos categorizados (6 categorias + 15 motivos pré-seeded), máscara BR
+  no refund, stale-alert diário. Distinto e independente do Reversals.
+  51 tests / 155 assertions.
 - **Reversals** (abr/2026) — Estornos de vendas com state machine 6 estados,
   lookup direto em `movements`, dedup via service, hook Helpdesk fail-safe,
   dashboard recharts, import XLSX + export PDF. 62 tests / 184 assertions.
@@ -215,6 +311,7 @@ DismissalReason, DeliveryReturnReason, PercentageAward, **ReversalReason**
 | `docs/DEPLOYMENT.md` | Guia de deploy |
 | `docs/CONTRIBUTING.md` | Guia de contribuicao |
 | `docs/ANALISE_MODULO_REVERSALS.md` | Modulo de Estornos (v2) — 6 fases, 62 testes |
+| `docs/ANALISE_MODULO_RETURNS.md` | Modulo de Devoluções/Trocas e-commerce (v2) — 7 fases, 51 testes |
 
 ## Deploy (VPS)
 
