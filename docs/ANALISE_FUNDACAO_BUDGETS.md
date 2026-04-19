@@ -1,8 +1,8 @@
-# Fundação Budgets/DRE — Análise das Fases 0.1 e 0.2
+# Fundação Budgets/DRE — Análise das Fases 0.1, 0.2 e 0.3
 
 **Data de conclusão:** 20/04/2026
-**Commits:** 10 (5 por fase)
-**Testes:** 48 feature tests / 182 assertions
+**Commits:** 15 (5 por fase)
+**Testes:** 72 feature tests / 245 assertions
 
 ---
 
@@ -138,6 +138,61 @@ Seed é idempotente: `if (DB::table('accounting_classes')->exists()) return;`. C
 
 ---
 
+## Fase 0.3 — ManagementClass (Plano de Contas Gerencial)
+
+Última peça da fundação. Visão **interna/operacional** do financeiro,
+complementar ao plano contábil.
+
+### Diferença vs AccountingClass
+
+| Dimensão | AccountingClass | ManagementClass |
+|---|---|---|
+| Propósito | DRE, segue CPC/Pronunciamentos | Gestão interna (como a empresa vê custos) |
+| Seed inicial | ~50 contas BR simplificado | Vazio (v1 não tem — tenant popula) |
+| Enums obrigatórios | `nature`, `dre_group` | Nenhum (natureza vem herdada via vínculo contábil) |
+| Cores no frontend | 11 grupos DRE codificados | Sem codificação — ícone Link/NoSymbol indica vínculo |
+
+### Schema
+
+```
+management_classes (
+    id, code (unique 30), name, description,
+    parent_id (FK self, nullable),
+    accounting_class_id (FK → accounting_classes, nullable),   -- opcional no MVP
+    cost_center_id (FK → cost_centers, nullable),              -- CC default
+    accepts_entries bool,
+    sort_order int,
+    is_active bool,
+    audit fields, soft delete manual
+)
+```
+
+### Regras de negócio
+
+- **Mesmas 4 do AccountingClass**: dedup por code, cycle em parent, leaf-não-pode-ser-pai, delete bloqueia com filhas
+- **Vínculo contábil só para folha**: `accounting_class_id` só pode apontar para `AccountingClass` com `accepts_entries=true`. Agrupadores contábeis não recebem lançamento direto.
+- **CC default existe**: `cost_center_id` valida que o CC está ativo e não deletado
+- **Sem seed inicial**: tenant popula conforme usa. Statistics mostra contas sem vínculo contábil (alertável via card clicável).
+
+### Entregas
+
+- **Model + Service + FormRequests**: 3 validações novas (`ensureAccountingClassIsLeaf`, `ensureCostCenterExists`, mais filtros `linkedToAccounting`/`unlinkedFromAccounting`)
+- **Controller + routes + tree endpoint**: filtros por vínculo contábil + FKs
+- **Frontend com toggle Lista/Árvore**: mesma pattern do AccountingClass + ícones de vínculo (LinkIcon ↔ NoSymbolIcon) + aviso amarelo no detalhe quando folha não está vinculada
+- **Export XLSX + Import XLSX**: resolve 3 FKs opcionais por code (parent, accounting_class, cost_center) — ausência silenciosa; folha-como-pai rejeita com erro explícito
+- **24 feature tests** (16 controller + 8 import/export)
+
+### Commits
+| Hash | Descrição |
+|------|-----------|
+| `0dfb153` | Migration + permissions |
+| `604d9d1` | Model + Service + FormRequests |
+| `932b657` | Controller + routes + 16 backend tests |
+| `937c862` | Frontend (toggle Lista/Árvore) + import/export + 8 tests |
+| `(este)` | Docs consolidados |
+
+---
+
 ## Decisões arquiteturais não-óbvias
 
 ### 1. FK `cost_centers.default_accounting_class_id` em duas etapas
@@ -172,24 +227,25 @@ Equipe financeira raramente digita `debit` — prefere PT-BR. O service normaliz
 
 ---
 
-## Permissões totais (14)
+## Permissões totais (21)
 
 `cost_centers.{view, create, edit, delete, manage, import, export}` (7)
 `accounting_classes.{view, create, edit, delete, manage, import, export}` (7)
+`management_classes.{view, create, edit, delete, manage, import, export}` (7)
 
 Distribuição:
-| Role | Cost Centers | Accounting Classes |
-|------|---|---|
-| SUPER_ADMIN | todas | todas |
-| ADMIN | todas | todas |
-| SUPPORT | todas | todas |
-| USER | view + export | view + export |
+| Role | CC | AC | MC |
+|------|---|---|---|
+| SUPER_ADMIN | todas | todas | todas |
+| ADMIN | todas | todas | todas |
+| SUPPORT | todas | todas | todas |
+| USER | view + export | view + export | view + export |
 
 ---
 
 ## Testes (consolidado)
 
-**Total: 48 tests / 182 assertions / ~6s**
+**Total: 72 tests / 245 assertions / ~7s**
 
 | Suite | Tests |
 |-------|-------|
@@ -197,15 +253,23 @@ Distribuição:
 | `CostCenterImportExportTest` | 7 |
 | `AccountingClassControllerTest` | 17 |
 | `AccountingClassImportExportTest` | 7 |
+| `ManagementClassControllerTest` | 16 |
+| `ManagementClassImportExportTest` | 8 |
 
-Cobertura: CRUD, permissões, ciclo em parent, folha-como-pai rejeitada, delete com filhas bloqueado, soft delete manual com motivo obrigatório, tree hierarchy, statistics, import upsert idempotente, rejeição de arquivos inválidos, aliases PT-BR, parent ausente silencioso vs erro duro.
+Cobertura: CRUD, permissões, ciclo em parent, folha-como-pai rejeitada, delete com filhas bloqueado, soft delete manual com motivo obrigatório, tree hierarchy, statistics, import upsert idempotente, rejeição de arquivos inválidos, aliases PT-BR, parent/FK ausente silencioso vs erro duro, vínculo contábil para agrupador rejeitado.
 
 ---
 
 ## Próximos passos
 
-- **Fase 0.3** — `ManagementClass` (Plano de Contas Gerencial) com FK opcional para `AccountingClass`. Começa vazio, tenant popula conforme uso.
-- **Fase 1+** — Módulo Budgets propriamente dito (5 fases previstas), usando as 3 fundações (CC/AC/MC) para resolver FKs reais no import do Excel de orçamento via preview + fuzzy matching + reconciliação.
+Fundação concluída — as 3 entidades referenciáveis (CC, AC, MC) estão prontas para receberem FKs no próximo módulo.
+
+- **Fase 1+** — Módulo Budgets propriamente dito (5 fases previstas), usando as 3 fundações para resolver FKs reais no import do Excel de orçamento via preview + fuzzy matching + reconciliação. Schema já projetado:
+  - `budget_uploads` — arquivo original + versionamento por (ano, área)
+  - `budget_items` — linhas com FKs obrigatórias para `accounting_class_id`, `management_class_id`, `cost_center_id`, `store_id` + 12 valores mensais
+  - FK `order_payments.budget_item_id` para medir consumo previsto × realizado
+  - Dashboard com alertas ≥ 80% consumo
+- **DRE futuro** — agregação SQL sobre `budget_items` + `order_payments` + `movements`, agrupando por `dre_group` do `AccountingClass`. Sem mudança no schema já criado.
 
 ---
 
@@ -215,3 +279,4 @@ Cobertura: CRUD, permissões, ciclo em parent, folha-como-pai rejeitada, delete 
 - **Documentos irmãos**: `ANALISE_MODULO_REVERSALS.md`, `ANALISE_MODULO_RETURNS.md`
 - **Código CostCenter**: `app/Models/CostCenter.php`, `app/Services/CostCenter*.php`, `app/Http/Controllers/CostCenterController.php`, `resources/js/Pages/CostCenters/`
 - **Código AccountingClass**: `app/Models/AccountingClass.php`, `app/Enums/{AccountingNature,DreGroup}.php`, `app/Services/AccountingClass*.php`, `app/Http/Controllers/AccountingClassController.php`, `resources/js/Pages/AccountingClasses/`
+- **Código ManagementClass**: `app/Models/ManagementClass.php`, `app/Services/ManagementClass*.php`, `app/Http/Controllers/ManagementClassController.php`, `resources/js/Pages/ManagementClasses/`
