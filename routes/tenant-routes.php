@@ -1088,6 +1088,27 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ==========================================
+    // Cost Centers (Centros de Custo — cadastro standalone)
+    // ==========================================
+    Route::middleware(['tenant.module:cost_centers', 'permission:'.Permission::VIEW_COST_CENTERS->value])->group(function () {
+        Route::get('/cost-centers', [\App\Http\Controllers\CostCenterController::class, 'index'])->name('cost-centers.index');
+        Route::get('/cost-centers/statistics', [\App\Http\Controllers\CostCenterController::class, 'statistics'])->name('cost-centers.statistics');
+        Route::get('/cost-centers/{costCenter}', [\App\Http\Controllers\CostCenterController::class, 'show'])->whereNumber('costCenter')->name('cost-centers.show');
+
+        Route::middleware('permission:'.Permission::CREATE_COST_CENTERS->value)->group(function () {
+            Route::post('/cost-centers', [\App\Http\Controllers\CostCenterController::class, 'store'])->name('cost-centers.store');
+        });
+
+        Route::middleware('permission:'.Permission::EDIT_COST_CENTERS->value)->group(function () {
+            Route::put('/cost-centers/{costCenter}', [\App\Http\Controllers\CostCenterController::class, 'update'])->whereNumber('costCenter')->name('cost-centers.update');
+        });
+
+        Route::middleware('permission:'.Permission::DELETE_COST_CENTERS->value)->group(function () {
+            Route::delete('/cost-centers/{costCenter}', [\App\Http\Controllers\CostCenterController::class, 'destroy'])->whereNumber('costCenter')->name('cost-centers.destroy');
+        });
+    });
+
+    // ==========================================
     // Trainings (Treinamentos)
     // ==========================================
     Route::middleware(['tenant.module:training', 'permission:'.Permission::VIEW_TRAININGS->value])->group(function () {
