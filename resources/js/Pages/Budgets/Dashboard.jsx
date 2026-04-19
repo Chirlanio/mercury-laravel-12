@@ -1,37 +1,378 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
+import { useMemo, useState } from 'react';
+import {
+    BanknotesIcon,
+    CheckCircleIcon,
+    ExclamationTriangleIcon,
+    FireIcon,
+    ChartBarIcon,
+    ArrowLeftIcon,
+    CalendarIcon,
+    TagIcon,
+} from '@heroicons/react/24/outline';
+import {
+    ResponsiveContainer,
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    Tooltip,
+    Legend,
+    CartesianGrid,
+    Cell,
+} from 'recharts';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import Button from '@/Components/Button';
+import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
+import StatusBadge from '@/Components/Shared/StatusBadge';
 
-/**
- * Placeholder — substituído pela versão completa no Commit 3 da Fase 3.
- */
+const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+const STATUS_COLORS = {
+    ok: { bar: '#10b981', text: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' },
+    warning: { bar: '#f59e0b', text: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
+    exceeded: { bar: '#ef4444', text: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' },
+};
+
+const TABS = [
+    { key: 'by_cost_center', label: 'Por centro de custo' },
+    { key: 'by_accounting_class', label: 'Por conta contábil' },
+    { key: 'by_item', label: 'Detalhe por linha' },
+];
+
 export default function Dashboard({ budget, consumption }) {
+    const [activeTab, setActiveTab] = useState('by_cost_center');
+
+    const statusCounts = useMemo(() => {
+        const counts = { ok: 0, warning: 0, exceeded: 0 };
+        (consumption?.by_item || []).forEach((item) => {
+            counts[item.status] = (counts[item.status] || 0) + 1;
+        });
+        return counts;
+    }, [consumption]);
+
+    const chartData = useMemo(() => {
+        return (consumption?.by_month || []).map((m) => ({
+            name: MONTH_LABELS[m.month - 1],
+            previsto: m.forecast,
+            realizado: m.realized,
+        }));
+    }, [consumption]);
+
+    const statisticsCards = useMemo(() => [
+        {
+            label: 'Previsto total',
+            value: consumption?.totals?.forecast || 0,
+            format: 'currency',
+            icon: BanknotesIcon,
+            color: 'indigo',
+        },
+        {
+            label: 'Realizado',
+            value: consumption?.totals?.realized || 0,
+            format: 'currency',
+            icon: FireIcon,
+            color: 'orange',
+        },
+        {
+            label: 'Disponível',
+            value: consumption?.totals?.available || 0,
+            format: 'currency',
+            icon: CheckCircleIcon,
+            color: (consumption?.totals?.available || 0) < 0 ? 'red' : 'green',
+        },
+        {
+            label: 'Utilização',
+            value: consumption?.totals?.utilization_pct || 0,
+            format: 'percentage',
+            icon: ChartBarIcon,
+            color: overallColor(consumption?.totals?.utilization_pct || 0),
+        },
+        {
+            label: 'Linhas em alerta',
+            value: statusCounts.warning + statusCounts.exceeded,
+            format: 'number',
+            icon: ExclamationTriangleIcon,
+            color: statusCounts.exceeded > 0 ? 'red' : statusCounts.warning > 0 ? 'orange' : 'gray',
+            sub: `${statusCounts.exceeded} excedido${statusCounts.exceeded !== 1 ? 's' : ''} · ${statusCounts.warning} warning`,
+        },
+    ], [consumption, statusCounts]);
+
     return (
         <AuthenticatedLayout>
             <Head title={`Dashboard — ${budget?.scope_label || 'Orçamento'}`} />
-            <div className="py-12">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                        Dashboard de Consumo
-                    </h1>
-                    <p className="text-gray-600 mb-4">
-                        {budget?.scope_label} — {budget?.year} · v{budget?.version_label}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                        (Placeholder — UI completa no próximo commit)
-                    </p>
-                    <div className="mt-4 bg-white rounded shadow p-4">
-                        <p className="text-sm">
-                            Previsto: R$ {consumption?.totals?.forecast?.toLocaleString('pt-BR')}
-                        </p>
-                        <p className="text-sm">
-                            Realizado: R$ {consumption?.totals?.realized?.toLocaleString('pt-BR')}
-                        </p>
-                        <p className="text-sm font-semibold">
-                            Utilização: {consumption?.totals?.utilization_pct}%
-                        </p>
+
+            <div className="py-8">
+                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="mb-6 flex justify-between items-start">
+                        <div>
+                            <Link
+                                href={route('budgets.index')}
+                                className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-2"
+                            >
+                                <ArrowLeftIcon className="w-4 h-4" />
+                                Voltar para orçamentos
+                            </Link>
+                            <h1 className="text-3xl font-bold text-gray-900">
+                                Dashboard de Consumo
+                            </h1>
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-700">
+                                <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-800 px-2.5 py-1 rounded">
+                                    <TagIcon className="w-4 h-4" />
+                                    {budget?.scope_label}
+                                </span>
+                                <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 px-2.5 py-1 rounded">
+                                    <CalendarIcon className="w-4 h-4" />
+                                    {budget?.year}
+                                </span>
+                                <span className="font-mono text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                    v{budget?.version_label}
+                                </span>
+                                {budget?.is_active ? (
+                                    <StatusBadge status="success" text="Ativo" />
+                                ) : (
+                                    <StatusBadge status="gray" text="Inativo" />
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <StatisticsGrid cards={statisticsCards} cols={5} />
+
+                    {/* Gráfico previsto × realizado por mês */}
+                    <div className="mt-6 bg-white shadow-sm rounded-lg p-6">
+                        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                            Previsto × Realizado por mês
+                        </h2>
+                        <div className="h-72">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData} margin={{ top: 10, right: 24, left: 0, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                                    <YAxis
+                                        tick={{ fontSize: 11 }}
+                                        tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
+                                    />
+                                    <Tooltip
+                                        formatter={(value) => BRL.format(value)}
+                                        contentStyle={{ fontSize: 12, borderRadius: 4 }}
+                                    />
+                                    <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+                                    <Bar dataKey="previsto" name="Previsto" fill="#6366f1" radius={[3, 3, 0, 0]} />
+                                    <Bar dataKey="realizado" name="Realizado" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    {/* Tabs */}
+                    <div className="mt-6 bg-white shadow-sm rounded-lg">
+                        <div className="border-b border-gray-200">
+                            <nav className="flex -mb-px" aria-label="Tabs">
+                                {TABS.map((tab) => (
+                                    <button
+                                        key={tab.key}
+                                        onClick={() => setActiveTab(tab.key)}
+                                        className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+                                            activeTab === tab.key
+                                                ? 'border-indigo-600 text-indigo-700'
+                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                        }`}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </nav>
+                        </div>
+
+                        <div className="p-6">
+                            {activeTab === 'by_cost_center' && (
+                                <AggregationTable
+                                    rows={consumption?.by_cost_center || []}
+                                    dimensionLabel="Centro de custo"
+                                    showItemsCount
+                                />
+                            )}
+                            {activeTab === 'by_accounting_class' && (
+                                <AggregationTable
+                                    rows={consumption?.by_accounting_class || []}
+                                    dimensionLabel="Conta contábil"
+                                    showItemsCount
+                                />
+                            )}
+                            {activeTab === 'by_item' && (
+                                <ItemsTable rows={consumption?.by_item || []} />
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
         </AuthenticatedLayout>
     );
+}
+
+function AggregationTable({ rows, dimensionLabel, showItemsCount }) {
+    if (rows.length === 0) {
+        return (
+            <p className="text-center text-sm text-gray-500 py-8">
+                Nenhum dado para exibir neste orçamento.
+            </p>
+        );
+    }
+
+    return (
+        <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+                <thead>
+                    <tr className="border-b border-gray-200">
+                        <th className="px-3 py-2 text-left font-medium text-gray-700">
+                            {dimensionLabel}
+                        </th>
+                        {showItemsCount && (
+                            <th className="px-3 py-2 text-right font-medium text-gray-700">
+                                Linhas
+                            </th>
+                        )}
+                        <th className="px-3 py-2 text-right font-medium text-gray-700">
+                            Previsto
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium text-gray-700">
+                            Realizado
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium text-gray-700">
+                            Disponível
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium text-gray-700 w-48">
+                            Utilização
+                        </th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                    {rows.map((row) => (
+                        <tr key={row.id} className="hover:bg-gray-50">
+                            <td className="px-3 py-2">
+                                <span className="font-mono text-gray-700 text-xs">{row.code}</span>
+                                <span className="block text-gray-900">{row.name}</span>
+                            </td>
+                            {showItemsCount && (
+                                <td className="px-3 py-2 text-right text-gray-600 text-xs">
+                                    {row.items_count}
+                                </td>
+                            )}
+                            <td className="px-3 py-2 text-right font-mono text-gray-900">
+                                {BRL.format(row.forecast)}
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono text-gray-900">
+                                {BRL.format(row.realized)}
+                            </td>
+                            <td className={`px-3 py-2 text-right font-mono ${row.available < 0 ? 'text-red-600 font-semibold' : 'text-gray-900'}`}>
+                                {BRL.format(row.available)}
+                            </td>
+                            <td className="px-3 py-2">
+                                <UtilizationBar pct={row.utilization_pct} status={row.status} />
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+function ItemsTable({ rows }) {
+    if (rows.length === 0) {
+        return (
+            <p className="text-center text-sm text-gray-500 py-8">
+                Nenhuma linha cadastrada neste orçamento.
+            </p>
+        );
+    }
+
+    return (
+        <div className="overflow-x-auto">
+            <table className="min-w-full text-xs">
+                <thead>
+                    <tr className="border-b border-gray-200">
+                        <th className="px-2 py-2 text-left font-medium">Contábil</th>
+                        <th className="px-2 py-2 text-left font-medium">Gerencial</th>
+                        <th className="px-2 py-2 text-left font-medium">CC</th>
+                        <th className="px-2 py-2 text-left font-medium">Loja</th>
+                        <th className="px-2 py-2 text-left font-medium">Fornecedor</th>
+                        <th className="px-2 py-2 text-right font-medium">Previsto</th>
+                        <th className="px-2 py-2 text-right font-medium">Realizado</th>
+                        <th className="px-2 py-2 text-right font-medium">Disponível</th>
+                        <th className="px-2 py-2 text-right font-medium w-44">Utilização</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                    {rows.map((row) => (
+                        <tr key={row.id} className="hover:bg-gray-50">
+                            <td className="px-2 py-1.5">
+                                <span className="font-mono text-gray-700">
+                                    {row.accounting_class?.code || '—'}
+                                </span>
+                            </td>
+                            <td className="px-2 py-1.5">
+                                <span className="font-mono text-gray-700">
+                                    {row.management_class?.code || '—'}
+                                </span>
+                            </td>
+                            <td className="px-2 py-1.5">
+                                <span className="font-mono text-gray-700">
+                                    {row.cost_center?.code || '—'}
+                                </span>
+                            </td>
+                            <td className="px-2 py-1.5 text-gray-600">
+                                {row.store?.code || '—'}
+                            </td>
+                            <td className="px-2 py-1.5 text-gray-600 max-w-xs truncate" title={row.supplier}>
+                                {row.supplier || '—'}
+                            </td>
+                            <td className="px-2 py-1.5 text-right font-mono text-gray-900">
+                                {BRL.format(row.forecast)}
+                            </td>
+                            <td className="px-2 py-1.5 text-right font-mono text-gray-900">
+                                {BRL.format(row.realized)}
+                            </td>
+                            <td className={`px-2 py-1.5 text-right font-mono ${row.available < 0 ? 'text-red-600 font-semibold' : 'text-gray-900'}`}>
+                                {BRL.format(row.available)}
+                            </td>
+                            <td className="px-2 py-1.5">
+                                <UtilizationBar pct={row.utilization_pct} status={row.status} />
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+function UtilizationBar({ pct, status }) {
+    const color = STATUS_COLORS[status] || STATUS_COLORS.ok;
+    const displayPct = Math.min(pct, 100);
+
+    return (
+        <div className="flex items-center gap-2">
+            <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div
+                    className="h-2 rounded-full"
+                    style={{
+                        width: `${displayPct}%`,
+                        backgroundColor: color.bar,
+                    }}
+                />
+            </div>
+            <span className={`text-xs font-semibold ${color.text} w-14 text-right`}>
+                {pct.toFixed(1)}%
+            </span>
+        </div>
+    );
+}
+
+function overallColor(pct) {
+    if (pct >= 100) return 'red';
+    if (pct >= 70) return 'orange';
+    return 'green';
 }

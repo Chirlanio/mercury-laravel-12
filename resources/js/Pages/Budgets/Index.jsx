@@ -12,6 +12,7 @@ import {
     ExclamationTriangleIcon,
     ClockIcon,
     CloudArrowUpIcon,
+    ChartBarIcon,
 } from '@heroicons/react/24/outline';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
@@ -33,6 +34,7 @@ export default function Index({ budgets, filters = {}, statistics = {}, enums = 
     const canDownload = hasPermission(PERMISSIONS.DOWNLOAD_BUDGETS);
     const canDelete = hasPermission(PERMISSIONS.DELETE_BUDGETS);
     const canUpload = hasPermission(PERMISSIONS.UPLOAD_BUDGETS);
+    const canViewConsumption = hasPermission(PERMISSIONS.VIEW_BUDGET_CONSUMPTION);
 
     const { modals, selected, openModal, closeModal } = useModalManager(['detail', 'upload']);
 
@@ -193,6 +195,14 @@ export default function Index({ budgets, filters = {}, statistics = {}, enums = 
                         onView={() => handleDetailOpen(b)}
                         onDelete={(canDelete && !b.is_active) ? () => setDeleteTarget(b) : undefined}
                     />
+                    {canViewConsumption && (
+                        <ActionButtons.Custom
+                            variant="info"
+                            icon={ChartBarIcon}
+                            title="Dashboard de consumo"
+                            onClick={() => router.visit(route('budgets.dashboard', b.id))}
+                        />
+                    )}
                     {canDownload && (
                         <ActionButtons.Custom
                             variant="success"
