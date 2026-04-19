@@ -93,6 +93,14 @@ vendor/bin/pint        # Laravel Pint (PHP code style fixer)
 - `{Module}ExportService` + `{Module}ImportService` — XLSX/PDF export, XLSX/CSV import with upsert
 - Events dispatched post-commit; listeners handle notifications and integrations (e.g. Helpdesk hooks)
 
+**Movements (fonte de verdade CIGAM):**
+- Tabela `movements` é source of truth — outros módulos leem, nunca escrevem. Dependentes: Reversals (FK `movement_id`), Returns (FK `movement_id`), PurchaseOrderReceiptItems (FK `matched_movement_id` unique), `sales` (derivada via `refreshSalesSummary()`)
+- Movement codes: **1**=Compra (200k+ registros reais), **2**=Vendas, **6**=Devoluções (entry_exit='E'). Code 17 é referência documental e **nunca aparece** em dados reais — use code=1 para OCs
+- Scheduled: `movements:sync today` every 5min + `movements:sync auto` daily 06:00 (veja `routes/console.php`)
+- `MovementController::buildFilteredQuery()` centraliza filtros da listagem + exports — paridade garantida
+- NF é chave composta (`store_code` + `invoice_number`), não entidade — `MovementInvoiceService::find()` agrega os items
+- Detalhes em `C:\Users\MSDEV\.claude\projects\C--xampp-htdocs-mercury-laravel\memory\movements_module.md`
+
 ### Frontend Structure
 
 ```
