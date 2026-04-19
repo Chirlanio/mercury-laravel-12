@@ -58,9 +58,9 @@ export default function InvoiceDetailModal({ show, onClose, storeCode, invoiceNu
     const items = data?.items || [];
     const totals = data?.totals;
 
-    const headerBadges = data ? [
-        { label: `${totals?.items ?? 0} ${totals?.items === 1 ? 'item' : 'itens'}` },
-    ] : null;
+    const headerBadges = data
+        ? [{ text: `${totals?.items ?? 0} ${totals?.items === 1 ? 'item' : 'itens'}` }]
+        : [];
 
     const headerActions = data && (
         <div className="flex gap-2">
