@@ -48,6 +48,7 @@ return new class extends Migration
             // Divergência
             ['code' => 'DIV_COR', 'name' => 'Cor diferente do anúncio', 'category' => ReturnReasonCategory::DIVERGENCIA->value, 'description' => 'Cor do produto entregue diverge da cor mostrada nas fotos do e-commerce.', 'is_active' => true, 'sort_order' => 60, 'created_at' => $now, 'updated_at' => $now],
             ['code' => 'DIV_MODELO', 'name' => 'Modelo diferente do anúncio', 'category' => ReturnReasonCategory::DIVERGENCIA->value, 'description' => 'Modelo entregue diverge do produto anunciado.', 'is_active' => true, 'sort_order' => 70, 'created_at' => $now, 'updated_at' => $now],
+            ['code' => 'DIV_VALOR', 'name' => 'Valor cobrado incorreto', 'category' => ReturnReasonCategory::DIVERGENCIA->value, 'description' => 'Cliente foi cobrado a mais, desconto/cupom não foi aplicado ou frete errado.', 'is_active' => true, 'sort_order' => 75, 'created_at' => $now, 'updated_at' => $now],
             ['code' => 'DIV_QTD', 'name' => 'Quantidade divergente', 'category' => ReturnReasonCategory::DIVERGENCIA->value, 'description' => 'Quantidade recebida menor que a comprada.', 'is_active' => true, 'sort_order' => 80, 'created_at' => $now, 'updated_at' => $now],
 
             // Tamanho / Cor errados (erro do cliente, não da loja)
