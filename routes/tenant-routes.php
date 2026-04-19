@@ -1122,6 +1122,28 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ==========================================
+    // Budgets (Orçamentos)
+    // ==========================================
+    Route::middleware(['tenant.module:budgets', 'permission:'.Permission::VIEW_BUDGETS->value])->group(function () {
+        Route::get('/budgets', [\App\Http\Controllers\BudgetController::class, 'index'])->name('budgets.index');
+        Route::get('/budgets/statistics', [\App\Http\Controllers\BudgetController::class, 'statistics'])->name('budgets.statistics');
+        Route::get('/budgets/{budget}', [\App\Http\Controllers\BudgetController::class, 'show'])->whereNumber('budget')->name('budgets.show');
+
+        Route::middleware('permission:'.Permission::DOWNLOAD_BUDGETS->value)->group(function () {
+            Route::get('/budgets/{budget}/download', [\App\Http\Controllers\BudgetController::class, 'download'])->whereNumber('budget')->name('budgets.download');
+        });
+
+        Route::middleware('permission:'.Permission::UPLOAD_BUDGETS->value)->group(function () {
+            Route::post('/budgets', [\App\Http\Controllers\BudgetController::class, 'store'])->name('budgets.store');
+            Route::put('/budgets/{budget}', [\App\Http\Controllers\BudgetController::class, 'update'])->whereNumber('budget')->name('budgets.update');
+        });
+
+        Route::middleware('permission:'.Permission::DELETE_BUDGETS->value)->group(function () {
+            Route::delete('/budgets/{budget}', [\App\Http\Controllers\BudgetController::class, 'destroy'])->whereNumber('budget')->name('budgets.destroy');
+        });
+    });
+
+    // ==========================================
     // Management Classes (Plano de Contas Gerencial)
     // ==========================================
     Route::middleware(['tenant.module:management_classes', 'permission:'.Permission::VIEW_MANAGEMENT_CLASSES->value])->group(function () {
