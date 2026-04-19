@@ -1090,6 +1090,29 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ==========================================
+    // Accounting Classes (Plano de Contas — fundação do DRE)
+    // ==========================================
+    Route::middleware(['tenant.module:accounting_classes', 'permission:'.Permission::VIEW_ACCOUNTING_CLASSES->value])->group(function () {
+        Route::get('/accounting-classes', [\App\Http\Controllers\AccountingClassController::class, 'index'])->name('accounting-classes.index');
+        Route::get('/accounting-classes/statistics', [\App\Http\Controllers\AccountingClassController::class, 'statistics'])->name('accounting-classes.statistics');
+        Route::get('/accounting-classes/tree', [\App\Http\Controllers\AccountingClassController::class, 'tree'])->name('accounting-classes.tree');
+
+        Route::get('/accounting-classes/{accountingClass}', [\App\Http\Controllers\AccountingClassController::class, 'show'])->whereNumber('accountingClass')->name('accounting-classes.show');
+
+        Route::middleware('permission:'.Permission::CREATE_ACCOUNTING_CLASSES->value)->group(function () {
+            Route::post('/accounting-classes', [\App\Http\Controllers\AccountingClassController::class, 'store'])->name('accounting-classes.store');
+        });
+
+        Route::middleware('permission:'.Permission::EDIT_ACCOUNTING_CLASSES->value)->group(function () {
+            Route::put('/accounting-classes/{accountingClass}', [\App\Http\Controllers\AccountingClassController::class, 'update'])->whereNumber('accountingClass')->name('accounting-classes.update');
+        });
+
+        Route::middleware('permission:'.Permission::DELETE_ACCOUNTING_CLASSES->value)->group(function () {
+            Route::delete('/accounting-classes/{accountingClass}', [\App\Http\Controllers\AccountingClassController::class, 'destroy'])->whereNumber('accountingClass')->name('accounting-classes.destroy');
+        });
+    });
+
+    // ==========================================
     // Cost Centers (Centros de Custo — cadastro standalone)
     // ==========================================
     Route::middleware(['tenant.module:cost_centers', 'permission:'.Permission::VIEW_COST_CENTERS->value])->group(function () {
