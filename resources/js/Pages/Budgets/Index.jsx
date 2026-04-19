@@ -13,7 +13,6 @@ import {
     ClockIcon,
     CloudArrowUpIcon,
 } from '@heroicons/react/24/outline';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
 import Button from '@/Components/Button';
@@ -22,6 +21,9 @@ import DataTable from '@/Components/DataTable';
 import StandardModal from '@/Components/StandardModal';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import StatusBadge from '@/Components/Shared/StatusBadge';
+import TextInput from '@/Components/TextInput';
+import InputLabel from '@/Components/InputLabel';
+import BudgetUploadWizard from './components/BudgetUploadWizard';
 
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -32,7 +34,7 @@ export default function Index({ budgets, filters = {}, statistics = {}, enums = 
     const canDelete = hasPermission(PERMISSIONS.DELETE_BUDGETS);
     const canUpload = hasPermission(PERMISSIONS.UPLOAD_BUDGETS);
 
-    const { modals, selected, openModal, closeModal } = useModalManager(['detail']);
+    const { modals, selected, openModal, closeModal } = useModalManager(['detail', 'upload']);
 
     // ------------------------------------------------------------------
     // Detail
@@ -168,10 +170,9 @@ export default function Index({ budgets, filters = {}, statistics = {}, enums = 
             key: 'is_active',
             label: 'Status',
             render: (b) => (
-                <StatusBadge
-                    status={b.is_active ? 'success' : 'gray'}
-                    text={b.is_active ? 'Ativo' : 'Inativo'}
-                />
+                <StatusBadge variant={b.is_active ? 'success' : 'gray'}>
+                    {b.is_active ? 'Ativo' : 'Inativo'}
+                </StatusBadge>
             ),
         },
         {
@@ -206,7 +207,7 @@ export default function Index({ budgets, filters = {}, statistics = {}, enums = 
     ];
 
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="Orçamentos" />
 
             <div className="py-12">
@@ -222,8 +223,7 @@ export default function Index({ budgets, filters = {}, statistics = {}, enums = 
                             <Button
                                 variant="primary"
                                 icon={CloudArrowUpIcon}
-                                disabled
-                                title="Upload completo com parse Excel será liberado na próxima fase"
+                                onClick={() => openModal('upload')}
                             >
                                 Novo Upload
                             </Button>
@@ -232,42 +232,23 @@ export default function Index({ budgets, filters = {}, statistics = {}, enums = 
 
                     <StatisticsGrid cards={statisticsCards} cols={5} />
 
-                    <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4 flex items-start gap-2">
-                        <ExclamationTriangleIcon className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                        <div className="text-sm text-amber-800">
-                            <p className="font-medium">MVP — Fase 1 ativa</p>
-                            <p className="text-xs mt-1">
-                                Listagem, detalhes, download e exclusão de versões já estão funcionais.
-                                Upload de planilha Excel com preview, reconciliação automática de FKs e
-                                fuzzy matching será liberado na <strong>Fase 2</strong>. Por enquanto,
-                                novos orçamentos podem ser criados via API (POST <code>/budgets</code> com
-                                multipart: arquivo + <code>items[]</code> com FKs resolvidas).
-                            </p>
-                        </div>
-                    </div>
-
                     <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Buscar
-                                </label>
-                                <input
-                                    type="text"
+                                <InputLabel value="Buscar" className="mb-2" />
+                                <TextInput
+                                    className="w-full text-sm"
                                     value={filters.search || ''}
                                     onChange={(e) => applyFilter('search', e.target.value)}
                                     placeholder="Escopo, versão ou arquivo..."
-                                    className="w-full rounded-md border-gray-300 shadow-sm text-sm"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Ano
-                                </label>
+                                <InputLabel value="Ano" className="mb-2" />
                                 <select
                                     value={filters.year || ''}
                                     onChange={(e) => applyFilter('year', e.target.value)}
-                                    className="w-full rounded-md border-gray-300 shadow-sm text-sm"
+                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
                                 >
                                     <option value="">Todos</option>
                                     {(selects.years || []).map((y) => (
@@ -276,13 +257,11 @@ export default function Index({ budgets, filters = {}, statistics = {}, enums = 
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Escopo
-                                </label>
+                                <InputLabel value="Escopo" className="mb-2" />
                                 <select
                                     value={filters.scope_label || ''}
                                     onChange={(e) => applyFilter('scope_label', e.target.value)}
-                                    className="w-full rounded-md border-gray-300 shadow-sm text-sm"
+                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
                                 >
                                     <option value="">Todos</option>
                                     {(selects.scopes || []).map((s) => (
@@ -291,13 +270,11 @@ export default function Index({ budgets, filters = {}, statistics = {}, enums = 
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Tipo
-                                </label>
+                                <InputLabel value="Tipo" className="mb-2" />
                                 <select
                                     value={filters.upload_type || ''}
                                     onChange={(e) => applyFilter('upload_type', e.target.value)}
-                                    className="w-full rounded-md border-gray-300 shadow-sm text-sm"
+                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
                                 >
                                     <option value="">Todos</option>
                                     {Object.entries(enums.uploadTypes || {}).map(([k, v]) => (
@@ -540,20 +517,25 @@ export default function Index({ budgets, filters = {}, statistics = {}, enums = 
                         </p>
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Motivo da exclusão *
-                        </label>
-                        <input
-                            type="text"
+                        <InputLabel value="Motivo da exclusão *" className="mb-1 text-xs" />
+                        <TextInput
+                            className="w-full text-sm"
                             value={deleteReason}
                             onChange={(e) => setDeleteReason(e.target.value)}
                             placeholder="Mínimo 3 caracteres"
-                            className="w-full rounded-md border-gray-300 shadow-sm text-sm"
                         />
                     </div>
                 </div>
             </StandardModal>
-        </AuthenticatedLayout>
+
+            {/* -------- Upload Wizard -------- */}
+            <BudgetUploadWizard
+                show={modals.upload}
+                onClose={() => closeModal('upload')}
+                enums={enums}
+                selects={selects}
+            />
+        </>
     );
 }
 
