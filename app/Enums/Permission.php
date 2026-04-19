@@ -235,6 +235,15 @@ enum Permission: string
     case IMPORT_COST_CENTERS = 'cost_centers.import';
     case EXPORT_COST_CENTERS = 'cost_centers.export';
 
+    // Plano de Contas Contábil (Accounting Classes — fundação do DRE)
+    case VIEW_ACCOUNTING_CLASSES = 'accounting_classes.view';
+    case CREATE_ACCOUNTING_CLASSES = 'accounting_classes.create';
+    case EDIT_ACCOUNTING_CLASSES = 'accounting_classes.edit';
+    case DELETE_ACCOUNTING_CLASSES = 'accounting_classes.delete';
+    case MANAGE_ACCOUNTING_CLASSES = 'accounting_classes.manage';
+    case IMPORT_ACCOUNTING_CLASSES = 'accounting_classes.import';
+    case EXPORT_ACCOUNTING_CLASSES = 'accounting_classes.export';
+
     public function label(): string
     {
         return match ($this) {
@@ -429,6 +438,14 @@ enum Permission: string
             self::MANAGE_COST_CENTERS => 'Gerenciar centros de custo (todas as áreas)',
             self::IMPORT_COST_CENTERS => 'Importar centros de custo (planilha)',
             self::EXPORT_COST_CENTERS => 'Exportar centros de custo',
+            // Plano de Contas Contábil
+            self::VIEW_ACCOUNTING_CLASSES => 'Visualizar plano de contas contábil',
+            self::CREATE_ACCOUNTING_CLASSES => 'Criar contas contábeis',
+            self::EDIT_ACCOUNTING_CLASSES => 'Editar contas contábeis',
+            self::DELETE_ACCOUNTING_CLASSES => 'Excluir contas contábeis',
+            self::MANAGE_ACCOUNTING_CLASSES => 'Gerenciar plano de contas (estrutura completa)',
+            self::IMPORT_ACCOUNTING_CLASSES => 'Importar plano de contas (planilha)',
+            self::EXPORT_ACCOUNTING_CLASSES => 'Exportar plano de contas',
         };
     }
 
@@ -626,6 +643,14 @@ enum Permission: string
             self::MANAGE_COST_CENTERS => 'Permite gerenciar centros de custo de todas as áreas (sem filtro por área)',
             self::IMPORT_COST_CENTERS => 'Permite importar centros de custo via planilha (XLSX/CSV)',
             self::EXPORT_COST_CENTERS => 'Permite exportar centros de custo para Excel',
+            // Plano de Contas Contábil
+            self::VIEW_ACCOUNTING_CLASSES => 'Permite visualizar o plano de contas contábil (estrutura hierárquica + grupos DRE)',
+            self::CREATE_ACCOUNTING_CLASSES => 'Permite cadastrar novas contas contábeis no plano',
+            self::EDIT_ACCOUNTING_CLASSES => 'Permite editar contas existentes (incluindo reclassificação DRE)',
+            self::DELETE_ACCOUNTING_CLASSES => 'Permite excluir contas contábeis (soft delete). Bloqueado se houver filhas ativas ou lançamentos',
+            self::MANAGE_ACCOUNTING_CLASSES => 'Permite gerenciar toda a estrutura do plano de contas (alterar hierarquia e grupos DRE)',
+            self::IMPORT_ACCOUNTING_CLASSES => 'Permite importar plano de contas personalizado via planilha',
+            self::EXPORT_ACCOUNTING_CLASSES => 'Permite exportar o plano de contas para Excel',
         };
     }
 

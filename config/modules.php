@@ -261,4 +261,10 @@ return [
         'routes' => ['cost-centers.*'],
         'icon' => 'Squares2X2Icon',
     ],
+    'accounting_classes' => [
+        'name' => 'Plano de Contas',
+        'description' => 'Plano de contas contábil com grupos DRE — fundação dos relatórios gerenciais e orçamentos.',
+        'routes' => ['accounting-classes.*'],
+        'icon' => 'DocumentChartBarIcon',
+    ],
 ];

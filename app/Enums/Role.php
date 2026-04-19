@@ -216,6 +216,14 @@ enum Role: string
                 Permission::MANAGE_COST_CENTERS->value,
                 Permission::IMPORT_COST_CENTERS->value,
                 Permission::EXPORT_COST_CENTERS->value,
+                // Plano de Contas Contábil (todas)
+                Permission::VIEW_ACCOUNTING_CLASSES->value,
+                Permission::CREATE_ACCOUNTING_CLASSES->value,
+                Permission::EDIT_ACCOUNTING_CLASSES->value,
+                Permission::DELETE_ACCOUNTING_CLASSES->value,
+                Permission::MANAGE_ACCOUNTING_CLASSES->value,
+                Permission::IMPORT_ACCOUNTING_CLASSES->value,
+                Permission::EXPORT_ACCOUNTING_CLASSES->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -394,6 +402,14 @@ enum Role: string
                 Permission::MANAGE_COST_CENTERS->value,
                 Permission::IMPORT_COST_CENTERS->value,
                 Permission::EXPORT_COST_CENTERS->value,
+                // Plano de Contas Contábil (todas)
+                Permission::VIEW_ACCOUNTING_CLASSES->value,
+                Permission::CREATE_ACCOUNTING_CLASSES->value,
+                Permission::EDIT_ACCOUNTING_CLASSES->value,
+                Permission::DELETE_ACCOUNTING_CLASSES->value,
+                Permission::MANAGE_ACCOUNTING_CLASSES->value,
+                Permission::IMPORT_ACCOUNTING_CLASSES->value,
+                Permission::EXPORT_ACCOUNTING_CLASSES->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -496,6 +512,9 @@ enum Role: string
                 // Centros de Custo (view + export apenas — cadastro é do financeiro/admin)
                 Permission::VIEW_COST_CENTERS->value,
                 Permission::EXPORT_COST_CENTERS->value,
+                // Plano de Contas (view + export apenas — cadastro é do contábil)
+                Permission::VIEW_ACCOUNTING_CLASSES->value,
+                Permission::EXPORT_ACCOUNTING_CLASSES->value,
             ],
             self::USER => [
                 // Apenas próprio perfil
