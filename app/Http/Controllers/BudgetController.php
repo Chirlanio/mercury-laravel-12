@@ -51,6 +51,54 @@ class BudgetController extends Controller
     }
 
     /**
+     * Lista items de orçamento para um CostCenter específico — usado pelo
+     * form de OrderPayment para popular dropdown "Vincular a linha de
+     * orçamento". Filtra pelo budget ativo do ano informado (default: ano
+     * atual) para o CC em questão.
+     */
+    public function itemsForCostCenter(Request $request, int $costCenterId): JsonResponse
+    {
+        $year = $request->integer('year', (int) now()->year);
+
+        // Budgets ativos do ano que tenham items no CC requisitado
+        $items = \App\Models\BudgetItem::query()
+            ->with(['accountingClass:id,code,name', 'managementClass:id,code,name', 'upload:id,scope_label,version_label,year'])
+            ->whereHas('upload', function ($q) use ($year) {
+                $q->where('year', $year)
+                    ->where('is_active', true)
+                    ->whereNull('deleted_at');
+            })
+            ->where('cost_center_id', $costCenterId)
+            ->orderBy('accounting_class_id')
+            ->get();
+
+        return response()->json([
+            'items' => $items->map(fn ($i) => [
+                'id' => $i->id,
+                'label' => sprintf(
+                    '%s · %s — %s (%s %s)',
+                    $i->accountingClass?->code ?? '?',
+                    $i->managementClass?->code ?? '?',
+                    $i->supplier ?? '(sem fornecedor)',
+                    $i->upload?->scope_label ?? '?',
+                    $i->upload?->version_label ? 'v'.$i->upload->version_label : ''
+                ),
+                'accounting_class' => $i->accountingClass
+                    ? ['id' => $i->accountingClass->id, 'code' => $i->accountingClass->code, 'name' => $i->accountingClass->name]
+                    : null,
+                'management_class' => $i->managementClass
+                    ? ['id' => $i->managementClass->id, 'code' => $i->managementClass->code, 'name' => $i->managementClass->name]
+                    : null,
+                'supplier' => $i->supplier,
+                'year_total' => (float) $i->year_total,
+                'budget_upload' => $i->upload
+                    ? ['id' => $i->upload->id, 'scope_label' => $i->upload->scope_label, 'version_label' => $i->upload->version_label]
+                    : null,
+            ])->values(),
+        ]);
+    }
+
+    /**
      * JSON do consumo — útil para polling/refresh sem recarregar a página.
      */
     public function consumptionJson(BudgetUpload $budget): JsonResponse

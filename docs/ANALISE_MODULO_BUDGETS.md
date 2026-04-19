@@ -1,9 +1,9 @@
-# Análise do Módulo — Orçamentos (Budgets) · Fases 1 + 2
+# Análise do Módulo — Orçamentos (Budgets) · Fases 1 + 2 + 3
 
-**Data de conclusão da Fase 2:** 20/04/2026
-**Commits:** 9 (Fase 1: 5 + Fase 2: 4)
-**Testes:** 39 feature tests / 162 assertions
-**Regressão fundação + Budgets:** 89 tests / 347 assertions
+**Data de conclusão da Fase 3:** 20/04/2026
+**Commits:** 13 (Fase 1: 5 + Fase 2: 4 + Fase 3: 4)
+**Testes:** 53 feature tests / 244 assertions
+**Regressão fundação + Budgets:** 103 tests / 429 assertions
 
 ---
 
@@ -30,9 +30,9 @@ Estrutura completa de orçamento com versionamento automático e armazenamento d
 
 ### O que ainda NÃO está disponível (próximas fases)
 
-- **Fase 3**: FK reversa `order_payments.budget_item_id` + dashboard consumo previsto × realizado
 - **Fase 4**: Command diário de alerta ≥ 80% consumo + notifications
 - **Fase 5**: Export xlsx consolidado (previsto + realizado) + PDF resumo
+- **Follow-up pós-Fase 3**: Integração do dropdown "Vincular a linha de orçamento" no form de OrderPayment (backend já disponível via `GET /budgets/items-for-cost-center/{cc}?year=YYYY`)
 
 ---
 
@@ -264,17 +264,83 @@ UX crítica: se usuário não interagir com um dropdown, a sugestão com menor d
 
 ---
 
+## Fase 3 — Consumo previsto × realizado (CONCLUÍDA 2026-04-20)
+
+Conecta o Budgets ao módulo financeiro. OrderPayments passam a poder ser vinculadas a linhas específicas do orçamento via `budget_item_id`, e um dashboard agregado mostra previsto × realizado em 4 dimensões (item, CC, AC, mês).
+
+### Entregas
+
+**Backend (2 commits):**
+- Migration `order_payments.budget_item_id` (FK nullable, onDelete=null, index)
+- Relations: `OrderPayment::budgetItem()` + `BudgetItem::orderPayments()`
+- `BudgetConsumptionService::getConsumption(BudgetUpload)` retorna:
+  - `totals` (forecast/realized/available/utilization_pct)
+  - `by_item` com semáforo status (ok/warning/exceeded)
+  - `by_cost_center` + `by_accounting_class` agregados ordenados por % DESC
+  - `by_month` 12 pontos (forecast = soma das colunas mensais, realized = OPs do ano agrupadas por mês)
+- Endpoints:
+  - `GET /budgets/{id}/dashboard` (Inertia page)
+  - `GET /budgets/{id}/consumption` (JSON)
+  - `GET /budgets/items-for-cost-center/{cc}?year=YYYY` (dropdown helper para futura integração com form de OP)
+
+**Frontend (1 commit):**
+- `Pages/Budgets/Dashboard.jsx` (~370 linhas)
+- StatisticsGrid com 5 KPIs (previsto/realizado/disponível/utilização/linhas em alerta)
+- Gráfico recharts BarChart previsto × realizado por mês (ResponsiveContainer, tooltip BR, tickFormatter em k)
+- 3 tabs navegáveis: por CC, por AC, detalhe por linha
+- UtilizationBar horizontal com cores por status (verde < 70%, amber 70–99%, vermelho ≥ 100%)
+- Ícone ChartBarIcon em cada linha da listagem abre o dashboard
+
+### Regras de agregação do service
+
+- **Ignora OPs com `status='backlog'`** (ainda não comprometidas)
+- **Ignora OPs soft-deleted** (deleted_at IS NOT NULL)
+- **Semáforo**: ok `<70%`, warning `70-99.99%`, exceeded `≥100%`
+- **`forecast=0` + `realized>0`** → `exceeded` (overrun implícito)
+- **by_month** extrai mês no PHP (driver-agnostic — funciona SQLite/MySQL/Postgres). Trade-off: transporta rows, aceitável para volumes de 1 ano de OPs
+
+### Performance
+
+- 1 query agregada `GROUP BY budget_item_id` para realized por item (N itens → 1 query)
+- Agregações by_cc / by_ac feitas em memória a partir do resultado acima (evita duplicar SQL)
+- by_month: 1 query busca todas OPs do ano do budget, agrega no PHP (compromisso driver-agnostic)
+
+### Decisões arquiteturais adicionais
+
+#### 1. `budget_item_id` com onDelete=null (não cascade)
+Razão: OP é registro financeiro legal. Deletar um item de orçamento não deve apagar OPs vinculadas — só perder o vínculo. Rastreabilidade financeira preservada independentemente.
+
+#### 2. Ignora backlog mas conta doing/waiting/done
+OPs em `backlog` ainda estão em planejamento (podem ser descartadas). Uma vez que saem de backlog, são comprometimentos de orçamento reais.
+
+#### 3. Dashboard page separada (não modal)
+Volume de dados (5 cards + gráfico + 3 tabelas tab'áveis) justifica navegação. Breadcrumb "voltar para orçamentos" mantém contexto.
+
+#### 4. Semáforo em 3 níveis (não 2)
+Alternativa considerada: só verde/vermelho em 100%. Escolhido 3 níveis (amber em 70%) para dar sinal antecipado de risco — equipe financeira pode agir antes de estourar.
+
+### Fase 3 — Commits
+
+| Hash | Descrição |
+|---|---|
+| `01baf36` | Migration + relations `OrderPayment ↔ BudgetItem` |
+| `950ca4a` | BudgetConsumptionService + endpoints + 11 tests |
+| `44a0a7c` | Frontend Dashboard.jsx + recharts + Index link |
+| `(este)` | Endpoint items-for-cost-center + docs |
+
+---
+
 ## Próximos passos
 
-### Fase 3 — Consumo previsto × realizado
+### Fase 4 — Alertas automatizados
 - Migration `order_payments.budget_item_id` (FK nullable)
 - Controller do dashboard com queries agregadas por CC/AC/MC/mês
 - Comparativo previsto (do budget ativo do mesmo year+scope) vs realizado (sum de order_payments vinculadas)
 - Alertas visuais em amarelo (≥ 80%) e vermelho (≥ 100%)
 
 ### Fase 4 — Alertas automatizados
-- Command `budgets:alert` (daily 09:00)
-- Notification database + mail para `APPROVE_BUDGETS` quando CC atinge threshold
+- Command `budgets:alert` (daily 09:00) usa `BudgetConsumptionService` para scanear budgets ativos
+- Notification database + mail quando CC/item atinge threshold (70% warning, 100% exceeded)
 - Thresholds configuráveis por tenant (settings)
 
 ### Fase 5 — Export consolidado

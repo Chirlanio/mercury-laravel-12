@@ -301,4 +301,44 @@ class BudgetConsumptionTest extends TestCase
 
         $response->assertStatus(403);
     }
+
+    public function test_items_for_cost_center_returns_items_from_active_budget(): void
+    {
+        $response = $this->actingAs($this->adminUser)
+            ->getJson(route('budgets.items-for-cost-center', [
+                'costCenter' => $this->cc1->id,
+                'year' => 2026,
+            ]));
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure(['items' => [['id', 'label', 'accounting_class', 'management_class', 'year_total', 'budget_upload']]]);
+        $this->assertCount(1, $response->json('items'));
+        $this->assertEquals($this->item1->id, $response->json('items.0.id'));
+    }
+
+    public function test_items_for_cost_center_skips_inactive_budgets(): void
+    {
+        $this->budget->update(['is_active' => false]);
+
+        $response = $this->actingAs($this->adminUser)
+            ->getJson(route('budgets.items-for-cost-center', [
+                'costCenter' => $this->cc1->id,
+                'year' => 2026,
+            ]));
+
+        $response->assertStatus(200);
+        $this->assertCount(0, $response->json('items'));
+    }
+
+    public function test_items_for_cost_center_filters_by_year(): void
+    {
+        $response = $this->actingAs($this->adminUser)
+            ->getJson(route('budgets.items-for-cost-center', [
+                'costCenter' => $this->cc1->id,
+                'year' => 2025, // ano diferente — nenhum budget ativo
+            ]));
+
+        $response->assertStatus(200);
+        $this->assertCount(0, $response->json('items'));
+    }
 }
