@@ -11,6 +11,7 @@ import ViewModal from '@/Components/Movements/ViewModal';
 import InvoiceDetailModal from '@/Components/Movements/InvoiceDetailModal';
 import {
     ArrowPathIcon, ClockIcon, MagnifyingGlassIcon, XMarkIcon,
+    DocumentArrowDownIcon, PrinterIcon,
 } from '@heroicons/react/24/outline';
 
 export default function Index({ movements, stores, movementTypes, filters, cigamAvailable, cigamUnavailableReason }) {
@@ -49,6 +50,21 @@ export default function Index({ movements, stores, movementTypes, filters, cigam
         setLocalFilters(prev => ({ ...prev, [key]: value }));
     };
 
+    const buildExportUrl = (format) => {
+        const params = new URLSearchParams();
+        Object.entries(filters).forEach(([k, v]) => {
+            if (v !== null && v !== undefined && v !== '') {
+                params.append(k, v);
+            }
+        });
+        const qs = params.toString();
+        return `/movements/export/${format}${qs ? '?'+qs : ''}`;
+    };
+
+    const downloadExport = (format) => {
+        window.location.href = buildExportUrl(format);
+    };
+
     const fmt = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
 
     return (
@@ -64,6 +80,14 @@ export default function Index({ movements, stores, movementTypes, filters, cigam
                             <p className="mt-1 text-sm text-gray-600">Dados granulares do CIGAM - fonte de verdade para vendas e estoque</p>
                         </div>
                         <div className="flex gap-2">
+                            <Button variant="outline" onClick={() => downloadExport('xlsx')} icon={DocumentArrowDownIcon}
+                                disabled={!movements.total}>
+                                XLSX
+                            </Button>
+                            <Button variant="outline" onClick={() => downloadExport('pdf')} icon={PrinterIcon}
+                                disabled={!movements.total}>
+                                PDF
+                            </Button>
                             {canSync && (
                                 <>
                                     <Button variant="outline" onClick={() => openModal('syncLogs')} icon={ClockIcon}>

@@ -430,6 +430,8 @@ Route::middleware(['auth', 'tenant.module:sales', 'permission:'.Permission::VIEW
 Route::middleware(['auth', 'tenant.module:movements', 'permission:'.Permission::VIEW_MOVEMENTS->value])->group(function () {
     Route::get('/movements/statistics', [MovementController::class, 'statistics'])->name('movements.statistics');
     Route::get('/movements/sync-logs', [MovementController::class, 'syncLogs'])->name('movements.sync-logs');
+    Route::get('/movements/export/xlsx', [MovementController::class, 'exportXlsx'])->name('movements.export.xlsx');
+    Route::get('/movements/export/pdf', [MovementController::class, 'exportPdf'])->name('movements.export.pdf');
     Route::get('/movements/invoice/{storeCode}/{invoiceNumber}', [MovementController::class, 'invoice'])
         ->where(['storeCode' => '[A-Za-z0-9]+', 'invoiceNumber' => '[A-Za-z0-9]+'])
         ->name('movements.invoice');

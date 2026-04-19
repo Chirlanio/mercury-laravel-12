@@ -9,6 +9,7 @@ use App\Models\MovementType;
 use App\Models\Store;
 use App\Services\CigamSyncService;
 use App\Services\MovementInvoiceService;
+use App\Services\MovementListExportService;
 use App\Services\MovementSyncService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -17,7 +18,13 @@ use Inertia\Inertia;
 
 class MovementController extends Controller
 {
-    public function index(Request $request)
+    /**
+     * Aplica os filtros de listagem (index + exports) a uma query de Movement.
+     * Centraliza a lógica para garantir que o export reflita exatamente a listagem.
+     *
+     * @return array{query: \Illuminate\Database\Eloquent\Builder, filters: array}
+     */
+    protected function buildFilteredQuery(Request $request): array
     {
         $dateStart = $request->get('date_start', now()->toDateString());
         $dateEnd = $request->get('date_end', now()->toDateString());
@@ -71,6 +78,26 @@ class MovementController extends Controller
             });
         }
 
+        return [
+            'query' => $query,
+            'filters' => [
+                'date_start' => $dateStart,
+                'date_end' => $dateEnd,
+                'store_code' => $storeCode,
+                'movement_code' => $movementCode,
+                'entry_exit' => $entryExit,
+                'cpf_consultant' => $cpfConsultant,
+                'cpf_customer' => $cpfCustomer,
+                'sync_status' => $syncStatus,
+                'search' => $search,
+            ],
+        ];
+    }
+
+    public function index(Request $request)
+    {
+        ['query' => $query, 'filters' => $filters] = $this->buildFilteredQuery($request);
+
         $movements = $query->paginate(50)->through(fn ($m) => [
             'id' => $m->id,
             'movement_date' => $m->movement_date->format('d/m/Y'),
@@ -107,17 +134,7 @@ class MovementController extends Controller
             'movements' => $movements,
             'stores' => $stores,
             'movementTypes' => $movementTypes,
-            'filters' => [
-                'date_start' => $dateStart,
-                'date_end' => $dateEnd,
-                'store_code' => $storeCode,
-                'movement_code' => $movementCode,
-                'entry_exit' => $entryExit,
-                'cpf_consultant' => $cpfConsultant,
-                'cpf_customer' => $cpfCustomer,
-                'sync_status' => $syncStatus,
-                'search' => $search,
-            ],
+            'filters' => $filters,
             'cigamAvailable' => $cigamAvailable,
             'cigamUnavailableReason' => $cigamAvailable ? null : $cigamService->getUnavailableReason(),
         ]);
@@ -199,6 +216,28 @@ class MovementController extends Controller
     public function invoicePdf(string $storeCode, string $invoiceNumber)
     {
         return app(MovementInvoiceService::class)->exportPdf($storeCode, $invoiceNumber);
+    }
+
+    // =============================================
+    // LIST EXPORTS (xlsx / pdf) — respeitam filtros do index
+    // =============================================
+
+    public function exportXlsx(Request $request)
+    {
+        set_time_limit(0);
+
+        ['query' => $query, 'filters' => $filters] = $this->buildFilteredQuery($request);
+
+        return app(MovementListExportService::class)->exportXlsx($query, $filters);
+    }
+
+    public function exportPdf(Request $request)
+    {
+        set_time_limit(0);
+
+        ['query' => $query, 'filters' => $filters] = $this->buildFilteredQuery($request);
+
+        return app(MovementListExportService::class)->exportPdf($query, $filters);
     }
 
     // =============================================
