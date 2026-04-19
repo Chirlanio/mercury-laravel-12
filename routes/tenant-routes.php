@@ -1127,6 +1127,7 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['tenant.module:budgets', 'permission:'.Permission::VIEW_BUDGETS->value])->group(function () {
         Route::get('/budgets', [\App\Http\Controllers\BudgetController::class, 'index'])->name('budgets.index');
         Route::get('/budgets/statistics', [\App\Http\Controllers\BudgetController::class, 'statistics'])->name('budgets.statistics');
+        Route::get('/budgets/template', [\App\Http\Controllers\BudgetController::class, 'template'])->name('budgets.template');
         Route::get('/budgets/{budget}', [\App\Http\Controllers\BudgetController::class, 'show'])->whereNumber('budget')->name('budgets.show');
 
         Route::middleware('permission:'.Permission::DOWNLOAD_BUDGETS->value)->group(function () {

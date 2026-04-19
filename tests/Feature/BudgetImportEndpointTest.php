@@ -244,4 +244,13 @@ class BudgetImportEndpointTest extends TestCase
 
         $response->assertSessionHasErrors(['year', 'scope_label', 'upload_type']);
     }
+
+    public function test_template_download_returns_xlsx(): void
+    {
+        $response = $this->actingAs($this->adminUser)
+            ->get(route('budgets.template'));
+
+        $response->assertStatus(200);
+        $this->assertStringContainsString('spreadsheetml', $response->headers->get('Content-Type'));
+    }
 }

@@ -9,6 +9,7 @@ import {
     ArrowRightIcon,
     ArrowLeftIcon,
     DocumentMagnifyingGlassIcon,
+    ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
 import StandardModal from '@/Components/StandardModal';
 import Button from '@/Components/Button';
@@ -331,6 +332,17 @@ export default function BudgetUploadWizard({ show, onClose, enums = {}, selects 
                                 <code>janeiro, fevereiro, ...</code> ou <code>01-12</code>.
                                 Formato BR aceito (<code>1.234,56</code>).
                             </p>
+                        </div>
+
+                        <div className="mt-3">
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                icon={ArrowDownTrayIcon}
+                                onClick={() => window.location.href = route('budgets.template')}
+                            >
+                                Baixar template xlsx (com exemplos)
+                            </Button>
                         </div>
                     </StandardModal.Section>
                 </>

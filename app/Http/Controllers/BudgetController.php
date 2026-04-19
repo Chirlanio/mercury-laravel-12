@@ -187,6 +187,59 @@ class BudgetController extends Controller
     }
 
     /**
+     * Template xlsx pré-formatado com todos os cabeçalhos aceitos.
+     * Download público para usuários que não conhecem o formato.
+     */
+    public function template()
+    {
+        $headings = [
+            'codigo_contabil', 'codigo_gerencial', 'codigo_centro_custo', 'codigo_loja',
+            'fornecedor', 'justificativa', 'descricao_conta', 'descricao_classe',
+            'jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez',
+        ];
+
+        $exampleRows = [
+            [
+                '5.2.01', 'MC-EXEMPLO', 'CC-001', 'Z100',
+                'Fornecedor Exemplo S/A', 'Contrato anual',
+                'Salários e ordenados', 'Folha de pagamento TI',
+                '10000.00', '10000.00', '10000.00', '10000.00',
+                '10000.00', '10000.00', '10000.00', '10000.00',
+                '10000.00', '10000.00', '10000.00', '13000.00',
+            ],
+            [
+                '5.2.03', 'MC-EXEMPLO', 'CC-001', '',
+                '', 'Aluguel loja matriz',
+                'Aluguel', '',
+                '5000', '5000', '5000', '5000',
+                '5000', '5000', '5000', '5000',
+                '5000', '5000', '5000', '5000',
+            ],
+        ];
+
+        $export = new class($exampleRows, $headings) implements \Maatwebsite\Excel\Concerns\FromArray, \Maatwebsite\Excel\Concerns\WithHeadings
+        {
+            public function __construct(public array $rows, public array $headings) {}
+
+            public function array(): array
+            {
+                return $this->rows;
+            }
+
+            public function headings(): array
+            {
+                return $this->headings;
+            }
+        };
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            $export,
+            'template-orcamento.xlsx',
+            \Maatwebsite\Excel\Excel::XLSX
+        );
+    }
+
+    /**
      * Passo 1 do upload — analisa o xlsx, retorna diagnóstico com
      * linhas válidas/pendentes/rejeitadas + sugestões fuzzy para
      * códigos ausentes. Não persiste nada.
