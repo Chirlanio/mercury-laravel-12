@@ -1093,6 +1093,16 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['tenant.module:cost_centers', 'permission:'.Permission::VIEW_COST_CENTERS->value])->group(function () {
         Route::get('/cost-centers', [\App\Http\Controllers\CostCenterController::class, 'index'])->name('cost-centers.index');
         Route::get('/cost-centers/statistics', [\App\Http\Controllers\CostCenterController::class, 'statistics'])->name('cost-centers.statistics');
+
+        Route::middleware('permission:'.Permission::EXPORT_COST_CENTERS->value)->group(function () {
+            Route::get('/cost-centers/export', [\App\Http\Controllers\CostCenterController::class, 'export'])->name('cost-centers.export');
+        });
+
+        Route::middleware('permission:'.Permission::IMPORT_COST_CENTERS->value)->group(function () {
+            Route::post('/cost-centers/import/preview', [\App\Http\Controllers\CostCenterController::class, 'importPreview'])->name('cost-centers.import.preview');
+            Route::post('/cost-centers/import', [\App\Http\Controllers\CostCenterController::class, 'importStore'])->name('cost-centers.import.store');
+        });
+
         Route::get('/cost-centers/{costCenter}', [\App\Http\Controllers\CostCenterController::class, 'show'])->whereNumber('costCenter')->name('cost-centers.show');
 
         Route::middleware('permission:'.Permission::CREATE_COST_CENTERS->value)->group(function () {

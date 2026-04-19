@@ -214,6 +214,15 @@ export const PERMISSIONS = {
     IMPORT_RETURNS: 'returns.import',
     EXPORT_RETURNS: 'returns.export',
     MANAGE_RETURN_REASONS: 'returns.manage_reasons',
+
+    // Centros de Custo
+    VIEW_COST_CENTERS: 'cost_centers.view',
+    CREATE_COST_CENTERS: 'cost_centers.create',
+    EDIT_COST_CENTERS: 'cost_centers.edit',
+    DELETE_COST_CENTERS: 'cost_centers.delete',
+    MANAGE_COST_CENTERS: 'cost_centers.manage',
+    IMPORT_COST_CENTERS: 'cost_centers.import',
+    EXPORT_COST_CENTERS: 'cost_centers.export',
 };
 
 export const ROLES = {

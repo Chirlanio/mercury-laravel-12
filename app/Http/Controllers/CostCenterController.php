@@ -7,6 +7,8 @@ use App\Http\Requests\CostCenter\StoreCostCenterRequest;
 use App\Http\Requests\CostCenter\UpdateCostCenterRequest;
 use App\Models\CostCenter;
 use App\Models\Manager;
+use App\Services\CostCenterExportService;
+use App\Services\CostCenterImportService;
 use App\Services\CostCenterService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -14,11 +16,14 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class CostCenterController extends Controller
 {
     public function __construct(
         private CostCenterService $service,
+        private CostCenterExportService $exportService,
+        private CostCenterImportService $importService,
     ) {}
 
     public function index(Request $request): Response
@@ -128,6 +133,70 @@ class CostCenterController extends Controller
         return redirect()
             ->route('cost-centers.index')
             ->with('success', 'Centro de custo excluído.');
+    }
+
+    public function export(Request $request): BinaryFileResponse
+    {
+        $query = CostCenter::query()->notDeleted();
+
+        if ($request->filled('search')) {
+            $query->search($request->string('search')->toString());
+        }
+
+        if ($request->filled('is_active')) {
+            $query->where('is_active', $request->boolean('is_active'));
+        }
+
+        return $this->exportService->exportExcel($query);
+    }
+
+    public function importPreview(Request $request): JsonResponse
+    {
+        $request->validate([
+            'file' => 'required|file|max:10240|mimes:xlsx,xls,csv',
+        ]);
+
+        try {
+            $result = $this->importService->preview(
+                $request->file('file')->getRealPath()
+            );
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Erro ao processar a planilha: '.$e->getMessage(),
+            ], 422);
+        }
+
+        return response()->json($result);
+    }
+
+    public function importStore(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'file' => 'required|file|max:10240|mimes:xlsx,xls,csv',
+        ]);
+
+        try {
+            $result = $this->importService->import(
+                $request->file('file')->getRealPath(),
+                $request->user()
+            );
+        } catch (\Throwable $e) {
+            return back()->withErrors([
+                'file' => 'Erro ao importar: '.$e->getMessage(),
+            ]);
+        }
+
+        $msg = sprintf(
+            '%d criados · %d atualizados · %d ignorados',
+            $result['created'],
+            $result['updated'],
+            $result['skipped']
+        );
+
+        return redirect()
+            ->route('cost-centers.index')
+            ->with('success', "Importação concluída: {$msg}")
+            ->with('import_result', $result);
     }
 
     // ------------------------------------------------------------------
