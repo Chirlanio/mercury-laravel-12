@@ -1129,6 +1129,15 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/management-classes/statistics', [\App\Http\Controllers\ManagementClassController::class, 'statistics'])->name('management-classes.statistics');
         Route::get('/management-classes/tree', [\App\Http\Controllers\ManagementClassController::class, 'tree'])->name('management-classes.tree');
 
+        Route::middleware('permission:'.Permission::EXPORT_MANAGEMENT_CLASSES->value)->group(function () {
+            Route::get('/management-classes/export', [\App\Http\Controllers\ManagementClassController::class, 'export'])->name('management-classes.export');
+        });
+
+        Route::middleware('permission:'.Permission::IMPORT_MANAGEMENT_CLASSES->value)->group(function () {
+            Route::post('/management-classes/import/preview', [\App\Http\Controllers\ManagementClassController::class, 'importPreview'])->name('management-classes.import.preview');
+            Route::post('/management-classes/import', [\App\Http\Controllers\ManagementClassController::class, 'importStore'])->name('management-classes.import.store');
+        });
+
         Route::get('/management-classes/{managementClass}', [\App\Http\Controllers\ManagementClassController::class, 'show'])->whereNumber('managementClass')->name('management-classes.show');
 
         Route::middleware('permission:'.Permission::CREATE_MANAGEMENT_CLASSES->value)->group(function () {

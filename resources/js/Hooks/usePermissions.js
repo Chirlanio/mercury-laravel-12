@@ -232,6 +232,15 @@ export const PERMISSIONS = {
     MANAGE_ACCOUNTING_CLASSES: 'accounting_classes.manage',
     IMPORT_ACCOUNTING_CLASSES: 'accounting_classes.import',
     EXPORT_ACCOUNTING_CLASSES: 'accounting_classes.export',
+
+    // Plano Gerencial
+    VIEW_MANAGEMENT_CLASSES: 'management_classes.view',
+    CREATE_MANAGEMENT_CLASSES: 'management_classes.create',
+    EDIT_MANAGEMENT_CLASSES: 'management_classes.edit',
+    DELETE_MANAGEMENT_CLASSES: 'management_classes.delete',
+    MANAGE_MANAGEMENT_CLASSES: 'management_classes.manage',
+    IMPORT_MANAGEMENT_CLASSES: 'management_classes.import',
+    EXPORT_MANAGEMENT_CLASSES: 'management_classes.export',
 };
 
 export const ROLES = {
