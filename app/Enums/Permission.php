@@ -226,6 +226,15 @@ enum Permission: string
     case EXPORT_RETURNS = 'returns.export';
     case MANAGE_RETURN_REASONS = 'returns.manage_reasons';
 
+    // Centros de Custo (Cost Centers — cadastro standalone)
+    case VIEW_COST_CENTERS = 'cost_centers.view';
+    case CREATE_COST_CENTERS = 'cost_centers.create';
+    case EDIT_COST_CENTERS = 'cost_centers.edit';
+    case DELETE_COST_CENTERS = 'cost_centers.delete';
+    case MANAGE_COST_CENTERS = 'cost_centers.manage';
+    case IMPORT_COST_CENTERS = 'cost_centers.import';
+    case EXPORT_COST_CENTERS = 'cost_centers.export';
+
     public function label(): string
     {
         return match ($this) {
@@ -412,6 +421,14 @@ enum Permission: string
             self::IMPORT_RETURNS => 'Importar devoluções (planilha)',
             self::EXPORT_RETURNS => 'Exportar devoluções',
             self::MANAGE_RETURN_REASONS => 'Gerenciar motivos de devolução',
+            // Centros de Custo
+            self::VIEW_COST_CENTERS => 'Visualizar centros de custo',
+            self::CREATE_COST_CENTERS => 'Criar centros de custo',
+            self::EDIT_COST_CENTERS => 'Editar centros de custo',
+            self::DELETE_COST_CENTERS => 'Excluir centros de custo',
+            self::MANAGE_COST_CENTERS => 'Gerenciar centros de custo (todas as áreas)',
+            self::IMPORT_COST_CENTERS => 'Importar centros de custo (planilha)',
+            self::EXPORT_COST_CENTERS => 'Exportar centros de custo',
         };
     }
 
@@ -601,6 +618,14 @@ enum Permission: string
             self::IMPORT_RETURNS => 'Permite importar devoluções via planilha — usado na migração de dados históricos v1',
             self::EXPORT_RETURNS => 'Permite exportar devoluções para Excel ou comprovante PDF',
             self::MANAGE_RETURN_REASONS => 'Permite cadastrar e editar motivos de devolução no catálogo',
+            // Centros de Custo
+            self::VIEW_COST_CENTERS => 'Permite visualizar centros de custo cadastrados (fundação do DRE e dimensão de orçamentos)',
+            self::CREATE_COST_CENTERS => 'Permite cadastrar novos centros de custo',
+            self::EDIT_COST_CENTERS => 'Permite editar dados de centros de custo existentes',
+            self::DELETE_COST_CENTERS => 'Permite excluir centros de custo (soft delete). Exige motivo',
+            self::MANAGE_COST_CENTERS => 'Permite gerenciar centros de custo de todas as áreas (sem filtro por área)',
+            self::IMPORT_COST_CENTERS => 'Permite importar centros de custo via planilha (XLSX/CSV)',
+            self::EXPORT_COST_CENTERS => 'Permite exportar centros de custo para Excel',
         };
     }
 

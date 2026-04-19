@@ -255,4 +255,10 @@ return [
         'icon' => 'ArrowPathRoundedSquareIcon',
         'dependencies' => ['movements', 'stores'],
     ],
+    'cost_centers' => [
+        'name' => 'Centros de Custo',
+        'description' => 'Cadastro de centros de custo com hierarquia — fundação para orçamentos e DRE.',
+        'routes' => ['cost-centers.*'],
+        'icon' => 'Squares2X2Icon',
+    ],
 ];

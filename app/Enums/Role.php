@@ -208,6 +208,14 @@ enum Role: string
                 Permission::IMPORT_RETURNS->value,
                 Permission::EXPORT_RETURNS->value,
                 Permission::MANAGE_RETURN_REASONS->value,
+                // Centros de Custo (todas)
+                Permission::VIEW_COST_CENTERS->value,
+                Permission::CREATE_COST_CENTERS->value,
+                Permission::EDIT_COST_CENTERS->value,
+                Permission::DELETE_COST_CENTERS->value,
+                Permission::MANAGE_COST_CENTERS->value,
+                Permission::IMPORT_COST_CENTERS->value,
+                Permission::EXPORT_COST_CENTERS->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -378,6 +386,14 @@ enum Role: string
                 Permission::IMPORT_RETURNS->value,
                 Permission::EXPORT_RETURNS->value,
                 Permission::MANAGE_RETURN_REASONS->value,
+                // Centros de Custo (todas)
+                Permission::VIEW_COST_CENTERS->value,
+                Permission::CREATE_COST_CENTERS->value,
+                Permission::EDIT_COST_CENTERS->value,
+                Permission::DELETE_COST_CENTERS->value,
+                Permission::MANAGE_COST_CENTERS->value,
+                Permission::IMPORT_COST_CENTERS->value,
+                Permission::EXPORT_COST_CENTERS->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -477,6 +493,9 @@ enum Role: string
                 Permission::PROCESS_RETURNS->value,
                 Permission::CANCEL_RETURNS->value,
                 Permission::EXPORT_RETURNS->value,
+                // Centros de Custo (view + export apenas — cadastro é do financeiro/admin)
+                Permission::VIEW_COST_CENTERS->value,
+                Permission::EXPORT_COST_CENTERS->value,
             ],
             self::USER => [
                 // Apenas próprio perfil
