@@ -12,6 +12,7 @@ use App\Models\BudgetUpload;
 use App\Models\CostCenter;
 use App\Models\ManagementClass;
 use App\Models\Store;
+use App\Services\BudgetConsumptionService;
 use App\Services\BudgetFileStorageService;
 use App\Services\BudgetImportService;
 use App\Services\BudgetService;
@@ -29,7 +30,37 @@ class BudgetController extends Controller
         private BudgetService $service,
         private BudgetFileStorageService $storage,
         private BudgetImportService $importService,
+        private BudgetConsumptionService $consumption,
     ) {}
+
+    /**
+     * Dashboard de consumo previsto × realizado para um budget.
+     */
+    public function dashboard(BudgetUpload $budget): Response
+    {
+        if ($budget->isDeleted()) {
+            abort(404);
+        }
+
+        $consumption = $this->consumption->getConsumption($budget);
+
+        return Inertia::render('Budgets/Dashboard', [
+            'budget' => $this->format($budget),
+            'consumption' => $consumption,
+        ]);
+    }
+
+    /**
+     * JSON do consumo — útil para polling/refresh sem recarregar a página.
+     */
+    public function consumptionJson(BudgetUpload $budget): JsonResponse
+    {
+        if ($budget->isDeleted()) {
+            return response()->json(['message' => 'Versão excluída.'], 404);
+        }
+
+        return response()->json($this->consumption->getConsumption($budget));
+    }
 
     public function index(Request $request): Response
     {

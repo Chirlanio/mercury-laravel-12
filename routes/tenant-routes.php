@@ -1128,6 +1128,12 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/budgets', [\App\Http\Controllers\BudgetController::class, 'index'])->name('budgets.index');
         Route::get('/budgets/statistics', [\App\Http\Controllers\BudgetController::class, 'statistics'])->name('budgets.statistics');
         Route::get('/budgets/template', [\App\Http\Controllers\BudgetController::class, 'template'])->name('budgets.template');
+
+        Route::middleware('permission:'.Permission::VIEW_BUDGET_CONSUMPTION->value)->group(function () {
+            Route::get('/budgets/{budget}/dashboard', [\App\Http\Controllers\BudgetController::class, 'dashboard'])->whereNumber('budget')->name('budgets.dashboard');
+            Route::get('/budgets/{budget}/consumption', [\App\Http\Controllers\BudgetController::class, 'consumptionJson'])->whereNumber('budget')->name('budgets.consumption');
+        });
+
         Route::get('/budgets/{budget}', [\App\Http\Controllers\BudgetController::class, 'show'])->whereNumber('budget')->name('budgets.show');
 
         Route::middleware('permission:'.Permission::DOWNLOAD_BUDGETS->value)->group(function () {
