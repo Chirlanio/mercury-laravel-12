@@ -25,7 +25,6 @@ use App\Http\Controllers\Admin\EmailSettingsController;
 use App\Http\Controllers\ChecklistController;
 use App\Http\Controllers\ColorThemeController;
 use App\Http\Controllers\Config\BankController as ConfigBankController;
-use App\Http\Controllers\Config\CostCenterController as ConfigCostCenterController;
 use App\Http\Controllers\Config\DriverController as ConfigDriverController;
 use App\Http\Controllers\Config\EducationLevelController as ConfigEducationLevelController;
 use App\Http\Controllers\Config\EmployeeEventTypeController as ConfigEmployeeEventTypeController;
@@ -367,7 +366,10 @@ Route::middleware(['auth', 'tenant.module:config', 'permission:'.Permission::MAN
     Route::resource('statuses', ConfigStatusController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('page-statuses', ConfigPageStatusController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('banks', ConfigBankController::class)->only(['index', 'store', 'update', 'destroy']);
-    Route::resource('cost-centers', ConfigCostCenterController::class)->only(['index', 'store', 'update', 'destroy']);
+    // cost-centers: migrado para módulo standalone em /cost-centers (Fase 0.1).
+    // Redirect 301 permanente de /config/cost-centers → /cost-centers para
+    // preservar bookmarks. Será removido em 6 meses.
+    Route::redirect('/cost-centers', '/cost-centers', 301);
     Route::resource('payment-types', ConfigPaymentTypeController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('drivers', ConfigDriverController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('stock-adjustment-statuses', ConfigStockAdjustmentStatusController::class)->only(['index', 'store', 'update', 'destroy']);

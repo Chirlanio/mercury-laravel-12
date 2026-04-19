@@ -139,7 +139,8 @@ class LaravelPagesSeeder extends Seeder
             ['route' => '/config/networks', 'page_name' => 'Redes', 'icon' => 'fas fa-cog', 'controller' => 'ConfigNetworks', 'method' => 'index', 'menu_controller' => 'config-networks', 'menu_method' => 'index'],
             ['route' => '/config/managers', 'page_name' => 'Gestores', 'icon' => 'fas fa-cog', 'controller' => 'ConfigManagers', 'method' => 'index', 'menu_controller' => 'config-managers', 'menu_method' => 'index'],
             ['route' => '/config/banks', 'page_name' => 'Bancos', 'icon' => 'fas fa-cog', 'controller' => 'ConfigBanks', 'method' => 'index', 'menu_controller' => 'banks', 'menu_method' => 'list'],
-            ['route' => '/config/cost-centers', 'page_name' => 'Centros de Custo', 'icon' => 'fas fa-cog', 'controller' => 'ConfigCostCenters', 'method' => 'index', 'menu_controller' => 'cost-centers', 'menu_method' => 'list'],
+            // /config/cost-centers removido na Fase 0.1 — migrado para /cost-centers standalone
+            ['route' => '/cost-centers', 'page_name' => 'Centros de Custo', 'icon' => 'fas fa-sitemap', 'controller' => 'CostCenters', 'method' => 'index', 'menu_controller' => 'cost-centers', 'menu_method' => 'list'],
             ['route' => '/config/payment-types', 'page_name' => 'Tipos de Pagamento', 'icon' => 'fas fa-cog', 'controller' => 'ConfigPaymentTypes', 'method' => 'index', 'menu_controller' => 'type-payments', 'menu_method' => 'list'],
             ['route' => '/config/drivers', 'page_name' => 'Motoristas', 'icon' => 'fas fa-cog', 'controller' => 'ConfigDrivers', 'method' => 'index', 'menu_controller' => 'drivers', 'menu_method' => 'list'],
 
@@ -195,7 +196,8 @@ class LaravelPagesSeeder extends Seeder
             '/config/networks' => 'Configurações',
             '/config/managers' => 'Configurações',
             '/config/banks' => 'Configurações',
-            '/config/cost-centers' => 'Configurações',
+            // /config/cost-centers removido na Fase 0.1 — migrado para Financeiro
+            '/cost-centers' => 'Financeiro',
             '/config/payment-types' => 'Configurações',
             '/config/drivers' => 'Configurações',
             '/config/product-lookup-groups' => 'Configurações',
