@@ -15,6 +15,8 @@ class CostCenterControllerTest extends TestCase
     {
         parent::setUp();
         $this->setUpTestData();
+        // Migration de seed popula 24 CCs reais — limpa para testes de CRUD isolados
+        CostCenter::query()->delete();
     }
 
     protected function createCostCenter(array $overrides = []): CostCenter

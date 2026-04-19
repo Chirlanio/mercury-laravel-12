@@ -29,8 +29,8 @@ class ManagementClassImportExportTest extends TestCase
         parent::setUp();
         $this->setUpTestData();
 
-        $this->acGroup = AccountingClass::where('code', '5.2')->firstOrFail();
-        $this->acLeaf = AccountingClass::where('code', '5.2.01')->firstOrFail();
+        $this->acGroup = AccountingClass::where('code', '4.2.1.04')->firstOrFail(); // Despesas Administrativas (sintético)
+        $this->acLeaf = AccountingClass::where('code', '4.2.1.04.00032')->firstOrFail(); // Telefonia (analítica)
 
         $this->cc = CostCenter::create([
             'code' => 'CC-MC-IMP',

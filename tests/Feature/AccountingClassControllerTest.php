@@ -36,10 +36,11 @@ class AccountingClassControllerTest extends TestCase
     {
         // O seed roda em migrate --seed. Com RefreshDatabase + sqlite
         // in-memory, a migration de seed executa automaticamente.
-        $this->assertGreaterThanOrEqual(40, AccountingClass::count());
-        $this->assertDatabaseHas('accounting_classes', ['code' => '3.1.01.001']);
-        $this->assertDatabaseHas('accounting_classes', ['code' => '5.2.01']);
-        $this->assertDatabaseHas('accounting_classes', ['code' => '7.1.01']);
+        // Reseed real (Grupo Meia Sola): 80 analíticas + 21 sintéticos
+        $this->assertGreaterThanOrEqual(100, AccountingClass::count());
+        $this->assertDatabaseHas('accounting_classes', ['code' => '3.1.1.01.00012']); // Receita de Vendas
+        $this->assertDatabaseHas('accounting_classes', ['code' => '4.2.1.04.00083']); // Telefonia
+        $this->assertDatabaseHas('accounting_classes', ['code' => '4.2.1.05.00053']); // Juros Passivo
     }
 
     public function test_admin_can_view_index(): void
@@ -246,12 +247,12 @@ class AccountingClassControllerTest extends TestCase
         $response->assertStatus(200);
         $response->assertJsonStructure(['tree']);
 
-        // A árvore deve ter raízes (3.1, 3.2, 4.1, 5.1, 5.2, 5.3, 5.4, 5.5, 6.1, 6.2, 7.1)
-        $this->assertGreaterThanOrEqual(10, count($response->json('tree')));
+        // Reseed real: 2 raízes (3=Receitas, 4=Custos/Despesas)
+        $this->assertGreaterThanOrEqual(2, count($response->json('tree')));
 
-        // Raiz 3.1 deve ter filhos
-        $receitaBruta = collect($response->json('tree'))->firstWhere('code', '3.1');
-        $this->assertNotNull($receitaBruta);
-        $this->assertNotEmpty($receitaBruta['children']);
+        // Raiz "3" deve ter filhos (3.1 Receitas Operacionais, 3.2 Receitas Não Op.)
+        $receitas = collect($response->json('tree'))->firstWhere('code', '3');
+        $this->assertNotNull($receitas);
+        $this->assertNotEmpty($receitas['children']);
     }
 }

@@ -35,9 +35,9 @@ class BudgetImportServiceTest extends TestCase
         parent::setUp();
         $this->setUpTestData();
 
-        // Reutiliza plano BR já populado pelo seed
-        $this->ac1 = AccountingClass::where('code', '5.2.01')->firstOrFail(); // Salários
-        $this->ac2 = AccountingClass::where('code', '5.2.03')->firstOrFail(); // Aluguel
+        // Reutiliza plano real (Grupo Meia Sola) já populado pelo seed
+        $this->ac1 = AccountingClass::where('code', '4.2.1.04.00032')->firstOrFail(); // Telefonia
+        $this->ac2 = AccountingClass::where('code', '4.2.1.04.00083')->firstOrFail(); // Outras Despesas
 
         $this->cc1 = CostCenter::create([
             'code' => 'CC-001',
@@ -98,7 +98,7 @@ class BudgetImportServiceTest extends TestCase
         $service = app(BudgetImportService::class);
 
         $path = $this->makeXlsx([
-            ['5.2.01', 'MC-TI', 'CC-001', 'Z100', 'Fornecedor X', '', '', '', 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000],
+            ['4.2.1.04.00032', 'MC-TI', 'CC-001', 'Z100', 'Fornecedor X', '', '', '', 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000],
         ], [
             'codigo_contabil', 'codigo_gerencial', 'codigo_centro_custo', 'codigo_loja',
             'fornecedor', 'justificativa', 'descricao_conta', 'descricao_classe',
@@ -143,7 +143,7 @@ class BudgetImportServiceTest extends TestCase
 
         $path = $this->makeXlsx([
             ['', '', '', '', '', '', '', '', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            ['5.2.01', 'MC-TI', 'CC-001', '', '', '', '', '', 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500],
+            ['4.2.1.04.00032', 'MC-TI', 'CC-001', '', '', '', '', '', 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500],
         ], [
             'codigo_contabil', 'codigo_gerencial', 'codigo_centro_custo', 'codigo_loja',
             'fornecedor', 'justificativa', 'descricao_conta', 'descricao_classe',
@@ -165,7 +165,7 @@ class BudgetImportServiceTest extends TestCase
 
         // CC-0O1 (letra O em vez de zero) — 1 letra de distância do CC-001
         $path = $this->makeXlsx([
-            ['5.2.01', 'MC-TI', 'CC-0O1', '', '', '', '', '', 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ['4.2.1.04.00032', 'MC-TI', 'CC-0O1', '', '', '', '', '', 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         ], [
             'codigo_contabil', 'codigo_gerencial', 'codigo_centro_custo', 'codigo_loja',
             'fornecedor', 'justificativa', 'descricao_conta', 'descricao_classe',
@@ -194,7 +194,7 @@ class BudgetImportServiceTest extends TestCase
 
         // "TOTALMENTE-DIFERENTE" (nem aproximado) — não deve ter sugestão
         $path = $this->makeXlsx([
-            ['5.2.01', 'MC-TI', 'TOTALMENTE-DIFERENTE', '', '', '', '', '', 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ['4.2.1.04.00032', 'MC-TI', 'TOTALMENTE-DIFERENTE', '', '', '', '', '', 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         ], [
             'codigo_contabil', 'codigo_gerencial', 'codigo_centro_custo', 'codigo_loja',
             'fornecedor', 'justificativa', 'descricao_conta', 'descricao_classe',
@@ -214,7 +214,7 @@ class BudgetImportServiceTest extends TestCase
 
         // "1.234,56" formato BR → 1234.56
         $path = $this->makeXlsx([
-            ['5.2.01', 'MC-TI', 'CC-001', '', '', '', '', '', '1.234,56', '500,50', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ['4.2.1.04.00032', 'MC-TI', 'CC-001', '', '', '', '', '', '1.234,56', '500,50', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         ], [
             'codigo_contabil', 'codigo_gerencial', 'codigo_centro_custo', 'codigo_loja',
             'fornecedor', 'justificativa', 'descricao_conta', 'descricao_classe',
@@ -235,7 +235,7 @@ class BudgetImportServiceTest extends TestCase
 
         // Linha com CC não resolvido diretamente
         $path = $this->makeXlsx([
-            ['5.2.01', 'MC-TI', 'CC-DESCONHECIDO', '', '', '', '', '', 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ['4.2.1.04.00032', 'MC-TI', 'CC-DESCONHECIDO', '', '', '', '', '', 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         ], [
             'codigo_contabil', 'codigo_gerencial', 'codigo_centro_custo', 'codigo_loja',
             'fornecedor', 'justificativa', 'descricao_conta', 'descricao_classe',
@@ -262,7 +262,7 @@ class BudgetImportServiceTest extends TestCase
 
         // Headers em estilo diferente ("Contábil", "Gerencial", "Centro de Custo", abrev dos meses)
         $path = $this->makeXlsx([
-            ['5.2.01', 'MC-TI', 'CC-001', '', 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ['4.2.1.04.00032', 'MC-TI', 'CC-001', '', 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         ], [
             'Contábil', 'Gerencial', 'Centro de Custo', 'Fornecedor',
             'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -281,10 +281,10 @@ class BudgetImportServiceTest extends TestCase
 
         // 3 linhas com o mesmo CC ausente + 1 linha com outro CC ausente
         $path = $this->makeXlsx([
-            ['5.2.01', 'MC-TI', 'CC-COMUM', '', '', '', '', '', 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            ['5.2.01', 'MC-TI', 'CC-COMUM', '', '', '', '', '', 200, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            ['5.2.01', 'MC-TI', 'CC-COMUM', '', '', '', '', '', 300, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            ['5.2.01', 'MC-TI', 'CC-RARO', '', '', '', '', '', 500, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ['4.2.1.04.00032', 'MC-TI', 'CC-COMUM', '', '', '', '', '', 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ['4.2.1.04.00032', 'MC-TI', 'CC-COMUM', '', '', '', '', '', 200, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ['4.2.1.04.00032', 'MC-TI', 'CC-COMUM', '', '', '', '', '', 300, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ['4.2.1.04.00032', 'MC-TI', 'CC-RARO', '', '', '', '', '', 500, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         ], [
             'codigo_contabil', 'codigo_gerencial', 'codigo_centro_custo', 'codigo_loja',
             'fornecedor', 'justificativa', 'descricao_conta', 'descricao_classe',
@@ -308,8 +308,8 @@ class BudgetImportServiceTest extends TestCase
         $service = app(BudgetImportService::class);
 
         $path = $this->makeXlsx([
-            ['5.2.01', 'MC-TI', 'CC-001', '', '', '', '', '', 100, 200, 300, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            ['5.2.03', 'MC-TI', 'CC-001', '', '', '', '', '', 50, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ['4.2.1.04.00032', 'MC-TI', 'CC-001', '', '', '', '', '', 100, 200, 300, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ['4.2.1.04.00083', 'MC-TI', 'CC-001', '', '', '', '', '', 50, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         ], [
             'codigo_contabil', 'codigo_gerencial', 'codigo_centro_custo', 'codigo_loja',
             'fornecedor', 'justificativa', 'descricao_conta', 'descricao_classe',

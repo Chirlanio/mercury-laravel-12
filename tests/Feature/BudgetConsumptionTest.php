@@ -36,7 +36,7 @@ class BudgetConsumptionTest extends TestCase
         parent::setUp();
         $this->setUpTestData();
 
-        $this->ac = AccountingClass::where('code', '5.2.01')->firstOrFail();
+        $this->ac = AccountingClass::where('code', '4.2.1.04.00032')->firstOrFail(); // Telefonia
 
         $this->cc1 = CostCenter::create([
             'code' => 'CC-CONS-1', 'name' => 'CC Admin',

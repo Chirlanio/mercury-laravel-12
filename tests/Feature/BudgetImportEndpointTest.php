@@ -31,7 +31,7 @@ class BudgetImportEndpointTest extends TestCase
         $this->setUpTestData();
         Storage::fake('local');
 
-        $this->ac = AccountingClass::where('code', '5.2.01')->firstOrFail();
+        $this->ac = AccountingClass::where('code', '4.2.1.04.00032')->firstOrFail(); // Telefonia
 
         $this->cc = CostCenter::create([
             'code' => 'CC-IMP',
@@ -93,8 +93,8 @@ class BudgetImportEndpointTest extends TestCase
     public function test_preview_returns_diagnostic(): void
     {
         $file = $this->makeXlsxUpload([
-            ['5.2.01', 'MC-IMP', 'CC-IMP', '', '', '', '', '', 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000],
-            ['5.2.01', 'MC-IMP', 'CC-INEXISTENTE', '', '', '', '', '', 500, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ['4.2.1.04.00032', 'MC-IMP', 'CC-IMP', '', '', '', '', '', 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000],
+            ['4.2.1.04.00032', 'MC-IMP', 'CC-INEXISTENTE', '', '', '', '', '', 500, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         ], $this->headers());
 
         $response = $this->actingAs($this->adminUser)
@@ -112,7 +112,7 @@ class BudgetImportEndpointTest extends TestCase
     public function test_preview_requires_upload_permission(): void
     {
         $file = $this->makeXlsxUpload([
-            ['5.2.01', 'MC-IMP', 'CC-IMP', '', '', '', '', '', 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ['4.2.1.04.00032', 'MC-IMP', 'CC-IMP', '', '', '', '', '', 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         ], $this->headers());
 
         $response = $this->actingAs($this->regularUser)
@@ -134,7 +134,7 @@ class BudgetImportEndpointTest extends TestCase
     public function test_import_creates_budget_from_xlsx(): void
     {
         $file = $this->makeXlsxUpload([
-            ['5.2.01', 'MC-IMP', 'CC-IMP', '', 'Forn X', '', '', '', 1000, 1000, 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ['4.2.1.04.00032', 'MC-IMP', 'CC-IMP', '', 'Forn X', '', '', '', 1000, 1000, 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         ], $this->headers());
 
         $response = $this->actingAs($this->adminUser)
@@ -159,7 +159,7 @@ class BudgetImportEndpointTest extends TestCase
     {
         // Linha com CC "CC-ERRADO" não existente — deve resolver via mapping
         $file = $this->makeXlsxUpload([
-            ['5.2.01', 'MC-IMP', 'CC-ERRADO', '', '', '', '', '', 500, 500, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ['4.2.1.04.00032', 'MC-IMP', 'CC-ERRADO', '', '', '', '', '', 500, 500, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         ], $this->headers());
 
         $response = $this->actingAs($this->adminUser)
@@ -211,7 +211,7 @@ class BudgetImportEndpointTest extends TestCase
     public function test_import_validates_mapping_ids_exist(): void
     {
         $file = $this->makeXlsxUpload([
-            ['5.2.01', 'MC-IMP', 'CC-IMP', '', '', '', '', '', 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ['4.2.1.04.00032', 'MC-IMP', 'CC-IMP', '', '', '', '', '', 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         ], $this->headers());
 
         $response = $this->actingAs($this->adminUser)
@@ -233,7 +233,7 @@ class BudgetImportEndpointTest extends TestCase
     public function test_import_validates_required_header_fields(): void
     {
         $file = $this->makeXlsxUpload([
-            ['5.2.01', 'MC-IMP', 'CC-IMP', '', '', '', '', '', 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ['4.2.1.04.00032', 'MC-IMP', 'CC-IMP', '', '', '', '', '', 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         ], $this->headers());
 
         $response = $this->actingAs($this->adminUser)

@@ -45,7 +45,7 @@ class BudgetAlertTest extends TestCase
         // cache (TTL 5min) ainda tem a lista antiga.
         app(\App\Services\CentralRoleResolver::class)->clearCache();
 
-        $this->ac = AccountingClass::where('code', '5.2.01')->firstOrFail();
+        $this->ac = AccountingClass::where('code', '4.2.1.04.00032')->firstOrFail(); // Telefonia
 
         $this->cc1 = CostCenter::create([
             'code' => 'CC-ALERT-1', 'name' => 'CC Warning',

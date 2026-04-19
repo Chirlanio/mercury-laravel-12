@@ -32,8 +32,8 @@ class BudgetControllerTest extends TestCase
         $this->setUpTestData();
         Storage::fake('local');
 
-        // Seed BR já popula accounting_classes via migration — pegamos uma folha
-        $this->ac = AccountingClass::where('code', '5.2.01')->firstOrFail();
+        // Seed real (Grupo Meia Sola) popula accounting_classes via migration — pegamos uma folha
+        $this->ac = AccountingClass::where('code', '4.2.1.04.00032')->firstOrFail(); // Telefonia
 
         $this->cc = CostCenter::create([
             'code' => 'CC-BUDGET',

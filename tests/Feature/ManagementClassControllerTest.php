@@ -26,9 +26,9 @@ class ManagementClassControllerTest extends TestCase
         parent::setUp();
         $this->setUpTestData();
 
-        // O seed do plano BR já popula accounting_classes — pegamos refs úteis
-        $this->accountingGroup = AccountingClass::where('code', '5.2')->firstOrFail();
-        $this->accountingLeaf = AccountingClass::where('code', '5.2.01')->firstOrFail();
+        // O seed do plano real (Grupo Meia Sola) popula accounting_classes — refs úteis
+        $this->accountingGroup = AccountingClass::where('code', '4.2.1.04')->firstOrFail();  // Despesas Administrativas (sintético)
+        $this->accountingLeaf = AccountingClass::where('code', '4.2.1.04.00032')->firstOrFail(); // Telefonia (analítica)
 
         $this->costCenter = CostCenter::create([
             'code' => 'CC-MGMT-TEST',
@@ -36,6 +36,9 @@ class ManagementClassControllerTest extends TestCase
             'is_active' => true,
             'created_by_user_id' => $this->adminUser->id,
         ]);
+
+        // Migration de seed popula 182 classes gerenciais reais — limpa para testes isolados
+        ManagementClass::query()->delete();
     }
 
     protected function createClass(array $overrides = []): ManagementClass
