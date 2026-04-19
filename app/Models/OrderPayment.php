@@ -14,6 +14,7 @@ class OrderPayment extends Model
     protected $fillable = [
         'area_id',
         'cost_center_id',
+        'budget_item_id',
         'brand_id',
         'supplier_id',
         'purchase_order_id',
@@ -129,6 +130,11 @@ class OrderPayment extends Model
     public function purchaseOrder(): BelongsTo
     {
         return $this->belongsTo(PurchaseOrder::class);
+    }
+
+    public function budgetItem(): BelongsTo
+    {
+        return $this->belongsTo(BudgetItem::class);
     }
 
     public function manager(): BelongsTo

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Linha de um orçamento — 1 linha por (CC + AC + MC + store opcional) com
@@ -72,6 +73,15 @@ class BudgetItem extends Model
     public function store(): BelongsTo
     {
         return $this->belongsTo(Store::class);
+    }
+
+    /**
+     * OrderPayments vinculadas a este item de orçamento — base do consumo
+     * previsto × realizado.
+     */
+    public function orderPayments(): HasMany
+    {
+        return $this->hasMany(OrderPayment::class);
     }
 
     // ------------------------------------------------------------------
