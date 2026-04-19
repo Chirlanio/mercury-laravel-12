@@ -88,3 +88,11 @@ Schedule::command('returns:stale-alert')
     ->dailyAt('09:00')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/returns-stale.log'));
+
+// Budgets — alerta diário de consumo ≥ 70% (warning) ou ≥ 100% (exceeded)
+// para orçamentos ativos do ano corrente. Chega antes das decisões de
+// compra do dia.
+Schedule::command('budgets:alert')
+    ->dailyAt('09:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/budgets-alert.log'));
