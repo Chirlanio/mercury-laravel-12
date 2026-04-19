@@ -224,6 +224,14 @@ enum Role: string
                 Permission::MANAGE_ACCOUNTING_CLASSES->value,
                 Permission::IMPORT_ACCOUNTING_CLASSES->value,
                 Permission::EXPORT_ACCOUNTING_CLASSES->value,
+                // Plano de Contas Gerencial (todas)
+                Permission::VIEW_MANAGEMENT_CLASSES->value,
+                Permission::CREATE_MANAGEMENT_CLASSES->value,
+                Permission::EDIT_MANAGEMENT_CLASSES->value,
+                Permission::DELETE_MANAGEMENT_CLASSES->value,
+                Permission::MANAGE_MANAGEMENT_CLASSES->value,
+                Permission::IMPORT_MANAGEMENT_CLASSES->value,
+                Permission::EXPORT_MANAGEMENT_CLASSES->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -410,6 +418,14 @@ enum Role: string
                 Permission::MANAGE_ACCOUNTING_CLASSES->value,
                 Permission::IMPORT_ACCOUNTING_CLASSES->value,
                 Permission::EXPORT_ACCOUNTING_CLASSES->value,
+                // Plano de Contas Gerencial (todas)
+                Permission::VIEW_MANAGEMENT_CLASSES->value,
+                Permission::CREATE_MANAGEMENT_CLASSES->value,
+                Permission::EDIT_MANAGEMENT_CLASSES->value,
+                Permission::DELETE_MANAGEMENT_CLASSES->value,
+                Permission::MANAGE_MANAGEMENT_CLASSES->value,
+                Permission::IMPORT_MANAGEMENT_CLASSES->value,
+                Permission::EXPORT_MANAGEMENT_CLASSES->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -515,6 +531,9 @@ enum Role: string
                 // Plano de Contas (view + export apenas — cadastro é do contábil)
                 Permission::VIEW_ACCOUNTING_CLASSES->value,
                 Permission::EXPORT_ACCOUNTING_CLASSES->value,
+                // Plano Gerencial (view + export apenas)
+                Permission::VIEW_MANAGEMENT_CLASSES->value,
+                Permission::EXPORT_MANAGEMENT_CLASSES->value,
             ],
             self::USER => [
                 // Apenas próprio perfil

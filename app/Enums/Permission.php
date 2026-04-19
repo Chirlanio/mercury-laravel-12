@@ -244,6 +244,15 @@ enum Permission: string
     case IMPORT_ACCOUNTING_CLASSES = 'accounting_classes.import';
     case EXPORT_ACCOUNTING_CLASSES = 'accounting_classes.export';
 
+    // Plano de Contas Gerencial (Management Classes — visão interna)
+    case VIEW_MANAGEMENT_CLASSES = 'management_classes.view';
+    case CREATE_MANAGEMENT_CLASSES = 'management_classes.create';
+    case EDIT_MANAGEMENT_CLASSES = 'management_classes.edit';
+    case DELETE_MANAGEMENT_CLASSES = 'management_classes.delete';
+    case MANAGE_MANAGEMENT_CLASSES = 'management_classes.manage';
+    case IMPORT_MANAGEMENT_CLASSES = 'management_classes.import';
+    case EXPORT_MANAGEMENT_CLASSES = 'management_classes.export';
+
     public function label(): string
     {
         return match ($this) {
@@ -446,6 +455,14 @@ enum Permission: string
             self::MANAGE_ACCOUNTING_CLASSES => 'Gerenciar plano de contas (estrutura completa)',
             self::IMPORT_ACCOUNTING_CLASSES => 'Importar plano de contas (planilha)',
             self::EXPORT_ACCOUNTING_CLASSES => 'Exportar plano de contas',
+            // Plano de Contas Gerencial
+            self::VIEW_MANAGEMENT_CLASSES => 'Visualizar plano de contas gerencial',
+            self::CREATE_MANAGEMENT_CLASSES => 'Criar contas gerenciais',
+            self::EDIT_MANAGEMENT_CLASSES => 'Editar contas gerenciais',
+            self::DELETE_MANAGEMENT_CLASSES => 'Excluir contas gerenciais',
+            self::MANAGE_MANAGEMENT_CLASSES => 'Gerenciar plano de contas gerencial (estrutura completa)',
+            self::IMPORT_MANAGEMENT_CLASSES => 'Importar plano de contas gerencial (planilha)',
+            self::EXPORT_MANAGEMENT_CLASSES => 'Exportar plano de contas gerencial',
         };
     }
 
@@ -651,6 +668,14 @@ enum Permission: string
             self::MANAGE_ACCOUNTING_CLASSES => 'Permite gerenciar toda a estrutura do plano de contas (alterar hierarquia e grupos DRE)',
             self::IMPORT_ACCOUNTING_CLASSES => 'Permite importar plano de contas personalizado via planilha',
             self::EXPORT_ACCOUNTING_CLASSES => 'Permite exportar o plano de contas para Excel',
+            // Plano de Contas Gerencial
+            self::VIEW_MANAGEMENT_CLASSES => 'Permite visualizar o plano de contas gerencial (visão interna operacional, complementar ao plano contábil)',
+            self::CREATE_MANAGEMENT_CLASSES => 'Permite cadastrar novas contas gerenciais',
+            self::EDIT_MANAGEMENT_CLASSES => 'Permite editar contas gerenciais (incluindo vínculo com conta contábil e centro de custo default)',
+            self::DELETE_MANAGEMENT_CLASSES => 'Permite excluir contas gerenciais (soft delete). Bloqueado se houver filhas ativas',
+            self::MANAGE_MANAGEMENT_CLASSES => 'Permite gerenciar toda a estrutura do plano gerencial (hierarquia e vínculos com contábil)',
+            self::IMPORT_MANAGEMENT_CLASSES => 'Permite importar plano gerencial via planilha',
+            self::EXPORT_MANAGEMENT_CLASSES => 'Permite exportar plano gerencial para Excel',
         };
     }
 

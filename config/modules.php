@@ -267,4 +267,11 @@ return [
         'routes' => ['accounting-classes.*'],
         'icon' => 'DocumentChartBarIcon',
     ],
+    'management_classes' => [
+        'name' => 'Plano Gerencial',
+        'description' => 'Plano de contas gerencial — visão interna operacional, complementar ao plano contábil.',
+        'routes' => ['management-classes.*'],
+        'icon' => 'FolderOpenIcon',
+        'dependencies' => ['accounting_classes', 'cost_centers'],
+    ],
 ];
