@@ -8,6 +8,7 @@ import StatisticsCards from '@/Components/Movements/StatisticsCards';
 import SyncModal from '@/Components/Movements/SyncModal';
 import SyncLogsModal from '@/Components/Movements/SyncLogsModal';
 import ViewModal from '@/Components/Movements/ViewModal';
+import InvoiceDetailModal from '@/Components/Movements/InvoiceDetailModal';
 import {
     ArrowPathIcon, ClockIcon, MagnifyingGlassIcon, XMarkIcon,
 } from '@heroicons/react/24/outline';
@@ -15,7 +16,7 @@ import {
 export default function Index({ movements, stores, movementTypes, filters, cigamAvailable, cigamUnavailableReason }) {
     const { hasPermission } = usePermissions();
     const canSync = hasPermission(PERMISSIONS.SYNC_MOVEMENTS);
-    const { modals, selected, openModal, closeModal } = useModalManager(['sync', 'syncLogs', 'view']);
+    const { modals, selected, openModal, closeModal } = useModalManager(['sync', 'syncLogs', 'view', 'invoice']);
 
     const [localFilters, setLocalFilters] = useState({
         date_start: filters.date_start || '',
@@ -187,7 +188,23 @@ export default function Index({ movements, stores, movementTypes, filters, cigam
                                             <td className="px-3 py-2 text-sm text-gray-900 whitespace-nowrap">{m.movement_date}</td>
                                             <td className="px-3 py-2 text-sm text-gray-500 whitespace-nowrap">{m.movement_time}</td>
                                             <td className="px-3 py-2 text-sm text-gray-900 whitespace-nowrap">{m.store_code}</td>
-                                            <td className="px-3 py-2 text-sm text-gray-500 whitespace-nowrap">{m.invoice_number || '-'}</td>
+                                            <td className="px-3 py-2 text-sm whitespace-nowrap">
+                                                {m.invoice_number ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            openModal('invoice', { store_code: m.store_code, invoice_number: m.invoice_number });
+                                                        }}
+                                                        className="text-indigo-600 hover:text-indigo-800 hover:underline font-medium"
+                                                        title="Ver todos os itens desta NF"
+                                                    >
+                                                        {m.invoice_number}
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-gray-500">-</span>
+                                                )}
+                                            </td>
                                             <td className="px-3 py-2 text-sm text-gray-500 truncate max-w-[150px]" title={m.ref_size}>{m.ref_size || '-'}</td>
                                             <td className="px-3 py-2 text-sm text-gray-900 text-right whitespace-nowrap">{m.quantity}</td>
                                             <td className="px-3 py-2 text-sm text-gray-900 text-right whitespace-nowrap font-mono">{fmt(m.realized_value)}</td>
@@ -258,6 +275,13 @@ export default function Index({ movements, stores, movementTypes, filters, cigam
                 show={modals.view && selected !== null}
                 onClose={() => closeModal('view')}
                 movement={selected}
+            />
+
+            <InvoiceDetailModal
+                show={modals.invoice && selected !== null}
+                onClose={() => closeModal('invoice')}
+                storeCode={selected?.store_code}
+                invoiceNumber={selected?.invoice_number}
             />
         </>
     );

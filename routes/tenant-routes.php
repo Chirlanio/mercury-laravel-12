@@ -430,6 +430,15 @@ Route::middleware(['auth', 'tenant.module:sales', 'permission:'.Permission::VIEW
 Route::middleware(['auth', 'tenant.module:movements', 'permission:'.Permission::VIEW_MOVEMENTS->value])->group(function () {
     Route::get('/movements/statistics', [MovementController::class, 'statistics'])->name('movements.statistics');
     Route::get('/movements/sync-logs', [MovementController::class, 'syncLogs'])->name('movements.sync-logs');
+    Route::get('/movements/invoice/{storeCode}/{invoiceNumber}', [MovementController::class, 'invoice'])
+        ->where(['storeCode' => '[A-Za-z0-9]+', 'invoiceNumber' => '[A-Za-z0-9]+'])
+        ->name('movements.invoice');
+    Route::get('/movements/invoice/{storeCode}/{invoiceNumber}/xlsx', [MovementController::class, 'invoiceXlsx'])
+        ->where(['storeCode' => '[A-Za-z0-9]+', 'invoiceNumber' => '[A-Za-z0-9]+'])
+        ->name('movements.invoice.xlsx');
+    Route::get('/movements/invoice/{storeCode}/{invoiceNumber}/pdf', [MovementController::class, 'invoicePdf'])
+        ->where(['storeCode' => '[A-Za-z0-9]+', 'invoiceNumber' => '[A-Za-z0-9]+'])
+        ->name('movements.invoice.pdf');
     Route::get('/movements', [MovementController::class, 'index'])->name('movements.index');
 
     Route::middleware('permission:'.Permission::SYNC_MOVEMENTS->value)->group(function () {

@@ -8,6 +8,7 @@ use App\Models\MovementSyncLog;
 use App\Models\MovementType;
 use App\Models\Store;
 use App\Services\CigamSyncService;
+use App\Services\MovementInvoiceService;
 use App\Services\MovementSyncService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -169,6 +170,35 @@ class MovementController extends Controller
             'total_movements' => (int) ($row->today_total ?? 0),
             'last_sync' => Movement::max('synced_at'),
         ]);
+    }
+
+    // =============================================
+    // INVOICE (nota fiscal) — lista itens + export XLSX/PDF
+    // =============================================
+
+    public function invoice(string $storeCode, string $invoiceNumber)
+    {
+        $data = app(MovementInvoiceService::class)->find($storeCode, $invoiceNumber);
+
+        if (! $data) {
+            return response()->json(['message' => 'Nota fiscal não encontrada.'], 404);
+        }
+
+        return response()->json([
+            'header' => $data['header'],
+            'items' => $data['items'],
+            'totals' => $data['totals'],
+        ]);
+    }
+
+    public function invoiceXlsx(string $storeCode, string $invoiceNumber)
+    {
+        return app(MovementInvoiceService::class)->exportXlsx($storeCode, $invoiceNumber);
+    }
+
+    public function invoicePdf(string $storeCode, string $invoiceNumber)
+    {
+        return app(MovementInvoiceService::class)->exportPdf($storeCode, $invoiceNumber);
     }
 
     // =============================================
