@@ -112,6 +112,17 @@ class BudgetController extends Controller
 
     public function index(Request $request): Response
     {
+        // Alertas atuais do ano corrente (se user tem permission)
+        $currentAlerts = null;
+        if ($request->user()?->hasPermissionTo(\App\Enums\Permission::VIEW_BUDGET_CONSUMPTION)) {
+            try {
+                $alertService = app(\App\Services\BudgetAlertService::class);
+                $currentAlerts = $alertService->scanAlerts();
+            } catch (\Throwable $e) {
+                $currentAlerts = null;
+            }
+        }
+
         $query = BudgetUpload::query()
             ->with(['createdBy', 'updatedBy'])
             ->notDeleted();
@@ -150,6 +161,7 @@ class BudgetController extends Controller
             'budgets' => $budgets,
             'filters' => $request->only(['search', 'year', 'scope_label', 'upload_type', 'include_inactive']),
             'statistics' => $this->buildStatistics(),
+            'currentAlerts' => $currentAlerts,
             'enums' => [
                 'uploadTypes' => BudgetUploadType::options(),
             ],

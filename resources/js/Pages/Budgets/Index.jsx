@@ -29,7 +29,7 @@ import BudgetUploadWizard from './components/BudgetUploadWizard';
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
-export default function Index({ budgets, filters = {}, statistics = {}, enums = {}, selects = {} }) {
+export default function Index({ budgets, filters = {}, statistics = {}, enums = {}, selects = {}, currentAlerts = null }) {
     const { hasPermission } = usePermissions();
     const canDownload = hasPermission(PERMISSIONS.DOWNLOAD_BUDGETS);
     const canDelete = hasPermission(PERMISSIONS.DELETE_BUDGETS);
@@ -242,6 +242,10 @@ export default function Index({ budgets, filters = {}, statistics = {}, enums = 
 
                     <StatisticsGrid cards={statisticsCards} cols={5} />
 
+                    {currentAlerts && currentAlerts.alerts && currentAlerts.alerts.length > 0 && (
+                        <AlertsBanner alerts={currentAlerts} />
+                    )}
+
                     <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                             <div>
@@ -319,7 +323,7 @@ export default function Index({ budgets, filters = {}, statistics = {}, enums = 
                         : 'Detalhes'}
                 subtitle={detail?.upload_type_label || selected?.upload_type_label}
                 headerColor="bg-indigo-700"
-                headerIcon={BanknotesIcon}
+                headerIcon={<BanknotesIcon className="h-6 w-6" />}
                 maxWidth="5xl"
                 loading={loadingDetail}
                 headerBadges={detail ? [
@@ -504,7 +508,7 @@ export default function Index({ budgets, filters = {}, statistics = {}, enums = 
                     ? `${deleteTarget.scope_label} ${deleteTarget.year} · v${deleteTarget.version_label}`
                     : ''}
                 headerColor="bg-red-600"
-                headerIcon={ExclamationTriangleIcon}
+                headerIcon={<ExclamationTriangleIcon className="h-6 w-6" />}
                 maxWidth="md"
                 footer={
                     <StandardModal.Footer
@@ -556,4 +560,75 @@ function eventLabel(event) {
         deactivated: 'Desativado',
         deleted: 'Excluído',
     })[event] || event;
+}
+
+function AlertsBanner({ alerts }) {
+    const { summary, alerts: list, year } = alerts;
+    const hasExceeded = summary.exceeded_count > 0;
+    const bannerColor = hasExceeded
+        ? 'bg-red-50 border-red-300 text-red-900'
+        : 'bg-amber-50 border-amber-300 text-amber-900';
+    const iconColor = hasExceeded ? 'text-red-600' : 'text-amber-600';
+
+    return (
+        <div className={`mt-6 border rounded-lg p-4 ${bannerColor}`}>
+            <div className="flex items-start gap-3">
+                <ExclamationTriangleIcon className={`w-6 h-6 shrink-0 mt-0.5 ${iconColor}`} />
+                <div className="flex-1">
+                    <p className="font-semibold">
+                        {hasExceeded
+                            ? `⚠️ ${summary.exceeded_count} orçamento(s) com consumo EXCEDIDO (≥100%) no ano ${year}`
+                            : `⚠️ ${summary.warning_count} orçamento(s) em alerta (≥70%) no ano ${year}`}
+                    </p>
+                    <p className="text-xs mt-0.5 opacity-80">
+                        Ação recomendada — revisar compras antes de novos lançamentos.
+                    </p>
+
+                    <div className="mt-3 space-y-1.5">
+                        {list.slice(0, 3).map((alert) => (
+                            <div
+                                key={alert.budget_id}
+                                className="flex items-center gap-2 text-sm bg-white/60 rounded p-2"
+                            >
+                                <span className={`font-mono text-xs px-1.5 py-0.5 rounded ${
+                                    alert.status === 'exceeded'
+                                        ? 'bg-red-200 text-red-900'
+                                        : 'bg-amber-200 text-amber-900'
+                                }`}>
+                                    {alert.status === 'exceeded' ? '🔴 EXCEDIDO' : '🟡 ALERTA'}
+                                </span>
+                                <span className="font-medium">
+                                    {alert.scope_label} v{alert.version_label}
+                                </span>
+                                <span className="text-xs opacity-70">
+                                    · {alert.total_pct.toFixed(1)}% consumido
+                                </span>
+                                {alert.exceeded_ccs.length > 0 && (
+                                    <span className="text-xs text-red-700">
+                                        · {alert.exceeded_ccs.length} CC excedido{alert.exceeded_ccs.length > 1 ? 's' : ''}
+                                    </span>
+                                )}
+                                {alert.warning_ccs.length > 0 && (
+                                    <span className="text-xs text-amber-700">
+                                        · {alert.warning_ccs.length} CC em alerta
+                                    </span>
+                                )}
+                                <a
+                                    href={route('budgets.dashboard', alert.budget_id)}
+                                    className="ml-auto text-xs text-indigo-700 font-medium hover:underline"
+                                >
+                                    Ver dashboard →
+                                </a>
+                            </div>
+                        ))}
+                        {list.length > 3 && (
+                            <p className="text-xs opacity-70 pl-2">
+                                +{list.length - 3} orçamento(s) adicionais...
+                            </p>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 }
