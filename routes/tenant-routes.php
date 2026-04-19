@@ -1097,6 +1097,15 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/accounting-classes/statistics', [\App\Http\Controllers\AccountingClassController::class, 'statistics'])->name('accounting-classes.statistics');
         Route::get('/accounting-classes/tree', [\App\Http\Controllers\AccountingClassController::class, 'tree'])->name('accounting-classes.tree');
 
+        Route::middleware('permission:'.Permission::EXPORT_ACCOUNTING_CLASSES->value)->group(function () {
+            Route::get('/accounting-classes/export', [\App\Http\Controllers\AccountingClassController::class, 'export'])->name('accounting-classes.export');
+        });
+
+        Route::middleware('permission:'.Permission::IMPORT_ACCOUNTING_CLASSES->value)->group(function () {
+            Route::post('/accounting-classes/import/preview', [\App\Http\Controllers\AccountingClassController::class, 'importPreview'])->name('accounting-classes.import.preview');
+            Route::post('/accounting-classes/import', [\App\Http\Controllers\AccountingClassController::class, 'importStore'])->name('accounting-classes.import.store');
+        });
+
         Route::get('/accounting-classes/{accountingClass}', [\App\Http\Controllers\AccountingClassController::class, 'show'])->whereNumber('accountingClass')->name('accounting-classes.show');
 
         Route::middleware('permission:'.Permission::CREATE_ACCOUNTING_CLASSES->value)->group(function () {

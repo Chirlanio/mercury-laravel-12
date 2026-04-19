@@ -223,6 +223,15 @@ export const PERMISSIONS = {
     MANAGE_COST_CENTERS: 'cost_centers.manage',
     IMPORT_COST_CENTERS: 'cost_centers.import',
     EXPORT_COST_CENTERS: 'cost_centers.export',
+
+    // Plano de Contas
+    VIEW_ACCOUNTING_CLASSES: 'accounting_classes.view',
+    CREATE_ACCOUNTING_CLASSES: 'accounting_classes.create',
+    EDIT_ACCOUNTING_CLASSES: 'accounting_classes.edit',
+    DELETE_ACCOUNTING_CLASSES: 'accounting_classes.delete',
+    MANAGE_ACCOUNTING_CLASSES: 'accounting_classes.manage',
+    IMPORT_ACCOUNTING_CLASSES: 'accounting_classes.import',
+    EXPORT_ACCOUNTING_CLASSES: 'accounting_classes.export',
 };
 
 export const ROLES = {
