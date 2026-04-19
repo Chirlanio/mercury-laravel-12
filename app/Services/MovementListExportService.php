@@ -34,10 +34,10 @@ class MovementListExportService
     {
         $total = (clone $query)->count();
 
-        if ($total > self::ROW_LIMIT) {
+        if ($total > static::ROW_LIMIT) {
             abort(422, sprintf(
                 'Export limitado a %s linhas (filtro atual: %s). Refine os filtros.',
-                number_format(self::ROW_LIMIT, 0, ',', '.'),
+                number_format(static::ROW_LIMIT, 0, ',', '.'),
                 number_format($total, 0, ',', '.'),
             ));
         }
@@ -93,10 +93,10 @@ class MovementListExportService
     {
         $total = (clone $query)->count();
 
-        if ($total > self::PDF_ROW_LIMIT) {
+        if ($total > static::PDF_ROW_LIMIT) {
             abort(422, sprintf(
                 'Export PDF limitado a %s linhas (filtro atual: %s). Refine os filtros ou use XLSX.',
-                number_format(self::PDF_ROW_LIMIT, 0, ',', '.'),
+                number_format(static::PDF_ROW_LIMIT, 0, ',', '.'),
                 number_format($total, 0, ',', '.'),
             ));
         }

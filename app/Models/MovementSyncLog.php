@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MovementSyncLog extends Model
 {
+    use HasFactory;
+
     const MAX_ERROR_RECORDS = 200;
 
     protected $fillable = [

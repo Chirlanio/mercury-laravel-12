@@ -62,9 +62,9 @@
         <strong>Filtros:</strong>
         <span class="chip">
             Período:
-            {{ $filters['date_start'] ? \Carbon\Carbon::parse($filters['date_start'])->format('d/m/Y') : '-' }}
+            {{ ! empty($filters['date_start']) ? \Carbon\Carbon::parse($filters['date_start'])->format('d/m/Y') : '-' }}
             a
-            {{ $filters['date_end'] ? \Carbon\Carbon::parse($filters['date_end'])->format('d/m/Y') : '-' }}
+            {{ ! empty($filters['date_end']) ? \Carbon\Carbon::parse($filters['date_end'])->format('d/m/Y') : '-' }}
         </span>
         @if ($storeLabel)
             <span class="chip">Loja: {{ $storeLabel }}</span>

@@ -3,12 +3,15 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Movement extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'movement_date', 'movement_time', 'store_code', 'cpf_customer',
         'invoice_number', 'movement_code', 'cpf_consultant', 'ref_size',
@@ -18,7 +21,7 @@ class Movement extends Model
     ];
 
     protected $casts = [
-        'movement_date' => 'date',
+        'movement_date' => 'date:Y-m-d',
         'sale_price' => 'decimal:2',
         'cost_price' => 'decimal:2',
         'realized_value' => 'decimal:2',
@@ -27,6 +30,7 @@ class Movement extends Model
         'net_value' => 'decimal:2',
         'net_quantity' => 'decimal:3',
         'movement_code' => 'integer',
+        'synced_at' => 'datetime',
     ];
 
     // Relationships
