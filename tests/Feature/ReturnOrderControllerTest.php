@@ -88,26 +88,26 @@ class ReturnOrderControllerTest extends TestCase
         $response->assertStatus(403);
     }
 
-    public function test_index_hides_terminal_states_by_default(): void
+    public function test_index_hides_only_cancelled_by_default(): void
     {
         $this->createReturn(['invoice_number' => 'A', 'status' => ReturnStatus::PENDING->value]);
         $this->createReturn(['invoice_number' => 'B', 'status' => ReturnStatus::COMPLETED->value]);
+        $this->createReturn(['invoice_number' => 'C', 'status' => ReturnStatus::CANCELLED->value]);
 
         $response = $this->actingAs($this->adminUser)->get(route('returns.index'));
 
         $response->assertStatus(200);
-        $response->assertInertia(
-            fn ($page) => $page->has('returns.data', 1)->where('returns.data.0.invoice_number', 'A')
-        );
+        // Completed fica visível, apenas cancelled é escondido por default
+        $response->assertInertia(fn ($page) => $page->has('returns.data', 2));
     }
 
-    public function test_index_can_include_terminal_with_flag(): void
+    public function test_index_can_include_cancelled_with_flag(): void
     {
         $this->createReturn(['invoice_number' => 'A', 'status' => ReturnStatus::PENDING->value]);
-        $this->createReturn(['invoice_number' => 'B', 'status' => ReturnStatus::COMPLETED->value]);
+        $this->createReturn(['invoice_number' => 'B', 'status' => ReturnStatus::CANCELLED->value]);
 
         $response = $this->actingAs($this->adminUser)
-            ->get(route('returns.index', ['include_terminal' => 1]));
+            ->get(route('returns.index', ['include_cancelled' => 1]));
 
         $response->assertInertia(fn ($page) => $page->has('returns.data', 2));
     }

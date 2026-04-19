@@ -56,11 +56,12 @@ class ReturnOrderController extends Controller
 
         if ($request->filled('status')) {
             $query->forStatus($request->status);
-        } elseif (! $request->boolean('include_terminal')) {
-            $query->whereNotIn('status', [
-                ReturnStatus::COMPLETED->value,
-                ReturnStatus::CANCELLED->value,
-            ]);
+        } elseif (! $request->boolean('include_cancelled')) {
+            // No e-commerce o atendimento precisa ver as devoluções concluídas
+            // no dia a dia (cliente pergunta: "minha devolução foi concluída?").
+            // Só escondemos cancelled por padrão — é ruído operacional. Para ver
+            // canceladas, usar include_cancelled=1 ou filtrar status=cancelled.
+            $query->where('status', '!=', ReturnStatus::CANCELLED->value);
         }
 
         if ($request->filled('type')) {
@@ -98,7 +99,7 @@ class ReturnOrderController extends Controller
             'returns' => $returns,
             'filters' => $request->only([
                 'store_code', 'status', 'type', 'reason_category',
-                'search', 'date_from', 'date_to', 'include_terminal',
+                'search', 'date_from', 'date_to', 'include_cancelled',
             ]),
             'statistics' => $statistics,
             'statusOptions' => ReturnStatus::labels(),
