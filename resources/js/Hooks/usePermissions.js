@@ -241,6 +241,15 @@ export const PERMISSIONS = {
     MANAGE_MANAGEMENT_CLASSES: 'management_classes.manage',
     IMPORT_MANAGEMENT_CLASSES: 'management_classes.import',
     EXPORT_MANAGEMENT_CLASSES: 'management_classes.export',
+
+    // Orçamentos
+    VIEW_BUDGETS: 'budgets.view',
+    UPLOAD_BUDGETS: 'budgets.upload',
+    DOWNLOAD_BUDGETS: 'budgets.download',
+    DELETE_BUDGETS: 'budgets.delete',
+    MANAGE_BUDGETS: 'budgets.manage',
+    EXPORT_BUDGETS: 'budgets.export',
+    VIEW_BUDGET_CONSUMPTION: 'budgets.view_consumption',
 };
 
 export const ROLES = {
