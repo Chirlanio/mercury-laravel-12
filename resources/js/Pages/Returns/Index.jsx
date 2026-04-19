@@ -14,6 +14,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
+import { maskMoney, parseMoney } from '@/Hooks/useMasks';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import DataTable from '@/Components/DataTable';
@@ -135,7 +136,9 @@ export default function Index({
                     employee_id: r.employee_id || '',
                     reason_category: r.reason_category || '',
                     return_reason_id: r.return_reason_id || '',
-                    refund_amount: r.refund_amount || '',
+                    refund_amount: r.refund_amount != null
+                        ? maskMoney(Math.round(Number(r.refund_amount) * 100).toString())
+                        : '',
                     reverse_tracking_code: r.reverse_tracking_code || '',
                     notes: r.notes || '',
                     type: r.type,
@@ -172,6 +175,11 @@ export default function Index({
         const items = plain.items || [];
         delete plain.items;
 
+        // Converte máscara BR "1.234,56" para float antes de enviar
+        if (plain.refund_amount) {
+            plain.refund_amount = parseMoney(plain.refund_amount);
+        }
+
         Object.entries(plain).forEach(([k, v]) => {
             if (v === null || v === undefined || v === '') return;
             fd.append(k, v);
@@ -199,7 +207,11 @@ export default function Index({
 
     const handleEditSubmit = () => {
         setEditProcessing(true);
-        router.put(route('returns.update', editForm.id), editForm, {
+        const payload = { ...editForm };
+        if (payload.refund_amount) {
+            payload.refund_amount = parseMoney(payload.refund_amount);
+        }
+        router.put(route('returns.update', editForm.id), payload, {
             onError: (errs) => setEditErrors(errs),
             onSuccess: () => {
                 closeModal('edit');
@@ -715,17 +727,24 @@ export default function Index({
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Valor do reembolso *
                                 </label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={createForm.refund_amount}
-                                    onChange={(e) =>
-                                        setCreateForm({ ...createForm, refund_amount: e.target.value })
-                                    }
-                                    placeholder="0,00"
-                                    className="w-full rounded-md border-gray-300 shadow-sm"
-                                />
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
+                                        R$
+                                    </span>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={createForm.refund_amount}
+                                        onChange={(e) =>
+                                            setCreateForm({
+                                                ...createForm,
+                                                refund_amount: maskMoney(e.target.value),
+                                            })
+                                        }
+                                        placeholder="0,00"
+                                        className="w-full rounded-md border-gray-300 shadow-sm pl-9"
+                                    />
+                                </div>
                                 {createErrors.refund_amount && (
                                     <p className="mt-1 text-xs text-red-600">
                                         {createErrors.refund_amount}
@@ -1036,16 +1055,24 @@ export default function Index({
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Valor do reembolso
                                 </label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={editForm.refund_amount || ''}
-                                    onChange={(e) =>
-                                        setEditForm({ ...editForm, refund_amount: e.target.value })
-                                    }
-                                    className="w-full rounded-md border-gray-300 shadow-sm"
-                                />
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
+                                        R$
+                                    </span>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={editForm.refund_amount || ''}
+                                        onChange={(e) =>
+                                            setEditForm({
+                                                ...editForm,
+                                                refund_amount: maskMoney(e.target.value),
+                                            })
+                                        }
+                                        placeholder="0,00"
+                                        className="w-full rounded-md border-gray-300 shadow-sm pl-9"
+                                    />
+                                </div>
                             </div>
                         )}
                         <div className="md:col-span-2">

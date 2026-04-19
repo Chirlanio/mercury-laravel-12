@@ -14,6 +14,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
+import { maskMoney, parseMoney } from '@/Hooks/useMasks';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import DataTable from '@/Components/DataTable';
@@ -208,6 +209,11 @@ export default function Index({
         // Limpa arrays/objetos para FormData
         const items = plain.items || [];
         delete plain.items;
+
+        // Converte máscara BR "1.234,56" para float antes de enviar
+        if (plain.amount_correct) {
+            plain.amount_correct = parseMoney(plain.amount_correct);
+        }
 
         Object.entries(plain).forEach(([k, v]) => {
             if (v === null || v === undefined || v === '') return;
@@ -885,20 +891,24 @@ export default function Index({
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
                                         Valor correto *
                                     </label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={createForm.amount_correct}
-                                        onChange={(e) =>
-                                            setCreateForm({
-                                                ...createForm,
-                                                amount_correct: e.target.value,
-                                            })
-                                        }
-                                        placeholder="0,00"
-                                        className="w-full rounded-md border-gray-300 shadow-sm"
-                                    />
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
+                                            R$
+                                        </span>
+                                        <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            value={createForm.amount_correct}
+                                            onChange={(e) =>
+                                                setCreateForm({
+                                                    ...createForm,
+                                                    amount_correct: maskMoney(e.target.value),
+                                                })
+                                            }
+                                            placeholder="0,00"
+                                            className="w-full rounded-md border-gray-300 shadow-sm pl-9"
+                                        />
+                                    </div>
                                     {createErrors.amount_correct && (
                                         <p className="mt-1 text-xs text-red-600">
                                             {createErrors.amount_correct}
