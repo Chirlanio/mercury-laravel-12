@@ -22,6 +22,10 @@ export default function Index({ movements, stores, movementTypes, filters, cigam
         date_end: filters.date_end || '',
         store_code: filters.store_code || '',
         movement_code: filters.movement_code || '',
+        entry_exit: filters.entry_exit || '',
+        cpf_consultant: filters.cpf_consultant || '',
+        cpf_customer: filters.cpf_customer || '',
+        sync_status: filters.sync_status || '',
         search: filters.search || '',
     });
 
@@ -31,7 +35,12 @@ export default function Index({ movements, stores, movementTypes, filters, cigam
 
     const clearFilters = () => {
         const today = new Date().toISOString().split('T')[0];
-        setLocalFilters({ date_start: today, date_end: today, store_code: '', movement_code: '', search: '' });
+        setLocalFilters({
+            date_start: today, date_end: today,
+            store_code: '', movement_code: '', entry_exit: '',
+            cpf_consultant: '', cpf_customer: '', sync_status: '',
+            search: '',
+        });
         router.get('/movements', {}, { preserveState: true, preserveScroll: true });
     };
 
@@ -72,7 +81,7 @@ export default function Index({ movements, stores, movementTypes, filters, cigam
 
                     {/* Filtros */}
                     <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
                             <div>
                                 <label className="block text-xs text-gray-500 mb-1">Data Início</label>
                                 <input type="date" value={localFilters.date_start}
@@ -101,6 +110,42 @@ export default function Index({ movements, stores, movementTypes, filters, cigam
                                     className="w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                     <option value="">Todos</option>
                                     {movementTypes.map(t => <option key={t.code} value={t.code}>{t.code} - {t.description}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">Entrada/Saída</label>
+                                <select value={localFilters.entry_exit}
+                                    onChange={(e) => handleFilterChange('entry_exit', e.target.value)}
+                                    className="w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <option value="">Ambos</option>
+                                    <option value="E">Entrada</option>
+                                    <option value="S">Saída</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">CPF Consultor</label>
+                                <input type="text" value={localFilters.cpf_consultant}
+                                    onChange={(e) => handleFilterChange('cpf_consultant', e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+                                    placeholder="Somente números"
+                                    className="w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">CPF Cliente</label>
+                                <input type="text" value={localFilters.cpf_customer}
+                                    onChange={(e) => handleFilterChange('cpf_customer', e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+                                    placeholder="Somente números"
+                                    className="w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">Status Sync</label>
+                                <select value={localFilters.sync_status}
+                                    onChange={(e) => handleFilterChange('sync_status', e.target.value)}
+                                    className="w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <option value="">Todos</option>
+                                    <option value="synced">Sincronizados</option>
+                                    <option value="pending">Pendentes</option>
                                 </select>
                             </div>
                             <div>

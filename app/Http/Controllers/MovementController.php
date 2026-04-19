@@ -11,6 +11,7 @@ use App\Services\CigamSyncService;
 use App\Services\MovementSyncService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class MovementController extends Controller
@@ -21,6 +22,10 @@ class MovementController extends Controller
         $dateEnd = $request->get('date_end', now()->toDateString());
         $storeCode = $request->get('store_code');
         $movementCode = $request->get('movement_code');
+        $entryExit = $request->get('entry_exit');
+        $cpfConsultant = $request->get('cpf_consultant');
+        $cpfCustomer = $request->get('cpf_customer');
+        $syncStatus = $request->get('sync_status');
         $search = $request->get('search');
 
         $query = Movement::query()
@@ -37,13 +42,31 @@ class MovementController extends Controller
             $query->forMovementCode((int) $movementCode);
         }
 
+        if (in_array($entryExit, ['E', 'S'], true)) {
+            $query->where('entry_exit', $entryExit);
+        }
+
+        if ($cpfConsultant) {
+            $query->where('cpf_consultant', 'like', preg_replace('/\D/', '', $cpfConsultant).'%');
+        }
+
+        if ($cpfCustomer) {
+            $query->where('cpf_customer', 'like', preg_replace('/\D/', '', $cpfCustomer).'%');
+        }
+
+        if ($syncStatus === 'synced') {
+            $query->whereNotNull('synced_at');
+        } elseif ($syncStatus === 'pending') {
+            $query->whereNull('synced_at');
+        }
+
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('barcode', 'like', "%{$search}%")
-                  ->orWhere('ref_size', 'like', "%{$search}%")
-                  ->orWhere('invoice_number', 'like', "%{$search}%")
-                  ->orWhere('cpf_consultant', 'like', "%{$search}%")
-                  ->orWhere('cpf_customer', 'like', "%{$search}%");
+                    ->orWhere('ref_size', 'like', "%{$search}%")
+                    ->orWhere('invoice_number', 'like', "%{$search}%")
+                    ->orWhere('cpf_consultant', 'like', "%{$search}%")
+                    ->orWhere('cpf_customer', 'like', "%{$search}%");
             });
         }
 
@@ -88,6 +111,10 @@ class MovementController extends Controller
                 'date_end' => $dateEnd,
                 'store_code' => $storeCode,
                 'movement_code' => $movementCode,
+                'entry_exit' => $entryExit,
+                'cpf_consultant' => $cpfConsultant,
+                'cpf_customer' => $cpfCustomer,
+                'sync_status' => $syncStatus,
                 'search' => $search,
             ],
             'cigamAvailable' => $cigamAvailable,
@@ -99,20 +126,30 @@ class MovementController extends Controller
     {
         $refDate = $request->get('date', now()->toDateString());
         $ref = Carbon::parse($refDate);
-        $yesterday = $ref->copy()->subDay();
-        $lastWeek = $ref->copy()->subWeek();
+        $yesterday = $ref->copy()->subDay()->toDateString();
+        $lastWeek = $ref->copy()->subWeek()->toDateString();
+        $today = $ref->toDateString();
 
-        $todaySales = (float) Movement::forDate($ref->toDateString())->sales()->sum('realized_value');
-        $todayReturns = (float) Movement::forDate($ref->toDateString())->returns()->sum('realized_value');
-        $todayNet = $todaySales - $todayReturns;
+        // Única query agregando os 3 períodos via CASE WHEN.
+        // Usa idx_mov_sales_agg (movement_date + movement_code + store_code).
+        $row = DB::table('movements')
+            ->selectRaw("
+                SUM(CASE WHEN movement_date = ? AND movement_code = 2 THEN realized_value ELSE 0 END) as today_sales,
+                SUM(CASE WHEN movement_date = ? AND movement_code = 6 AND entry_exit = 'E' THEN realized_value ELSE 0 END) as today_returns,
+                SUM(CASE WHEN movement_date = ? AND movement_code = 2 THEN quantity ELSE 0 END) as today_items,
+                SUM(CASE WHEN movement_date = ? THEN 1 ELSE 0 END) as today_total,
+                COUNT(DISTINCT CASE WHEN movement_date = ? THEN store_code END) as today_active_stores,
+                SUM(CASE WHEN movement_date = ? AND movement_code = 2 THEN realized_value ELSE 0 END) as yesterday_sales,
+                SUM(CASE WHEN movement_date = ? AND movement_code = 6 AND entry_exit = 'E' THEN realized_value ELSE 0 END) as yesterday_returns,
+                SUM(CASE WHEN movement_date = ? AND movement_code = 2 THEN realized_value ELSE 0 END) as lastweek_sales,
+                SUM(CASE WHEN movement_date = ? AND movement_code = 6 AND entry_exit = 'E' THEN realized_value ELSE 0 END) as lastweek_returns
+            ", [$today, $today, $today, $today, $today, $yesterday, $yesterday, $lastWeek, $lastWeek])
+            ->whereIn('movement_date', [$today, $yesterday, $lastWeek])
+            ->first();
 
-        $yesterdaySales = (float) Movement::forDate($yesterday->toDateString())->sales()->sum('realized_value');
-        $yesterdayReturns = (float) Movement::forDate($yesterday->toDateString())->returns()->sum('realized_value');
-        $yesterdayNet = $yesterdaySales - $yesterdayReturns;
-
-        $lastWeekSales = (float) Movement::forDate($lastWeek->toDateString())->sales()->sum('realized_value');
-        $lastWeekReturns = (float) Movement::forDate($lastWeek->toDateString())->returns()->sum('realized_value');
-        $lastWeekNet = $lastWeekSales - $lastWeekReturns;
+        $todayNet = (float) ($row->today_sales ?? 0) - (float) ($row->today_returns ?? 0);
+        $yesterdayNet = (float) ($row->yesterday_sales ?? 0) - (float) ($row->yesterday_returns ?? 0);
+        $lastWeekNet = (float) ($row->lastweek_sales ?? 0) - (float) ($row->lastweek_returns ?? 0);
 
         $variationYesterday = $yesterdayNet > 0
             ? round((($todayNet - $yesterdayNet) / $yesterdayNet) * 100, 1)
@@ -121,21 +158,16 @@ class MovementController extends Controller
             ? round((($todayNet - $lastWeekNet) / $lastWeekNet) * 100, 1)
             : null;
 
-        $itemsSold = (int) Movement::forDate($ref->toDateString())->sales()->sum('quantity');
-        $activeStores = Movement::forDate($ref->toDateString())->distinct('store_code')->count('store_code');
-        $totalMovements = Movement::forDate($ref->toDateString())->count();
-        $lastSync = Movement::max('synced_at');
-
         return response()->json([
             'today_net' => round($todayNet, 2),
             'yesterday_net' => round($yesterdayNet, 2),
             'variation_yesterday' => $variationYesterday,
             'last_week_net' => round($lastWeekNet, 2),
             'variation_week' => $variationWeek,
-            'items_sold' => $itemsSold,
-            'active_stores' => $activeStores,
-            'total_movements' => $totalMovements,
-            'last_sync' => $lastSync,
+            'items_sold' => (int) ($row->today_items ?? 0),
+            'active_stores' => (int) ($row->today_active_stores ?? 0),
+            'total_movements' => (int) ($row->today_total ?? 0),
+            'last_sync' => Movement::max('synced_at'),
         ]);
     }
 
@@ -252,6 +284,7 @@ class MovementController extends Controller
             'skipped_records' => $log->skipped_records ?? 0,
             'error_count' => $log->error_count ?? 0,
             'error_details' => $log->error_details,
+            'deletion_summary' => $log->deletion_summary,
             'date_range_start' => $log->date_range_start?->format('d/m/Y'),
             'date_range_end' => $log->date_range_end?->format('d/m/Y'),
             'started_at' => $log->started_at?->format('d/m/Y H:i:s'),
@@ -282,6 +315,9 @@ class MovementController extends Controller
                 'skipped_records' => $log->skipped_records ?? 0,
                 'error_count' => $log->error_count ?? 0,
                 'error_message' => $log->error_details['message'] ?? null,
+                'error_records' => $log->error_details['records'] ?? [],
+                'error_truncated' => $log->error_details['truncated'] ?? 0,
+                'deletion_summary' => $log->deletion_summary,
                 'date_range_start' => $log->date_range_start?->format('d/m/Y'),
                 'date_range_end' => $log->date_range_end?->format('d/m/Y'),
                 'started_at' => $log->started_at?->format('d/m/Y H:i:s'),

@@ -2,12 +2,9 @@
 
 namespace App\Services;
 
-use App\Models\Employee;
 use App\Models\Movement;
 use App\Models\MovementSyncLog;
 use App\Models\MovementType;
-use App\Models\Sale;
-use App\Models\Store;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -16,12 +13,11 @@ use Illuminate\Support\Str;
 class MovementSyncService
 {
     const BATCH_INSERT_SIZE = 500;
+    const SALES_UPSERT_CHUNK = 500;
     const MAX_CHUNK_DAYS = 7;
     const MAX_RANGE_DAYS = 180;
 
     protected CigamSyncService $cigamService;
-    protected array $storeCodeMap = [];
-    protected array $employeeCpfMap = [];
 
     public function __construct(CigamSyncService $cigamService)
     {
@@ -131,13 +127,25 @@ class MovementSyncService
             $batch = [];
 
             foreach ($cursor as $record) {
-                $batch[] = $this->mapCigamRecord($record, $batchId);
+                try {
+                    $batch[] = $this->mapCigamRecord($record, $batchId);
 
-                if (count($batch) >= self::BATCH_INSERT_SIZE) {
-                    DB::table('movements')->insert($batch);
-                    $log->increment('inserted_records', count($batch));
-                    $log->increment('processed_records', count($batch));
-                    $batch = [];
+                    if (count($batch) >= self::BATCH_INSERT_SIZE) {
+                        DB::table('movements')->insert($batch);
+                        $log->increment('inserted_records', count($batch));
+                        $log->increment('processed_records', count($batch));
+                        $batch = [];
+                    }
+                } catch (\Exception $e) {
+                    $log->pushError([
+                        'phase' => 'map',
+                        'record_date' => $record->data ?? null,
+                        'record_time' => $record->hora ?? null,
+                        'store' => $record->cod_lojas ?? null,
+                        'invoice' => $record->nf ?? null,
+                        'barcode' => $record->cod_barras ?? null,
+                        'message' => $e->getMessage(),
+                    ]);
                 }
             }
 
@@ -176,7 +184,7 @@ class MovementSyncService
         }
 
         if ($start->diffInDays($end) > self::MAX_RANGE_DAYS) {
-            $log->markFailed("Período máximo de " . self::MAX_RANGE_DAYS . " dias excedido.");
+            $log->markFailed("Período máximo de ".self::MAX_RANGE_DAYS.' dias excedido.');
 
             return $log;
         }
@@ -202,72 +210,80 @@ class MovementSyncService
     // SALES SUMMARY REFRESH
     // =============================================
 
+    /**
+     * Atualiza a tabela sales agregando movements (vendas + devoluções).
+     * Usa JOIN para resolver store_id e employee_id direto no SQL (sem carregar maps em memória)
+     * e processa em chunks para evitar picos de RAM.
+     */
     public function refreshSalesSummary(Carbon $start, Carbon $end): array
     {
-        $this->loadMappings();
+        $cpfExpr = "COALESCE(NULLIF(TRIM(m.cpf_consultant), ''), '00000000000')";
 
-        $rows = DB::table('movements')
+        $base = DB::table('movements as m')
+            ->leftJoin('stores as s', 's.code', '=', 'm.store_code')
+            ->leftJoin('employees as e', function ($join) use ($cpfExpr) {
+                $join->on('e.cpf', '=', DB::raw($cpfExpr));
+            })
             ->select(
-                'movement_date',
-                'store_code',
-                DB::raw("COALESCE(NULLIF(TRIM(cpf_consultant), ''), '00000000000') as cpf"),
-                DB::raw("SUM(CASE WHEN movement_code = 6 AND entry_exit = 'E' THEN -realized_value ELSE realized_value END) as total_sales"),
-                DB::raw("CAST(SUM(CASE WHEN movement_code = 6 AND entry_exit = 'E' THEN -quantity ELSE quantity END) AS SIGNED) as qtde_total"),
+                'm.movement_date',
+                'm.store_code',
+                DB::raw("$cpfExpr as cpf"),
+                's.id as store_id',
+                'e.id as employee_id',
+                DB::raw("SUM(CASE WHEN m.movement_code = 6 AND m.entry_exit = 'E' THEN -m.realized_value ELSE m.realized_value END) as total_sales"),
+                DB::raw("CAST(SUM(CASE WHEN m.movement_code = 6 AND m.entry_exit = 'E' THEN -m.quantity ELSE m.quantity END) AS SIGNED) as qtde_total"),
             )
             ->where(function ($q) {
-                $q->where('movement_code', 2)
-                  ->orWhere(function ($q2) {
-                      $q2->where('movement_code', 6)->where('entry_exit', 'E');
-                  });
+                $q->where('m.movement_code', 2)
+                    ->orWhere(function ($q2) {
+                        $q2->where('m.movement_code', 6)->where('m.entry_exit', 'E');
+                    });
             })
-            ->whereBetween('movement_date', [$start->toDateString(), $end->toDateString()])
-            ->groupBy('movement_date', 'store_code', DB::raw("COALESCE(NULLIF(TRIM(cpf_consultant), ''), '00000000000')"))
-            ->get();
+            ->whereBetween('m.movement_date', [$start->toDateString(), $end->toDateString()])
+            ->groupBy('m.movement_date', 'm.store_code', DB::raw($cpfExpr), 's.id', 'e.id')
+            ->orderBy('m.movement_date')
+            ->orderBy('m.store_code');
 
         $inserted = 0;
         $updated = 0;
         $skipped = 0;
 
-        foreach ($rows as $row) {
-            $storeId = $this->storeCodeMap[$row->store_code] ?? null;
-            $employeeId = $this->employeeCpfMap[$row->cpf] ?? null;
+        $base->chunk(self::SALES_UPSERT_CHUNK, function ($rows) use (&$inserted, &$updated, &$skipped) {
+            foreach ($rows as $row) {
+                if (! $row->store_id) {
+                    $skipped++;
 
-            if (! $storeId) {
-                $skipped++;
+                    continue;
+                }
 
-                continue;
+                $data = [
+                    'total_sales' => round((float) $row->total_sales, 2),
+                    'qtde_total' => (int) $row->qtde_total,
+                    'source' => 'cigam',
+                    'user_hash' => md5($row->cpf.$row->store_code.$row->movement_date),
+                    'updated_at' => now(),
+                ];
+
+                $affected = DB::table('sales')
+                    ->where('store_id', $row->store_id)
+                    ->where('date_sales', $row->movement_date)
+                    ->when($row->employee_id, fn ($q) => $q->where('employee_id', $row->employee_id))
+                    ->when(! $row->employee_id, fn ($q) => $q->whereNull('employee_id'))
+                    ->update($data);
+
+                if ($affected > 0) {
+                    $updated++;
+                } else {
+                    DB::table('sales')->insert(array_merge($data, [
+                        'store_id' => $row->store_id,
+                        'employee_id' => $row->employee_id,
+                        'date_sales' => $row->movement_date,
+                        'created_at' => now(),
+                    ]));
+                    $inserted++;
+                }
             }
-
-            $existing = Sale::where('store_id', $storeId)
-                ->where('date_sales', $row->movement_date)
-                ->where(function ($q) use ($employeeId) {
-                    if ($employeeId) {
-                        $q->where('employee_id', $employeeId);
-                    } else {
-                        $q->whereNull('employee_id');
-                    }
-                })
-                ->first();
-
-            $data = [
-                'total_sales' => round((float) $row->total_sales, 2),
-                'qtde_total' => (int) $row->qtde_total,
-                'source' => 'cigam',
-                'user_hash' => md5($row->cpf . $row->store_code . $row->movement_date),
-            ];
-
-            if ($existing) {
-                $existing->update($data);
-                $updated++;
-            } else {
-                Sale::create(array_merge($data, [
-                    'store_id' => $storeId,
-                    'employee_id' => $employeeId,
-                    'date_sales' => $row->movement_date,
-                ]));
-                $inserted++;
-            }
-        }
+        });
 
         Log::info('Sales summary refreshed', compact('inserted', 'updated', 'skipped'));
 
@@ -310,7 +326,6 @@ class MovementSyncService
 
     protected function syncDateRangeInternal(Carbon $start, Carbon $end, MovementSyncLog $log, bool $deleteFirst = true): void
     {
-        // Chunk into MAX_CHUNK_DAYS windows
         $chunkStart = $start->copy();
 
         while ($chunkStart->lte($end)) {
@@ -319,8 +334,9 @@ class MovementSyncService
                 $chunkEnd = $end->copy();
             }
 
-            // Delete existing data for this chunk
             if ($deleteFirst) {
+                $this->captureDeletionSummary($log, $chunkStart, $chunkEnd);
+
                 $deleted = Movement::forDateRange(
                     $chunkStart->toDateString(),
                     $chunkEnd->toDateString()
@@ -328,7 +344,6 @@ class MovementSyncService
                 $log->increment('deleted_records', $deleted);
             }
 
-            // Count records in CIGAM for this chunk
             $chunkCount = DB::connection('cigam')
                 ->table('msl_fmovimentodiario_')
                 ->whereBetween('data', [$chunkStart->toDateString(), $chunkEnd->toDateString()])
@@ -342,7 +357,6 @@ class MovementSyncService
                 continue;
             }
 
-            // Stream records using cursor to avoid memory exhaustion
             $cursor = DB::connection('cigam')
                 ->table('msl_fmovimentodiario_')
                 ->whereBetween('data', [$chunkStart->toDateString(), $chunkEnd->toDateString()])
@@ -364,11 +378,14 @@ class MovementSyncService
                         $batch = [];
                     }
                 } catch (\Exception $e) {
-                    $log->increment('error_count');
-                    $log->increment('skipped_records');
-                    Log::warning('Movement record error', [
-                        'error' => $e->getMessage(),
-                        'date' => $record->data ?? null,
+                    $log->pushError([
+                        'phase' => 'map',
+                        'record_date' => $record->data ?? null,
+                        'record_time' => $record->hora ?? null,
+                        'store' => $record->cod_lojas ?? null,
+                        'invoice' => $record->nf ?? null,
+                        'barcode' => $record->cod_barras ?? null,
+                        'message' => $e->getMessage(),
                     ]);
                 }
             }
@@ -381,6 +398,38 @@ class MovementSyncService
 
             $chunkStart->addDays(self::MAX_CHUNK_DAYS);
         }
+    }
+
+    /**
+     * Agrega contagem de registros a serem deletados por loja, data e movement_code
+     * antes do delete físico, para auditoria.
+     */
+    protected function captureDeletionSummary(MovementSyncLog $log, Carbon $start, Carbon $end): void
+    {
+        $rows = DB::table('movements')
+            ->selectRaw('store_code, movement_date, movement_code, COUNT(*) as total')
+            ->whereBetween('movement_date', [$start->toDateString(), $end->toDateString()])
+            ->groupBy('store_code', 'movement_date', 'movement_code')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return;
+        }
+
+        $summary = ['by_store' => [], 'by_date' => [], 'by_movement_code' => [], 'total' => 0];
+
+        foreach ($rows as $row) {
+            $count = (int) $row->total;
+            $summary['by_store'][$row->store_code] = ($summary['by_store'][$row->store_code] ?? 0) + $count;
+            $date = $row->movement_date instanceof \DateTimeInterface
+                ? $row->movement_date->format('Y-m-d')
+                : (string) $row->movement_date;
+            $summary['by_date'][$date] = ($summary['by_date'][$date] ?? 0) + $count;
+            $summary['by_movement_code'][$row->movement_code] = ($summary['by_movement_code'][$row->movement_code] ?? 0) + $count;
+            $summary['total'] += $count;
+        }
+
+        $log->mergeDeletionSummary($summary);
     }
 
     protected function mapCigamRecord(object $record, string $batchId): array
@@ -417,17 +466,5 @@ class MovementSyncService
             'created_at' => now()->toDateTimeString(),
             'updated_at' => now()->toDateTimeString(),
         ];
-    }
-
-    protected function loadMappings(): void
-    {
-        if (empty($this->storeCodeMap)) {
-            $this->storeCodeMap = Store::pluck('id', 'code')->toArray();
-        }
-        if (empty($this->employeeCpfMap)) {
-            $this->employeeCpfMap = Employee::whereNotNull('cpf')
-                ->pluck('id', 'cpf')
-                ->toArray();
-        }
     }
 }

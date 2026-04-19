@@ -9,6 +9,24 @@ const TYPE_LABELS = { auto: 'Automático', today: 'Hoje', range: 'Período', typ
 const STATUS_VARIANT = { completed: 'success', failed: 'danger', running: 'info' };
 const STATUS_LABEL = { completed: 'Concluído', failed: 'Falha', running: 'Executando' };
 
+function SummaryList({ title, data }) {
+    const entries = Object.entries(data || {}).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    if (entries.length === 0) return null;
+    return (
+        <div className="bg-gray-50 rounded p-2">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase mb-1">{title}</p>
+            <div className="space-y-0.5 text-xs">
+                {entries.map(([k, v]) => (
+                    <div key={k} className="flex justify-between">
+                        <span className="text-gray-600 truncate">{k}</span>
+                        <span className="text-gray-900 font-medium ml-2">{new Intl.NumberFormat('pt-BR').format(v)}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 export default function SyncLogsModal({ show, onClose }) {
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState(null);
@@ -116,6 +134,8 @@ export default function SyncLogsModal({ show, onClose }) {
                     {expandedId && (() => {
                         const log = logs.find(l => l.id === expandedId);
                         if (!log) return null;
+                        const delSummary = log.deletion_summary;
+                        const errRecords = log.error_records || [];
                         return (
                             <StandardModal.Section title={`Detalhes - Sync #${log.id}`}>
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -128,9 +148,55 @@ export default function SyncLogsModal({ show, onClose }) {
                                     <StandardModal.MiniField label="Início" value={log.started_at || '-'} />
                                     <StandardModal.MiniField label="Fim" value={log.completed_at || '-'} />
                                 </div>
+
                                 {log.error_message && (
                                     <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
-                                        {log.error_message}
+                                        <strong>Erro fatal:</strong> {log.error_message}
+                                    </div>
+                                )}
+
+                                {delSummary && delSummary.total > 0 && (
+                                    <div className="mt-4">
+                                        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                                            Remoções ({fmt(delSummary.total)} registros)
+                                        </h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                            <SummaryList title="Por Loja" data={delSummary.by_store} />
+                                            <SummaryList title="Por Data" data={delSummary.by_date} />
+                                            <SummaryList title="Por Tipo" data={delSummary.by_movement_code} />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {errRecords.length > 0 && (
+                                    <div className="mt-4">
+                                        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                                            Registros com Erro ({errRecords.length}{log.error_truncated > 0 ? ` + ${log.error_truncated} truncados` : ''})
+                                        </h4>
+                                        <div className="max-h-48 overflow-y-auto border border-red-200 rounded bg-red-50">
+                                            <table className="min-w-full text-xs">
+                                                <thead className="bg-red-100 sticky top-0">
+                                                    <tr>
+                                                        <th className="px-2 py-1 text-left">Data</th>
+                                                        <th className="px-2 py-1 text-left">Loja</th>
+                                                        <th className="px-2 py-1 text-left">NF</th>
+                                                        <th className="px-2 py-1 text-left">Barcode</th>
+                                                        <th className="px-2 py-1 text-left">Mensagem</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {errRecords.map((err, i) => (
+                                                        <tr key={i} className="border-t border-red-100">
+                                                            <td className="px-2 py-1 whitespace-nowrap">{err.record_date || '-'}</td>
+                                                            <td className="px-2 py-1 whitespace-nowrap">{err.store || '-'}</td>
+                                                            <td className="px-2 py-1 whitespace-nowrap">{err.invoice || '-'}</td>
+                                                            <td className="px-2 py-1 whitespace-nowrap">{err.barcode || '-'}</td>
+                                                            <td className="px-2 py-1 text-red-700">{err.message}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 )}
                             </StandardModal.Section>
