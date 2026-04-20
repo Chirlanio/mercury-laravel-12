@@ -119,12 +119,19 @@ class ManagementClassController extends Controller
     }
 
     /**
-     * Lista os 11 departamentos gerenciais (sintéticos 8.1.DD) com as classes
+     * Lista os departamentos gerenciais (sintéticos 8.1.DD) com as classes
      * analíticas filhas (8.1.DD.UU) e o CC pré-vinculado de cada uma.
      *
      * Consumido pelo form de OrderPayment para a cascata Área → Gerencial → CC.
-     * O frontend escolhe uma área (departamento), depois escolhe uma gerencial
-     * daquela área, e o CC vem automático da gerencial.
+     * O frontend escolhe uma área, depois escolhe uma gerencial, e o CC vem
+     * automático da gerencial.
+     *
+     * Filtros via query string:
+     *   - year (int, opcional): quando informado, só retorna departamentos
+     *     e classes que TÊM budget_item em upload ativo naquele ano. Evita
+     *     confusão do user com dropdowns cheios de opções sem orçamento.
+     *   - all=1: desabilita o filtro por budget e retorna a estrutura inteira
+     *     (útil para cadastros/admin que não dependem de orçamento).
      *
      * Retorno:
      *   departments: [
@@ -133,8 +140,30 @@ class ManagementClassController extends Controller
      *     ]}
      *   ]
      */
-    public function departments(): JsonResponse
+    public function departments(\Illuminate\Http\Request $request): JsonResponse
     {
+        $year = $request->integer('year') ?: null;
+        $skipBudgetFilter = $request->boolean('all');
+
+        // MCs analíticas que têm budget ativo no ano — lista de IDs para
+        // intersectar com as analíticas de cada departamento.
+        $mcIdsWithBudget = null;
+        if ($year && ! $skipBudgetFilter) {
+            $mcIdsWithBudget = \App\Models\BudgetItem::query()
+                ->whereHas('upload', fn ($q) => $q->where('year', $year)
+                    ->where('is_active', true)
+                    ->whereNull('deleted_at'))
+                ->whereNotNull('management_class_id')
+                ->distinct()
+                ->pluck('management_class_id')
+                ->all();
+
+            // Nenhuma MC com budget → devolve lista vazia
+            if (empty($mcIdsWithBudget)) {
+                return response()->json(['departments' => []]);
+            }
+        }
+
         // Departamentos = sintéticos nível 3 (8.1.DD). Ignora 8 e 8.1 que são
         // raiz/agregador — só os 11 departamentos de negócio.
         $departments = ManagementClass::query()
@@ -146,30 +175,40 @@ class ManagementClassController extends Controller
             ->orderBy('code')
             ->get(['id', 'code', 'name']);
 
-        $analyticals = ManagementClass::query()
+        $analyticalsQuery = ManagementClass::query()
             ->with(['costCenter:id,code,name'])
             ->notDeleted()
             ->where('accepts_entries', true)
             ->whereIn('parent_id', $departments->pluck('id'))
             ->where('is_active', true)
-            ->orderBy('code')
-            ->get(['id', 'code', 'name', 'parent_id', 'cost_center_id']);
+            ->orderBy('code');
+
+        if ($mcIdsWithBudget !== null) {
+            $analyticalsQuery->whereIn('id', $mcIdsWithBudget);
+        }
+
+        $analyticals = $analyticalsQuery->get(['id', 'code', 'name', 'parent_id', 'cost_center_id']);
 
         $byParent = $analyticals->groupBy('parent_id');
 
-        $payload = $departments->map(fn ($d) => [
-            'id' => $d->id,
-            'code' => $d->code,
-            'name' => $d->name,
-            'classes' => ($byParent[$d->id] ?? collect())->map(fn ($c) => [
-                'id' => $c->id,
-                'code' => $c->code,
-                'name' => $c->name,
-                'cost_center' => $c->costCenter
-                    ? ['id' => $c->costCenter->id, 'code' => $c->costCenter->code, 'name' => $c->costCenter->name]
-                    : null,
-            ])->values(),
-        ]);
+        $payload = $departments
+            // Quando filtra por budget, só retorna departamentos que têm
+            // pelo menos uma analítica com budget ativo.
+            ->filter(fn ($d) => $mcIdsWithBudget === null || $byParent->has($d->id))
+            ->map(fn ($d) => [
+                'id' => $d->id,
+                'code' => $d->code,
+                'name' => $d->name,
+                'classes' => ($byParent[$d->id] ?? collect())->map(fn ($c) => [
+                    'id' => $c->id,
+                    'code' => $c->code,
+                    'name' => $c->name,
+                    'cost_center' => $c->costCenter
+                        ? ['id' => $c->costCenter->id, 'code' => $c->costCenter->code, 'name' => $c->costCenter->name]
+                        : null,
+                ])->values(),
+            ])
+            ->values();
 
         return response()->json(['departments' => $payload]);
     }

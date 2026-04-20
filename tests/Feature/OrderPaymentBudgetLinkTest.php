@@ -361,6 +361,7 @@ class OrderPaymentBudgetLinkTest extends TestCase
     public function test_endpoint_departments_returns_synthetic_parents_with_analytical_children(): void
     {
         // Seed real já populou 11 departamentos sintéticos 8.1.01..8.1.11
+        // Sem filtro year (ou com all=1), retorna todos — útil em cadastros.
         $response = $this->actingAs($this->adminUser)
             ->getJson(route('management-classes.departments'));
 
@@ -386,5 +387,42 @@ class OrderPaymentBudgetLinkTest extends TestCase
         // Pelo menos uma analítica deve ter cost_center não-null
         $withCc = collect($marketing['classes'])->filter(fn ($c) => $c['cost_center'] !== null);
         $this->assertGreaterThan(0, $withCc->count());
+    }
+
+    public function test_endpoint_departments_filters_by_year_showing_only_areas_with_budget(): void
+    {
+        // O seed popula budget só com MC "MC-OP-TEST" vinculada a uma AC
+        // (via ManagementClass $mc criada no setUp). O budget_item aponta
+        // para essa MC. Só o departamento dessa MC deve aparecer no filtro.
+        //
+        // MC-OP-TEST é standalone (parent_id=null); não é filha de um 8.1.DD.
+        // Portanto, filtrar por ano 2026 → nenhum departamento 8.1.DD bate.
+
+        // Vincula a MC criada no setUp a um departamento para validar o filtro
+        $marketing = ManagementClass::where('code', '8.1.01')->first();
+        $this->itemTelefonia2026->managementClass->update([
+            'parent_id' => $marketing->id,
+            'accepts_entries' => true,
+        ]);
+
+        $response = $this->actingAs($this->adminUser)
+            ->getJson(route('management-classes.departments', ['year' => 2026]));
+
+        $response->assertStatus(200);
+        $departments = $response->json('departments');
+
+        // Só Marketing deve aparecer (a MC usada no budget foi movida para lá)
+        $this->assertCount(1, $departments);
+        $this->assertEquals('8.1.01', $departments[0]['code']);
+        $this->assertCount(1, $departments[0]['classes']);
+    }
+
+    public function test_endpoint_departments_returns_empty_when_no_budget_for_year(): void
+    {
+        $response = $this->actingAs($this->adminUser)
+            ->getJson(route('management-classes.departments', ['year' => 2099]));
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('departments', []);
     }
 }

@@ -220,17 +220,11 @@ function CreateModal({ selects, onClose }) {
         observations: '',
     });
 
-    // Cascata Área (departamento gerencial) → Classe Gerencial → CC → AC
-    // Um único fetch em mount traz os 11 departamentos com as classes analíticas
-    // aninhadas (já com cost_center incluído). Filtro local evita round-trips.
+    // Cascata Área (departamento gerencial) → Classe Gerencial → CC → AC.
+    // Fetch com filtro por `year` — só retorna áreas/classes que têm budget
+    // ativo no ano. Evita mostrar ao user opções sem orçamento cadastrado.
     const [departments, setDepartments] = useState([]);
     const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
-
-    useEffect(() => {
-        axios.get(route('management-classes.departments'))
-            .then(r => setDepartments(r.data.departments || []))
-            .catch(() => setDepartments([]));
-    }, []);
 
     const managementClassesForDept = useMemo(() => {
         if (!selectedDepartmentId) return [];
@@ -266,6 +260,24 @@ function CreateModal({ selects, onClose }) {
     const cc = form.data.cost_center_id;
     const yearSource = form.data.competence_date || form.data.date_payment;
     const year = yearSource ? new Date(yearSource).getFullYear() : new Date().getFullYear();
+
+    // Carrega departments filtrado pelo ano — recarrega ao mudar o ano da
+    // OP (competência/pagamento). Reseta seleções se departamento sumir.
+    useEffect(() => {
+        axios.get(route('management-classes.departments'), { params: { year } })
+            .then(r => {
+                const depts = r.data.departments || [];
+                setDepartments(depts);
+                // Se o departamento selecionado não está mais na lista, limpa
+                if (selectedDepartmentId && !depts.some(d => d.id == selectedDepartmentId)) {
+                    setSelectedDepartmentId('');
+                    form.setData('management_class_id', '');
+                    form.setData('cost_center_id', '');
+                    form.setData('accounting_class_id', '');
+                }
+            })
+            .catch(() => setDepartments([]));
+    }, [year]);
 
     useEffect(() => {
         if (!cc) {
@@ -390,9 +402,16 @@ function CreateModal({ selects, onClose }) {
                     {/* Card 1: Informações Básicas — cascata Área → Gerencial → CC → AC */}
                     <StandardModal.Section title="Informações Básicas" icon="📋">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <Select label="Área *" value={selectedDepartmentId} onChange={handleDepartmentChange}
-                                options={departments.map(d => ({ value: d.id, label: d.name }))}
-                                error={form.errors.area_id} required />
+                            <div>
+                                <Select label="Área *" value={selectedDepartmentId} onChange={handleDepartmentChange}
+                                    options={departments.map(d => ({ value: d.id, label: d.name }))}
+                                    error={form.errors.area_id} required />
+                                {departments.length === 0 && (
+                                    <p className="mt-1 text-xs text-amber-700">
+                                        Nenhuma área com orçamento ativo para {year}. Cadastre o orçamento em Orçamentos antes.
+                                    </p>
+                                )}
+                            </div>
                             <ManagementClassCascadeSelect
                                 value={form.data.management_class_id}
                                 onChange={v => form.setData('management_class_id', v)}
