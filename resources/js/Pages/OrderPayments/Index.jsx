@@ -541,6 +541,8 @@ function OrderPaymentFormBody({
     addAllocationRow, removeAllocationRow, updateAllocation, divideEqually,
 }) {
     const criticalDisabled = !canEditCritical;
+    // Derivado local — era variável no CreateModal antes do extract do FormBody
+    const cc = form.data.cost_center_id;
     return (
         <>
                     {/* Card 1: Informações Básicas — cascata Área → Gerencial → CC → AC */}
