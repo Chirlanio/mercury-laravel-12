@@ -13,6 +13,9 @@ import {
 } from '@heroicons/react/24/outline';
 import StandardModal from '@/Components/StandardModal';
 import Button from '@/Components/Button';
+import TextInput from '@/Components/TextInput';
+import InputLabel from '@/Components/InputLabel';
+import InputError from '@/Components/InputError';
 
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -197,68 +200,74 @@ export default function BudgetUploadWizard({ show, onClose, enums = {}, selects 
     const renderFooter = () => {
         if (step === 'upload') {
             return (
-                <div className="flex justify-end gap-2 w-full">
-                    <Button variant="secondary" onClick={handleClose}>
-                        Cancelar
-                    </Button>
-                    <Button
-                        variant="primary"
-                        onClick={handleAnalyze}
-                        disabled={!file || processing}
-                        loading={processing}
-                        icon={DocumentMagnifyingGlassIcon}
-                    >
-                        Analisar planilha
-                    </Button>
-                </div>
+                <StandardModal.Footer>
+                    <div className="flex justify-end gap-2 w-full">
+                        <Button variant="secondary" onClick={handleClose}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            variant="primary"
+                            onClick={handleAnalyze}
+                            disabled={!file || processing}
+                            loading={processing}
+                            icon={DocumentMagnifyingGlassIcon}
+                        >
+                            Analisar planilha
+                        </Button>
+                    </div>
+                </StandardModal.Footer>
             );
         }
 
         if (step === 'reconcile') {
             return (
-                <div className="flex justify-between items-center gap-2 w-full">
-                    <Button variant="secondary" onClick={() => setStep('upload')} icon={ArrowLeftIcon}>
-                        Voltar
-                    </Button>
-                    <div className="text-sm text-gray-600">
-                        <span className="font-semibold text-indigo-700">
-                            {effectiveImportableRows}
-                        </span>{' '}
-                        de {preview?.total_rows} linhas importáveis
-                        {unresolvedCount > 0 && (
-                            <span className="ml-2 text-amber-600">
-                                ({unresolvedCount} códigos sem mapeamento)
-                            </span>
-                        )}
+                <StandardModal.Footer>
+                    <div className="flex justify-between items-center gap-2 w-full">
+                        <Button variant="secondary" onClick={() => setStep('upload')} icon={ArrowLeftIcon}>
+                            Voltar
+                        </Button>
+                        <div className="text-sm text-gray-600">
+                            <span className="font-semibold text-indigo-700">
+                                {effectiveImportableRows}
+                            </span>{' '}
+                            de {preview?.total_rows} linhas importáveis
+                            {unresolvedCount > 0 && (
+                                <span className="ml-2 text-amber-600">
+                                    ({unresolvedCount} códigos sem mapeamento)
+                                </span>
+                            )}
+                        </div>
+                        <Button
+                            variant="primary"
+                            onClick={() => setStep('confirm')}
+                            disabled={effectiveImportableRows === 0}
+                            icon={ArrowRightIcon}
+                        >
+                            Continuar
+                        </Button>
                     </div>
-                    <Button
-                        variant="primary"
-                        onClick={() => setStep('confirm')}
-                        disabled={effectiveImportableRows === 0}
-                        icon={ArrowRightIcon}
-                    >
-                        Continuar
-                    </Button>
-                </div>
+                </StandardModal.Footer>
             );
         }
 
         // confirm
         return (
-            <div className="flex justify-between items-center gap-2 w-full">
-                <Button variant="secondary" onClick={() => setStep('reconcile')} icon={ArrowLeftIcon}>
-                    Voltar
-                </Button>
-                <Button
-                    variant="success"
-                    onClick={handleConfirm}
-                    disabled={processing || !header.scope_label || !header.year}
-                    loading={processing}
-                    icon={CloudArrowUpIcon}
-                >
-                    Importar {effectiveImportableRows} linhas
-                </Button>
-            </div>
+            <StandardModal.Footer>
+                <div className="flex justify-between items-center gap-2 w-full">
+                    <Button variant="secondary" onClick={() => setStep('reconcile')} icon={ArrowLeftIcon}>
+                        Voltar
+                    </Button>
+                    <Button
+                        variant="success"
+                        onClick={handleConfirm}
+                        disabled={processing || !header.scope_label || !header.year}
+                        loading={processing}
+                        icon={CloudArrowUpIcon}
+                    >
+                        Importar {effectiveImportableRows} linhas
+                    </Button>
+                </div>
+            </StandardModal.Footer>
         );
     };
 
@@ -276,7 +285,7 @@ export default function BudgetUploadWizard({ show, onClose, enums = {}, selects 
                 : 'Confirme e importe'
             }
             headerColor="bg-indigo-700"
-            headerIcon={CloudArrowUpIcon}
+            headerIcon={<CloudArrowUpIcon className="h-6 w-6" />}
             maxWidth="6xl"
             footer={renderFooter()}
         >
@@ -285,15 +294,19 @@ export default function BudgetUploadWizard({ show, onClose, enums = {}, selects 
                 <>
                     <StandardModal.Section title="Arquivo do orçamento">
                         <div className="space-y-3">
-                            <input
-                                type="file"
-                                accept=".xlsx,.xls,.csv"
-                                onChange={(e) => {
-                                    setFile(e.target.files?.[0] || null);
-                                    setServerMessage(null);
-                                }}
-                                className="block w-full text-sm text-gray-900 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-                            />
+                            <div>
+                                <InputLabel htmlFor="budget-file" value="Planilha (.xlsx, .xls, .csv)" className="mb-2" />
+                                <input
+                                    id="budget-file"
+                                    type="file"
+                                    accept=".xlsx,.xls,.csv"
+                                    onChange={(e) => {
+                                        setFile(e.target.files?.[0] || null);
+                                        setServerMessage(null);
+                                    }}
+                                    className="block w-full text-sm text-gray-900 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                                />
+                            </div>
 
                             {file && (
                                 <div className="text-xs text-gray-600">
@@ -315,22 +328,28 @@ export default function BudgetUploadWizard({ show, onClose, enums = {}, selects 
                         <div className="bg-gray-50 rounded p-3 text-xs text-gray-700 space-y-1.5">
                             <p>
                                 <strong>Códigos (obrigatórios):</strong>{' '}
-                                <code>codigo_contabil</code>, <code>codigo_gerencial</code>,{' '}
-                                <code>codigo_centro_custo</code>
+                                <code>Class contabil</code> / <code>codigo_contabil</code>,{' '}
+                                <code>Class Gerencial</code> / <code>codigo_gerencial</code>
+                            </p>
+                            <p>
+                                <strong>Centro de custo (opcional):</strong>{' '}
+                                <code>codigo_centro_custo</code> — se omitido, usa o CC
+                                default vinculado à classe gerencial.
                             </p>
                             <p>
                                 <strong>Loja (opcional):</strong> <code>codigo_loja</code>
                             </p>
                             <p>
-                                <strong>Texto (opcional):</strong> <code>fornecedor</code>,{' '}
-                                <code>justificativa</code>, <code>descricao_conta</code>,{' '}
-                                <code>descricao_classe</code>
+                                <strong>Texto (opcional):</strong> <code>Fornecedor</code>,{' '}
+                                <code>Justificativa</code>, <code>Descrição Conta</code>,{' '}
+                                <code>Descrição Class</code> (ou <code>descricao_classe</code>)
                             </p>
                             <p>
                                 <strong>Valores mensais:</strong>{' '}
-                                <code>jan, fev, ..., dez</code> ou{' '}
-                                <code>janeiro, fevereiro, ...</code> ou <code>01-12</code>.
-                                Formato BR aceito (<code>1.234,56</code>).
+                                <code>janeiro, fevereiro, ..., dezembro</code> ou{' '}
+                                <code>jan, fev, ..., dez</code> ou <code>01-12</code>.
+                                Aceita números, fórmulas (<code>=162 + 0.04 * 162</code>) e
+                                formato BR (<code>1.234,56</code>).
                             </p>
                         </div>
 
@@ -383,28 +402,27 @@ function ReconcileStep({ preview, mapping, updateMapping }) {
         <>
             <StandardModal.Section title="Resumo da análise">
                 <div className="grid grid-cols-4 gap-3">
-                    <SummaryCard
+                    <StandardModal.InfoCard
                         label="Linhas totais"
                         value={preview.total_rows}
-                        color="gray"
                     />
-                    <SummaryCard
+                    <StandardModal.InfoCard
                         label="Válidas"
                         value={preview.valid_rows}
-                        color="green"
-                        icon={CheckCircleIcon}
+                        icon={<CheckCircleIcon className="w-3 h-3" />}
+                        colorClass="bg-green-50"
                     />
-                    <SummaryCard
+                    <StandardModal.InfoCard
                         label="Pendentes"
                         value={preview.needs_reconciliation}
-                        color="amber"
-                        icon={ExclamationTriangleIcon}
+                        icon={<ExclamationTriangleIcon className="w-3 h-3" />}
+                        colorClass="bg-amber-50"
                     />
-                    <SummaryCard
+                    <StandardModal.InfoCard
                         label="Rejeitadas"
                         value={preview.rejected_rows}
-                        color="red"
-                        icon={XCircleIcon}
+                        icon={<XCircleIcon className="w-3 h-3" />}
+                        colorClass="bg-red-50"
                     />
                 </div>
 
@@ -522,7 +540,7 @@ function UnresolvedRow({ type, entry, selected, onChange }) {
                         <select
                             value={selected}
                             onChange={(e) => onChange(e.target.value)}
-                            className="w-full rounded-md border-gray-300 shadow-sm text-sm"
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
                         >
                             <option value="">— Ignorar (linhas serão puladas) —</option>
                             {entry.suggestions.map((s) => (
@@ -545,25 +563,6 @@ function UnresolvedRow({ type, entry, selected, onChange }) {
                     </>
                 )}
             </div>
-        </div>
-    );
-}
-
-function SummaryCard({ label, value, color, icon: Icon }) {
-    const colors = {
-        gray: 'bg-gray-50 border-gray-200 text-gray-700',
-        green: 'bg-green-50 border-green-200 text-green-700',
-        amber: 'bg-amber-50 border-amber-200 text-amber-800',
-        red: 'bg-red-50 border-red-200 text-red-700',
-    };
-
-    return (
-        <div className={`rounded p-3 border ${colors[color]}`}>
-            <div className="flex items-center gap-1.5">
-                {Icon && <Icon className="w-4 h-4" />}
-                <p className="text-xs uppercase font-semibold">{label}</p>
-            </div>
-            <p className="text-2xl font-bold mt-1">{value}</p>
         </div>
     );
 }
@@ -607,10 +606,9 @@ function ConfirmStep({ header, setHeader, preview, effectiveImportableRows, enum
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Ano *
-                        </label>
-                        <input
+                        <InputLabel htmlFor="budget-year" value="Ano *" className="mb-1" />
+                        <TextInput
+                            id="budget-year"
                             type="number"
                             value={header.year}
                             onChange={(e) =>
@@ -618,36 +616,32 @@ function ConfirmStep({ header, setHeader, preview, effectiveImportableRows, enum
                             }
                             min={2000}
                             max={2100}
-                            className="w-full rounded-md border-gray-300 shadow-sm"
+                            className="w-full"
                         />
-                        {errors.year && <p className="mt-1 text-xs text-red-600">{errors.year}</p>}
+                        <InputError message={errors.year} className="mt-1" />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Escopo *
-                        </label>
-                        <input
+                        <InputLabel htmlFor="budget-scope" value="Escopo *" className="mb-1" />
+                        <TextInput
+                            id="budget-scope"
                             type="text"
                             value={header.scope_label}
                             onChange={(e) => setHeader({ ...header, scope_label: e.target.value })}
                             placeholder="Ex: Administrativo, TI, Geral"
                             maxLength={100}
-                            className="w-full rounded-md border-gray-300 shadow-sm"
+                            className="w-full"
                         />
-                        {errors.scope_label && (
-                            <p className="mt-1 text-xs text-red-600">{errors.scope_label}</p>
-                        )}
+                        <InputError message={errors.scope_label} className="mt-1" />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Tipo *
-                        </label>
+                        <InputLabel htmlFor="budget-type" value="Tipo *" className="mb-1" />
                         <select
+                            id="budget-type"
                             value={header.upload_type}
                             onChange={(e) => setHeader({ ...header, upload_type: e.target.value })}
-                            className="w-full rounded-md border-gray-300 shadow-sm"
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         >
                             {Object.entries(enums.uploadTypes || { novo: 'Novo orçamento', ajuste: 'Ajuste' }).map(
                                 ([k, v]) => (
@@ -655,9 +649,7 @@ function ConfirmStep({ header, setHeader, preview, effectiveImportableRows, enum
                                 )
                             )}
                         </select>
-                        {errors.upload_type && (
-                            <p className="mt-1 text-xs text-red-600">{errors.upload_type}</p>
-                        )}
+                        <InputError message={errors.upload_type} className="mt-1" />
                         <p className="text-xs text-gray-500 mt-1">
                             {header.upload_type === 'novo'
                                 ? 'Incrementa versão principal (1.0 → 2.0)'
@@ -667,15 +659,14 @@ function ConfirmStep({ header, setHeader, preview, effectiveImportableRows, enum
                 </div>
 
                 <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Observações
-                    </label>
+                    <InputLabel htmlFor="budget-notes" value="Observações" className="mb-1" />
                     <textarea
+                        id="budget-notes"
                         value={header.notes}
                         onChange={(e) => setHeader({ ...header, notes: e.target.value })}
                         rows={2}
                         maxLength={2000}
-                        className="w-full rounded-md border-gray-300 shadow-sm"
+                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         placeholder="Contexto opcional sobre este upload..."
                     />
                 </div>

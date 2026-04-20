@@ -38,6 +38,8 @@ class BudgetImportService
         'codigo_conta' => 'accounting_code',
         'conta_contabil' => 'accounting_code',
         'contabil' => 'accounting_code',
+        'class_contabil' => 'accounting_code',      // template real "Class contabil"
+        'classe_contabil' => 'accounting_code',
         'accounting_code' => 'accounting_code',
         'accounting_class_code' => 'accounting_code',
 
@@ -46,6 +48,8 @@ class BudgetImportService
         'codigo_gerencia' => 'management_code',
         'conta_gerencial' => 'management_code',
         'gerencial' => 'management_code',
+        'class_gerencial' => 'management_code',     // template real "Class Gerencial"
+        'classe_gerencial' => 'management_code',
         'management_code' => 'management_code',
         'management_class_code' => 'management_code',
 
@@ -72,6 +76,7 @@ class BudgetImportService
         'descricao_contabil' => 'account_description',
         'account_description' => 'account_description',
         'descricao_classe' => 'class_description',
+        'descricao_class' => 'class_description',   // template real "Descrição Class"
         'descricao_gerencial' => 'class_description',
         'class_description' => 'class_description',
 
@@ -320,9 +325,8 @@ class BudgetImportService
         if (! $mcCode) {
             $errors[] = 'Código gerencial obrigatório';
         }
-        if (! $ccCode) {
-            $errors[] = 'Código de centro de custo obrigatório';
-        }
+        // cost_center_code é OPCIONAL — quando ausente, derivamos do
+        // management_classes.cost_center_id (pré-vinculado no seed).
 
         if ($yearTotal == 0.0) {
             $errors[] = 'Soma dos 12 meses é zero — linha sem valor';
@@ -343,7 +347,18 @@ class BudgetImportService
         // ---- Resolve FKs (direto no cadastro ou via mapping) ----
         $acId = $indexes['accounting_class'][$acCode] ?? $mapping['accounting_class'][$acCode] ?? null;
         $mcId = $indexes['management_class'][$mcCode] ?? $mapping['management_class'][$mcCode] ?? null;
-        $ccId = $indexes['cost_center'][$ccCode] ?? $mapping['cost_center'][$ccCode] ?? null;
+
+        // cost_center:
+        //   - CC informado na linha → lookup direto + mapping (se bateu fuzzy)
+        //   - CC vazio → deriva do default da ManagementClass (fallback silencioso)
+        // Evita usar default quando CC foi informado mas errou — nesse caso o
+        // user deve escolher via reconciliação, respeitando a intenção explícita.
+        $ccId = null;
+        if ($ccCode) {
+            $ccId = $indexes['cost_center'][$ccCode] ?? $mapping['cost_center'][$ccCode] ?? null;
+        } elseif ($mcId) {
+            $ccId = $indexes['management_class_default_cc'][$mcId] ?? null;
+        }
 
         $storeId = null;
         if ($storeCode) {
@@ -359,8 +374,25 @@ class BudgetImportService
         if (! $mcId) {
             $unresolved['management_class'] = $mcCode;
         }
-        if (! $ccId) {
+        // Regras de CC:
+        //   a) CC informado + não bateu → unresolved (user pode mapear)
+        //   b) CC vazio + MC resolvida sem default → erro (planilha precisa informar CC)
+        //   c) CC vazio + MC ainda unresolved → silencioso; após o user mapear a MC,
+        //      resolveItems() recalcula e pega o CC default automaticamente.
+        if (! $ccId && $ccCode) {
             $unresolved['cost_center'] = $ccCode;
+        } elseif (! $ccId && ! $ccCode && $mcId) {
+            $errors[] = "Classe gerencial {$mcCode} não tem CC default; informe o codigo_centro_custo na planilha";
+        }
+
+        if (! empty($errors)) {
+            return [
+                'row_number' => $rowNumber,
+                'status' => 'rejected',
+                'errors' => $errors,
+                'months' => $months,
+                'year_total' => $yearTotal,
+            ];
         }
 
         if (! empty($unresolved)) {
@@ -435,6 +467,13 @@ class BudgetImportService
                 ->whereNull('deleted_at')
                 ->where('accepts_entries', true)
                 ->pluck('id', 'code')
+                ->all(),
+            // id da management_class → cost_center_id default (para derivação
+            // automática quando a planilha não traz coluna de CC).
+            'management_class_default_cc' => ManagementClass::query()
+                ->whereNull('deleted_at')
+                ->whereNotNull('cost_center_id')
+                ->pluck('cost_center_id', 'id')
                 ->all(),
             'cost_center' => CostCenter::query()
                 ->whereNull('deleted_at')
