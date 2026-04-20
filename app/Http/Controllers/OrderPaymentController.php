@@ -119,6 +119,8 @@ class OrderPaymentController extends Controller
      */
     public function store(Request $request)
     {
+        $isBoleto = $request->input('payment_type') === 'Boleto';
+
         $validated = $request->validate([
             'store_id' => 'nullable|exists:stores,id',
             'area_id' => 'nullable|integer',
@@ -146,8 +148,10 @@ class OrderPaymentController extends Controller
             'document_number_supplier' => 'nullable|string|max:20',
             'pix_key_type' => 'nullable|string',
             'pix_key' => 'nullable|string',
-            'installments' => 'nullable|integer|min:0|max:12',
-            'installment_items' => 'nullable|array',
+            // Boleto: mínimo 1 parcela com valor e data obrigatórios.
+            // Outros tipos: parcelamento é opcional.
+            'installments' => [$isBoleto ? 'required' : 'nullable', 'integer', 'min:' . ($isBoleto ? 1 : 0), 'max:12'],
+            'installment_items' => [$isBoleto ? 'required' : 'nullable', 'array', $isBoleto ? 'min:1' : ''],
             'installment_items.*.value' => 'required_with:installment_items|numeric|min:0.01',
             'installment_items.*.date' => 'required_with:installment_items|date',
             'allocations' => 'nullable|array',

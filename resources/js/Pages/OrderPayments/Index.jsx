@@ -296,6 +296,14 @@ function CreateModal({ selects, onClose }) {
     const isBoleto = selectedPaymentType === 'Boleto';
     const isBankTransfer = selectedPaymentType === 'Transferência Bancária';
 
+    // Boleto começa sempre com 1 parcela (quando o tipo é selecionado e ainda
+    // não há parcelas). Não força para 1 quando o user aumenta manualmente.
+    useEffect(() => {
+        if (isBoleto && form.data.installments === 0) {
+            handleInstallmentCountChange(1);
+        }
+    }, [isBoleto]);
+
     const handleInstallmentCountChange = (count) => {
         const n = Math.min(12, Math.max(0, parseInt(count) || 0));
         form.setData('installments', n);
@@ -461,21 +469,24 @@ function CreateModal({ selects, onClose }) {
                         {isBoleto && (
                             <div className="mt-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
                                 <div className="flex items-center gap-4 mb-3">
-                                    <label className="text-sm font-medium text-gray-700">Parcelas:</label>
-                                    <input type="number" min="0" max="12" value={form.data.installments}
+                                    <label className="text-sm font-medium text-gray-700">Parcelas: *</label>
+                                    <input type="number" min="1" max="12" value={form.data.installments}
                                         onChange={e => handleInstallmentCountChange(e.target.value)}
+                                        required
                                         className="w-20 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
                                 </div>
                                 {form.data.installments > 0 && (
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                         {form.data.installment_items.map((item, i) => (
                                             <div key={i} className="bg-white p-2 rounded border">
-                                                <p className="text-xs font-medium text-gray-500 mb-1">Parcela {i + 1}</p>
-                                                <input type="text" placeholder="0,00" value={item.value}
+                                                <p className="text-xs font-medium text-gray-500 mb-1">Parcela {i + 1} *</p>
+                                                <input type="text" placeholder="Valor *" value={item.value}
                                                     onChange={e => updateInstallmentItem(i, 'value', maskMoney(e.target.value))}
+                                                    required
                                                     className="w-full mb-1 rounded-md border-gray-300 text-sm" />
                                                 <input type="date" value={item.date}
                                                     onChange={e => updateInstallmentItem(i, 'date', e.target.value)}
+                                                    required
                                                     className="w-full rounded-md border-gray-300 text-sm" />
                                             </div>
                                         ))}
@@ -928,9 +939,7 @@ function ManagementClassCascadeSelect({ value, onChange, options, hasDepartment,
             >
                 <option value="">Selecione</option>
                 {options.map(m => (
-                    <option key={m.id} value={m.id}>
-                        {m.code} · {m.name}{m.cost_center ? ` (CC ${m.cost_center.code})` : ''}
-                    </option>
+                    <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
             </select>
             {helper && <p className="mt-1 text-xs text-gray-500">{helper}</p>}
@@ -949,7 +958,7 @@ function CostCenterReadonly({ costCenter, error }) {
             <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Custo</label>
             <div className="w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700 min-h-[38px] flex items-center">
                 {costCenter
-                    ? <span><span className="font-mono text-gray-500 mr-2">{costCenter.code}</span>{costCenter.name}</span>
+                    ? <span>{costCenter.name}</span>
                     : <span className="text-xs text-gray-400">Derivado da classe gerencial</span>}
             </div>
             {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
@@ -995,7 +1004,7 @@ function AccountingClassSelect({ value, onChange, options, loading, hasCostCente
                 <option value="">Selecione</option>
                 {options.map(o => (
                     <option key={o.id} value={o.id}>
-                        {o.label} — previsto {BRL(o.forecast_total)} · realizado {BRL(o.realized_total)} ({o.utilization_pct.toFixed(1)}%)
+                        {o.name} — previsto {BRL(o.forecast_total)} · realizado {BRL(o.realized_total)} ({o.utilization_pct.toFixed(1)}%)
                     </option>
                 ))}
             </select>
