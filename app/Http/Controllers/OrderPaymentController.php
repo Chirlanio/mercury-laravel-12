@@ -28,11 +28,56 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class OrderPaymentController extends Controller
 {
+    /**
+     * Campos críticos — impacto financeiro, fiscal, orçamentário, contábil.
+     * Só usuários com role SUPPORT/ADMIN/SUPER_ADMIN podem editar.
+     * Usuários de nível menor (USER, DRIVER) têm essas chaves ignoradas no
+     * update — o backend sobrescreve silenciosamente com os valores atuais
+     * do model, mesmo que o payload tente alterá-los.
+     */
+    private const CRITICAL_FIELDS = [
+        'total_value',
+        'advance',
+        'advance_amount',
+        'advance_paid',
+        'cost_center_id',
+        'accounting_class_id',
+        'management_class_id',
+        'date_payment',
+        'competence_date',
+        'launch_number',
+        'supplier_id',
+    ];
+
+    /**
+     * Roles autorizadas a editar campos críticos de uma OrderPayment.
+     */
+    private const CRITICAL_EDIT_ROLES = ['super_admin', 'admin', 'support'];
+
     public function __construct(
         private OrderPaymentTransitionService $transitionService,
         private OrderPaymentDeleteService $deleteService,
         private OrderPaymentAllocationService $allocationService,
     ) {}
+
+    /**
+     * Determina se o usuário pode editar os campos críticos definidos em
+     * self::CRITICAL_FIELDS. A comparação é feita pelo `value` do enum/role
+     * para funcionar tanto com Role enum quanto com DynamicRole customizado.
+     */
+    protected function userCanEditCriticalFields(?\App\Models\User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        $roleValue = match (true) {
+            is_string($user->role) => $user->role,
+            default => $user->role?->value ?? null,
+        };
+
+        return $roleValue !== null && in_array($roleValue, self::CRITICAL_EDIT_ROLES, true);
+    }
 
     /**
      * List order payments (Kanban + Table view)
@@ -259,10 +304,16 @@ class OrderPaymentController extends Controller
      */
     public function update(Request $request, OrderPayment $orderPayment)
     {
+        $canEditCritical = $this->userCanEditCriticalFields($request->user());
+
+        // Campos críticos são validados como `sometimes` — user regular pode
+        // omitir, o valor atual no model é preservado. Admin+ envia e valida.
+        $criticalRule = $canEditCritical ? 'required' : 'sometimes|required';
+
         $validated = $request->validate([
             'description' => 'required|string',
-            'total_value' => 'required|numeric|min:0.01',
-            'date_payment' => 'required|date',
+            'total_value' => "{$criticalRule}|numeric|min:0.01",
+            'date_payment' => "{$criticalRule}|date",
             'competence_date' => 'nullable|date',
             'payment_type' => 'nullable|string',
             'store_id' => 'nullable|exists:stores,id',
@@ -290,25 +341,36 @@ class OrderPaymentController extends Controller
             'allocations' => 'nullable|array',
         ]);
 
-        // Deriva CC da MC quando a cascata Área→Gerencial preencher management_class_id.
-        // O payload pode trazer cost_center_id explícito OU management_class_id — a MC
-        // ganha prioridade porque é a fonte autoritária (CC é faceta da MC).
-        $mergedForResolve = [
-            'cost_center_id' => $validated['cost_center_id'] ?? $orderPayment->cost_center_id,
-            'accounting_class_id' => $validated['accounting_class_id'] ?? $orderPayment->accounting_class_id,
-            'management_class_id' => $validated['management_class_id'] ?? $orderPayment->management_class_id,
-            'competence_date' => $validated['competence_date'] ?? $orderPayment->competence_date,
-            'date_payment' => $validated['date_payment'],
-        ];
-        $validated['cost_center_id'] = $this->resolveCostCenterId($mergedForResolve);
-        $mergedForResolve['cost_center_id'] = $validated['cost_center_id'];
+        // Descarta campos críticos do payload se user não tem role para editá-los.
+        // Blindagem defense-in-depth contra tampering do frontend (inputs disabled
+        // ainda podem ser burlados via devtools). Campos ignorados retêm o valor
+        // atual do model.
+        if (! $canEditCritical) {
+            foreach (self::CRITICAL_FIELDS as $field) {
+                unset($validated[$field]);
+            }
+        }
 
-        // Recalcula budget_item_id sempre que CC, AC ou competence_date mudar.
-        $validated['budget_item_id'] = $this->resolveBudgetItemId($mergedForResolve);
+        // Só recalcula cost_center_id / budget_item_id se o user pode editar os
+        // campos que alimentam a cascata (CC, AC, MC, competence_date).
+        if ($canEditCritical) {
+            $mergedForResolve = [
+                'cost_center_id' => $validated['cost_center_id'] ?? $orderPayment->cost_center_id,
+                'accounting_class_id' => $validated['accounting_class_id'] ?? $orderPayment->accounting_class_id,
+                'management_class_id' => $validated['management_class_id'] ?? $orderPayment->management_class_id,
+                'competence_date' => $validated['competence_date'] ?? $orderPayment->competence_date,
+                'date_payment' => $validated['date_payment'] ?? $orderPayment->date_payment,
+            ];
+            $validated['cost_center_id'] = $this->resolveCostCenterId($mergedForResolve);
+            $mergedForResolve['cost_center_id'] = $validated['cost_center_id'];
+            $validated['budget_item_id'] = $this->resolveBudgetItemId($mergedForResolve);
+        }
 
         DB::transaction(function () use ($orderPayment, $validated) {
-            $totalValue = $validated['total_value'];
-            $advanceAmount = $validated['advance_amount'] ?? 0;
+            // total_value e advance_amount podem não estar no payload se user
+            // não é admin — usa os valores atuais do model como fallback.
+            $totalValue = $validated['total_value'] ?? $orderPayment->total_value;
+            $advanceAmount = $validated['advance_amount'] ?? $orderPayment->advance_amount;
 
             $validated['diff_payment_advance'] = $totalValue - $advanceAmount;
             $validated['has_allocation'] = ! empty($validated['allocations']);
@@ -749,6 +811,12 @@ class OrderPaymentController extends Controller
         return array_merge($this->formatPayment($p), [
             'area_id' => $p->area_id,
             'cost_center_id' => $p->cost_center_id,
+            'accounting_class_id' => $p->accounting_class_id,
+            'management_class_id' => $p->management_class_id,
+            // Datas em ISO para o form edit (input type=date espera YYYY-MM-DD).
+            'date_payment_iso' => $p->date_payment?->format('Y-m-d'),
+            'date_paid_iso' => $p->date_paid?->format('Y-m-d'),
+            'competence_date' => $p->competence_date?->format('Y-m-d'),
             'brand_id' => $p->brand_id,
             'supplier_id' => $p->supplier_id,
             'store_id' => $p->store_id,

@@ -3,6 +3,7 @@ import {
     XMarkIcon, ArrowRightIcon, ArrowLeftIcon, CheckCircleIcon,
     ExclamationTriangleIcon, ClockIcon, BanknotesIcon,
     BuildingOfficeIcon, DocumentTextIcon, UserIcon,
+    PencilSquareIcon,
 } from '@heroicons/react/24/outline';
 import { CheckCircleIcon as CheckCircleSolid } from '@heroicons/react/24/solid';
 import StandardModal from '@/Components/StandardModal';
@@ -16,7 +17,7 @@ const STATUS_CONFIG = {
     done:    { bg: 'bg-green-100', text: 'text-green-800', ring: 'ring-green-300', header: 'bg-green-600', dot: 'bg-green-500' },
 };
 
-export default function DetailModal({ orderId, onClose, onTransition, canEdit }) {
+export default function DetailModal({ orderId, onClose, onTransition, onEdit, canEdit }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -44,6 +45,12 @@ export default function DetailModal({ orderId, onClose, onTransition, canEdit })
 
     const headerActions = order && canEdit ? (
         <>
+            {onEdit && (
+                <button onClick={() => onEdit(order.id)}
+                    className="inline-flex items-center px-3 py-1.5 text-xs font-medium bg-white/20 text-white rounded-md hover:bg-white/30 transition">
+                    <PencilSquareIcon className="h-3.5 w-3.5 mr-1" /> Editar
+                </button>
+            )}
             {order.status !== 'done' && (
                 <button onClick={() => onTransition(order, { backlog: 'doing', doing: 'waiting', waiting: 'done' }[order.status])}
                     className="inline-flex items-center px-3 py-1.5 text-xs font-medium bg-white/20 text-white rounded-md hover:bg-white/30 transition">

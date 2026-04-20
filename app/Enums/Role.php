@@ -459,6 +459,10 @@ enum Role: string
                 Permission::VIEW_TRANSFERS->value,
                 Permission::VIEW_ADJUSTMENTS->value,
                 Permission::VIEW_ORDER_PAYMENTS->value,
+                // SUPPORT/USER editam OPs. Campos críticos são filtrados no
+                // controller pelo OrderPaymentController::CRITICAL_FIELDS
+                // (só SUPPORT/ADMIN/SUPER_ADMIN mudam valores/datas/CC/AC).
+                Permission::EDIT_ORDER_PAYMENTS->value,
                 Permission::VIEW_SUPPLIERS->value,
                 // Ordens de Compra (view + create + edit + approve/cancel/receive,
                 // SEM delete e SEM manage — fica com store scoping automático)
@@ -579,6 +583,11 @@ enum Role: string
                 // TaneIA (view + send)
                 Permission::VIEW_TANEIA->value,
                 Permission::SEND_TANEIA_MESSAGES->value,
+                // Ordens de pagamento: view + edit (só campos não críticos —
+                // filtro por role no OrderPaymentController::CRITICAL_FIELDS
+                // impede tampering de valor/datas/CC/AC).
+                Permission::VIEW_ORDER_PAYMENTS->value,
+                Permission::EDIT_ORDER_PAYMENTS->value,
             ],
             self::DRIVER => [
                 // Perfil próprio

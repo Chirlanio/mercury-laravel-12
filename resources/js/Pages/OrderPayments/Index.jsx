@@ -4,6 +4,7 @@ import {
     ArrowRightIcon, ArrowLeftIcon, BookmarkIcon, DocumentCheckIcon,
     ExclamationTriangleIcon, ChartBarIcon, ArrowDownTrayIcon,
     ClipboardDocumentListIcon, ArrowPathIcon, ClockIcon, CheckCircleIcon,
+    PencilSquareIcon,
 } from '@heroicons/react/24/outline';
 import { useState, useMemo, useEffect } from 'react';
 import axios from 'axios';
@@ -79,6 +80,29 @@ export default function Index({
     const [viewMode, setViewMode] = useState('kanban');
     const [transitionError, setTransitionError] = useState('');
     const [detailOrderId, setDetailOrderId] = useState(null);
+    const [editData, setEditData] = useState(null); // { order, installments, allocations }
+    const [loadingEdit, setLoadingEdit] = useState(false);
+
+    // Usuários com role SUPPORT+ editam todos os campos. USER só os não críticos.
+    const { hasRoleLevel } = usePermissions();
+    const canEditCriticalFields = hasRoleLevel('support');
+
+    const openEditModal = (orderId) => {
+        setLoadingEdit(true);
+        fetch(route('order-payments.show', orderId), {
+            headers: { Accept: 'application/json' },
+        })
+            .then(r => r.json())
+            .then(data => {
+                setEditData({
+                    order: data.order,
+                    installments: data.installments || [],
+                    allocations: data.allocations || [],
+                });
+            })
+            .catch(err => console.error('Falha ao carregar OP para edição', err))
+            .finally(() => setLoadingEdit(false));
+    };
 
     const applyFilters = () => {
         router.get(route('order-payments.index'), {
@@ -213,6 +237,7 @@ export default function Index({
                         <KanbanBoard statusOptions={statusOptions} kanbanData={kanbanData}
                             kanbanCards={kanbanCards} canEdit={canEdit} onTransition={openTransitionModal}
                             onDetail={(id) => setDetailOrderId(id)}
+                            onEdit={openEditModal}
                             draggedOrder={draggedOrder} dragOverStatus={dragOverStatus}
                             onDragStart={handleDragStart} onDragEnd={handleDragEnd}
                             onDragOver={handleDragOver} onDrop={handleDrop}
@@ -222,7 +247,8 @@ export default function Index({
                     {/* Table */}
                     {viewMode === 'table' && (
                         <TableView payments={payments} canEdit={canEdit} statusOptions={statusOptions}
-                            onTransition={openTransitionModal} onDetail={(id) => setDetailOrderId(id)} />
+                            onTransition={openTransitionModal} onDetail={(id) => setDetailOrderId(id)}
+                            onEdit={openEditModal} />
                     )}
                 </div>
             </div>
@@ -248,7 +274,20 @@ export default function Index({
             <DetailModal orderId={detailOrderId}
                 onClose={() => setDetailOrderId(null)}
                 onTransition={(order, newSt) => { setDetailOrderId(null); openTransitionModal(order, newSt); }}
+                onEdit={(orderId) => { setDetailOrderId(null); openEditModal(orderId); }}
                 canEdit={canEdit} />
+
+            {/* Edit Modal */}
+            {editData && (
+                <EditModal
+                    order={editData.order}
+                    installments={editData.installments}
+                    allocations={editData.allocations}
+                    selects={selects}
+                    canEditCritical={canEditCriticalFields}
+                    onClose={() => setEditData(null)}
+                />
+            )}
         </>
     );
 }
@@ -461,13 +500,56 @@ function CreateModal({ selects, onClose }) {
                 />
             }
         >
+            <OrderPaymentFormBody
+                form={form}
+                selects={selects}
+                canEditCritical={true}
+                departments={departments}
+                selectedDepartmentId={selectedDepartmentId}
+                handleDepartmentChange={handleDepartmentChange}
+                managementClassesForDept={managementClassesForDept}
+                selectedMgmtClass={selectedMgmtClass}
+                accountingClasses={accountingClasses}
+                loadingAcs={loadingAcs}
+                year={year}
+                isPix={isPix}
+                isBoleto={isBoleto}
+                handleInstallmentCountChange={handleInstallmentCountChange}
+                updateInstallmentItem={updateInstallmentItem}
+                addAllocationRow={addAllocationRow}
+                removeAllocationRow={removeAllocationRow}
+                updateAllocation={updateAllocation}
+                divideEqually={divideEqually}
+            />
+        </StandardModal>
+    );
+}
+
+// ============================================================
+// FORM BODY — compartilhado entre CreateModal e EditModal
+// ============================================================
+// Quando canEditCritical=false, inputs dos campos críticos ficam disabled
+// (user sem role SUPPORT/ADMIN/SUPER_ADMIN). Lista de críticos espelha
+// OrderPaymentController::CRITICAL_FIELDS no backend.
+function OrderPaymentFormBody({
+    form, selects, canEditCritical,
+    departments, selectedDepartmentId, handleDepartmentChange,
+    managementClassesForDept, selectedMgmtClass,
+    accountingClasses, loadingAcs, year,
+    isPix, isBoleto,
+    handleInstallmentCountChange, updateInstallmentItem,
+    addAllocationRow, removeAllocationRow, updateAllocation, divideEqually,
+}) {
+    const criticalDisabled = !canEditCritical;
+    return (
+        <>
                     {/* Card 1: Informações Básicas — cascata Área → Gerencial → CC → AC */}
                     <StandardModal.Section title="Informações Básicas" icon="📋">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <Select label="Área *" value={selectedDepartmentId} onChange={handleDepartmentChange}
                                     options={departments.map(d => ({ value: d.id, label: d.name }))}
-                                    error={form.errors.area_id} required />
+                                    error={form.errors.area_id} required disabled={criticalDisabled} />
                                 {departments.length === 0 && (
                                     <p className="mt-1 text-xs text-amber-700">
                                         Nenhuma área com orçamento ativo para {year}. Cadastre o orçamento em Orçamentos antes.
@@ -480,6 +562,7 @@ function CreateModal({ selects, onClose }) {
                                 options={managementClassesForDept}
                                 hasDepartment={!!selectedDepartmentId}
                                 error={form.errors.management_class_id}
+                                disabled={criticalDisabled}
                             />
                             <CostCenterReadonly
                                 costCenter={selectedMgmtClass?.cost_center || null}
@@ -492,13 +575,14 @@ function CreateModal({ selects, onClose }) {
                                 loading={loadingAcs}
                                 hasCostCenter={!!cc}
                                 error={form.errors.accounting_class_id}
+                                disabled={criticalDisabled}
                             />
                             <Select label="Marca *" value={form.data.brand_id} onChange={v => form.setData('brand_id', v)}
                                 options={(selects.brands || []).map(b => ({ value: b.id, label: b.name }))} error={form.errors.brand_id} required />
                             <Input label="Data Pagamento *" type="date" value={form.data.date_payment}
-                                onChange={v => form.setData('date_payment', v)} error={form.errors.date_payment} required />
+                                onChange={v => form.setData('date_payment', v)} error={form.errors.date_payment} required disabled={criticalDisabled} />
                             <Input label="Data de Competência" type="date" value={form.data.competence_date}
-                                onChange={v => form.setData('competence_date', v)} error={form.errors.competence_date} />
+                                onChange={v => form.setData('competence_date', v)} error={form.errors.competence_date} disabled={criticalDisabled} />
                             <Select label="Aprovador *" value={form.data.manager_id} onChange={v => form.setData('manager_id', v)}
                                 options={(selects.managers || []).map(m => ({ value: m.id, label: m.name }))} error={form.errors.manager_id} required />
                             <Select label="Motivo Gerencial" value={form.data.management_reason_id} onChange={v => form.setData('management_reason_id', v)}
@@ -511,13 +595,13 @@ function CreateModal({ selects, onClose }) {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Select label="Fornecedor *" value={form.data.supplier_id} onChange={v => form.setData('supplier_id', v)}
                                 options={(selects.suppliers || []).map(s => ({ value: s.id, label: `${s.nome_fantasia}${s.cnpj ? ` (${s.cnpj})` : ''}` }))}
-                                error={form.errors.supplier_id} required />
+                                error={form.errors.supplier_id} required disabled={criticalDisabled} />
                             <MoneyInput label="Valor Total *" value={form.data.total_value}
-                                onChange={v => form.setData('total_value', v)} error={form.errors.total_value} required />
+                                onChange={v => form.setData('total_value', v)} error={form.errors.total_value} required disabled={criticalDisabled} />
                             <Input label="Nota Fiscal" type="text" value={form.data.number_nf}
                                 onChange={v => form.setData('number_nf', v)} />
                             <Input label="Lançamento" type="text" value={form.data.launch_number}
-                                onChange={v => form.setData('launch_number', v)} />
+                                onChange={v => form.setData('launch_number', v)} disabled={criticalDisabled} />
                         </div>
                         <div className="mt-4">
                             <Input label="Descrição *" value={form.data.description}
@@ -532,7 +616,7 @@ function CreateModal({ selects, onClose }) {
                                 onChange={v => form.setData('payment_type_id', v)}
                                 options={(selects.paymentTypes || []).map(t => ({ value: t.id, label: t.name }))} required />
                             <Select label="Adiantamento *" value={form.data.advance} onChange={v => form.setData('advance', v)}
-                                options={[{ value: '1', label: 'Sim' }, { value: '2', label: 'Não' }]} required />
+                                options={[{ value: '1', label: 'Sim' }, { value: '2', label: 'Não' }]} required disabled={criticalDisabled} />
                             <Select label="Comprovante *" value={form.data.proof} onChange={v => form.setData('proof', v)}
                                 options={[{ value: '1', label: 'Sim' }, { value: '2', label: 'Não' }]} required />
                         </div>
@@ -540,10 +624,10 @@ function CreateModal({ selects, onClose }) {
                         {form.data.advance === '1' && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
                                 <MoneyInput label="Valor Adiantamento" value={form.data.advance_amount}
-                                    onChange={v => form.setData('advance_amount', v)} />
+                                    onChange={v => form.setData('advance_amount', v)} disabled={criticalDisabled} />
                                 <Select label="Adiant. Pago?" value={form.data.advance_paid}
                                     onChange={v => form.setData('advance_paid', v)}
-                                    options={[{ value: '1', label: 'Sim' }, { value: '2', label: 'Não' }]} />
+                                    options={[{ value: '1', label: 'Sim' }, { value: '2', label: 'Não' }]} disabled={criticalDisabled} />
                             </div>
                         )}
 
@@ -703,6 +787,250 @@ function CreateModal({ selects, onClose }) {
                             rows={3} placeholder="Observações adicionais..."
                             className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
                     </StandardModal.Section>
+        </>
+    );
+}
+
+// ============================================================
+// EDIT MODAL — edita OP existente. Desabilita campos críticos quando
+// o usuário não tem role SUPPORT/ADMIN/SUPER_ADMIN.
+// ============================================================
+function EditModal({ order, installments: installmentProps = [], allocations: allocationProps = [], selects, canEditCritical, onClose }) {
+    // Helper: decimal vindo do backend ("500.00") → money BR mascarado ("500,00")
+    const decimalToMoneyBR = (v) => {
+        if (v === null || v === undefined || v === '') return '';
+        return maskMoney(String(Math.round(parseFloat(v) * 100)));
+    };
+
+    const form = useForm({
+        area_id: order.area_id || '',
+        management_class_id: order.management_class_id || '',
+        cost_center_id: order.cost_center_id || '',
+        accounting_class_id: order.accounting_class_id || '',
+        brand_id: order.brand_id || '',
+        date_payment: order.date_payment_iso || '',
+        competence_date: order.competence_date || '',
+        manager_id: order.manager_id || '',
+        management_reason_id: '',
+        supplier_id: order.supplier_id || '',
+        total_value: decimalToMoneyBR(order.total_value),
+        number_nf: order.number_nf || '',
+        launch_number: order.launch_number || '',
+        description: order.description || '',
+        payment_type_id: (() => {
+            const pt = (selects.paymentTypes || []).find(t => t.name === order.payment_type);
+            return pt?.id || '';
+        })(),
+        advance: order.advance ? '1' : '2',
+        advance_amount: decimalToMoneyBR(order.advance_amount),
+        advance_paid: order.advance_paid ? '1' : '2',
+        proof: order.proof ? '1' : '2',
+        installments: order.installments || 0,
+        installment_items: installmentProps.map(i => ({
+            value: decimalToMoneyBR(i.value),
+            // Converte "dd/mm/yyyy" para ISO para o input type=date
+            date: i.date_payment ? i.date_payment.split('/').reverse().join('-') : '',
+        })),
+        bank_id: (() => {
+            const b = (selects.banks || []).find(b => b.bank_name === order.bank_name);
+            return b?.id || '';
+        })(),
+        agency: order.agency || '',
+        type_account: order.type_account || '',
+        checking_account: order.checking_account || '',
+        name_supplier: order.name_supplier || '',
+        document_number_supplier: order.document_number_supplier || '',
+        pix_key_type_id: (() => {
+            const t = (selects.pixKeyTypes || []).find(t => t.name === order.pix_key_type);
+            return t?.id || '';
+        })(),
+        pix_key: order.pix_key || '',
+        has_allocation: !!order.has_allocation,
+        allocations: allocationProps.map(a => ({
+            cost_center_id: a.cost_center_id || '',
+            percentage: a.percentage ?? '',
+            value: decimalToMoneyBR(a.value),
+        })),
+        observations: order.observations || '',
+    });
+
+    // Cascata (mesma lógica do CreateModal)
+    const [departments, setDepartments] = useState([]);
+    const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
+    const [accountingClasses, setAccountingClasses] = useState([]);
+    const [loadingAcs, setLoadingAcs] = useState(false);
+
+    const cc = form.data.cost_center_id;
+    const yearSource = form.data.competence_date || form.data.date_payment;
+    const year = yearSource ? new Date(yearSource).getFullYear() : new Date().getFullYear();
+
+    // Ao carregar departments, detecta qual departamento contém a MC atual
+    // para pré-selecionar o dropdown da Área.
+    useEffect(() => {
+        axios.get(route('management-classes.departments'), { params: { year, all: 1 } })
+            .then(r => {
+                const depts = r.data.departments || [];
+                setDepartments(depts);
+                if (form.data.management_class_id) {
+                    const parent = depts.find(d =>
+                        (d.classes || []).some(c => c.id == form.data.management_class_id)
+                    );
+                    if (parent) setSelectedDepartmentId(parent.id);
+                }
+            })
+            .catch(() => setDepartments([]));
+    }, []);
+
+    const managementClassesForDept = useMemo(() => {
+        if (!selectedDepartmentId) return [];
+        return (departments.find(d => d.id == selectedDepartmentId)?.classes) || [];
+    }, [departments, selectedDepartmentId]);
+
+    const selectedMgmtClass = useMemo(() => {
+        return managementClassesForDept.find(m => m.id == form.data.management_class_id) || null;
+    }, [managementClassesForDept, form.data.management_class_id]);
+
+    useEffect(() => {
+        if (selectedMgmtClass?.cost_center?.id && form.data.cost_center_id != selectedMgmtClass.cost_center.id) {
+            form.setData('cost_center_id', selectedMgmtClass.cost_center.id);
+        }
+    }, [selectedMgmtClass]);
+
+    const handleDepartmentChange = (newDeptId) => {
+        setSelectedDepartmentId(newDeptId);
+        form.setData('management_class_id', '');
+        form.setData('cost_center_id', '');
+        form.setData('accounting_class_id', '');
+    };
+
+    useEffect(() => {
+        if (!cc) { setAccountingClasses([]); return; }
+        setLoadingAcs(true);
+        axios.get(route('budgets.accounting-classes-for-cost-center', cc), { params: { year } })
+            .then(r => setAccountingClasses(r.data.accounting_classes || []))
+            .catch(() => setAccountingClasses([]))
+            .finally(() => setLoadingAcs(false));
+    }, [cc, year]);
+
+    useEffect(() => {
+        if (form.data.accounting_class_id && accountingClasses.length > 0) {
+            const stillValid = accountingClasses.some(a => a.id == form.data.accounting_class_id);
+            if (!stillValid) form.setData('accounting_class_id', '');
+        }
+    }, [accountingClasses]);
+
+    const selectedPaymentType = useMemo(() => {
+        const pt = (selects.paymentTypes || []).find(t => t.id == form.data.payment_type_id);
+        return pt?.name || '';
+    }, [form.data.payment_type_id, selects.paymentTypes]);
+
+    const isPix = selectedPaymentType === 'PIX';
+    const isBoleto = selectedPaymentType === 'Boleto';
+
+    const handleInstallmentCountChange = (count) => {
+        const n = Math.min(12, Math.max(0, parseInt(count) || 0));
+        form.setData('installments', n);
+        const items = [...form.data.installment_items];
+        while (items.length < n) items.push({ value: '', date: '' });
+        form.setData('installment_items', items.slice(0, n));
+    };
+
+    const updateInstallmentItem = (idx, field, val) => {
+        const items = [...form.data.installment_items];
+        items[idx] = { ...items[idx], [field]: val };
+        form.setData('installment_items', items);
+    };
+
+    const addAllocationRow = () => {
+        form.setData('allocations', [...form.data.allocations, { cost_center_id: '', percentage: '', value: '' }]);
+    };
+    const removeAllocationRow = (idx) => {
+        form.setData('allocations', form.data.allocations.filter((_, i) => i !== idx));
+    };
+    const updateAllocation = (idx, field, val) => {
+        const allocs = [...form.data.allocations];
+        allocs[idx] = { ...allocs[idx], [field]: val };
+        if (field === 'percentage' && form.data.total_value) {
+            const total = parseMoney(form.data.total_value);
+            allocs[idx].value = maskMoney(String(Math.round((parseFloat(val) || 0) / 100 * total * 100)));
+        }
+        form.setData('allocations', allocs);
+    };
+    const divideEqually = () => {
+        const n = form.data.allocations.length;
+        if (!n || !form.data.total_value) return;
+        const total = parseMoney(form.data.total_value);
+        const pct = (100 / n).toFixed(2);
+        const val = maskMoney(String(Math.round(total / n * 100)));
+        form.setData('allocations', form.data.allocations.map(a => ({ ...a, percentage: pct, value: val })));
+    };
+
+    const handleSubmit = () => {
+        const pt = (selects.paymentTypes || []).find(t => t.id == form.data.payment_type_id);
+        const submitData = {
+            ...form.data,
+            payment_type: pt?.name || '',
+            total_value: parseMoney(form.data.total_value),
+            advance_amount: parseMoney(form.data.advance_amount),
+            advance: form.data.advance === '1',
+            advance_paid: form.data.advance_paid === '1',
+            proof: form.data.proof === '1',
+            installment_items: form.data.installment_items.map(item => ({
+                ...item,
+                value: parseMoney(item.value),
+            })),
+            allocations: form.data.allocations.map(a => ({
+                ...a,
+                value: parseMoney(a.value),
+                percentage: parseFloat(a.percentage) || 0,
+            })),
+        };
+        form.transform(() => submitData);
+        form.put(route('order-payments.update', order.id), {
+            onSuccess: () => onClose(),
+        });
+    };
+
+    return (
+        <StandardModal
+            show={true}
+            onClose={onClose}
+            title={`Editar OP #${order.id}`}
+            subtitle={!canEditCritical ? 'Alguns campos estão bloqueados. Entre em contato com um administrador para editar valores críticos.' : null}
+            headerColor="bg-amber-600"
+            maxWidth="7xl"
+            onSubmit={handleSubmit}
+            footer={
+                <StandardModal.Footer
+                    onCancel={onClose}
+                    onSubmit="submit"
+                    submitLabel={form.processing ? 'Salvando...' : 'Salvar Alterações'}
+                    submitColor="bg-amber-600 hover:bg-amber-700"
+                    processing={form.processing}
+                />
+            }
+        >
+            <OrderPaymentFormBody
+                form={form}
+                selects={selects}
+                canEditCritical={canEditCritical}
+                departments={departments}
+                selectedDepartmentId={selectedDepartmentId}
+                handleDepartmentChange={handleDepartmentChange}
+                managementClassesForDept={managementClassesForDept}
+                selectedMgmtClass={selectedMgmtClass}
+                accountingClasses={accountingClasses}
+                loadingAcs={loadingAcs}
+                year={year}
+                isPix={isPix}
+                isBoleto={isBoleto}
+                handleInstallmentCountChange={handleInstallmentCountChange}
+                updateInstallmentItem={updateInstallmentItem}
+                addAllocationRow={addAllocationRow}
+                removeAllocationRow={removeAllocationRow}
+                updateAllocation={updateAllocation}
+                divideEqually={divideEqually}
+            />
         </StandardModal>
     );
 }
@@ -811,7 +1139,7 @@ function TransitionModal({ data, statusOptions, selects, error, setError, onClos
 // ============================================================
 // KANBAN BOARD
 // ============================================================
-function KanbanBoard({ statusOptions, kanbanData, kanbanCards, canEdit, onTransition, onDetail,
+function KanbanBoard({ statusOptions, kanbanData, kanbanCards, canEdit, onTransition, onDetail, onEdit,
     draggedOrder, dragOverStatus, onDragStart, onDragEnd, onDragOver, onDrop, canDropTo }) {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -862,8 +1190,12 @@ function KanbanBoard({ statusOptions, kanbanData, kanbanCards, canEdit, onTransi
                                     <p><strong>Valor:</strong> <span className="text-gray-900 font-medium">{p.formatted_total}</span></p>
                                 </div>
                                 {canEdit && (
-                                    <div className="flex justify-end mt-2 pt-2 border-t border-gray-100">
+                                    <div className="flex justify-end mt-2 pt-2 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
                                         <ActionButtons size="xs">
+                                            {onEdit && (
+                                                <ActionButtons.Custom variant="primary" icon={PencilSquareIcon} title="Editar" size="xs"
+                                                    onClick={() => onEdit(p.id)} />
+                                            )}
                                             {status !== 'done' && (
                                                 <ActionButtons.Custom variant="success" icon={ArrowRightIcon} title="Avançar" size="xs"
                                                     onClick={() => onTransition(p, nextStatus(status))} />
@@ -889,7 +1221,7 @@ function KanbanBoard({ statusOptions, kanbanData, kanbanCards, canEdit, onTransi
 // ============================================================
 // TABLE VIEW
 // ============================================================
-function TableView({ payments, canEdit, statusOptions, onTransition, onDetail }) {
+function TableView({ payments, canEdit, statusOptions, onTransition, onDetail, onEdit }) {
     return (
         <div className="bg-white shadow rounded-lg overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200">
@@ -916,6 +1248,7 @@ function TableView({ payments, canEdit, statusOptions, onTransition, onDetail })
                             <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                 <ActionButtons
                                     onView={() => onDetail(p.id)}
+                                    onEdit={canEdit && onEdit ? () => onEdit(p.id) : undefined}
                                 >
                                     {canEdit && p.status !== 'done' && (
                                         <ActionButtons.Custom variant="success" icon={ArrowRightIcon} title="Avançar"
@@ -992,23 +1325,23 @@ function ViewToggle({ viewMode, setViewMode }) {
 }
 
 
-function Input({ label, error, onChange, ...props }) {
+function Input({ label, error, onChange, disabled, ...props }) {
     return (
         <div>
             {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
-            <input {...props} onChange={e => onChange(e.target.value)}
-                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+            <input {...props} disabled={disabled} onChange={e => onChange(e.target.value)}
+                className={`w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${disabled ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`} />
             {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
         </div>
     );
 }
 
-function Select({ label, options = [], error, onChange, value, required }) {
+function Select({ label, options = [], error, onChange, value, required, disabled }) {
     return (
         <div>
             {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
-            <select value={value} onChange={e => onChange(e.target.value)} required={required}
-                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+            <select value={value} onChange={e => onChange(e.target.value)} required={required} disabled={disabled}
+                className={`w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${disabled ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}>
                 <option value="">Selecione</option>
                 {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
@@ -1022,7 +1355,7 @@ function Select({ label, options = [], error, onChange, value, required }) {
  * analíticas do departamento selecionado com o CC que cada uma representa
  * exibido inline no label.
  */
-function ManagementClassCascadeSelect({ value, onChange, options, hasDepartment, error }) {
+function ManagementClassCascadeSelect({ value, onChange, options, hasDepartment, error, disabled }) {
     const helper = !hasDepartment
         ? 'Selecione uma Área primeiro.'
         : options.length === 0
@@ -1035,9 +1368,9 @@ function ManagementClassCascadeSelect({ value, onChange, options, hasDepartment,
             <select
                 value={value}
                 onChange={e => onChange(e.target.value)}
-                disabled={!hasDepartment || options.length === 0}
+                disabled={disabled || !hasDepartment || options.length === 0}
                 required
-                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
             >
                 <option value="">Selecione</option>
                 {options.map(m => (
@@ -1076,7 +1409,7 @@ function CostCenterReadonly({ costCenter, error }) {
  * Abaixo do select, renderiza um mini-indicador visual com barra de utilização
  * da opção selecionada quando há dados.
  */
-function AccountingClassSelect({ value, onChange, options, loading, hasCostCenter, error }) {
+function AccountingClassSelect({ value, onChange, options, loading, hasCostCenter, error, disabled }) {
     const BRL = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(v || 0));
     const selected = options.find(o => o.id == value);
 
@@ -1100,8 +1433,8 @@ function AccountingClassSelect({ value, onChange, options, loading, hasCostCente
             <select
                 value={value}
                 onChange={e => onChange(e.target.value)}
-                disabled={!hasCostCenter || loading}
-                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+                disabled={disabled || !hasCostCenter || loading}
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
             >
                 <option value="">Selecione</option>
                 {options.map(o => (
@@ -1142,15 +1475,15 @@ function Textarea({ label, error, onChange, ...props }) {
     );
 }
 
-function MoneyInput({ label, value, onChange, error, required }) {
+function MoneyInput({ label, value, onChange, error, required, disabled }) {
     return (
         <div>
             {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
             <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">R$</span>
-                <input type="text" value={value} placeholder="0,00" required={required}
+                <input type="text" value={value} placeholder="0,00" required={required} disabled={disabled}
                     onChange={e => onChange(maskMoney(e.target.value))}
-                    className="w-full pl-10 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+                    className={`w-full pl-10 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${disabled ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`} />
             </div>
             {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
         </div>
