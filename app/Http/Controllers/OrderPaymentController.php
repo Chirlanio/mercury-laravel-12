@@ -341,7 +341,10 @@ class OrderPaymentController extends Controller
             'document_number_supplier' => 'nullable|string|max:20',
             'pix_key_type' => 'nullable|string',
             'pix_key' => 'nullable|string',
+            'installments' => 'nullable|integer|min:0|max:12',
             'installment_items' => 'nullable|array',
+            'installment_items.*.value' => 'required_with:installment_items|numeric|min:0.01',
+            'installment_items.*.date' => 'required_with:installment_items|date',
             'allocations' => 'nullable|array',
         ]);
 
