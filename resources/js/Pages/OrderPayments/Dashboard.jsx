@@ -198,19 +198,22 @@ export default function Dashboard({ statistics = {}, analytics = {} }) {
                             {supplierPieData.length === 0 ? (
                                 <EmptyState title="Sem dados" description="Nenhum fornecedor registrado em OP." compact />
                             ) : (
-                                <ResponsiveContainer width="100%" height={280}>
-                                    <PieChart>
-                                        <Pie data={supplierPieData} dataKey="value" nameKey="name"
-                                            cx="50%" cy="50%" outerRadius={95}
-                                            label={(entry) => BRL(entry.value)}>
+                                <ResponsiveContainer width="100%" height={Math.max(280, supplierPieData.length * 32)}>
+                                    <BarChart data={supplierPieData} layout="vertical"
+                                        margin={{ top: 5, right: 24, left: 0, bottom: 5 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
+                                        <XAxis type="number" tick={{ fontSize: 11 }}
+                                            tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
+                                        <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }}
+                                            width={160} interval={0}
+                                            tickFormatter={(name) => name.length > 22 ? name.slice(0, 22) + '…' : name} />
+                                        <Tooltip formatter={formatTooltipCurrency} />
+                                        <Bar dataKey="value" name="Total" radius={[0, 3, 3, 0]}>
                                             {supplierPieData.map((entry, i) => (
                                                 <Cell key={i} fill={entry.fill} />
                                             ))}
-                                        </Pie>
-                                        <Tooltip formatter={formatTooltipCurrency} />
-                                        <Legend layout="vertical" align="right" verticalAlign="middle"
-                                            wrapperStyle={{ fontSize: 11 }} />
-                                    </PieChart>
+                                        </Bar>
+                                    </BarChart>
                                 </ResponsiveContainer>
                             )}
                         </div>
