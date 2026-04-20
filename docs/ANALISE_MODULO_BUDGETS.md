@@ -30,8 +30,23 @@ Estrutura completa de orçamento com versionamento automático e armazenamento d
 
 ### O que ainda NÃO está disponível (próximas fases)
 
-- **Fase 5**: Export xlsx consolidado (previsto + realizado) + PDF resumo
-- **Follow-up pós-Fase 3**: Integração do dropdown "Vincular a linha de orçamento" no form de OrderPayment (backend já disponível via `GET /budgets/items-for-cost-center/{cc}?year=YYYY`)
+Roadmap detalhado em [ROADMAP_ORCAMENTO_PENDENCIAS.md](ROADMAP_ORCAMENTO_PENDENCIAS.md). Resumo:
+
+- **Fase 5**: Campo Área (`area_department_id`) no BudgetUpload — FK → departamento gerencial sintético
+- **Fase 6**: Export xlsx consolidado multi-sheet (previsto + comprometido + realizado + por mês/CC/AC/área)
+- **Fase 7**: Fallback de Contas Contábeis do CC "Geral" quando user escolhe CC de loja — pendente decisão de negócio
+- **Melhorias 8–10**: editor inline de BudgetItem, comparativo entre versões, lixeira administrativa
+- **Integração OP C3b/C3c**: backfill de OPs antigas sem CC/AC + tornar campos NOT NULL após validação em staging
+
+### Entregue pós-Fase 4 (fora do escopo original documentado)
+
+- Dashboard como página Inertia dedicada (antes era modal)
+- Split Comprometido × Realizado baseado em status da OP (`done` = realizado; demais = comprometido)
+- Integração OP ↔ Budget: auto-resolução de `budget_item_id` via (cost_center_id, accounting_class_id, ano)
+- Cascata Área → Gerencial → CC → AC no form de OP (endpoint `/management-classes/departments`)
+- Parser aceita template real do Grupo Meia Sola (headers "Class contabil"/"Class Gerencial") + calcula fórmulas Excel corretamente
+- Edição de OP com controle granular por role (SUPER_ADMIN/ADMIN/SUPPORT editam críticos; USER edita só não-críticos)
+- Drag-and-drop no Kanban de OP
 
 ---
 
