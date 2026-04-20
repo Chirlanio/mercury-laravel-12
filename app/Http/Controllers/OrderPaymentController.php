@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Exports\OrderPaymentExport;
 use App\Models\Bank;
 use App\Models\Brand;
+use App\Models\AccountingClass;
+use App\Models\BudgetItem;
 use App\Models\CostCenter;
 use App\Models\ManagementReason;
 use App\Models\Manager;
@@ -119,11 +121,14 @@ class OrderPaymentController extends Controller
         $validated = $request->validate([
             'store_id' => 'nullable|exists:stores,id',
             'area_id' => 'nullable|integer',
+            'cost_center_id' => 'nullable|exists:cost_centers,id',
+            'accounting_class_id' => 'nullable|exists:accounting_classes,id',
             'supplier_id' => 'nullable|exists:suppliers,id',
             'manager_id' => 'nullable|exists:managers,id',
             'description' => 'required|string',
             'total_value' => 'required|numeric|min:0.01',
             'date_payment' => 'required|date',
+            'competence_date' => 'nullable|date',
             'payment_type' => 'nullable|string',
             'advance' => 'boolean',
             'advance_amount' => 'nullable|numeric|min:0',
@@ -145,6 +150,9 @@ class OrderPaymentController extends Controller
             'installment_items.*.date' => 'required_with:installment_items|date',
             'allocations' => 'nullable|array',
         ]);
+
+        // Auto-resolve budget_item_id pelo trio (CC, AC, ano da competência)
+        $validated['budget_item_id'] = $this->resolveBudgetItemId($validated);
 
         $order = DB::transaction(function () use ($validated) {
             $totalValue = $validated['total_value'];
@@ -245,9 +253,12 @@ class OrderPaymentController extends Controller
             'description' => 'required|string',
             'total_value' => 'required|numeric|min:0.01',
             'date_payment' => 'required|date',
+            'competence_date' => 'nullable|date',
             'payment_type' => 'nullable|string',
             'store_id' => 'nullable|exists:stores,id',
             'area_id' => 'nullable|integer',
+            'cost_center_id' => 'nullable|exists:cost_centers,id',
+            'accounting_class_id' => 'nullable|exists:accounting_classes,id',
             'supplier_id' => 'nullable|exists:suppliers,id',
             'manager_id' => 'nullable|exists:managers,id',
             'advance' => 'boolean',
@@ -266,6 +277,15 @@ class OrderPaymentController extends Controller
             'pix_key' => 'nullable|string',
             'installment_items' => 'nullable|array',
             'allocations' => 'nullable|array',
+        ]);
+
+        // Recalcula budget_item_id sempre que CC, AC ou competence_date mudar.
+        // Pega valores do payload ou fallback pro estado atual da OP.
+        $validated['budget_item_id'] = $this->resolveBudgetItemId([
+            'cost_center_id' => $validated['cost_center_id'] ?? $orderPayment->cost_center_id,
+            'accounting_class_id' => $validated['accounting_class_id'] ?? $orderPayment->accounting_class_id,
+            'competence_date' => $validated['competence_date'] ?? $orderPayment->competence_date,
+            'date_payment' => $validated['date_payment'],
         ]);
 
         DB::transaction(function () use ($orderPayment, $validated) {
@@ -732,5 +752,36 @@ class OrderPaymentController extends Controller
             'deleted_at' => $p->deleted_at?->format('d/m/Y H:i'),
             'delete_reason' => $p->delete_reason,
         ]);
+    }
+
+    /**
+     * Resolve o budget_item_id a partir do trio (cost_center_id,
+     * accounting_class_id, ano da competência). Retorna null se falta algum
+     * dos dois códigos, ou se não há budget ativo que case com o par no ano.
+     *
+     * O ano vem de competence_date quando informado; fallback para
+     * date_payment. Esse fallback alinha o regime contábil natural — a OP
+     * que não tem competência explícita cai no orçamento do ano do caixa.
+     */
+    protected function resolveBudgetItemId(array $attrs): ?int
+    {
+        $ccId = $attrs['cost_center_id'] ?? null;
+        $acId = $attrs['accounting_class_id'] ?? null;
+
+        if (! $ccId || ! $acId) {
+            return null;
+        }
+
+        $dateSource = $attrs['competence_date'] ?? $attrs['date_payment'] ?? null;
+        if (! $dateSource) {
+            return null;
+        }
+        $year = (int) date('Y', is_string($dateSource) ? strtotime($dateSource) : $dateSource->timestamp);
+
+        return BudgetItem::query()
+            ->where('cost_center_id', $ccId)
+            ->where('accounting_class_id', $acId)
+            ->whereHas('upload', fn ($q) => $q->where('year', $year)->where('is_active', true))
+            ->value('id');
     }
 }

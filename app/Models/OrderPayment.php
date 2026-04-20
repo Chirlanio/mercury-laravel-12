@@ -14,6 +14,7 @@ class OrderPayment extends Model
     protected $fillable = [
         'area_id',
         'cost_center_id',
+        'accounting_class_id',
         'budget_item_id',
         'brand_id',
         'supplier_id',
@@ -23,6 +24,7 @@ class OrderPayment extends Model
         'description',
         'total_value',
         'date_payment',
+        'competence_date',
         'payment_type',
         'installments',
         'bank_name',
@@ -58,6 +60,7 @@ class OrderPayment extends Model
         'advance_amount' => 'decimal:2',
         'diff_payment_advance' => 'decimal:2',
         'date_payment' => 'date',
+        'competence_date' => 'date',
         'date_paid' => 'date',
         'deleted_at' => 'datetime',
         'advance' => 'boolean',
@@ -135,6 +138,16 @@ class OrderPayment extends Model
     public function budgetItem(): BelongsTo
     {
         return $this->belongsTo(BudgetItem::class);
+    }
+
+    public function accountingClass(): BelongsTo
+    {
+        return $this->belongsTo(AccountingClass::class);
+    }
+
+    public function costCenter(): BelongsTo
+    {
+        return $this->belongsTo(CostCenter::class);
     }
 
     public function manager(): BelongsTo
