@@ -5,7 +5,8 @@ import {
     ExclamationTriangleIcon, ChartBarIcon, ArrowDownTrayIcon,
     ClipboardDocumentListIcon, ArrowPathIcon, ClockIcon, CheckCircleIcon,
 } from '@heroicons/react/24/outline';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import axios from 'axios';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
 import { maskMoney, parseMoney, maskCpfCnpj, maskPhone, handleMasked } from '@/Hooks/useMasks';
@@ -199,7 +200,8 @@ export default function Index({
 function CreateModal({ selects, onClose }) {
     const form = useForm({
         // Card 1: Informações Básicas
-        area_id: '', cost_center_id: '', brand_id: '', date_payment: '', manager_id: '', management_reason_id: '',
+        area_id: '', cost_center_id: '', accounting_class_id: '', brand_id: '',
+        date_payment: '', competence_date: '', manager_id: '', management_reason_id: '',
         // Card 2: Fornecedor e Valores
         supplier_id: '', total_value: '', number_nf: '', launch_number: '', description: '',
         // Card 3: Pagamento e Adiantamento
@@ -213,6 +215,34 @@ function CreateModal({ selects, onClose }) {
         // Card 6: Observações
         observations: '',
     });
+
+    // Cascata CC → AC: lista de contas contábeis com budget ativo no CC+ano.
+    // Recarrega sempre que CC ou o ano (de competência ou pagamento) mudam.
+    const [accountingClasses, setAccountingClasses] = useState([]);
+    const [loadingAcs, setLoadingAcs] = useState(false);
+    const cc = form.data.cost_center_id;
+    const yearSource = form.data.competence_date || form.data.date_payment;
+    const year = yearSource ? new Date(yearSource).getFullYear() : new Date().getFullYear();
+
+    useEffect(() => {
+        if (!cc) {
+            setAccountingClasses([]);
+            return;
+        }
+        setLoadingAcs(true);
+        axios.get(route('budgets.accounting-classes-for-cost-center', cc), { params: { year } })
+            .then(r => setAccountingClasses(r.data.accounting_classes || []))
+            .catch(() => setAccountingClasses([]))
+            .finally(() => setLoadingAcs(false));
+    }, [cc, year]);
+
+    // Se o AC selecionado saiu da lista (mudou CC/ano), limpa
+    useEffect(() => {
+        if (form.data.accounting_class_id && accountingClasses.length > 0) {
+            const stillValid = accountingClasses.some(a => a.id == form.data.accounting_class_id);
+            if (!stillValid) form.setData('accounting_class_id', '');
+        }
+    }, [accountingClasses]);
 
     const selectedPaymentType = useMemo(() => {
         const pt = (selects.paymentTypes || []).find(t => t.id == form.data.payment_type_id);
@@ -311,12 +341,22 @@ function CreateModal({ selects, onClose }) {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <Select label="Área *" value={form.data.area_id} onChange={v => form.setData('area_id', v)}
                                 options={(selects.areas || []).map(a => ({ value: a.id, label: a.name }))} error={form.errors.area_id} required />
-                            <Select label="Centro de Custo *" value={form.data.cost_center_id} onChange={v => form.setData('cost_center_id', v)}
-                                options={(selects.costCenters || []).map(c => ({ value: c.id, label: `${c.name} - ${c.code}` }))} error={form.errors.cost_center_id} required />
+                            <Select label="Centro de Custo" value={form.data.cost_center_id} onChange={v => form.setData('cost_center_id', v)}
+                                options={(selects.costCenters || []).map(c => ({ value: c.id, label: `${c.name} - ${c.code}` }))} error={form.errors.cost_center_id} />
+                            <AccountingClassSelect
+                                value={form.data.accounting_class_id}
+                                onChange={v => form.setData('accounting_class_id', v)}
+                                options={accountingClasses}
+                                loading={loadingAcs}
+                                hasCostCenter={!!cc}
+                                error={form.errors.accounting_class_id}
+                            />
                             <Select label="Marca *" value={form.data.brand_id} onChange={v => form.setData('brand_id', v)}
                                 options={(selects.brands || []).map(b => ({ value: b.id, label: b.name }))} error={form.errors.brand_id} required />
                             <Input label="Data Pagamento *" type="date" value={form.data.date_payment}
                                 onChange={v => form.setData('date_payment', v)} error={form.errors.date_payment} required />
+                            <Input label="Data de Competência" type="date" value={form.data.competence_date}
+                                onChange={v => form.setData('competence_date', v)} error={form.errors.competence_date} />
                             <Select label="Aprovador *" value={form.data.manager_id} onChange={v => form.setData('manager_id', v)}
                                 options={(selects.managers || []).map(m => ({ value: m.id, label: m.name }))} error={form.errors.manager_id} required />
                             <Select label="Motivo Gerencial" value={form.data.management_reason_id} onChange={v => form.setData('management_reason_id', v)}
@@ -806,6 +846,69 @@ function Select({ label, options = [], error, onChange, value, required }) {
                 <option value="">Selecione</option>
                 {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
+            {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+        </div>
+    );
+}
+
+/**
+ * Select especializado para Conta Contábil — dependente do CC selecionado.
+ * Carrega via `budgets.accounting-classes-for-cost-center` e mostra o consumo
+ * inline no dropdown (previsto × realizado × % utilização).
+ *
+ * Abaixo do select, renderiza um mini-indicador visual com barra de utilização
+ * da opção selecionada quando há dados.
+ */
+function AccountingClassSelect({ value, onChange, options, loading, hasCostCenter, error }) {
+    const BRL = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(v || 0));
+    const selected = options.find(o => o.id == value);
+
+    const statusColor = (status) => {
+        if (status === 'exceeded') return 'bg-red-500';
+        if (status === 'warning') return 'bg-amber-500';
+        return 'bg-green-500';
+    };
+
+    const helper = !hasCostCenter
+        ? 'Selecione um Centro de Custo para ver as contas contábeis com orçamento.'
+        : loading
+        ? 'Carregando contas contábeis…'
+        : options.length === 0
+        ? 'Nenhuma conta contábil com orçamento ativo neste CC para o ano.'
+        : null;
+
+    return (
+        <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Conta Contábil</label>
+            <select
+                value={value}
+                onChange={e => onChange(e.target.value)}
+                disabled={!hasCostCenter || loading}
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+            >
+                <option value="">Selecione</option>
+                {options.map(o => (
+                    <option key={o.id} value={o.id}>
+                        {o.label} — previsto {BRL(o.forecast_total)} · realizado {BRL(o.realized_total)} ({o.utilization_pct.toFixed(1)}%)
+                    </option>
+                ))}
+            </select>
+            {helper && <p className="mt-1 text-xs text-gray-500">{helper}</p>}
+            {selected && (
+                <div className="mt-1.5">
+                    <div className="flex items-center gap-2">
+                        <div className="flex-1 bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                            <div
+                                className={`h-1.5 rounded-full ${statusColor(selected.status)}`}
+                                style={{ width: `${Math.min(selected.utilization_pct, 100)}%` }}
+                            />
+                        </div>
+                        <span className="text-xs font-medium text-gray-700">
+                            {BRL(selected.available)} disponível
+                        </span>
+                    </div>
+                </div>
+            )}
             {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
         </div>
     );

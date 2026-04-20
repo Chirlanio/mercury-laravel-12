@@ -230,4 +230,75 @@ class OrderPaymentBudgetLinkTest extends TestCase
         $op = OrderPayment::latest('id')->first();
         $this->assertNull($op->budget_item_id);
     }
+
+    // ------------------------------------------------------------------
+    // Endpoint: accounting-classes-for-cost-center
+    // ------------------------------------------------------------------
+
+    public function test_endpoint_returns_accounting_classes_with_forecast_and_realized(): void
+    {
+        // Cria OP "realized" no budget
+        OrderPayment::create([
+            'description' => 'Conta de telefone março',
+            'total_value' => 300,
+            'date_payment' => '2026-03-10',
+            'cost_center_id' => $this->cc->id,
+            'accounting_class_id' => $this->ac->id,
+            'budget_item_id' => $this->itemTelefonia2026->id,
+            'status' => OrderPayment::STATUS_DOING,
+            'created_by_user_id' => $this->adminUser->id,
+        ]);
+
+        $response = $this->actingAs($this->adminUser)
+            ->getJson(route('budgets.accounting-classes-for-cost-center', [
+                'costCenter' => $this->cc->id,
+                'year' => 2026,
+            ]));
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure(['accounting_classes' => [['id', 'code', 'name', 'label', 'forecast_total', 'realized_total', 'available', 'utilization_pct', 'status']]]);
+
+        $acs = $response->json('accounting_classes');
+        $this->assertCount(1, $acs);
+        $this->assertEquals($this->ac->id, $acs[0]['id']);
+        $this->assertEquals(12000, $acs[0]['forecast_total']);
+        $this->assertEquals(300, $acs[0]['realized_total']);
+        $this->assertEquals(11700, $acs[0]['available']);
+        $this->assertEquals('ok', $acs[0]['status']);
+    }
+
+    public function test_endpoint_returns_empty_when_no_budget_for_year(): void
+    {
+        $response = $this->actingAs($this->adminUser)
+            ->getJson(route('budgets.accounting-classes-for-cost-center', [
+                'costCenter' => $this->cc->id,
+                'year' => 2099,
+            ]));
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('accounting_classes', []);
+    }
+
+    public function test_endpoint_excludes_backlog_from_realized(): void
+    {
+        // OP backlog não entra no realized (OPs apenas solicitadas não comprometem)
+        OrderPayment::create([
+            'description' => 'Solicitação em aberto',
+            'total_value' => 500,
+            'date_payment' => '2026-03-10',
+            'cost_center_id' => $this->cc->id,
+            'accounting_class_id' => $this->ac->id,
+            'budget_item_id' => $this->itemTelefonia2026->id,
+            'status' => OrderPayment::STATUS_BACKLOG,
+            'created_by_user_id' => $this->adminUser->id,
+        ]);
+
+        $response = $this->actingAs($this->adminUser)
+            ->getJson(route('budgets.accounting-classes-for-cost-center', [
+                'costCenter' => $this->cc->id,
+                'year' => 2026,
+            ]));
+
+        $response->assertJsonPath('accounting_classes.0.realized_total', 0);
+    }
 }

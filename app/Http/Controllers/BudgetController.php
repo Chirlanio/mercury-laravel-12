@@ -99,6 +99,92 @@ class BudgetController extends Controller
     }
 
     /**
+     * Lista as AccountingClasses que têm budget ativo no CC+ano informado,
+     * já com os totais de previsto/realizado agregados. Usado no form de
+     * OrderPayment para montar a cascata CC → AC e mostrar o consumo inline
+     * no dropdown ("Telefonia · previsto R$ 12k · realizado R$ 8k").
+     *
+     * Retorno agrupa budget_items pela classe contábil — se houver múltiplos
+     * items da mesma AC no mesmo CC (ex: fornecedores diferentes), eles são
+     * somados para o total da linha.
+     */
+    public function accountingClassesForCostCenter(Request $request, int $costCenterId): JsonResponse
+    {
+        $year = $request->integer('year', (int) now()->year);
+
+        // Busca budget_items ativos do ano para o CC, agrupados por AC
+        $items = \App\Models\BudgetItem::query()
+            ->selectRaw('accounting_class_id, SUM(year_total) as forecast_total, MIN(id) as sample_item_id')
+            ->whereHas('upload', function ($q) use ($year) {
+                $q->where('year', $year)->where('is_active', true)->whereNull('deleted_at');
+            })
+            ->where('cost_center_id', $costCenterId)
+            ->whereNotNull('accounting_class_id')
+            ->groupBy('accounting_class_id')
+            ->get()
+            ->keyBy('accounting_class_id');
+
+        if ($items->isEmpty()) {
+            return response()->json(['accounting_classes' => []]);
+        }
+
+        $acIds = $items->keys()->all();
+        $itemIds = \App\Models\BudgetItem::query()
+            ->whereIn('accounting_class_id', $acIds)
+            ->whereHas('upload', function ($q) use ($year) {
+                $q->where('year', $year)->where('is_active', true)->whereNull('deleted_at');
+            })
+            ->where('cost_center_id', $costCenterId)
+            ->pluck('id', 'accounting_class_id');
+
+        // Realized por AC = sum de OPs não-canceladas e não-excluídas com budget_item_id correspondente
+        $budgetItemIdsByAc = \App\Models\BudgetItem::query()
+            ->whereIn('accounting_class_id', $acIds)
+            ->whereHas('upload', function ($q) use ($year) {
+                $q->where('year', $year)->where('is_active', true)->whereNull('deleted_at');
+            })
+            ->where('cost_center_id', $costCenterId)
+            ->get(['id', 'accounting_class_id'])
+            ->groupBy('accounting_class_id')
+            ->map(fn ($g) => $g->pluck('id')->all());
+
+        $realizedByAc = [];
+        foreach ($budgetItemIdsByAc as $acId => $ids) {
+            $realizedByAc[$acId] = (float) \App\Models\OrderPayment::query()
+                ->whereIn('budget_item_id', $ids)
+                ->whereNull('deleted_at')
+                ->where('status', '!=', \App\Models\OrderPayment::STATUS_BACKLOG)
+                ->sum('total_value');
+        }
+
+        $accountingClasses = AccountingClass::query()
+            ->whereIn('id', $acIds)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name']);
+
+        $payload = $accountingClasses->map(function ($ac) use ($items, $realizedByAc) {
+            $forecast = (float) $items[$ac->id]->forecast_total;
+            $realized = (float) ($realizedByAc[$ac->id] ?? 0);
+            $available = $forecast - $realized;
+            $pct = $forecast > 0 ? round(($realized / $forecast) * 100, 1) : 0;
+
+            return [
+                'id' => $ac->id,
+                'code' => $ac->code,
+                'name' => $ac->name,
+                'label' => sprintf('%s · %s', $ac->code, $ac->name),
+                'forecast_total' => round($forecast, 2),
+                'realized_total' => round($realized, 2),
+                'available' => round($available, 2),
+                'utilization_pct' => $pct,
+                'status' => $pct >= 100 ? 'exceeded' : ($pct >= 70 ? 'warning' : 'ok'),
+            ];
+        })->values();
+
+        return response()->json(['accounting_classes' => $payload]);
+    }
+
+    /**
      * JSON do consumo — útil para polling/refresh sem recarregar a página.
      */
     public function consumptionJson(BudgetUpload $budget): JsonResponse
