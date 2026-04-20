@@ -1161,6 +1161,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/management-classes', [\App\Http\Controllers\ManagementClassController::class, 'index'])->name('management-classes.index');
         Route::get('/management-classes/statistics', [\App\Http\Controllers\ManagementClassController::class, 'statistics'])->name('management-classes.statistics');
         Route::get('/management-classes/tree', [\App\Http\Controllers\ManagementClassController::class, 'tree'])->name('management-classes.tree');
+        Route::get('/management-classes/departments', [\App\Http\Controllers\ManagementClassController::class, 'departments'])->name('management-classes.departments');
 
         Route::middleware('permission:'.Permission::EXPORT_MANAGEMENT_CLASSES->value)->group(function () {
             Route::get('/management-classes/export', [\App\Http\Controllers\ManagementClassController::class, 'export'])->name('management-classes.export');

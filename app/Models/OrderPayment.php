@@ -15,6 +15,7 @@ class OrderPayment extends Model
         'area_id',
         'cost_center_id',
         'accounting_class_id',
+        'management_class_id',
         'budget_item_id',
         'brand_id',
         'supplier_id',
@@ -148,6 +149,11 @@ class OrderPayment extends Model
     public function costCenter(): BelongsTo
     {
         return $this->belongsTo(CostCenter::class);
+    }
+
+    public function managementClass(): BelongsTo
+    {
+        return $this->belongsTo(ManagementClass::class);
     }
 
     public function manager(): BelongsTo

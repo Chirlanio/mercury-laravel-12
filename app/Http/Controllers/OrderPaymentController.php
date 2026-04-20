@@ -8,6 +8,7 @@ use App\Models\Brand;
 use App\Models\AccountingClass;
 use App\Models\BudgetItem;
 use App\Models\CostCenter;
+use App\Models\ManagementClass;
 use App\Models\ManagementReason;
 use App\Models\Manager;
 use App\Models\OrderPayment;
@@ -123,6 +124,7 @@ class OrderPaymentController extends Controller
             'area_id' => 'nullable|integer',
             'cost_center_id' => 'nullable|exists:cost_centers,id',
             'accounting_class_id' => 'nullable|exists:accounting_classes,id',
+            'management_class_id' => 'nullable|exists:management_classes,id',
             'supplier_id' => 'nullable|exists:suppliers,id',
             'manager_id' => 'nullable|exists:managers,id',
             'description' => 'required|string',
@@ -150,6 +152,10 @@ class OrderPaymentController extends Controller
             'installment_items.*.date' => 'required_with:installment_items|date',
             'allocations' => 'nullable|array',
         ]);
+
+        // Deriva cost_center_id da ManagementClass quando a UI usa a cascata
+        // Área→Gerencial→CC (o CC não vem no payload, vem embutido na MC).
+        $validated['cost_center_id'] = $this->resolveCostCenterId($validated);
 
         // Auto-resolve budget_item_id pelo trio (CC, AC, ano da competência)
         $validated['budget_item_id'] = $this->resolveBudgetItemId($validated);
@@ -259,6 +265,7 @@ class OrderPaymentController extends Controller
             'area_id' => 'nullable|integer',
             'cost_center_id' => 'nullable|exists:cost_centers,id',
             'accounting_class_id' => 'nullable|exists:accounting_classes,id',
+            'management_class_id' => 'nullable|exists:management_classes,id',
             'supplier_id' => 'nullable|exists:suppliers,id',
             'manager_id' => 'nullable|exists:managers,id',
             'advance' => 'boolean',
@@ -279,14 +286,21 @@ class OrderPaymentController extends Controller
             'allocations' => 'nullable|array',
         ]);
 
-        // Recalcula budget_item_id sempre que CC, AC ou competence_date mudar.
-        // Pega valores do payload ou fallback pro estado atual da OP.
-        $validated['budget_item_id'] = $this->resolveBudgetItemId([
+        // Deriva CC da MC quando a cascata Área→Gerencial preencher management_class_id.
+        // O payload pode trazer cost_center_id explícito OU management_class_id — a MC
+        // ganha prioridade porque é a fonte autoritária (CC é faceta da MC).
+        $mergedForResolve = [
             'cost_center_id' => $validated['cost_center_id'] ?? $orderPayment->cost_center_id,
             'accounting_class_id' => $validated['accounting_class_id'] ?? $orderPayment->accounting_class_id,
+            'management_class_id' => $validated['management_class_id'] ?? $orderPayment->management_class_id,
             'competence_date' => $validated['competence_date'] ?? $orderPayment->competence_date,
             'date_payment' => $validated['date_payment'],
-        ]);
+        ];
+        $validated['cost_center_id'] = $this->resolveCostCenterId($mergedForResolve);
+        $mergedForResolve['cost_center_id'] = $validated['cost_center_id'];
+
+        // Recalcula budget_item_id sempre que CC, AC ou competence_date mudar.
+        $validated['budget_item_id'] = $this->resolveBudgetItemId($mergedForResolve);
 
         DB::transaction(function () use ($orderPayment, $validated) {
             $totalValue = $validated['total_value'];
@@ -752,6 +766,31 @@ class OrderPaymentController extends Controller
             'deleted_at' => $p->deleted_at?->format('d/m/Y H:i'),
             'delete_reason' => $p->delete_reason,
         ]);
+    }
+
+    /**
+     * Resolve o cost_center_id quando a UI enviar a cascata
+     * Área → Gerencial → CC — nesse caso o CC é derivado da ManagementClass
+     * selecionada (já pré-vinculada no seed de management_classes).
+     *
+     * Se o payload já trouxer cost_center_id explícito e não houver
+     * management_class_id, mantém o que veio. Se houver conflito (cost_center_id
+     * explícito ≠ cost_center_id da MC), a MC ganha — é a fonte autoritária
+     * do vínculo conforme a taxonomia gerencial.
+     */
+    protected function resolveCostCenterId(array $attrs): ?int
+    {
+        $mcId = $attrs['management_class_id'] ?? null;
+        $ccExplicit = $attrs['cost_center_id'] ?? null;
+
+        if ($mcId) {
+            $mcCc = ManagementClass::whereKey($mcId)->value('cost_center_id');
+            if ($mcCc) {
+                return $mcCc;
+            }
+        }
+
+        return $ccExplicit;
     }
 
     /**

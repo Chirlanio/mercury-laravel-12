@@ -118,6 +118,62 @@ class ManagementClassController extends Controller
         ]);
     }
 
+    /**
+     * Lista os 11 departamentos gerenciais (sintéticos 8.1.DD) com as classes
+     * analíticas filhas (8.1.DD.UU) e o CC pré-vinculado de cada uma.
+     *
+     * Consumido pelo form de OrderPayment para a cascata Área → Gerencial → CC.
+     * O frontend escolhe uma área (departamento), depois escolhe uma gerencial
+     * daquela área, e o CC vem automático da gerencial.
+     *
+     * Retorno:
+     *   departments: [
+     *     { id, code, name, classes: [
+     *       { id, code, name, cost_center: { id, code, name } | null }
+     *     ]}
+     *   ]
+     */
+    public function departments(): JsonResponse
+    {
+        // Departamentos = sintéticos nível 3 (8.1.DD). Ignora 8 e 8.1 que são
+        // raiz/agregador — só os 11 departamentos de negócio.
+        $departments = ManagementClass::query()
+            ->notDeleted()
+            ->where('accepts_entries', false)
+            ->where('code', 'like', '8.1._%')
+            ->whereRaw('LENGTH(code) = ?', [6]) // "8.1.XX" — LENGTH é portável MySQL+SQLite
+            ->orderBy('sort_order')
+            ->orderBy('code')
+            ->get(['id', 'code', 'name']);
+
+        $analyticals = ManagementClass::query()
+            ->with(['costCenter:id,code,name'])
+            ->notDeleted()
+            ->where('accepts_entries', true)
+            ->whereIn('parent_id', $departments->pluck('id'))
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'parent_id', 'cost_center_id']);
+
+        $byParent = $analyticals->groupBy('parent_id');
+
+        $payload = $departments->map(fn ($d) => [
+            'id' => $d->id,
+            'code' => $d->code,
+            'name' => $d->name,
+            'classes' => ($byParent[$d->id] ?? collect())->map(fn ($c) => [
+                'id' => $c->id,
+                'code' => $c->code,
+                'name' => $c->name,
+                'cost_center' => $c->costCenter
+                    ? ['id' => $c->costCenter->id, 'code' => $c->costCenter->code, 'name' => $c->costCenter->name]
+                    : null,
+            ])->values(),
+        ]);
+
+        return response()->json(['departments' => $payload]);
+    }
+
     public function show(ManagementClass $managementClass): JsonResponse
     {
         if ($managementClass->isDeleted()) {

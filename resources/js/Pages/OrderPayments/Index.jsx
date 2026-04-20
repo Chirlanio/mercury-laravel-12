@@ -200,7 +200,11 @@ export default function Index({
 function CreateModal({ selects, onClose }) {
     const form = useForm({
         // Card 1: Informações Básicas
-        area_id: '', cost_center_id: '', accounting_class_id: '', brand_id: '',
+        area_id: '',  // legado — não usado na nova cascata
+        management_class_id: '',  // fonte autoritária (carrega CC + filtra ACs)
+        cost_center_id: '',  // derivado da management_class, preenchido automaticamente
+        accounting_class_id: '',
+        brand_id: '',
         date_payment: '', competence_date: '', manager_id: '', management_reason_id: '',
         // Card 2: Fornecedor e Valores
         supplier_id: '', total_value: '', number_nf: '', launch_number: '', description: '',
@@ -216,7 +220,46 @@ function CreateModal({ selects, onClose }) {
         observations: '',
     });
 
-    // Cascata CC → AC: lista de contas contábeis com budget ativo no CC+ano.
+    // Cascata Área (departamento gerencial) → Classe Gerencial → CC → AC
+    // Um único fetch em mount traz os 11 departamentos com as classes analíticas
+    // aninhadas (já com cost_center incluído). Filtro local evita round-trips.
+    const [departments, setDepartments] = useState([]);
+    const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
+
+    useEffect(() => {
+        axios.get(route('management-classes.departments'))
+            .then(r => setDepartments(r.data.departments || []))
+            .catch(() => setDepartments([]));
+    }, []);
+
+    const managementClassesForDept = useMemo(() => {
+        if (!selectedDepartmentId) return [];
+        const dept = departments.find(d => d.id == selectedDepartmentId);
+        return dept?.classes || [];
+    }, [departments, selectedDepartmentId]);
+
+    const selectedMgmtClass = useMemo(() => {
+        return managementClassesForDept.find(m => m.id == form.data.management_class_id) || null;
+    }, [managementClassesForDept, form.data.management_class_id]);
+
+    // Quando MC muda, preenche cost_center_id automaticamente (CC derivado)
+    useEffect(() => {
+        if (selectedMgmtClass?.cost_center?.id) {
+            if (form.data.cost_center_id != selectedMgmtClass.cost_center.id) {
+                form.setData('cost_center_id', selectedMgmtClass.cost_center.id);
+            }
+        }
+    }, [selectedMgmtClass]);
+
+    // Reset de cascata quando muda o departamento
+    const handleDepartmentChange = (newDeptId) => {
+        setSelectedDepartmentId(newDeptId);
+        form.setData('management_class_id', '');
+        form.setData('cost_center_id', '');
+        form.setData('accounting_class_id', '');
+    };
+
+    // Lista de contas contábeis com budget ativo no CC+ano atual.
     // Recarrega sempre que CC ou o ano (de competência ou pagamento) mudam.
     const [accountingClasses, setAccountingClasses] = useState([]);
     const [loadingAcs, setLoadingAcs] = useState(false);
@@ -336,13 +379,23 @@ function CreateModal({ selects, onClose }) {
                 />
             }
         >
-                    {/* Card 1: Informações Básicas */}
+                    {/* Card 1: Informações Básicas — cascata Área → Gerencial → CC → AC */}
                     <StandardModal.Section title="Informações Básicas" icon="📋">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <Select label="Área *" value={form.data.area_id} onChange={v => form.setData('area_id', v)}
-                                options={(selects.areas || []).map(a => ({ value: a.id, label: a.name }))} error={form.errors.area_id} required />
-                            <Select label="Centro de Custo" value={form.data.cost_center_id} onChange={v => form.setData('cost_center_id', v)}
-                                options={(selects.costCenters || []).map(c => ({ value: c.id, label: `${c.name} - ${c.code}` }))} error={form.errors.cost_center_id} />
+                            <Select label="Área *" value={selectedDepartmentId} onChange={handleDepartmentChange}
+                                options={departments.map(d => ({ value: d.id, label: d.name }))}
+                                error={form.errors.area_id} required />
+                            <ManagementClassCascadeSelect
+                                value={form.data.management_class_id}
+                                onChange={v => form.setData('management_class_id', v)}
+                                options={managementClassesForDept}
+                                hasDepartment={!!selectedDepartmentId}
+                                error={form.errors.management_class_id}
+                            />
+                            <CostCenterReadonly
+                                costCenter={selectedMgmtClass?.cost_center || null}
+                                error={form.errors.cost_center_id}
+                            />
                             <AccountingClassSelect
                                 value={form.data.accounting_class_id}
                                 onChange={v => form.setData('accounting_class_id', v)}
@@ -846,6 +899,59 @@ function Select({ label, options = [], error, onChange, value, required }) {
                 <option value="">Selecione</option>
                 {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
+            {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+        </div>
+    );
+}
+
+/**
+ * Select dependente da Área (departamento gerencial). Lista as classes
+ * analíticas do departamento selecionado com o CC que cada uma representa
+ * exibido inline no label.
+ */
+function ManagementClassCascadeSelect({ value, onChange, options, hasDepartment, error }) {
+    const helper = !hasDepartment
+        ? 'Selecione uma Área primeiro.'
+        : options.length === 0
+        ? 'Nenhuma classe gerencial cadastrada para esta Área.'
+        : null;
+
+    return (
+        <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Classe Gerencial *</label>
+            <select
+                value={value}
+                onChange={e => onChange(e.target.value)}
+                disabled={!hasDepartment || options.length === 0}
+                required
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+            >
+                <option value="">Selecione</option>
+                {options.map(m => (
+                    <option key={m.id} value={m.id}>
+                        {m.code} · {m.name}{m.cost_center ? ` (CC ${m.cost_center.code})` : ''}
+                    </option>
+                ))}
+            </select>
+            {helper && <p className="mt-1 text-xs text-gray-500">{helper}</p>}
+            {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+        </div>
+    );
+}
+
+/**
+ * Mostra o CC derivado da Classe Gerencial como read-only. Não tem select —
+ * o CC é fixado pela cascata. Se não houver CC vinculado, indica hint.
+ */
+function CostCenterReadonly({ costCenter, error }) {
+    return (
+        <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Centro de Custo</label>
+            <div className="w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700 min-h-[38px] flex items-center">
+                {costCenter
+                    ? <span><span className="font-mono text-gray-500 mr-2">{costCenter.code}</span>{costCenter.name}</span>
+                    : <span className="text-xs text-gray-400">Derivado da classe gerencial</span>}
+            </div>
             {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
         </div>
     );

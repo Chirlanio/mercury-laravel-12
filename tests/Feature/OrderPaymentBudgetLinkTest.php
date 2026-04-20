@@ -301,4 +301,90 @@ class OrderPaymentBudgetLinkTest extends TestCase
 
         $response->assertJsonPath('accounting_classes.0.realized_total', 0);
     }
+
+    // ------------------------------------------------------------------
+    // Cascata Área → Gerencial: auto-derive cost_center_id da ManagementClass
+    // ------------------------------------------------------------------
+
+    public function test_store_derives_cost_center_id_from_management_class(): void
+    {
+        // MC já tem cost_center_id vinculado no setUp — envia só a MC e espera
+        // o CC ser derivado pelo controller
+        $mc = ManagementClass::create([
+            'code' => 'MC-CASCADE', 'name' => 'Cascade test',
+            'accepts_entries' => true,
+            'cost_center_id' => $this->cc->id,
+            'is_active' => true,
+            'created_by_user_id' => $this->adminUser->id,
+        ]);
+
+        $this->actingAs($this->adminUser)
+            ->post(route('order-payments.store'), [
+                ...$this->basePayload(),
+                'management_class_id' => $mc->id,
+                'accounting_class_id' => $this->ac->id,
+                // cost_center_id NÃO enviado — deve vir da MC
+            ])
+            ->assertRedirect();
+
+        $op = OrderPayment::latest('id')->first();
+        $this->assertEquals($this->cc->id, $op->cost_center_id);
+        $this->assertEquals($mc->id, $op->management_class_id);
+        // Budget_item também deve bater porque CC foi derivado corretamente
+        $this->assertEquals($this->itemTelefonia2026->id, $op->budget_item_id);
+    }
+
+    public function test_management_class_overrides_explicit_cost_center_id(): void
+    {
+        // Quando os dois vêm no payload e divergem, MC é a fonte autoritária
+        $mc = ManagementClass::create([
+            'code' => 'MC-OVERRIDE', 'name' => 'Override test',
+            'accepts_entries' => true,
+            'cost_center_id' => $this->cc->id,  // MC aponta para $this->cc
+            'is_active' => true,
+            'created_by_user_id' => $this->adminUser->id,
+        ]);
+
+        $this->actingAs($this->adminUser)
+            ->post(route('order-payments.store'), [
+                ...$this->basePayload(),
+                'management_class_id' => $mc->id,
+                'cost_center_id' => $this->ccOutro->id, // divergente → é sobrescrito
+                'accounting_class_id' => $this->ac->id,
+            ])
+            ->assertRedirect();
+
+        $op = OrderPayment::latest('id')->first();
+        $this->assertEquals($this->cc->id, $op->cost_center_id);
+    }
+
+    public function test_endpoint_departments_returns_synthetic_parents_with_analytical_children(): void
+    {
+        // Seed real já populou 11 departamentos sintéticos 8.1.01..8.1.11
+        $response = $this->actingAs($this->adminUser)
+            ->getJson(route('management-classes.departments'));
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'departments' => [
+                ['id', 'code', 'name', 'classes' => [['id', 'code', 'name', 'cost_center']]],
+            ],
+        ]);
+
+        $departments = $response->json('departments');
+        $this->assertGreaterThanOrEqual(11, count($departments));
+
+        // Todos devem ter código no padrão 8.1.XX (6 chars)
+        foreach ($departments as $d) {
+            $this->assertMatchesRegularExpression('/^8\.1\.\d{2}$/', $d['code']);
+        }
+
+        // Marketing (8.1.01) deve ter analíticas com CC vinculado
+        $marketing = collect($departments)->firstWhere('code', '8.1.01');
+        $this->assertNotNull($marketing);
+        $this->assertNotEmpty($marketing['classes']);
+        // Pelo menos uma analítica deve ter cost_center não-null
+        $withCc = collect($marketing['classes'])->filter(fn ($c) => $c['cost_center'] !== null);
+        $this->assertGreaterThan(0, $withCc->count());
+    }
 }
