@@ -22,6 +22,7 @@ class OrderPayment extends Model
         'purchase_order_id',
         'store_id',
         'manager_id',
+        'management_reason_id',
         'description',
         'total_value',
         'date_payment',

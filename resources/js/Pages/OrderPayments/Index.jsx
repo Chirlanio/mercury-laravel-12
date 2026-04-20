@@ -809,7 +809,7 @@ function EditModal({ order, installments: installmentProps = [], allocations: al
         date_payment: order.date_payment_iso || '',
         competence_date: order.competence_date || '',
         manager_id: order.manager_id || '',
-        management_reason_id: '',
+        management_reason_id: order.management_reason_id || '',
         supplier_id: order.supplier_id || '',
         total_value: decimalToMoneyBR(order.total_value),
         number_nf: order.number_nf || '',
