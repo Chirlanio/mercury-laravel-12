@@ -180,11 +180,11 @@ export default function DataTable({
                                     className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
                                         column.sortable ? 'cursor-pointer hover:bg-gray-100 select-none' : ''
                                     }`}
-                                    onClick={() => column.sortable && handleSort(column.field)}
+                                    onClick={() => column.sortable && handleSort(column.field ?? column.key)}
                                 >
                                     <div className="flex items-center space-x-1">
                                         <span>{column.label}</span>
-                                        {column.sortable && getSortIcon(column.field)}
+                                        {column.sortable && getSortIcon(column.field ?? column.key)}
                                     </div>
                                 </th>
                             ))}
@@ -216,9 +216,9 @@ export default function DataTable({
                                         >
                                             {column.render
                                                 ? column.render(row, rowIndex)
-                                                : isDateTimeField(column.field)
-                                                    ? formatDateTime(row[column.field])
-                                                    : row[column.field] || '-'
+                                                : isDateTimeField(column.field ?? column.key)
+                                                    ? formatDateTime(row[column.field ?? column.key])
+                                                    : row[column.field ?? column.key] || '-'
                                             }
                                         </td>
                                     ))}

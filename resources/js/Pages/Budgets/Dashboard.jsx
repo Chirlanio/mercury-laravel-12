@@ -21,10 +21,9 @@ import {
     CartesianGrid,
     Cell,
 } from 'recharts';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import Button from '@/Components/Button';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import StatusBadge from '@/Components/Shared/StatusBadge';
+import EmptyState from '@/Components/Shared/EmptyState';
 
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -100,7 +99,7 @@ export default function Dashboard({ budget, consumption }) {
     ], [consumption, statusCounts]);
 
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title={`Dashboard — ${budget?.scope_label || 'Orçamento'}`} />
 
             <div className="py-8">
@@ -118,21 +117,19 @@ export default function Dashboard({ budget, consumption }) {
                                 Dashboard de Consumo
                             </h1>
                             <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-700">
-                                <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-800 px-2.5 py-1 rounded">
-                                    <TagIcon className="w-4 h-4" />
+                                <StatusBadge variant="indigo" icon={TagIcon}>
                                     {budget?.scope_label}
-                                </span>
-                                <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 px-2.5 py-1 rounded">
-                                    <CalendarIcon className="w-4 h-4" />
+                                </StatusBadge>
+                                <StatusBadge variant="gray" icon={CalendarIcon}>
                                     {budget?.year}
-                                </span>
-                                <span className="font-mono text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                </StatusBadge>
+                                <StatusBadge variant="gray" className="font-mono">
                                     v{budget?.version_label}
-                                </span>
+                                </StatusBadge>
                                 {budget?.is_active ? (
-                                    <StatusBadge status="success" text="Ativo" />
+                                    <StatusBadge variant="success">Ativo</StatusBadge>
                                 ) : (
-                                    <StatusBadge status="gray" text="Inativo" />
+                                    <StatusBadge variant="gray">Inativo</StatusBadge>
                                 )}
                             </div>
                         </div>
@@ -142,28 +139,39 @@ export default function Dashboard({ budget, consumption }) {
 
                     {/* Gráfico previsto × realizado por mês */}
                     <div className="mt-6 bg-white shadow-sm rounded-lg p-6">
-                        <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                            Previsto × Realizado por mês
-                        </h2>
-                        <div className="h-72">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={chartData} margin={{ top: 10, right: 24, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                                    <YAxis
-                                        tick={{ fontSize: 11 }}
-                                        tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
-                                    />
-                                    <Tooltip
-                                        formatter={(value) => BRL.format(value)}
-                                        contentStyle={{ fontSize: 12, borderRadius: 4 }}
-                                    />
-                                    <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
-                                    <Bar dataKey="previsto" name="Previsto" fill="#6366f1" radius={[3, 3, 0, 0]} />
-                                    <Bar dataKey="realizado" name="Realizado" fill="#f59e0b" radius={[3, 3, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
+                        <div className="flex items-center gap-2 mb-4">
+                            <ChartBarIcon className="h-5 w-5 text-indigo-600" />
+                            <h2 className="text-lg font-semibold text-gray-900">
+                                Previsto × Realizado por mês
+                            </h2>
                         </div>
+                        {chartData.length === 0 ? (
+                            <EmptyState
+                                title="Sem dados para exibir"
+                                description="Este orçamento ainda não tem valores mensais registrados."
+                                compact
+                            />
+                        ) : (
+                            <div className="h-72">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={chartData} margin={{ top: 10, right: 24, left: 0, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                                        <YAxis
+                                            tick={{ fontSize: 11 }}
+                                            tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
+                                        />
+                                        <Tooltip
+                                            formatter={(value) => BRL.format(value)}
+                                            contentStyle={{ fontSize: 12, borderRadius: 4 }}
+                                        />
+                                        <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+                                        <Bar dataKey="previsto" name="Previsto" fill="#6366f1" radius={[3, 3, 0, 0]} />
+                                        <Bar dataKey="realizado" name="Realizado" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
                     </div>
 
                     {/* Tabs */}
@@ -208,16 +216,18 @@ export default function Dashboard({ budget, consumption }) {
                     </div>
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }
 
 function AggregationTable({ rows, dimensionLabel, showItemsCount }) {
     if (rows.length === 0) {
         return (
-            <p className="text-center text-sm text-gray-500 py-8">
-                Nenhum dado para exibir neste orçamento.
-            </p>
+            <EmptyState
+                title="Sem dados para exibir"
+                description="Nenhuma agregação disponível neste orçamento."
+                compact
+            />
         );
     }
 
@@ -283,9 +293,11 @@ function AggregationTable({ rows, dimensionLabel, showItemsCount }) {
 function ItemsTable({ rows }) {
     if (rows.length === 0) {
         return (
-            <p className="text-center text-sm text-gray-500 py-8">
-                Nenhuma linha cadastrada neste orçamento.
-            </p>
+            <EmptyState
+                title="Sem linhas cadastradas"
+                description="Este orçamento ainda não tem itens."
+                compact
+            />
         );
     }
 
