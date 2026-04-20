@@ -18,6 +18,16 @@ import DashboardCharts from '@/Components/OrderPayments/DashboardCharts';
 import DetailModal from '@/Components/OrderPayments/DetailModal';
 import StandardModal from '@/Components/StandardModal';
 
+// Mirror da OrderPayment::VALID_TRANSITIONS (PHP) — define quais drops
+// são aceitos no Kanban. Transições inválidas rejeitam visualmente sem
+// fazer request.
+const VALID_TRANSITIONS = {
+    backlog: ['doing'],
+    doing: ['backlog', 'waiting'],
+    waiting: ['doing', 'done'],
+    done: ['waiting'],
+};
+
 const STATUS_COLORS = {
     backlog: { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-300', header: 'bg-gray-600' },
     doing:   { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300', header: 'bg-blue-600' },
@@ -79,6 +89,51 @@ export default function Index({
     const openTransitionModal = (order, newSt) => {
         setTransitionError('');
         openModal('transition', { order, newStatus: newSt });
+    };
+
+    // Drag & drop state — controlado no pai para permitir feedback visual
+    // sincronizado entre todas as colunas (coluna origem escurece o card,
+    // coluna destino destaca o drop zone).
+    const [draggedOrder, setDraggedOrder] = useState(null);
+    const [dragOverStatus, setDragOverStatus] = useState(null);
+
+    const canDropTo = (fromStatus, toStatus) => {
+        if (!fromStatus || fromStatus === toStatus) return false;
+        return (VALID_TRANSITIONS[fromStatus] || []).includes(toStatus);
+    };
+
+    const handleDragStart = (order) => {
+        setDraggedOrder(order);
+    };
+
+    const handleDragEnd = () => {
+        setDraggedOrder(null);
+        setDragOverStatus(null);
+    };
+
+    const handleDragOver = (e, status) => {
+        if (!draggedOrder) return;
+        e.preventDefault(); // necessário para permitir drop
+        if (canDropTo(draggedOrder.status, status)) {
+            e.dataTransfer.dropEffect = 'move';
+            if (dragOverStatus !== status) setDragOverStatus(status);
+        } else {
+            e.dataTransfer.dropEffect = 'none';
+        }
+    };
+
+    const handleDrop = (e, status) => {
+        e.preventDefault();
+        if (draggedOrder && canDropTo(draggedOrder.status, status)) {
+            const order = draggedOrder;
+            // Reseta drag state antes de abrir modal para não atrapalhar
+            // cliques subsequentes dentro do modal.
+            setDraggedOrder(null);
+            setDragOverStatus(null);
+            openTransitionModal(order, status);
+        } else {
+            handleDragEnd();
+        }
     };
 
     const statisticsCards = Object.entries(kanbanData).map(([status, data]) => ({
@@ -157,7 +212,11 @@ export default function Index({
                     {viewMode === 'kanban' && (
                         <KanbanBoard statusOptions={statusOptions} kanbanData={kanbanData}
                             kanbanCards={kanbanCards} canEdit={canEdit} onTransition={openTransitionModal}
-                            onDetail={(id) => setDetailOrderId(id)} />
+                            onDetail={(id) => setDetailOrderId(id)}
+                            draggedOrder={draggedOrder} dragOverStatus={dragOverStatus}
+                            onDragStart={handleDragStart} onDragEnd={handleDragEnd}
+                            onDragOver={handleDragOver} onDrop={handleDrop}
+                            canDropTo={canDropTo} />
                     )}
 
                     {/* Table */}
@@ -752,11 +811,26 @@ function TransitionModal({ data, statusOptions, selects, error, setError, onClos
 // ============================================================
 // KANBAN BOARD
 // ============================================================
-function KanbanBoard({ statusOptions, kanbanData, kanbanCards, canEdit, onTransition, onDetail }) {
+function KanbanBoard({ statusOptions, kanbanData, kanbanCards, canEdit, onTransition, onDetail,
+    draggedOrder, dragOverStatus, onDragStart, onDragEnd, onDragOver, onDrop, canDropTo }) {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {Object.entries(statusOptions).map(([status, label]) => (
-                <div key={status} className="bg-white rounded-lg shadow overflow-hidden flex flex-col">
+            {Object.entries(statusOptions).map(([status, label]) => {
+                // Feedback visual da coluna durante o drag
+                const isDropTarget = dragOverStatus === status;
+                const isInvalidHover = draggedOrder && draggedOrder.status === status;
+                const canAcceptDrop = draggedOrder
+                    && typeof canDropTo === 'function'
+                    && canDropTo(draggedOrder.status, status);
+                const showInvalidHint = draggedOrder && !canAcceptDrop && !isInvalidHover;
+
+                return (
+                <div key={status}
+                    onDragOver={onDragOver ? (e) => onDragOver(e, status) : undefined}
+                    onDrop={onDrop ? (e) => onDrop(e, status) : undefined}
+                    className={`bg-white rounded-lg shadow overflow-hidden flex flex-col transition-all
+                        ${isDropTarget ? 'ring-2 ring-indigo-500 ring-offset-2' : ''}
+                        ${showInvalidHint ? 'opacity-60' : ''}`}>
                     <div className={`${STATUS_COLORS[status]?.header} px-4 py-3`}>
                         <div className="flex justify-between items-center">
                             <h3 className="text-sm font-semibold text-white">{label}</h3>
@@ -767,7 +841,12 @@ function KanbanBoard({ statusOptions, kanbanData, kanbanCards, canEdit, onTransi
                     </div>
                     <div className="p-2 space-y-2 flex-1 overflow-y-auto max-h-[600px]">
                         {(kanbanCards[status] || []).map((p) => (
-                            <div key={p.id} className={`border rounded-lg p-3 cursor-pointer ${p.is_overdue ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'} hover:shadow-md transition-shadow`}
+                            <div key={p.id}
+                                draggable={canEdit}
+                                onDragStart={canEdit && onDragStart ? () => onDragStart(p) : undefined}
+                                onDragEnd={canEdit && onDragEnd ? onDragEnd : undefined}
+                                className={`border rounded-lg p-3 ${canEdit ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} ${p.is_overdue ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'} hover:shadow-md transition-all
+                                    ${draggedOrder?.id === p.id ? 'opacity-40 scale-95' : ''}`}
                                 onClick={() => onDetail(p.id)}>
                                 <div className="flex justify-between items-start mb-1">
                                     <span className="text-xs font-bold text-gray-500">#{p.id}</span>
@@ -801,7 +880,8 @@ function KanbanBoard({ statusOptions, kanbanData, kanbanCards, canEdit, onTransi
                         {(kanbanCards[status] || []).length === 0 && <p className="text-center text-gray-400 text-sm py-8">Nenhuma ordem</p>}
                     </div>
                 </div>
-            ))}
+            );
+            })}
         </div>
     );
 }
