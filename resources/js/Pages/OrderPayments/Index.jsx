@@ -1,4 +1,4 @@
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     PlusIcon, XMarkIcon, MagnifyingGlassIcon, Squares2X2Icon, TableCellsIcon,
     ArrowRightIcon, ArrowLeftIcon, BookmarkIcon, DocumentCheckIcon,
@@ -15,7 +15,6 @@ import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
-import DashboardCharts from '@/Components/OrderPayments/DashboardCharts';
 import DetailModal from '@/Components/OrderPayments/DetailModal';
 import StandardModal from '@/Components/StandardModal';
 
@@ -73,7 +72,7 @@ export default function Index({
     const canCreate = hasPermission(PERMISSIONS.CREATE_ORDER_PAYMENTS);
     const canEdit = hasPermission(PERMISSIONS.EDIT_ORDER_PAYMENTS);
 
-    const { modals, selected, openModal, closeModal } = useModalManager(['create', 'transition', 'dashboard']);
+    const { modals, selected, openModal, closeModal } = useModalManager(['create', 'transition']);
     const [search, setSearch] = useState(filters.search || '');
     const [statusFilter, setStatusFilter] = useState(filters.status || '');
     const [storeFilter, setStoreFilter] = useState(filters.store_id || '');
@@ -189,14 +188,15 @@ export default function Index({
                             </div>
                             <div className="flex items-center space-x-3">
                                 <ViewToggle viewMode={viewMode} setViewMode={setViewMode} />
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => openModal('dashboard')}
-                                    icon={ChartBarIcon}
-                                    iconOnly
-                                    title="Dashboard"
-                                />
+                                <Link href={route('order-payments.dashboard')}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        icon={ChartBarIcon}
+                                        iconOnly
+                                        title="Dashboard"
+                                    />
+                                </Link>
                                 <Button
                                     variant="outline"
                                     size="sm"
@@ -265,10 +265,6 @@ export default function Index({
                     onClose={() => closeModal('transition')} />
             )}
 
-            {/* Dashboard Charts */}
-            <DashboardCharts show={modals.dashboard} onClose={() => closeModal('dashboard')}
-                statisticsUrl={route('order-payments.statistics')}
-                dashboardUrl={route('order-payments.dashboard')} />
 
             {/* Detail Modal */}
             <DetailModal orderId={detailOrderId}

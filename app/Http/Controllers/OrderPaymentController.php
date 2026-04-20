@@ -647,6 +647,42 @@ class OrderPaymentController extends Controller
      */
     public function statistics(Request $request)
     {
+        return response()->json($this->buildStatisticsPayload());
+    }
+
+    /**
+     * Export order payments to Excel
+     */
+    public function export(Request $request)
+    {
+        $filters = $request->only(['search', 'status', 'store_id', 'date_from', 'date_to']);
+        $filename = 'ordens_pagamento_'.now()->format('Y-m-d_His').'.xlsx';
+
+        return Excel::download(new OrderPaymentExport($filters), $filename);
+    }
+
+    /**
+     * Dashboard — página Inertia com gráficos de ordens de pagamento.
+     *
+     * Agrega estatísticas KPI + analytics (por área, por fornecedor, por mês)
+     * num único payload para a view Pages/OrderPayments/Dashboard.jsx. Antes
+     * era um JSON consumido por modal; agora é página dedicada com URL própria,
+     * seguindo o padrão do Reversals/Returns/PurchaseOrders dashboards.
+     */
+    public function dashboard(Request $request)
+    {
+        return Inertia::render('OrderPayments/Dashboard', [
+            'statistics' => $this->buildStatisticsPayload(),
+            'analytics' => $this->buildAnalyticsPayload(),
+        ]);
+    }
+
+    /**
+     * Payload de estatísticas (KPIs agregados). Também consumido pelo endpoint
+     * /order-payments/statistics via JSON para backwards compat.
+     */
+    protected function buildStatisticsPayload(): array
+    {
         // Totals by status
         $byStatus = [];
         foreach (OrderPayment::STATUS_LABELS as $status => $label) {
@@ -658,11 +694,9 @@ class OrderPaymentController extends Controller
             ];
         }
 
-        // Overdue
         $overdueCount = OrderPayment::overdue()->count();
         $overdueTotal = round(OrderPayment::overdue()->sum('total_value'), 2);
 
-        // Monthly totals (last 6 months)
         $monthlyFlow = [];
         for ($i = 5; $i >= 0; $i--) {
             $date = now()->subMonths($i);
@@ -678,7 +712,6 @@ class OrderPaymentController extends Controller
             ];
         }
 
-        // Installment summary
         $installmentSummary = [
             'overdue' => OrderPaymentInstallment::where('is_paid', false)
                 ->where('date_payment', '<', today())->count(),
@@ -687,29 +720,19 @@ class OrderPaymentController extends Controller
             'paid' => OrderPaymentInstallment::where('is_paid', true)->count(),
         ];
 
-        return response()->json([
+        return [
             'by_status' => $byStatus,
             'overdue' => ['count' => $overdueCount, 'total' => $overdueTotal],
             'monthly_flow' => $monthlyFlow,
             'installments' => $installmentSummary,
-        ]);
+        ];
     }
 
     /**
-     * Export order payments to Excel
+     * Payload de analytics (agregações por dimensão). Gráficos da página
+     * dashboard (por área, por fornecedor, evolução mensal 12 meses).
      */
-    public function export(Request $request)
-    {
-        $filters = $request->only(['search', 'status', 'store_id', 'date_from', 'date_to']);
-        $filename = 'ordens_pagamento_'.now()->format('Y-m-d_His').'.xlsx';
-
-        return Excel::download(new OrderPaymentExport($filters), $filename);
-    }
-
-    /**
-     * Dashboard analytics data (by area, by supplier, by month)
-     */
-    public function dashboard(Request $request)
+    protected function buildAnalyticsPayload(): array
     {
         // By area (sector)
         $byArea = OrderPayment::active()
@@ -764,11 +787,11 @@ class OrderPaymentController extends Controller
             ];
         }
 
-        return response()->json([
+        return [
             'by_area' => $byArea,
             'by_supplier' => $bySupplier,
             'monthly_detailed' => $monthlyDetailed,
-        ]);
+        ];
     }
 
     // ==========================================
