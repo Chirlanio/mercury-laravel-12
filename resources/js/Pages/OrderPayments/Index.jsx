@@ -376,7 +376,10 @@ function CreateModal({ selects, onClose }) {
                 percentage: parseFloat(a.percentage) || 0,
             })),
         };
-        form.transform(() => submitData).post(route('order-payments.store'), {
+        // transform() em algumas versões do Inertia retorna void em vez de
+        // encadear o form — separar em duas chamadas é resiliente.
+        form.transform(() => submitData);
+        form.post(route('order-payments.store'), {
             onSuccess: () => onClose(),
         });
     };
