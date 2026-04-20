@@ -18,7 +18,6 @@ import {
     ChevronRightIcon,
     ChevronDownIcon,
 } from '@heroicons/react/24/outline';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
 import Button from '@/Components/Button';
@@ -27,6 +26,9 @@ import DataTable from '@/Components/DataTable';
 import StandardModal from '@/Components/StandardModal';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import StatusBadge from '@/Components/Shared/StatusBadge';
+import TextInput from '@/Components/TextInput';
+import InputLabel from '@/Components/InputLabel';
+import InputError from '@/Components/InputError';
 
 export default function Index({ managementClasses, filters = {}, statistics = {}, selects = {} }) {
     const { hasPermission } = usePermissions();
@@ -295,10 +297,9 @@ export default function Index({ managementClasses, filters = {}, statistics = {}
             key: 'is_active',
             label: 'Status',
             render: (c) => (
-                <StatusBadge
-                    status={c.is_active ? 'success' : 'gray'}
-                    text={c.is_active ? 'Ativa' : 'Inativa'}
-                />
+                <StatusBadge variant={c.is_active ? 'success' : 'gray'}>
+                    {c.is_active ? 'Ativa' : 'Inativa'}
+                </StatusBadge>
             ),
         },
         {
@@ -315,7 +316,7 @@ export default function Index({ managementClasses, filters = {}, statistics = {}
     ];
 
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="Plano Gerencial" />
 
             <div className="py-12">
@@ -388,17 +389,16 @@ export default function Index({ managementClasses, filters = {}, statistics = {}
 
                         {viewMode === 'list' && (
                             <div className="flex items-center gap-2 flex-wrap">
-                                <input
-                                    type="text"
+                                <TextInput
                                     value={filters.search || ''}
                                     onChange={(e) => applyFilter('search', e.target.value)}
                                     placeholder="Buscar..."
-                                    className="rounded-md border-gray-300 shadow-sm text-sm w-56"
+                                    className="text-sm w-56"
                                 />
                                 <select
                                     value={filters.accepts_entries ?? ''}
                                     onChange={(e) => applyFilter('accepts_entries', e.target.value)}
-                                    className="rounded-md border-gray-300 shadow-sm text-sm"
+                                    className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
                                 >
                                     <option value="">Todos tipos</option>
                                     <option value="1">Folhas (analíticas)</option>
@@ -407,7 +407,7 @@ export default function Index({ managementClasses, filters = {}, statistics = {}
                                 <select
                                     value={filters.is_active ?? ''}
                                     onChange={(e) => applyFilter('is_active', e.target.value)}
-                                    className="rounded-md border-gray-300 shadow-sm text-sm"
+                                    className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
                                 >
                                     <option value="">Todos status</option>
                                     <option value="1">Ativas</option>
@@ -448,7 +448,7 @@ export default function Index({ managementClasses, filters = {}, statistics = {}
                 onClose={() => closeModal('create')}
                 title="Nova Conta Gerencial"
                 headerColor="bg-indigo-600"
-                headerIcon={PlusIcon}
+                headerIcon={<PlusIcon className="h-6 w-6" />}
                 maxWidth="3xl"
                 onSubmit={handleCreateSubmit}
                 footer={
@@ -580,10 +580,9 @@ export default function Index({ managementClasses, filters = {}, statistics = {}
                                                     <span className="ml-2 text-xs text-gray-400">(grupo)</span>
                                                 )}
                                             </div>
-                                            <StatusBadge
-                                                status={c.is_active ? 'success' : 'gray'}
-                                                text={c.is_active ? 'Ativa' : 'Inativa'}
-                                            />
+                                            <StatusBadge variant={c.is_active ? 'success' : 'gray'}>
+                                                {c.is_active ? 'Ativa' : 'Inativa'}
+                                            </StatusBadge>
                                         </li>
                                     ))}
                                 </ul>
@@ -600,7 +599,7 @@ export default function Index({ managementClasses, filters = {}, statistics = {}
                 title="Excluir conta gerencial"
                 subtitle={deleteTarget ? `${deleteTarget.code} · ${deleteTarget.name}` : ''}
                 headerColor="bg-red-600"
-                headerIcon={ExclamationTriangleIcon}
+                headerIcon={<ExclamationTriangleIcon className="h-6 w-6" />}
                 maxWidth="md"
                 footer={
                     <StandardModal.Footer
@@ -621,15 +620,12 @@ export default function Index({ managementClasses, filters = {}, statistics = {}
                         </p>
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Motivo da exclusão *
-                        </label>
-                        <input
-                            type="text"
+                        <InputLabel value="Motivo da exclusão *" className="mb-1 text-xs" />
+                        <TextInput
+                            className="w-full text-sm"
                             value={deleteReason}
                             onChange={(e) => setDeleteReason(e.target.value)}
                             placeholder="Mínimo 3 caracteres"
-                            className="w-full rounded-md border-gray-300 shadow-sm text-sm"
                         />
                     </div>
                 </div>
@@ -641,7 +637,7 @@ export default function Index({ managementClasses, filters = {}, statistics = {}
                 onClose={() => closeModal('import')}
                 title="Importar Plano Gerencial"
                 headerColor="bg-emerald-600"
-                headerIcon={DocumentArrowUpIcon}
+                headerIcon={<DocumentArrowUpIcon className="h-6 w-6" />}
                 maxWidth="4xl"
                 footer={(
                     <div className="flex justify-between items-center w-full">
@@ -755,7 +751,7 @@ export default function Index({ managementClasses, filters = {}, statistics = {}
                     </>
                 )}
             </StandardModal>
-        </AuthenticatedLayout>
+        </>
     );
 }
 
@@ -837,35 +833,33 @@ function ManagementClassFormFields({ form, errors, onChange, parents, accounting
             <StandardModal.Section title="Dados básicos">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Código *</label>
-                        <input
-                            type="text"
+                        <InputLabel value="Código *" className="mb-1" />
+                        <TextInput
+                            className="w-full font-mono"
                             value={form.code || ''}
                             onChange={(e) => onChange({ code: e.target.value })}
                             maxLength={30}
-                            className="w-full rounded-md border-gray-300 shadow-sm font-mono"
                         />
-                        {errors.code && <p className="mt-1 text-xs text-red-600">{errors.code}</p>}
+                        <InputError message={errors.code} className="mt-1 text-xs" />
                     </div>
                     <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
-                        <input
-                            type="text"
+                        <InputLabel value="Nome *" className="mb-1" />
+                        <TextInput
+                            className="w-full"
                             value={form.name || ''}
                             onChange={(e) => onChange({ name: e.target.value })}
-                            className="w-full rounded-md border-gray-300 shadow-sm"
                         />
-                        {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
+                        <InputError message={errors.name} className="mt-1 text-xs" />
                     </div>
                 </div>
 
                 <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                    <InputLabel value="Descrição" className="mb-1" />
                     <textarea
                         value={form.description || ''}
                         onChange={(e) => onChange({ description: e.target.value })}
                         rows={2}
-                        className="w-full rounded-md border-gray-300 shadow-sm"
+                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     />
                 </div>
             </StandardModal.Section>
@@ -873,13 +867,11 @@ function ManagementClassFormFields({ form, errors, onChange, parents, accounting
             <StandardModal.Section title="Vínculos opcionais">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Conta contábil vinculada
-                        </label>
+                        <InputLabel value="Conta contábil vinculada" className="mb-1" />
                         <select
                             value={form.accounting_class_id || ''}
                             onChange={(e) => onChange({ accounting_class_id: e.target.value })}
-                            className="w-full rounded-md border-gray-300 shadow-sm"
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         >
                             <option value="">— Não vinculada —</option>
                             {accountingClasses.map((a) => (
@@ -892,19 +884,15 @@ function ManagementClassFormFields({ form, errors, onChange, parents, accounting
                             Apenas contas folhas (analíticas) aparecem aqui. Vínculo opcional no MVP;
                             obrigatório quando o tenant ativar DRE.
                         </p>
-                        {errors.accounting_class_id && (
-                            <p className="mt-1 text-xs text-red-600">{errors.accounting_class_id}</p>
-                        )}
+                        <InputError message={errors.accounting_class_id} className="mt-1 text-xs" />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Centro de custo default
-                        </label>
+                        <InputLabel value="Centro de custo default" className="mb-1" />
                         <select
                             value={form.cost_center_id || ''}
                             onChange={(e) => onChange({ cost_center_id: e.target.value })}
-                            className="w-full rounded-md border-gray-300 shadow-sm"
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         >
                             <option value="">— Sem CC default —</option>
                             {costCenters.map((cc) => (
@@ -917,9 +905,7 @@ function ManagementClassFormFields({ form, errors, onChange, parents, accounting
                             Usado quando uma linha do orçamento vem só com a conta gerencial —
                             o sistema usa este CC como default.
                         </p>
-                        {errors.cost_center_id && (
-                            <p className="mt-1 text-xs text-red-600">{errors.cost_center_id}</p>
-                        )}
+                        <InputError message={errors.cost_center_id} className="mt-1 text-xs" />
                     </div>
                 </div>
             </StandardModal.Section>
@@ -927,13 +913,11 @@ function ManagementClassFormFields({ form, errors, onChange, parents, accounting
             <StandardModal.Section title="Hierarquia e tipo">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Conta pai (apenas grupos sintéticos)
-                        </label>
+                        <InputLabel value="Conta pai (apenas grupos sintéticos)" className="mb-1" />
                         <select
                             value={form.parent_id || ''}
                             onChange={(e) => onChange({ parent_id: e.target.value })}
-                            className="w-full rounded-md border-gray-300 shadow-sm"
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         >
                             <option value="">— Raiz (sem pai) —</option>
                             {parents.map((p) => (
@@ -942,19 +926,17 @@ function ManagementClassFormFields({ form, errors, onChange, parents, accounting
                                 </option>
                             ))}
                         </select>
-                        {errors.parent_id && (
-                            <p className="mt-1 text-xs text-red-600">{errors.parent_id}</p>
-                        )}
+                        <InputError message={errors.parent_id} className="mt-1 text-xs" />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Ordem</label>
-                        <input
+                        <InputLabel value="Ordem" className="mb-1" />
+                        <TextInput
                             type="number"
                             min="0"
+                            className="w-full"
                             value={form.sort_order || 0}
                             onChange={(e) => onChange({ sort_order: parseInt(e.target.value) || 0 })}
-                            className="w-full rounded-md border-gray-300 shadow-sm"
                         />
                     </div>
                 </div>
@@ -975,9 +957,7 @@ function ManagementClassFormFields({ form, errors, onChange, parents, accounting
                         </span>
                     </label>
                 </div>
-                {errors.accepts_entries && (
-                    <p className="mt-1 text-xs text-red-600">{errors.accepts_entries}</p>
-                )}
+                <InputError message={errors.accepts_entries} className="mt-1 text-xs" />
 
                 <div className="mt-4 flex items-center">
                     <input
@@ -987,7 +967,7 @@ function ManagementClassFormFields({ form, errors, onChange, parents, accounting
                         onChange={(e) => onChange({ is_active: e.target.checked })}
                         className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                     />
-                    <label htmlFor="is_active" className="ml-2 text-sm text-gray-700">Ativa</label>
+                    <InputLabel htmlFor="is_active" value="Ativa" className="ml-2" />
                 </div>
             </StandardModal.Section>
         </>

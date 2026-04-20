@@ -16,7 +16,6 @@ import {
     ChevronRightIcon,
     ChevronDownIcon,
 } from '@heroicons/react/24/outline';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
 import Button from '@/Components/Button';
@@ -25,6 +24,9 @@ import DataTable from '@/Components/DataTable';
 import StandardModal from '@/Components/StandardModal';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import StatusBadge from '@/Components/Shared/StatusBadge';
+import TextInput from '@/Components/TextInput';
+import InputLabel from '@/Components/InputLabel';
+import InputError from '@/Components/InputError';
 
 const DRE_GROUP_COLORS = {
     receita_bruta: 'bg-green-100 text-green-800 border-green-200',
@@ -339,10 +341,9 @@ export default function Index({ accountingClasses, filters = {}, statistics = {}
             key: 'is_active',
             label: 'Status',
             render: (c) => (
-                <StatusBadge
-                    status={c.is_active ? 'success' : 'gray'}
-                    text={c.is_active ? 'Ativa' : 'Inativa'}
-                />
+                <StatusBadge variant={c.is_active ? 'success' : 'gray'}>
+                    {c.is_active ? 'Ativa' : 'Inativa'}
+                </StatusBadge>
             ),
         },
         {
@@ -359,7 +360,7 @@ export default function Index({ accountingClasses, filters = {}, statistics = {}
     ];
 
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="Plano de Contas" />
 
             <div className="py-12">
@@ -432,17 +433,16 @@ export default function Index({ accountingClasses, filters = {}, statistics = {}
 
                         {viewMode === 'list' && (
                             <div className="flex items-center gap-2 flex-wrap">
-                                <input
-                                    type="text"
+                                <TextInput
                                     value={filters.search || ''}
                                     onChange={(e) => applyFilter('search', e.target.value)}
                                     placeholder="Buscar por código ou nome..."
-                                    className="rounded-md border-gray-300 shadow-sm text-sm w-64"
+                                    className="text-sm w-64"
                                 />
                                 <select
                                     value={filters.dre_group || ''}
                                     onChange={(e) => applyFilter('dre_group', e.target.value)}
-                                    className="rounded-md border-gray-300 shadow-sm text-sm"
+                                    className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
                                 >
                                     <option value="">Todos os grupos</option>
                                     {Object.entries(enums.dreGroups || {}).map(([k, v]) => (
@@ -452,7 +452,7 @@ export default function Index({ accountingClasses, filters = {}, statistics = {}
                                 <select
                                     value={filters.nature || ''}
                                     onChange={(e) => applyFilter('nature', e.target.value)}
-                                    className="rounded-md border-gray-300 shadow-sm text-sm"
+                                    className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
                                 >
                                     <option value="">Ambas naturezas</option>
                                     {Object.entries(enums.natures || {}).map(([k, v]) => (
@@ -494,7 +494,7 @@ export default function Index({ accountingClasses, filters = {}, statistics = {}
                 onClose={() => closeModal('create')}
                 title="Nova Conta Contábil"
                 headerColor="bg-indigo-600"
-                headerIcon={PlusIcon}
+                headerIcon={<PlusIcon className="h-6 w-6" />}
                 maxWidth="3xl"
                 onSubmit={handleCreateSubmit}
                 footer={
@@ -631,10 +631,9 @@ export default function Index({ accountingClasses, filters = {}, statistics = {}
                                                     <span className="ml-2 text-xs text-gray-400">(grupo)</span>
                                                 )}
                                             </div>
-                                            <StatusBadge
-                                                status={c.is_active ? 'success' : 'gray'}
-                                                text={c.is_active ? 'Ativa' : 'Inativa'}
-                                            />
+                                            <StatusBadge variant={c.is_active ? 'success' : 'gray'}>
+                                                {c.is_active ? 'Ativa' : 'Inativa'}
+                                            </StatusBadge>
                                         </li>
                                     ))}
                                 </ul>
@@ -651,7 +650,7 @@ export default function Index({ accountingClasses, filters = {}, statistics = {}
                 title="Excluir conta contábil"
                 subtitle={deleteTarget ? `${deleteTarget.code} · ${deleteTarget.name}` : ''}
                 headerColor="bg-red-600"
-                headerIcon={ExclamationTriangleIcon}
+                headerIcon={<ExclamationTriangleIcon className="h-6 w-6" />}
                 maxWidth="md"
                 footer={
                     <StandardModal.Footer
@@ -673,15 +672,12 @@ export default function Index({ accountingClasses, filters = {}, statistics = {}
                         </p>
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Motivo da exclusão *
-                        </label>
-                        <input
-                            type="text"
+                        <InputLabel value="Motivo da exclusão *" className="mb-1 text-xs" />
+                        <TextInput
+                            className="w-full text-sm"
                             value={deleteReason}
                             onChange={(e) => setDeleteReason(e.target.value)}
                             placeholder="Mínimo 3 caracteres"
-                            className="w-full rounded-md border-gray-300 shadow-sm text-sm"
                         />
                     </div>
                 </div>
@@ -693,7 +689,7 @@ export default function Index({ accountingClasses, filters = {}, statistics = {}
                 onClose={() => closeModal('import')}
                 title="Importar Plano de Contas"
                 headerColor="bg-emerald-600"
-                headerIcon={DocumentArrowUpIcon}
+                headerIcon={<DocumentArrowUpIcon className="h-6 w-6" />}
                 maxWidth="4xl"
                 footer={(
                     <div className="flex justify-between items-center w-full">
@@ -820,7 +816,7 @@ export default function Index({ accountingClasses, filters = {}, statistics = {}
                     </>
                 )}
             </StandardModal>
-        </AuthenticatedLayout>
+        </>
     );
 }
 
@@ -912,46 +908,34 @@ function AccountingClassFormFields({ form, errors, onChange, parents, enums }) {
             <StandardModal.Section title="Dados básicos">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Código *
-                        </label>
-                        <input
-                            type="text"
+                        <InputLabel value="Código *" className="mb-1" />
+                        <TextInput
+                            className="w-full font-mono"
                             value={form.code || ''}
                             onChange={(e) => onChange({ code: e.target.value })}
                             maxLength={30}
                             placeholder="ex: 3.1.01.001"
-                            className="w-full rounded-md border-gray-300 shadow-sm font-mono"
                         />
-                        {errors.code && (
-                            <p className="mt-1 text-xs text-red-600">{errors.code}</p>
-                        )}
+                        <InputError message={errors.code} className="mt-1 text-xs" />
                     </div>
                     <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Nome *
-                        </label>
-                        <input
-                            type="text"
+                        <InputLabel value="Nome *" className="mb-1" />
+                        <TextInput
+                            className="w-full"
                             value={form.name || ''}
                             onChange={(e) => onChange({ name: e.target.value })}
-                            className="w-full rounded-md border-gray-300 shadow-sm"
                         />
-                        {errors.name && (
-                            <p className="mt-1 text-xs text-red-600">{errors.name}</p>
-                        )}
+                        <InputError message={errors.name} className="mt-1 text-xs" />
                     </div>
                 </div>
 
                 <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Descrição
-                    </label>
+                    <InputLabel value="Descrição" className="mb-1" />
                     <textarea
                         value={form.description || ''}
                         onChange={(e) => onChange({ description: e.target.value })}
                         rows={2}
-                        className="w-full rounded-md border-gray-300 shadow-sm"
+                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     />
                 </div>
             </StandardModal.Section>
@@ -959,39 +943,31 @@ function AccountingClassFormFields({ form, errors, onChange, parents, enums }) {
             <StandardModal.Section title="Classificação contábil">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Natureza *
-                        </label>
+                        <InputLabel value="Natureza *" className="mb-1" />
                         <select
                             value={form.nature || 'debit'}
                             onChange={(e) => onChange({ nature: e.target.value })}
-                            className="w-full rounded-md border-gray-300 shadow-sm"
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         >
                             {Object.entries(enums.natures || {}).map(([k, v]) => (
                                 <option key={k} value={k}>{v}</option>
                             ))}
                         </select>
-                        {errors.nature && (
-                            <p className="mt-1 text-xs text-red-600">{errors.nature}</p>
-                        )}
+                        <InputError message={errors.nature} className="mt-1 text-xs" />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Grupo DRE *
-                        </label>
+                        <InputLabel value="Grupo DRE *" className="mb-1" />
                         <select
                             value={form.dre_group || 'despesas_administrativas'}
                             onChange={(e) => onChange({ dre_group: e.target.value })}
-                            className="w-full rounded-md border-gray-300 shadow-sm"
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         >
                             {Object.entries(enums.dreGroups || {}).map(([k, v]) => (
                                 <option key={k} value={k}>{v}</option>
                             ))}
                         </select>
-                        {errors.dre_group && (
-                            <p className="mt-1 text-xs text-red-600">{errors.dre_group}</p>
-                        )}
+                        <InputError message={errors.dre_group} className="mt-1 text-xs" />
                     </div>
                 </div>
 
@@ -1012,20 +988,16 @@ function AccountingClassFormFields({ form, errors, onChange, parents, enums }) {
                         </span>
                     </label>
                 </div>
-                {errors.accepts_entries && (
-                    <p className="mt-1 text-xs text-red-600">{errors.accepts_entries}</p>
-                )}
+                <InputError message={errors.accepts_entries} className="mt-1 text-xs" />
             </StandardModal.Section>
 
             <StandardModal.Section title="Hierarquia">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Conta pai (apenas grupos sintéticos)
-                    </label>
+                    <InputLabel value="Conta pai (apenas grupos sintéticos)" className="mb-1" />
                     <select
                         value={form.parent_id || ''}
                         onChange={(e) => onChange({ parent_id: e.target.value })}
-                        className="w-full rounded-md border-gray-300 shadow-sm"
+                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     >
                         <option value="">— Raiz (sem pai) —</option>
                         {parents.map((p) => (
@@ -1034,24 +1006,20 @@ function AccountingClassFormFields({ form, errors, onChange, parents, enums }) {
                             </option>
                         ))}
                     </select>
-                    {errors.parent_id && (
-                        <p className="mt-1 text-xs text-red-600">{errors.parent_id}</p>
-                    )}
+                    <InputError message={errors.parent_id} className="mt-1 text-xs" />
                 </div>
             </StandardModal.Section>
 
             <StandardModal.Section title="Organização">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Ordem
-                        </label>
-                        <input
+                        <InputLabel value="Ordem" className="mb-1" />
+                        <TextInput
                             type="number"
                             min="0"
+                            className="w-full"
                             value={form.sort_order || 0}
                             onChange={(e) => onChange({ sort_order: parseInt(e.target.value) || 0 })}
-                            className="w-full rounded-md border-gray-300 shadow-sm"
                         />
                     </div>
 
@@ -1063,9 +1031,7 @@ function AccountingClassFormFields({ form, errors, onChange, parents, enums }) {
                             onChange={(e) => onChange({ is_active: e.target.checked })}
                             className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                         />
-                        <label htmlFor="is_active" className="ml-2 text-sm text-gray-700">
-                            Ativa
-                        </label>
+                        <InputLabel htmlFor="is_active" value="Ativa" className="ml-2" />
                     </div>
                 </div>
             </StandardModal.Section>

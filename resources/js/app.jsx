@@ -10,24 +10,22 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
-// Configure CSRF token for Inertia requests
-router.on('before', (event) => {
-    // Sempre pegar o token mais recente do DOM
-    const token = document.head.querySelector('meta[name="csrf-token"]');
-    if (token) {
-        event.detail.visit.headers = {
-            ...event.detail.visit.headers,
-            'X-CSRF-TOKEN': token.content,
-            'X-Requested-With': 'XMLHttpRequest',
-        };
-    }
-});
+// CSRF: deixe o axios do Inertia anexar X-XSRF-TOKEN do cookie automaticamente.
+// Forçar X-CSRF-TOKEN da meta tag causa 419 quando o token de sessão rotaciona
+// (ex: após regenerateToken no Profile/LGPD ou login em outra aba) — a meta fica
+// stale enquanto o cookie XSRF-TOKEN é mantido em dia pelo browser.
 
-// Handle 419 CSRF token errors
-router.on('error', (event) => {
-    const { detail } = event;
-    if (detail.page && detail.page.status === 419) {
+// Handle 419 CSRF token errors. Inertia v2 dispara `invalid` (não `error`) para
+// respostas não-Inertia como o HTML "Page Expired" do Laravel.
+router.on('invalid', (event) => {
+    const status = event.detail?.response?.status;
+    if (status === 419) {
+        event.preventDefault();
         console.error('CSRF token mismatch. A sessão pode ter expirado.');
+
+        if (document.getElementById('session-expired-modal')) {
+            return;
+        }
 
         // Criar modal personalizado para erro de sessão
         const modalHtml = `

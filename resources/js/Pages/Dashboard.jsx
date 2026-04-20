@@ -1,23 +1,34 @@
-import PageHeader from '@/Components/PageHeader';
-import StatCard from '@/Components/Dashboard/StatCard';
-import SimpleChart from '@/Components/Dashboard/SimpleChart';
 import RecentActivities from '@/Components/Dashboard/RecentActivities';
 import AlertCard from '@/Components/Dashboard/AlertCard';
 import TopUsers from '@/Components/Dashboard/TopUsers';
+import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
+import EmptyState from '@/Components/Shared/EmptyState';
+import {
+    BarChart,
+    Bar,
+    Cell,
+    LineChart,
+    Line,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    ResponsiveContainer,
+} from 'recharts';
 import { Head, Link } from '@inertiajs/react';
+
+const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 import {
     UsersIcon,
     UserPlusIcon,
     ChartBarIcon,
     ClockIcon,
-    CheckCircleIcon,
     WifiIcon,
     CurrencyDollarIcon,
     ArrowsRightLeftIcon,
     ClipboardDocumentCheckIcon,
     BanknotesIcon,
     TruckIcon,
-    ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 
 export default function Dashboard({
@@ -44,28 +55,102 @@ export default function Dashboard({
         return 'Boa noite';
     };
 
+    const calcVariation = (current, previous) => {
+        if (!previous || previous <= 0) return null;
+        return ((current - previous) / previous) * 100;
+    };
+
+    const previousUsersBase =
+        (stats.total_users || 0) - (stats.new_users_this_month || 0);
+
+    const generalCards = [
+        {
+            label: 'Total de Usuários',
+            value: stats.total_users || 0,
+            format: 'number',
+            icon: UsersIcon,
+            color: 'blue',
+            variation: calcVariation(stats.total_users, previousUsersBase),
+        },
+        {
+            label: 'Novos Usuários (Hoje)',
+            value: stats.new_users_today || 0,
+            format: 'number',
+            icon: UserPlusIcon,
+            color: 'green',
+        },
+        {
+            label: 'Atividades (Hoje)',
+            value: activityStats.total_activities_today || 0,
+            format: 'number',
+            icon: ChartBarIcon,
+            color: 'purple',
+        },
+        {
+            label: 'Usuários Online',
+            value: usersOnlineSummary?.online_count ?? 0,
+            format: 'number',
+            icon: WifiIcon,
+            color: 'teal',
+        },
+    ];
+
+    const moduleCards = [
+        salesSummary && {
+            label: 'Vendas do Mês',
+            value: salesSummary.current_month_total || 0,
+            format: 'currency',
+            icon: CurrencyDollarIcon,
+            color: 'green',
+            variation: calcVariation(
+                salesSummary.current_month_total,
+                salesSummary.last_month_total
+            ),
+        },
+        transfersSummary && {
+            label: 'Transferências Pendentes',
+            value: transfersSummary.pending_count || 0,
+            format: 'number',
+            icon: ArrowsRightLeftIcon,
+            color: 'yellow',
+        },
+        stockSummary && {
+            label: 'Ajustes Pendentes',
+            value: stockSummary.pending_count || 0,
+            format: 'number',
+            icon: ClipboardDocumentCheckIcon,
+            color: 'indigo',
+        },
+        paymentsSummary && {
+            label: 'Pagamentos Vencidos',
+            value: paymentsSummary.overdue_count || 0,
+            format: 'number',
+            icon: BanknotesIcon,
+            color: 'red',
+        },
+    ].filter(Boolean);
+
     return (
         <>
             <Head title="Dashboard" />
-            <PageHeader>
-                <div className="flex justify-between items-center">
-                    <div>
-                        <h2 className="text-xl font-semibold leading-tight text-gray-800">
-                            Dashboard
-                        </h2>
-                        <p className="text-sm text-gray-600 mt-1">
-                            {getCurrentGreeting()}! Aqui está um resumo do seu sistema.
-                        </p>
-                    </div>
-                    <div className="flex items-center space-x-2 text-sm text-gray-500">
-                        <ClockIcon className="h-4 w-4" />
-                        <span>Atualizado agora</span>
-                    </div>
-                </div>
-            </PageHeader>
 
-            <div className="py-6">
-                <div className="mx-auto max-w-full px-4 sm:px-6 lg:px-8">
+            <div className="py-12">
+                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="mb-6 flex justify-between items-center">
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-900">
+                                Dashboard
+                            </h1>
+                            <p className="mt-1 text-sm text-gray-600">
+                                {getCurrentGreeting()}! Aqui está um resumo do seu sistema.
+                            </p>
+                        </div>
+                        <div className="flex items-center space-x-2 text-sm text-gray-500">
+                            <ClockIcon className="h-4 w-4" />
+                            <span>Atualizado agora</span>
+                        </div>
+                    </div>
+
                     {/* Alertas */}
                     {alerts && alerts.length > 0 && (
                         <div className="mb-6">
@@ -73,109 +158,139 @@ export default function Dashboard({
                         </div>
                     )}
 
-                    {/* Cards de Estatísticas - Linha 1: Gerais */}
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-5">
-                        <StatCard
-                            title="Total de Usuários"
-                            value={stats.total_users}
-                            previousValue={stats.total_users - stats.new_users_this_month}
-                            icon={UsersIcon}
-                            color="blue"
-                        />
-                        <StatCard
-                            title="Novos Usuários (Hoje)"
-                            value={stats.new_users_today}
-                            icon={UserPlusIcon}
-                            color="green"
-                        />
-                        <StatCard
-                            title="Atividades (Hoje)"
-                            value={activityStats.total_activities_today}
-                            icon={ChartBarIcon}
-                            color="purple"
-                        />
-                        <StatCard
-                            title="Usuários Online"
-                            value={usersOnlineSummary?.online_count ?? 0}
-                            icon={WifiIcon}
-                            color="green"
-                        />
-                    </div>
+                    {/* KPIs gerais */}
+                    <StatisticsGrid cards={generalCards} cols={4} />
 
-                    {/* Cards de Estatísticas - Linha 2: Módulos */}
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-                        {salesSummary && (
-                            <StatCard
-                                title="Vendas do Mês"
-                                value={salesSummary.current_month_total}
-                                previousValue={salesSummary.last_month_total}
-                                icon={CurrencyDollarIcon}
-                                color="green"
-                                format="currency"
-                            />
-                        )}
-                        {transfersSummary && (
-                            <StatCard
-                                title="Transferências Pendentes"
-                                value={transfersSummary.pending_count}
-                                icon={ArrowsRightLeftIcon}
-                                color="yellow"
-                            />
-                        )}
-                        {stockSummary && (
-                            <StatCard
-                                title="Ajustes Pendentes"
-                                value={stockSummary.pending_count}
-                                icon={ClipboardDocumentCheckIcon}
-                                color="indigo"
-                            />
-                        )}
-                        {paymentsSummary && (
-                            <StatCard
-                                title="Pagamentos Vencidos"
-                                value={paymentsSummary.overdue_count}
-                                icon={BanknotesIcon}
-                                color="red"
-                            />
-                        )}
-                    </div>
+                    {/* KPIs de módulos */}
+                    {moduleCards.length > 0 && (
+                        <StatisticsGrid cards={moduleCards} cols={4} />
+                    )}
 
                     {/* Gráficos */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                         {salesSummary ? (
-                            <SimpleChart
-                                data={salesChartData}
-                                title="Vendas (Últimos 7 dias)"
-                                type="bar"
-                                color="green"
-                                format="currency"
-                            />
+                            <div className="bg-white shadow-sm rounded-lg p-6">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <CurrencyDollarIcon className="h-5 w-5 text-green-600" />
+                                    <h2 className="text-lg font-semibold text-gray-900">
+                                        Vendas (Últimos 7 dias)
+                                    </h2>
+                                </div>
+                                {salesChartData.length === 0 ? (
+                                    <EmptyState title="Sem dados" compact />
+                                ) : (
+                                    (() => {
+                                        const maxValue = Math.max(
+                                            ...salesChartData.map((d) => Number(d.value) || 0)
+                                        );
+                                        return (
+                                            <ResponsiveContainer width="100%" height={280}>
+                                                <BarChart data={salesChartData}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                                                    <YAxis
+                                                        tick={{ fontSize: 11 }}
+                                                        tickFormatter={(v) =>
+                                                            v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v
+                                                        }
+                                                    />
+                                                    <Tooltip
+                                                        formatter={(v) => BRL.format(Number(v || 0))}
+                                                    />
+                                                    <Bar
+                                                        dataKey="value"
+                                                        name="Vendas"
+                                                        radius={[4, 4, 0, 0]}
+                                                    >
+                                                        {salesChartData.map((entry, index) => (
+                                                            <Cell
+                                                                key={index}
+                                                                fill={
+                                                                    maxValue > 0 &&
+                                                                    Number(entry.value) === maxValue
+                                                                        ? '#15803d'
+                                                                        : '#86efac'
+                                                                }
+                                                            />
+                                                        ))}
+                                                    </Bar>
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        );
+                                    })()
+                                )}
+                            </div>
                         ) : (
-                            <SimpleChart
-                                data={userChartData}
-                                title="Novos Usuários (Últimos 7 dias)"
-                                type="line"
-                                color="blue"
-                            />
+                            <div className="bg-white shadow-sm rounded-lg p-6">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <UserPlusIcon className="h-5 w-5 text-blue-600" />
+                                    <h2 className="text-lg font-semibold text-gray-900">
+                                        Novos Usuários (Últimos 7 dias)
+                                    </h2>
+                                </div>
+                                {userChartData.length === 0 ? (
+                                    <EmptyState title="Sem dados" compact />
+                                ) : (
+                                    <ResponsiveContainer width="100%" height={280}>
+                                        <LineChart data={userChartData}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                            <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                                            <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                                            <Tooltip />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="users"
+                                                name="Novos usuários"
+                                                stroke="#3b82f6"
+                                                strokeWidth={2}
+                                                dot={{ r: 3 }}
+                                            />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                )}
+                            </div>
                         )}
-                        <SimpleChart
-                            data={activityChartData}
-                            title="Atividades do Sistema (Últimos 7 dias)"
-                            type="line"
-                            color="green"
-                        />
+
+                        <div className="bg-white shadow-sm rounded-lg p-6">
+                            <div className="flex items-center gap-2 mb-4">
+                                <ChartBarIcon className="h-5 w-5 text-indigo-600" />
+                                <h2 className="text-lg font-semibold text-gray-900">
+                                    Atividades do Sistema (Últimos 7 dias)
+                                </h2>
+                            </div>
+                            {activityChartData.length === 0 ? (
+                                <EmptyState title="Sem dados" compact />
+                            ) : (
+                                <ResponsiveContainer width="100%" height={280}>
+                                    <LineChart data={activityChartData}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                        <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                                        <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                                        <Tooltip />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="activities"
+                                            name="Atividades"
+                                            stroke="#4338ca"
+                                            strokeWidth={2}
+                                            dot={{ r: 3 }}
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            )}
+                        </div>
                     </div>
 
                     {/* Resumo dos Módulos */}
                     {(transfersSummary || stockSummary || paymentsSummary) && (
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                             {transfersSummary && (
-                                <div className="bg-white shadow rounded-lg p-6">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h3 className="text-lg font-medium text-gray-900">
+                                <div className="bg-white shadow-sm rounded-lg p-6">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <TruckIcon className="h-5 w-5 text-yellow-600" />
+                                        <h2 className="text-lg font-semibold text-gray-900">
                                             Transferências
-                                        </h3>
-                                        <TruckIcon className="h-5 w-5 text-gray-400" />
+                                        </h2>
                                     </div>
                                     <div className="space-y-3">
                                         <div className="flex justify-between items-center">
@@ -207,12 +322,12 @@ export default function Dashboard({
                             )}
 
                             {stockSummary && (
-                                <div className="bg-white shadow rounded-lg p-6">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h3 className="text-lg font-medium text-gray-900">
+                                <div className="bg-white shadow-sm rounded-lg p-6">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <ClipboardDocumentCheckIcon className="h-5 w-5 text-indigo-600" />
+                                        <h2 className="text-lg font-semibold text-gray-900">
                                             Ajustes de Estoque
-                                        </h3>
-                                        <ClipboardDocumentCheckIcon className="h-5 w-5 text-gray-400" />
+                                        </h2>
                                     </div>
                                     <div className="space-y-3">
                                         <div className="flex justify-between items-center">
@@ -244,12 +359,12 @@ export default function Dashboard({
                             )}
 
                             {paymentsSummary && (
-                                <div className="bg-white shadow rounded-lg p-6">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h3 className="text-lg font-medium text-gray-900">
+                                <div className="bg-white shadow-sm rounded-lg p-6">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <BanknotesIcon className="h-5 w-5 text-red-600" />
+                                        <h2 className="text-lg font-semibold text-gray-900">
                                             Ordens de Pagamento
-                                        </h3>
-                                        <BanknotesIcon className="h-5 w-5 text-gray-400" />
+                                        </h2>
                                     </div>
                                     <div className="space-y-3">
                                         <div className="flex justify-between items-center">
@@ -298,10 +413,13 @@ export default function Dashboard({
 
                     {/* Distribuição de Ações e Picos de Atividade */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                        <div className="bg-white shadow rounded-lg p-6">
-                            <h3 className="text-lg font-medium text-gray-900 mb-4">
-                                Tipos de Ação (30 dias)
-                            </h3>
+                        <div className="bg-white shadow-sm rounded-lg p-6">
+                            <div className="flex items-center gap-2 mb-4">
+                                <ChartBarIcon className="h-5 w-5 text-blue-600" />
+                                <h2 className="text-lg font-semibold text-gray-900">
+                                    Tipos de Ação (30 dias)
+                                </h2>
+                            </div>
                             {actionDistribution && actionDistribution.length > 0 ? (
                                 <div className="space-y-3">
                                     {actionDistribution.slice(0, 5).map((action) => {
@@ -332,16 +450,17 @@ export default function Dashboard({
                                     })}
                                 </div>
                             ) : (
-                                <p className="text-gray-500 text-center py-4">
-                                    Nenhum dado disponível
-                                </p>
+                                <EmptyState title="Nenhum dado disponível" compact />
                             )}
                         </div>
 
-                        <div className="bg-white shadow rounded-lg p-6">
-                            <h3 className="text-lg font-medium text-gray-900 mb-4">
-                                Horários de Pico (7 dias)
-                            </h3>
+                        <div className="bg-white shadow-sm rounded-lg p-6">
+                            <div className="flex items-center gap-2 mb-4">
+                                <ClockIcon className="h-5 w-5 text-orange-600" />
+                                <h2 className="text-lg font-semibold text-gray-900">
+                                    Horários de Pico (7 dias)
+                                </h2>
+                            </div>
                             {peakHours && peakHours.length > 0 ? (
                                 <div className="space-y-4">
                                     {peakHours.map((peak, index) => (
@@ -363,42 +482,44 @@ export default function Dashboard({
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-gray-500 text-center py-4">
-                                    Dados insuficientes
-                                </p>
+                                <EmptyState title="Dados insuficientes" compact />
                             )}
                         </div>
                     </div>
 
                     {/* Seção inferior: Atividades Recentes e Usuários Mais Ativos */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                         <RecentActivities activities={recentActivities} />
                         <TopUsers users={topUsers} />
                     </div>
 
                     {/* Informações adicionais */}
-                    <div className="mt-8 bg-gray-50 rounded-lg p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-                            <div>
-                                <h4 className="text-lg font-semibold text-gray-900">
-                                    {stats.new_users_this_week}
-                                </h4>
-                                <p className="text-sm text-gray-600">Novos usuários esta semana</p>
-                            </div>
-                            <div>
-                                <h4 className="text-lg font-semibold text-gray-900">
-                                    {activityStats.total_activities_week}
-                                </h4>
-                                <p className="text-sm text-gray-600">Atividades esta semana</p>
-                            </div>
-                            <div>
-                                <h4 className="text-lg font-semibold text-gray-900">
-                                    {stats.new_users_this_month}
-                                </h4>
-                                <p className="text-sm text-gray-600">Novos usuários este mês</p>
-                            </div>
-                        </div>
-                    </div>
+                    <StatisticsGrid
+                        cols={3}
+                        cards={[
+                            {
+                                label: 'Novos usuários esta semana',
+                                value: stats.new_users_this_week || 0,
+                                format: 'number',
+                                icon: UserPlusIcon,
+                                color: 'blue',
+                            },
+                            {
+                                label: 'Atividades esta semana',
+                                value: activityStats.total_activities_week || 0,
+                                format: 'number',
+                                icon: ChartBarIcon,
+                                color: 'purple',
+                            },
+                            {
+                                label: 'Novos usuários este mês',
+                                value: stats.new_users_this_month || 0,
+                                format: 'number',
+                                icon: UsersIcon,
+                                color: 'indigo',
+                            },
+                        ]}
+                    />
                 </div>
             </div>
         </>

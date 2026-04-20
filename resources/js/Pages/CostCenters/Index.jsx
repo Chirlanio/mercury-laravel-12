@@ -12,7 +12,6 @@ import {
     DocumentArrowUpIcon,
     ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
 import Button from '@/Components/Button';
@@ -21,6 +20,9 @@ import DataTable from '@/Components/DataTable';
 import StandardModal from '@/Components/StandardModal';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import StatusBadge from '@/Components/Shared/StatusBadge';
+import TextInput from '@/Components/TextInput';
+import InputLabel from '@/Components/InputLabel';
+import InputError from '@/Components/InputError';
 
 export default function Index({ costCenters, filters = {}, statistics = {}, selects = {} }) {
     const { hasPermission } = usePermissions();
@@ -261,10 +263,9 @@ export default function Index({ costCenters, filters = {}, statistics = {}, sele
             key: 'is_active',
             label: 'Status',
             render: (c) => (
-                <StatusBadge
-                    status={c.is_active ? 'success' : 'gray'}
-                    text={c.is_active ? 'Ativo' : 'Inativo'}
-                />
+                <StatusBadge variant={c.is_active ? 'success' : 'gray'}>
+                    {c.is_active ? 'Ativo' : 'Inativo'}
+                </StatusBadge>
             ),
         },
         {
@@ -281,7 +282,7 @@ export default function Index({ costCenters, filters = {}, statistics = {}, sele
     ];
 
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="Centros de Custo" />
 
             <div className="py-12">
@@ -338,38 +339,31 @@ export default function Index({ costCenters, filters = {}, statistics = {}, sele
                     <div className="bg-white shadow-sm rounded-lg p-4 mb-6 mt-6">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Buscar
-                                </label>
-                                <input
-                                    type="text"
+                                <InputLabel value="Buscar" className="mb-2" />
+                                <TextInput
+                                    className="w-full"
                                     value={filters.search || ''}
                                     onChange={(e) => applyFilter('search', e.target.value)}
                                     placeholder="Código, nome ou descrição..."
-                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Hierarquia
-                                </label>
+                                <InputLabel value="Hierarquia" className="mb-2" />
                                 <select
                                     value={filters.parent_id || ''}
                                     onChange={(e) => applyFilter('parent_id', e.target.value)}
-                                    className="w-full rounded-md border-gray-300 shadow-sm"
+                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                 >
                                     <option value="">Todos</option>
                                     <option value="root">Apenas raízes</option>
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Status
-                                </label>
+                                <InputLabel value="Status" className="mb-2" />
                                 <select
                                     value={filters.is_active ?? ''}
                                     onChange={(e) => applyFilter('is_active', e.target.value)}
-                                    className="w-full rounded-md border-gray-300 shadow-sm"
+                                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                 >
                                     <option value="">Todos</option>
                                     <option value="1">Ativos</option>
@@ -393,7 +387,7 @@ export default function Index({ costCenters, filters = {}, statistics = {}, sele
                 onClose={() => closeModal('create')}
                 title="Novo Centro de Custo"
                 headerColor="bg-indigo-600"
-                headerIcon={PlusIcon}
+                headerIcon={<PlusIcon className="h-6 w-6" />}
                 maxWidth="3xl"
                 onSubmit={handleCreateSubmit}
                 footer={
@@ -503,10 +497,9 @@ export default function Index({ costCenters, filters = {}, statistics = {}, sele
                                                 <span className="font-mono text-gray-700">{c.code}</span>
                                                 <span className="text-gray-500 ml-2">{c.name}</span>
                                             </div>
-                                            <StatusBadge
-                                                status={c.is_active ? 'success' : 'gray'}
-                                                text={c.is_active ? 'Ativo' : 'Inativo'}
-                                            />
+                                            <StatusBadge variant={c.is_active ? 'success' : 'gray'}>
+                                                {c.is_active ? 'Ativo' : 'Inativo'}
+                                            </StatusBadge>
                                         </li>
                                     ))}
                                 </ul>
@@ -523,7 +516,7 @@ export default function Index({ costCenters, filters = {}, statistics = {}, sele
                 title="Excluir centro de custo"
                 subtitle={deleteTarget ? `${deleteTarget.code} · ${deleteTarget.name}` : ''}
                 headerColor="bg-red-600"
-                headerIcon={ExclamationTriangleIcon}
+                headerIcon={<ExclamationTriangleIcon className="h-6 w-6" />}
                 maxWidth="md"
                 footer={
                     <StandardModal.Footer
@@ -545,15 +538,12 @@ export default function Index({ costCenters, filters = {}, statistics = {}, sele
                         </p>
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Motivo da exclusão *
-                        </label>
-                        <input
-                            type="text"
+                        <InputLabel value="Motivo da exclusão *" className="mb-1 text-xs" />
+                        <TextInput
+                            className="w-full text-sm"
                             value={deleteReason}
                             onChange={(e) => setDeleteReason(e.target.value)}
                             placeholder="Mínimo 3 caracteres"
-                            className="w-full rounded-md border-gray-300 shadow-sm text-sm"
                         />
                     </div>
                 </div>
@@ -565,7 +555,7 @@ export default function Index({ costCenters, filters = {}, statistics = {}, sele
                 onClose={() => closeModal('import')}
                 title="Importar Centros de Custo"
                 headerColor="bg-emerald-600"
-                headerIcon={DocumentArrowUpIcon}
+                headerIcon={<DocumentArrowUpIcon className="h-6 w-6" />}
                 maxWidth="4xl"
                 footer={(
                     <div className="flex justify-between items-center w-full">
@@ -692,7 +682,7 @@ export default function Index({ costCenters, filters = {}, statistics = {}, sele
                     </>
                 )}
             </StandardModal>
-        </AuthenticatedLayout>
+        </>
     );
 }
 
@@ -705,45 +695,33 @@ function CostCenterFormFields({ form, errors, onChange, parents, managers }) {
             <StandardModal.Section title="Dados básicos">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Código *
-                        </label>
-                        <input
-                            type="text"
+                        <InputLabel value="Código *" className="mb-1" />
+                        <TextInput
+                            className="w-full font-mono"
                             value={form.code || ''}
                             onChange={(e) => onChange({ code: e.target.value })}
                             maxLength={20}
-                            className="w-full rounded-md border-gray-300 shadow-sm font-mono"
                         />
-                        {errors.code && (
-                            <p className="mt-1 text-xs text-red-600">{errors.code}</p>
-                        )}
+                        <InputError message={errors.code} className="mt-1 text-xs" />
                     </div>
                     <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Nome *
-                        </label>
-                        <input
-                            type="text"
+                        <InputLabel value="Nome *" className="mb-1" />
+                        <TextInput
+                            className="w-full"
                             value={form.name || ''}
                             onChange={(e) => onChange({ name: e.target.value })}
-                            className="w-full rounded-md border-gray-300 shadow-sm"
                         />
-                        {errors.name && (
-                            <p className="mt-1 text-xs text-red-600">{errors.name}</p>
-                        )}
+                        <InputError message={errors.name} className="mt-1 text-xs" />
                     </div>
                 </div>
 
                 <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Descrição
-                    </label>
+                    <InputLabel value="Descrição" className="mb-1" />
                     <textarea
                         value={form.description || ''}
                         onChange={(e) => onChange({ description: e.target.value })}
                         rows={2}
-                        className="w-full rounded-md border-gray-300 shadow-sm"
+                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     />
                 </div>
             </StandardModal.Section>
@@ -751,13 +729,11 @@ function CostCenterFormFields({ form, errors, onChange, parents, managers }) {
             <StandardModal.Section title="Hierarquia e responsabilidade">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Centro pai
-                        </label>
+                        <InputLabel value="Centro pai" className="mb-1" />
                         <select
                             value={form.parent_id || ''}
                             onChange={(e) => onChange({ parent_id: e.target.value })}
-                            className="w-full rounded-md border-gray-300 shadow-sm"
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         >
                             <option value="">— Raiz (sem pai) —</option>
                             {parents.map((p) => (
@@ -766,19 +742,15 @@ function CostCenterFormFields({ form, errors, onChange, parents, managers }) {
                                 </option>
                             ))}
                         </select>
-                        {errors.parent_id && (
-                            <p className="mt-1 text-xs text-red-600">{errors.parent_id}</p>
-                        )}
+                        <InputError message={errors.parent_id} className="mt-1 text-xs" />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Responsável
-                        </label>
+                        <InputLabel value="Responsável" className="mb-1" />
                         <select
                             value={form.manager_id || ''}
                             onChange={(e) => onChange({ manager_id: e.target.value })}
-                            className="w-full rounded-md border-gray-300 shadow-sm"
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         >
                             <option value="">— Sem responsável —</option>
                             {managers.map((m) => (
@@ -796,9 +768,7 @@ function CostCenterFormFields({ form, errors, onChange, parents, managers }) {
                         onChange={(e) => onChange({ is_active: e.target.checked })}
                         className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                     />
-                    <label htmlFor="is_active" className="ml-2 text-sm text-gray-700">
-                        Ativo
-                    </label>
+                    <InputLabel htmlFor="is_active" value="Ativo" className="ml-2" />
                 </div>
             </StandardModal.Section>
         </>

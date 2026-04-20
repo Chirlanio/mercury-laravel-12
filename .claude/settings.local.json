@@ -105,7 +105,17 @@
       "Read(//c/wamp64/bin/php/php8.4.0/**)",
       "Bash(\"C:/wamp64/bin/php/php8.3.14/php.exe\" -r \"echo \\(extension_loaded\\('pdo_pgsql'\\) ? 'YES' : 'NO'\\).PHP_EOL;\")",
       "Bash(C:\\\\\\\\Users\\\\\\\\MSDEV\\\\\\\\php84\\\\\\\\php.exe artisan:*)",
-      "Bash('C:/Users/MSDEV/php84/php.exe' artisan:*)"
+      "Bash('C:/Users/MSDEV/php84/php.exe' artisan:*)",
+      "Bash(\"/c/Users/MSDEV/php84/php.exe\" artisan *)",
+      "Bash(echo \"exitcode: $?\")",
+      "Bash(where python *)",
+      "Bash(where py *)",
+      "Bash(venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('services/taneia_service.py'\\).read\\(\\)\\); ast.parse\\(open\\('main.py'\\).read\\(\\)\\); print\\('OK'\\)\")",
+      "Bash(venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('services/taneia_service.py'\\).read\\(\\)\\); ast.parse\\(open\\('main.py'\\).read\\(\\)\\); print\\('Python OK'\\)\")",
+      "Bash(venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('services/taneia_service.py'\\).read\\(\\)\\); print\\('OK'\\)\")",
+      "Bash(venv/Scripts/python.exe -c ' *)",
+      "Bash(tee \"C:/xampp/htdocs/mercury-laravel/storage/app/tmp_analyze_result.txt\")",
+      "Bash(npx --no-install eslint resources/js/Pages/Budgets/components/BudgetUploadWizard.jsx)"
     ],
     "deny": [],
     "ask": []
