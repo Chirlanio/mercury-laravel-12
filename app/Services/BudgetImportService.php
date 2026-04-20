@@ -575,21 +575,60 @@ class BudgetImportService
     // File parsing + normalization
     // ------------------------------------------------------------------
 
+    /**
+     * Lê o xlsx CALCULANDO fórmulas Excel — o Maatwebsite/Excel padrão
+     * retorna a fórmula literal como string, o que causava o parser a
+     * concatenar dígitos (ex: "=149 + 0.04 * 149" lido como "1490.04149"
+     * em vez do valor calculado 154.96). Uso PhpSpreadsheet direto
+     * chamando getCalculatedValue() em cada célula.
+     *
+     * Primeira linha é o cabeçalho (normalizado pelo normalizeKey). Linhas
+     * completamente vazias são puladas aqui mesmo.
+     */
     protected function readFile(string $filePath): array
     {
-        $reader = new class implements ToArray, WithHeadingRow
-        {
-            public array $rows = [];
+        $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($filePath);
+        // setReadDataOnly(false) mantém cache de fórmulas para getCalculatedValue funcionar
+        $reader->setReadDataOnly(false);
+        $spreadsheet = $reader->load($filePath);
+        $sheet = $spreadsheet->getActiveSheet();
 
-            public function array(array $array): void
-            {
-                $this->rows = $array;
+        $highestRow = $sheet->getHighestDataRow();
+        $highestCol = $sheet->getHighestDataColumn();
+        $highestColIdx = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestCol);
+
+        // Headers (row 1), normalizados para as chaves canônicas
+        $headers = [];
+        for ($c = 1; $c <= $highestColIdx; $c++) {
+            $colLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c);
+            $raw = $sheet->getCell($colLetter.'1')->getCalculatedValue();
+            $headers[$c] = $raw === null ? '' : trim((string) $raw);
+        }
+
+        $rows = [];
+        for ($r = 2; $r <= $highestRow; $r++) {
+            $row = [];
+            $hasAny = false;
+            for ($c = 1; $c <= $highestColIdx; $c++) {
+                if ($headers[$c] === '') {
+                    continue;
+                }
+                $colLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c);
+                $value = $sheet->getCell($colLetter.$r)->getCalculatedValue();
+                if ($value !== null && $value !== '') {
+                    $hasAny = true;
+                }
+                $row[$headers[$c]] = $value;
             }
-        };
+            if ($hasAny) {
+                $rows[] = $row;
+            }
+        }
 
-        Excel::import($reader, $filePath);
+        $spreadsheet->disconnectWorksheets();
+        unset($spreadsheet);
 
-        return $reader->rows;
+        return $rows;
     }
 
     protected function normalizeRows(array $raw): array

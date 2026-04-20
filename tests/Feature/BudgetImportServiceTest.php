@@ -152,11 +152,11 @@ class BudgetImportServiceTest extends TestCase
 
         $result = $service->preview($path);
 
-        // Empty row counted as rejected (with "linha vazia" message), valid row OK
-        $this->assertEquals(2, $result['total_rows']);
+        // readFile filtra linhas completamente vazias antes do parse —
+        // evita inflar "rejected" em templates com buffer vazio enorme.
+        $this->assertEquals(1, $result['total_rows']);
         $this->assertEquals(1, $result['valid_rows']);
-        $this->assertEquals(1, $result['rejected_rows']);
-        $this->assertStringContainsString('vazia', $result['rows'][0]['errors'][0]);
+        $this->assertEquals(0, $result['rejected_rows']);
     }
 
     public function test_detects_unresolved_cost_center_with_fuzzy_suggestions(): void
