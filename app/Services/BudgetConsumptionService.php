@@ -6,16 +6,21 @@ use App\Models\BudgetUpload;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Agregações de consumo previsto × realizado para um BudgetUpload.
+ * Agregações de consumo previsto × comprometido × realizado para um BudgetUpload.
  *
- * "Previsto" vem de budget_items (somas dos 12 meses). "Realizado"
- * vem de order_payments vinculadas a esses items via budget_item_id
- * (FK adicionada na Fase 3 C1).
+ * Três grandezas distintas:
+ *   - forecast (previsto): soma dos 12 meses dos budget_items
+ *   - committed (comprometido): todas as OPs não-deletadas — pipeline
+ *     inteira, do backlog ao pago. Representa "o quanto do orçamento
+ *     pode ser consumido se nada for cancelado". Alarme mais conservador.
+ *   - realized (realizado): apenas OPs com status=done — o que efetivamente
+ *     saiu do caixa. Semântica contábil estrita (regime de caixa).
  *
- * O consumo considera apenas OPs com status != 'backlog' (efetivamente
- * comprometidas) para evitar dupla contagem. Decisão: não filtra por
- * date_payment — o orçamento é anual e a OP está "consumida" uma vez
- * criada em modo diferente de backlog.
+ * committed >= realized sempre. Dashboard exibe ambas — committed é o
+ * indicador operacional (saúde do orçamento), realized é a foto contábil.
+ *
+ * FK em order_payments.budget_item_id adicionada na Fase 3 C1. OPs com
+ * budget_item_id=null não entram em nenhuma das contagens.
  */
 class BudgetConsumptionService
 {
@@ -23,7 +28,7 @@ class BudgetConsumptionService
      * Retorna estrutura completa de consumo para o budget.
      *
      * @return array{
-     *   totals: array{forecast: float, realized: float, available: float, utilization_pct: float},
+     *   totals: array{forecast: float, committed: float, realized: float, available: float, utilization_pct: float, committed_pct: float},
      *   by_item: array,
      *   by_cost_center: array,
      *   by_accounting_class: array,
@@ -42,18 +47,21 @@ class BudgetConsumptionService
         $items = $budget->items;
         $itemIds = $items->pluck('id')->all();
 
-        // Realizado por item — 1 query agregada
-        $realizedByItem = $this->aggregateRealizedByItem($itemIds);
+        // 2 queries agregadas — committed (todos não-deletados) + realized (done)
+        $committedByItem = $this->aggregateByItem($itemIds, onlyDone: false);
+        $realizedByItem = $this->aggregateByItem($itemIds, onlyDone: true);
 
-        // Monta estrutura by_item com %
         $byItem = [];
         $forecastTotal = 0.0;
+        $committedTotal = 0.0;
         $realizedTotal = 0.0;
 
         foreach ($items as $item) {
             $forecast = (float) $item->year_total;
+            $committed = (float) ($committedByItem[$item->id] ?? 0);
             $realized = (float) ($realizedByItem[$item->id] ?? 0);
             $forecastTotal += $forecast;
+            $committedTotal += $committed;
             $realizedTotal += $realized;
 
             $byItem[] = [
@@ -72,21 +80,29 @@ class BudgetConsumptionService
                     : null,
                 'supplier' => $item->supplier,
                 'forecast' => round($forecast, 2),
+                'committed' => round($committed, 2),
                 'realized' => round($realized, 2),
-                'available' => round($forecast - $realized, 2),
+                'available' => round($forecast - $committed, 2),
                 'utilization_pct' => $forecast > 0
+                    ? round(($committed / $forecast) * 100, 2)
+                    : 0.0,
+                'realized_pct' => $forecast > 0
                     ? round(($realized / $forecast) * 100, 2)
                     : 0.0,
-                'status' => $this->utilizationStatus($forecast, $realized),
+                'status' => $this->utilizationStatus($forecast, $committed),
             ];
         }
 
         return [
             'totals' => [
                 'forecast' => round($forecastTotal, 2),
+                'committed' => round($committedTotal, 2),
                 'realized' => round($realizedTotal, 2),
-                'available' => round($forecastTotal - $realizedTotal, 2),
+                'available' => round($forecastTotal - $committedTotal, 2),
                 'utilization_pct' => $forecastTotal > 0
+                    ? round(($committedTotal / $forecastTotal) * 100, 2)
+                    : 0.0,
+                'realized_pct' => $forecastTotal > 0
                     ? round(($realizedTotal / $forecastTotal) * 100, 2)
                     : 0.0,
             ],
@@ -98,22 +114,28 @@ class BudgetConsumptionService
     }
 
     /**
-     * Agrega realizado por budget_item_id. Considera apenas OPs não-backlog
-     * e não-deletadas.
+     * Agrega total por budget_item_id. Sempre exclui OPs deletadas.
      *
      * @param  array<int>  $itemIds
-     * @return array<int, float>  [item_id => realized_sum]
+     * @param  bool  $onlyDone  true = apenas status='done' (realized);
+     *                          false = todas não-deletadas (committed).
+     * @return array<int, float>  [item_id => total]
      */
-    protected function aggregateRealizedByItem(array $itemIds): array
+    protected function aggregateByItem(array $itemIds, bool $onlyDone): array
     {
         if (empty($itemIds)) {
             return [];
         }
 
-        return DB::table('order_payments')
+        $query = DB::table('order_payments')
             ->whereIn('budget_item_id', $itemIds)
-            ->whereNull('deleted_at')
-            ->where('status', '!=', 'backlog')
+            ->whereNull('deleted_at');
+
+        if ($onlyDone) {
+            $query->where('status', 'done');
+        }
+
+        return $query
             ->selectRaw('budget_item_id, COALESCE(SUM(total_value), 0) as total')
             ->groupBy('budget_item_id')
             ->pluck('total', 'budget_item_id')
@@ -142,24 +164,30 @@ class BudgetConsumptionService
                     'code' => $dim['code'],
                     'name' => $dim['name'],
                     'forecast' => 0.0,
+                    'committed' => 0.0,
                     'realized' => 0.0,
                     'items_count' => 0,
                 ];
             }
 
             $map[$key]['forecast'] += $row['forecast'];
+            $map[$key]['committed'] += $row['committed'];
             $map[$key]['realized'] += $row['realized'];
             $map[$key]['items_count']++;
         }
 
         $result = array_map(function ($agg) {
-            $agg['available'] = round($agg['forecast'] - $agg['realized'], 2);
+            $agg['available'] = round($agg['forecast'] - $agg['committed'], 2);
             $agg['forecast'] = round($agg['forecast'], 2);
+            $agg['committed'] = round($agg['committed'], 2);
             $agg['realized'] = round($agg['realized'], 2);
             $agg['utilization_pct'] = $agg['forecast'] > 0
+                ? round(($agg['committed'] / $agg['forecast']) * 100, 2)
+                : 0.0;
+            $agg['realized_pct'] = $agg['forecast'] > 0
                 ? round(($agg['realized'] / $agg['forecast']) * 100, 2)
                 : 0.0;
-            $agg['status'] = $this->utilizationStatus($agg['forecast'], $agg['realized']);
+            $agg['status'] = $this->utilizationStatus($agg['forecast'], $agg['committed']);
 
             return $agg;
         }, array_values($map));
@@ -171,11 +199,14 @@ class BudgetConsumptionService
     }
 
     /**
-     * Agrega previsto × realizado por mês (1..12).
-     * Previsto: soma das colunas month_NN_value de todos os items.
-     * Realizado: soma de OPs vinculadas, agrupadas pelo mês do date_payment.
+     * Agrega previsto × comprometido × realizado por mês (1..12).
      *
-     * @return array<int, array{month: int, forecast: float, realized: float}>
+     * Previsto: soma das colunas month_NN_value de todos os items.
+     * Comprometido: soma de OPs não-deletadas (todos os status), agrupadas
+     *               pelo mês do date_payment.
+     * Realizado: subset acima restrito a status='done'.
+     *
+     * @return array<int, array{month: int, forecast: float, committed: float, realized: float}>
      */
     protected function aggregateByMonth(BudgetUpload $budget, array $itemIds): array
     {
@@ -188,6 +219,7 @@ class BudgetConsumptionService
             $months[$m] = [
                 'month' => $m,
                 'forecast' => round((float) $forecastAgg, 2),
+                'committed' => 0.0,
                 'realized' => 0.0,
             ];
         }
@@ -199,21 +231,25 @@ class BudgetConsumptionService
             $ops = DB::table('order_payments')
                 ->whereIn('budget_item_id', $itemIds)
                 ->whereNull('deleted_at')
-                ->where('status', '!=', 'backlog')
                 ->whereNotNull('date_payment')
                 ->whereYear('date_payment', $budget->year)
-                ->select('date_payment', 'total_value')
+                ->select('date_payment', 'total_value', 'status')
                 ->get();
 
             foreach ($ops as $op) {
                 $m = (int) date('n', strtotime((string) $op->date_payment));
-                if ($m >= 1 && $m <= 12 && isset($months[$m])) {
+                if ($m < 1 || $m > 12 || ! isset($months[$m])) {
+                    continue;
+                }
+                $months[$m]['committed'] += (float) $op->total_value;
+                if ($op->status === 'done') {
                     $months[$m]['realized'] += (float) $op->total_value;
                 }
             }
 
             // Arredonda no fim
             for ($m = 1; $m <= 12; $m++) {
+                $months[$m]['committed'] = round($months[$m]['committed'], 2);
                 $months[$m]['realized'] = round($months[$m]['realized'], 2);
             }
         }
@@ -222,18 +258,18 @@ class BudgetConsumptionService
     }
 
     /**
-     * Semáforo de utilização:
+     * Semáforo de utilização (baseado em committed — visão operacional).
      *   - 'ok': < 70% do previsto
      *   - 'warning': 70% - 99.99%
      *   - 'exceeded': >= 100% (consumo atingiu ou passou do previsto)
      */
-    protected function utilizationStatus(float $forecast, float $realized): string
+    protected function utilizationStatus(float $forecast, float $committed): string
     {
         if ($forecast <= 0) {
-            return $realized > 0 ? 'exceeded' : 'ok';
+            return $committed > 0 ? 'exceeded' : 'ok';
         }
 
-        $pct = ($realized / $forecast) * 100;
+        $pct = ($committed / $forecast) * 100;
 
         if ($pct >= 100) {
             return 'exceeded';

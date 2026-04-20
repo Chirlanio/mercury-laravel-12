@@ -135,23 +135,43 @@ class BudgetConsumptionTest extends TestCase
 
     public function test_consumption_aggregates_by_item(): void
     {
-        // 2 OPs no item1 totalizando 5000, 0 no item2
-        $this->createOrderPayment(['budget_item_id' => $this->item1->id, 'total_value' => 2000]);
-        $this->createOrderPayment(['budget_item_id' => $this->item1->id, 'total_value' => 3000]);
+        // 2 OPs done no item1 totalizando 5000, 0 no item2
+        $this->createOrderPayment(['budget_item_id' => $this->item1->id, 'total_value' => 2000, 'status' => 'done']);
+        $this->createOrderPayment(['budget_item_id' => $this->item1->id, 'total_value' => 3000, 'status' => 'done']);
 
         $service = app(BudgetConsumptionService::class);
         $result = $service->getConsumption($this->budget);
 
         $this->assertEquals(5000, $result['totals']['realized']);
+        $this->assertEquals(5000, $result['totals']['committed']);
 
         $byItem = collect($result['by_item']);
         $itm1 = $byItem->firstWhere('id', $this->item1->id);
         $itm2 = $byItem->firstWhere('id', $this->item2->id);
 
         $this->assertEquals(5000, $itm1['realized']);
+        $this->assertEquals(5000, $itm1['committed']);
         $this->assertEquals(0, $itm2['realized']);
+        // utilization_pct agora é baseado em committed (visão operacional)
         $this->assertEqualsWithDelta(41.67, $itm1['utilization_pct'], 0.01);
         $this->assertEquals(0, $itm2['utilization_pct']);
+    }
+
+    public function test_committed_includes_non_done_while_realized_excludes_them(): void
+    {
+        // waiting/doing/backlog entram em committed, NÃO em realized
+        $this->createOrderPayment(['budget_item_id' => $this->item1->id, 'total_value' => 1000, 'status' => 'waiting']);
+        $this->createOrderPayment(['budget_item_id' => $this->item1->id, 'total_value' => 500, 'status' => 'backlog']);
+        // done entra nos dois
+        $this->createOrderPayment(['budget_item_id' => $this->item1->id, 'total_value' => 300, 'status' => 'done']);
+
+        $service = app(BudgetConsumptionService::class);
+        $result = $service->getConsumption($this->budget);
+
+        // Committed: 1000 + 500 + 300 = 1800
+        // Realized: 300 (só done)
+        $this->assertEquals(1800, $result['totals']['committed']);
+        $this->assertEquals(300, $result['totals']['realized']);
     }
 
     public function test_consumption_ignores_backlog_and_deleted_ops(): void
@@ -186,8 +206,9 @@ class BudgetConsumptionTest extends TestCase
 
     public function test_consumption_aggregates_by_cost_center(): void
     {
-        $this->createOrderPayment(['budget_item_id' => $this->item1->id, 'total_value' => 6000]);
-        $this->createOrderPayment(['budget_item_id' => $this->item2->id, 'total_value' => 3000]);
+        // Usa status=done para popular tanto committed quanto realized
+        $this->createOrderPayment(['budget_item_id' => $this->item1->id, 'total_value' => 6000, 'status' => 'done']);
+        $this->createOrderPayment(['budget_item_id' => $this->item2->id, 'total_value' => 3000, 'status' => 'done']);
 
         $service = app(BudgetConsumptionService::class);
         $result = $service->getConsumption($this->budget);
@@ -199,11 +220,13 @@ class BudgetConsumptionTest extends TestCase
         $cc2Agg = $byCc->firstWhere('id', $this->cc2->id);
 
         $this->assertEquals(12000, $cc1Agg['forecast']);
+        $this->assertEquals(6000, $cc1Agg['committed']);
         $this->assertEquals(6000, $cc1Agg['realized']);
         $this->assertEquals(50.0, $cc1Agg['utilization_pct']);
         $this->assertEquals('ok', $cc1Agg['status']);
 
         $this->assertEquals(12000, $cc2Agg['forecast']);
+        $this->assertEquals(3000, $cc2Agg['committed']);
         $this->assertEquals(3000, $cc2Agg['realized']);
         $this->assertEquals(25.0, $cc2Agg['utilization_pct']);
     }
@@ -284,13 +307,14 @@ class BudgetConsumptionTest extends TestCase
 
     public function test_consumption_json_endpoint(): void
     {
-        $this->createOrderPayment(['budget_item_id' => $this->item1->id, 'total_value' => 1000]);
+        $this->createOrderPayment(['budget_item_id' => $this->item1->id, 'total_value' => 1000, 'status' => 'done']);
 
         $response = $this->actingAs($this->adminUser)
             ->getJson(route('budgets.consumption', $this->budget->id));
 
         $response->assertStatus(200);
         $response->assertJsonPath('totals.realized', 1000);
+        $response->assertJsonPath('totals.committed', 1000);
         $response->assertJsonPath('totals.forecast', 24000);
     }
 

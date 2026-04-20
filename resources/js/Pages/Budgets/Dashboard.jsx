@@ -55,6 +55,7 @@ export default function Dashboard({ budget, consumption }) {
         return (consumption?.by_month || []).map((m) => ({
             name: MONTH_LABELS[m.month - 1],
             previsto: m.forecast,
+            comprometido: m.committed ?? 0,
             realizado: m.realized,
         }));
     }, [consumption]);
@@ -68,18 +69,28 @@ export default function Dashboard({ budget, consumption }) {
             color: 'indigo',
         },
         {
-            label: 'Realizado',
-            value: consumption?.totals?.realized || 0,
+            label: 'Comprometido',
+            value: consumption?.totals?.committed || 0,
             format: 'currency',
             icon: FireIcon,
             color: 'orange',
+            sub: 'Em fluxo + pago',
+        },
+        {
+            label: 'Realizado (Pago)',
+            value: consumption?.totals?.realized || 0,
+            format: 'currency',
+            icon: CheckCircleIcon,
+            color: 'green',
+            sub: 'Efetivamente saído do caixa',
         },
         {
             label: 'Disponível',
             value: consumption?.totals?.available || 0,
             format: 'currency',
-            icon: CheckCircleIcon,
-            color: (consumption?.totals?.available || 0) < 0 ? 'red' : 'green',
+            icon: BanknotesIcon,
+            color: (consumption?.totals?.available || 0) < 0 ? 'red' : 'teal',
+            sub: 'Previsto − Comprometido',
         },
         {
             label: 'Utilização',
@@ -135,7 +146,7 @@ export default function Dashboard({ budget, consumption }) {
                         </div>
                     </div>
 
-                    <StatisticsGrid cards={statisticsCards} cols={5} />
+                    <StatisticsGrid cards={statisticsCards} cols={6} />
 
                     {/* Gráfico previsto × realizado por mês */}
                     <div className="mt-6 bg-white shadow-sm rounded-lg p-6">
@@ -167,7 +178,8 @@ export default function Dashboard({ budget, consumption }) {
                                         />
                                         <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
                                         <Bar dataKey="previsto" name="Previsto" fill="#6366f1" radius={[3, 3, 0, 0]} />
-                                        <Bar dataKey="realizado" name="Realizado" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                                        <Bar dataKey="comprometido" name="Comprometido" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                                        <Bar dataKey="realizado" name="Realizado" fill="#10b981" radius={[3, 3, 0, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -248,6 +260,9 @@ function AggregationTable({ rows, dimensionLabel, showItemsCount }) {
                             Previsto
                         </th>
                         <th className="px-3 py-2 text-right font-medium text-gray-700">
+                            Comprometido
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium text-gray-700">
                             Realizado
                         </th>
                         <th className="px-3 py-2 text-right font-medium text-gray-700">
@@ -262,7 +277,6 @@ function AggregationTable({ rows, dimensionLabel, showItemsCount }) {
                     {rows.map((row) => (
                         <tr key={row.id} className="hover:bg-gray-50">
                             <td className="px-3 py-2">
-                                <span className="font-mono text-gray-700 text-xs">{row.code}</span>
                                 <span className="block text-gray-900">{row.name}</span>
                             </td>
                             {showItemsCount && (
@@ -274,6 +288,9 @@ function AggregationTable({ rows, dimensionLabel, showItemsCount }) {
                                 {BRL.format(row.forecast)}
                             </td>
                             <td className="px-3 py-2 text-right font-mono text-gray-900">
+                                {BRL.format(row.committed ?? 0)}
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono text-green-700">
                                 {BRL.format(row.realized)}
                             </td>
                             <td className={`px-3 py-2 text-right font-mono ${row.available < 0 ? 'text-red-600 font-semibold' : 'text-gray-900'}`}>
@@ -308,10 +325,11 @@ function ItemsTable({ rows }) {
                     <tr className="border-b border-gray-200">
                         <th className="px-2 py-2 text-left font-medium">Contábil</th>
                         <th className="px-2 py-2 text-left font-medium">Gerencial</th>
-                        <th className="px-2 py-2 text-left font-medium">CC</th>
+                        <th className="px-2 py-2 text-left font-medium">Centro de Custo</th>
                         <th className="px-2 py-2 text-left font-medium">Loja</th>
                         <th className="px-2 py-2 text-left font-medium">Fornecedor</th>
                         <th className="px-2 py-2 text-right font-medium">Previsto</th>
+                        <th className="px-2 py-2 text-right font-medium">Comprometido</th>
                         <th className="px-2 py-2 text-right font-medium">Realizado</th>
                         <th className="px-2 py-2 text-right font-medium">Disponível</th>
                         <th className="px-2 py-2 text-right font-medium w-44">Utilização</th>
@@ -320,23 +338,17 @@ function ItemsTable({ rows }) {
                 <tbody className="divide-y divide-gray-200">
                     {rows.map((row) => (
                         <tr key={row.id} className="hover:bg-gray-50">
-                            <td className="px-2 py-1.5">
-                                <span className="font-mono text-gray-700">
-                                    {row.accounting_class?.code || '—'}
-                                </span>
+                            <td className="px-2 py-1.5 text-gray-700">
+                                {row.accounting_class?.name || '—'}
                             </td>
-                            <td className="px-2 py-1.5">
-                                <span className="font-mono text-gray-700">
-                                    {row.management_class?.code || '—'}
-                                </span>
+                            <td className="px-2 py-1.5 text-gray-700">
+                                {row.management_class?.name || '—'}
                             </td>
-                            <td className="px-2 py-1.5">
-                                <span className="font-mono text-gray-700">
-                                    {row.cost_center?.code || '—'}
-                                </span>
+                            <td className="px-2 py-1.5 text-gray-700">
+                                {row.cost_center?.name || '—'}
                             </td>
                             <td className="px-2 py-1.5 text-gray-600">
-                                {row.store?.code || '—'}
+                                {row.store?.name || '—'}
                             </td>
                             <td className="px-2 py-1.5 text-gray-600 max-w-xs truncate" title={row.supplier}>
                                 {row.supplier || '—'}
@@ -345,6 +357,9 @@ function ItemsTable({ rows }) {
                                 {BRL.format(row.forecast)}
                             </td>
                             <td className="px-2 py-1.5 text-right font-mono text-gray-900">
+                                {BRL.format(row.committed ?? 0)}
+                            </td>
+                            <td className="px-2 py-1.5 text-right font-mono text-green-700">
                                 {BRL.format(row.realized)}
                             </td>
                             <td className={`px-2 py-1.5 text-right font-mono ${row.available < 0 ? 'text-red-600 font-semibold' : 'text-gray-900'}`}>

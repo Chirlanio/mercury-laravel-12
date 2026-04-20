@@ -85,6 +85,7 @@ class BudgetAlertService
                 'scope_label' => $budget->scope_label,
                 'version_label' => $budget->version_label,
                 'total_forecast' => (float) ($consumption['totals']['forecast'] ?? 0),
+                'total_committed' => (float) ($consumption['totals']['committed'] ?? 0),
                 'total_realized' => (float) ($consumption['totals']['realized'] ?? 0),
                 'total_pct' => (float) ($consumption['totals']['utilization_pct'] ?? 0),
                 'status' => ! empty($exceededCcs) ? 'exceeded' : 'warning',
