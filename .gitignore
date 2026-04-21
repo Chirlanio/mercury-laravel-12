@@ -23,3 +23,9 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 u401878354_meiaso26_bd_me.sql
+
+
+# Tenant storage (runtime artifacts — não versionar)
+storage/tenantmeia-sola/
+storage/tenant*/app/
+
