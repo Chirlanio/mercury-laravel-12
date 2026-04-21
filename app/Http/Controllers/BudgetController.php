@@ -469,6 +469,7 @@ class BudgetController extends Controller
                 [
                     'year' => $data['year'],
                     'scope_label' => $data['scope_label'],
+                    'area_department_id' => $data['area_department_id'],
                     'upload_type' => $data['upload_type'],
                     'notes' => $data['notes'] ?? null,
                 ],

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { router } from '@inertiajs/react';
 import axios from 'axios';
 import {
@@ -52,12 +52,24 @@ export default function BudgetUploadWizard({ show, onClose, enums = {}, selects 
     const [header, setHeader] = useState({
         year: new Date().getFullYear() + 1,
         scope_label: '',
+        area_department_id: '',
         upload_type: 'novo',
         notes: '',
     });
     const [errors, setErrors] = useState({});
     const [processing, setProcessing] = useState(false);
     const [serverMessage, setServerMessage] = useState(null);
+    const [departments, setDepartments] = useState([]);
+
+    // Carrega departamentos gerenciais (sintéticos 8.1.DD) para popular o
+    // dropdown "Área". Usa ?all=1 porque queremos ver todas as áreas mesmo
+    // que ainda não tenham budget (este form está criando um).
+    useEffect(() => {
+        if (!show) return;
+        axios.get(route('management-classes.departments'), { params: { all: 1 } })
+            .then(r => setDepartments(r.data.departments || []))
+            .catch(() => setDepartments([]));
+    }, [show]);
 
     const reset = () => {
         setStep('upload');
@@ -72,6 +84,7 @@ export default function BudgetUploadWizard({ show, onClose, enums = {}, selects 
         setHeader({
             year: new Date().getFullYear() + 1,
             scope_label: '',
+            area_department_id: '',
             upload_type: 'novo',
             notes: '',
         });
@@ -168,6 +181,7 @@ export default function BudgetUploadWizard({ show, onClose, enums = {}, selects 
         formData.append('file', file);
         formData.append('year', header.year);
         formData.append('scope_label', header.scope_label);
+        formData.append('area_department_id', header.area_department_id);
         formData.append('upload_type', header.upload_type);
         if (header.notes) formData.append('notes', header.notes);
 
@@ -260,7 +274,7 @@ export default function BudgetUploadWizard({ show, onClose, enums = {}, selects 
                     <Button
                         variant="success"
                         onClick={handleConfirm}
-                        disabled={processing || !header.scope_label || !header.year}
+                        disabled={processing || !header.scope_label || !header.year || !header.area_department_id}
                         loading={processing}
                         icon={CloudArrowUpIcon}
                     >
@@ -604,7 +618,7 @@ function ConfirmStep({ header, setHeader, preview, effectiveImportableRows, enum
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
                         <InputLabel htmlFor="budget-year" value="Ano *" className="mb-1" />
                         <TextInput
@@ -619,6 +633,25 @@ function ConfirmStep({ header, setHeader, preview, effectiveImportableRows, enum
                             className="w-full"
                         />
                         <InputError message={errors.year} className="mt-1" />
+                    </div>
+
+                    <div>
+                        <InputLabel htmlFor="budget-area" value="Área *" className="mb-1" />
+                        <select
+                            id="budget-area"
+                            value={header.area_department_id}
+                            onChange={(e) => setHeader({ ...header, area_department_id: e.target.value })}
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        >
+                            <option value="">Selecione</option>
+                            {departments.map((d) => (
+                                <option key={d.id} value={d.id}>{d.name}</option>
+                            ))}
+                        </select>
+                        <InputError message={errors.area_department_id} className="mt-1" />
+                        <p className="text-xs text-gray-500 mt-1">
+                            Departamento gerencial. A planilha deve conter classes gerenciais desta área.
+                        </p>
                     </div>
 
                     <div>

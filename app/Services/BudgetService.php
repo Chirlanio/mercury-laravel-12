@@ -55,6 +55,16 @@ class BudgetService
         $type = BudgetUploadType::from($data['upload_type']);
         $year = (int) $data['year'];
         $scopeLabel = trim((string) $data['scope_label']);
+        $areaDepartmentId = isset($data['area_department_id'])
+            ? (int) $data['area_department_id']
+            : null;
+
+        // Fase 5: valida coerência da área com as MCs dos items.
+        // Se a planilha tem MCs de áreas diferentes da selecionada, o user
+        // escolheu área errada ou a planilha está misturando departamentos.
+        if ($areaDepartmentId) {
+            $this->validateAreaCoherence($areaDepartmentId, $items);
+        }
 
         $version = $this->versions->resolveNextVersion($year, $scopeLabel, $type);
 
@@ -68,6 +78,7 @@ class BudgetService
             $items,
             $year,
             $scopeLabel,
+            $areaDepartmentId,
             $type,
             $version,
             $file,
@@ -95,6 +106,7 @@ class BudgetService
             $upload = BudgetUpload::create([
                 'year' => $year,
                 'scope_label' => $scopeLabel,
+                'area_department_id' => $data['area_department_id'] ?? null,
                 'version_label' => $version['label'],
                 'major_version' => $version['major'],
                 'minor_version' => $version['minor'],
@@ -205,6 +217,55 @@ class BudgetService
                 'upload_type' => 'Tipo de upload inválido. Use "novo" ou "ajuste".',
             ]);
         }
+    }
+
+    /**
+     * Confere se todas as MCs dos items pertencem ao departamento (área)
+     * selecionado. As MCs do seed têm `parent_id` apontando pro sintético
+     * 8.1.DD — basta garantir que todas coincidam com `$areaDepartmentId`.
+     *
+     * Se o upload é legacy (sem área) ou se a MC está fora da hierarquia
+     * gerencial, o check é pulado.
+     *
+     * @param  array<int, array<string, mixed>>  $items
+     */
+    protected function validateAreaCoherence(int $areaDepartmentId, array $items): void
+    {
+        $mcIds = collect($items)
+            ->pluck('management_class_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($mcIds)) {
+            return;
+        }
+
+        // Busca as MCs dos items e os parent_id delas
+        $mcs = \App\Models\ManagementClass::whereIn('id', $mcIds)
+            ->get(['id', 'code', 'name', 'parent_id']);
+
+        $divergent = $mcs->filter(
+            fn ($mc) => $mc->parent_id !== null && $mc->parent_id !== $areaDepartmentId
+        );
+
+        if ($divergent->isEmpty()) {
+            return;
+        }
+
+        $area = \App\Models\ManagementClass::find($areaDepartmentId);
+        $list = $divergent->take(5)->map(fn ($m) => "{$m->code} ({$m->name})")->implode(', ');
+        $more = $divergent->count() > 5 ? " e mais " . ($divergent->count() - 5) : '';
+
+        throw ValidationException::withMessages([
+            'area_department_id' => sprintf(
+                'A planilha tem classes gerenciais fora da área "%s": %s%s. Verifique a área escolhida ou corrija a planilha.',
+                $area?->name ?? 'selecionada',
+                $list,
+                $more
+            ),
+        ]);
     }
 
     /**

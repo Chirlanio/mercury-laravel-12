@@ -23,6 +23,8 @@ class BudgetImportEndpointTest extends TestCase
 
     protected ManagementClass $mc;
 
+    protected ManagementClass $areaDepartment;
+
     protected CostCenter $cc;
 
     protected function setUp(): void
@@ -40,11 +42,16 @@ class BudgetImportEndpointTest extends TestCase
             'created_by_user_id' => $this->adminUser->id,
         ]);
 
+        // Fase 5: MC precisa de parent_id apontando para um departamento
+        // para passar pelo validateAreaCoherence.
+        $this->areaDepartment = ManagementClass::where('code', '8.1.01')->firstOrFail();
+
         $this->mc = ManagementClass::create([
             'code' => 'MC-IMP',
             'name' => 'Gerencial Import',
             'accepts_entries' => true,
             'accounting_class_id' => $this->ac->id,
+            'parent_id' => $this->areaDepartment->id,
             'is_active' => true,
             'created_by_user_id' => $this->adminUser->id,
         ]);
@@ -142,6 +149,7 @@ class BudgetImportEndpointTest extends TestCase
                 'file' => $file,
                 'year' => 2026,
                 'scope_label' => 'ImportTest',
+                'area_department_id' => $this->areaDepartment->id,
                 'upload_type' => 'novo',
             ]);
 
@@ -167,6 +175,7 @@ class BudgetImportEndpointTest extends TestCase
                 'file' => $file,
                 'year' => 2026,
                 'scope_label' => 'WithMapping',
+                'area_department_id' => $this->areaDepartment->id,
                 'upload_type' => 'novo',
                 'mapping' => [
                     'cost_center' => [
@@ -201,6 +210,7 @@ class BudgetImportEndpointTest extends TestCase
                 'file' => $file,
                 'year' => 2026,
                 'scope_label' => 'NoValid',
+                'area_department_id' => $this->areaDepartment->id,
                 'upload_type' => 'novo',
             ]);
 
@@ -219,6 +229,7 @@ class BudgetImportEndpointTest extends TestCase
                 'file' => $file,
                 'year' => 2026,
                 'scope_label' => 'BadMap',
+                'area_department_id' => $this->areaDepartment->id,
                 'upload_type' => 'novo',
                 'mapping' => [
                     'cost_center' => [

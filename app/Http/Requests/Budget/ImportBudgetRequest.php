@@ -28,6 +28,7 @@ class ImportBudgetRequest extends FormRequest
             'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
             'year' => 'required|integer|min:2000|max:2100',
             'scope_label' => 'required|string|min:2|max:100',
+            'area_department_id' => 'required|integer|exists:management_classes,id',
             'upload_type' => ['required', Rule::in($types)],
             'notes' => 'nullable|string|max:2000',
 
@@ -49,6 +50,8 @@ class ImportBudgetRequest extends FormRequest
         return [
             'year.required' => 'O ano é obrigatório.',
             'scope_label.required' => 'Informe o escopo.',
+            'area_department_id.required' => 'Selecione a Área (departamento) do orçamento.',
+            'area_department_id.exists' => 'Área selecionada não existe.',
             'upload_type.required' => 'Informe se é novo ou ajuste.',
             'upload_type.in' => 'Tipo inválido.',
             'mapping.accounting_class.*.exists' => 'Conta contábil mapeada não encontrada.',

@@ -29,6 +29,9 @@ class StoreBudgetRequest extends FormRequest
         return [
             'year' => 'required|integer|min:2000|max:2100',
             'scope_label' => 'required|string|min:2|max:100',
+            // Fase 5: Área (departamento gerencial sintético). Obrigatório
+            // em uploads novos; uploads legacy sem área são backfilled.
+            'area_department_id' => 'required|integer|exists:management_classes,id',
             'upload_type' => ['required', Rule::in($types)],
             'notes' => 'nullable|string|max:2000',
             'file' => 'required|file|mimes:xlsx,xls,csv|max:10240', // 10MB
@@ -64,6 +67,8 @@ class StoreBudgetRequest extends FormRequest
             'year.max' => 'Ano inválido.',
             'scope_label.required' => 'Informe o escopo (ex: Administrativo, TI, Geral).',
             'scope_label.min' => 'Escopo deve ter ao menos 2 caracteres.',
+            'area_department_id.required' => 'Selecione a Área (departamento) do orçamento.',
+            'area_department_id.exists' => 'Área selecionada não existe.',
             'upload_type.required' => 'Informe se é um orçamento novo ou um ajuste.',
             'upload_type.in' => 'Tipo de upload inválido.',
             'file.required' => 'Anexe a planilha original do orçamento.',

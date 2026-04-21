@@ -22,6 +22,8 @@ class BudgetControllerTest extends TestCase
 
     protected ManagementClass $mc;
 
+    protected ManagementClass $areaDepartment;
+
     protected CostCenter $cc;
 
     protected Store $store;
@@ -42,12 +44,24 @@ class BudgetControllerTest extends TestCase
             'created_by_user_id' => $this->adminUser->id,
         ]);
 
+        // Fase 5: MC analítica tem que ter parent_id apontando para um
+        // departamento (sintético 8.1.DD) pra validateAreaCoherence aceitar.
+        $this->areaDepartment = ManagementClass::where('code', '8.1.01')->first()
+            ?? ManagementClass::create([
+                'code' => '8.1.99',
+                'name' => 'Dept Teste',
+                'accepts_entries' => false,
+                'is_active' => true,
+                'created_by_user_id' => $this->adminUser->id,
+            ]);
+
         $this->mc = ManagementClass::create([
             'code' => 'MC-BUDGET',
             'name' => 'Admin MC',
             'accepts_entries' => true,
             'accounting_class_id' => $this->ac->id,
             'cost_center_id' => $this->cc->id,
+            'parent_id' => $this->areaDepartment->id,
             'is_active' => true,
             'created_by_user_id' => $this->adminUser->id,
         ]);
@@ -60,6 +74,7 @@ class BudgetControllerTest extends TestCase
         return array_merge([
             'year' => 2026,
             'scope_label' => 'Administrativo',
+            'area_department_id' => $this->areaDepartment->id,
             'upload_type' => 'novo',
             'notes' => 'Upload inicial',
             'file' => UploadedFile::fake()->create('orc-2026.xlsx', 100),
@@ -130,7 +145,7 @@ class BudgetControllerTest extends TestCase
         $response = $this->actingAs($this->adminUser)
             ->post(route('budgets.store'), []);
 
-        $response->assertSessionHasErrors(['year', 'scope_label', 'upload_type', 'file', 'items']);
+        $response->assertSessionHasErrors(['year', 'scope_label', 'area_department_id', 'upload_type', 'file', 'items']);
     }
 
     public function test_store_rejects_item_without_required_fks(): void

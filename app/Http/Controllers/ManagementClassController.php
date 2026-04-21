@@ -147,30 +147,66 @@ class ManagementClassController extends Controller
 
         // MCs analíticas que têm budget ativo no ano — lista de IDs para
         // intersectar com as analíticas de cada departamento.
+        //
+        // Estratégia de filtro:
+        //   1. Se todos os uploads ativos do ano têm area_department_id setado
+        //      (Fase 5), usa o WHERE direto no parent_id (O(1)).
+        //   2. Senão, fallback via BudgetItem → management_class_id (mais lento
+        //      mas funciona pra uploads legacy sem área).
         $mcIdsWithBudget = null;
+        $areaDepartmentIds = null;
         if ($year && ! $skipBudgetFilter) {
-            $mcIdsWithBudget = \App\Models\BudgetItem::query()
-                ->whereHas('upload', fn ($q) => $q->where('year', $year)
-                    ->where('is_active', true)
-                    ->whereNull('deleted_at'))
-                ->whereNotNull('management_class_id')
-                ->distinct()
-                ->pluck('management_class_id')
-                ->all();
+            $activeUploads = \App\Models\BudgetUpload::query()
+                ->where('year', $year)
+                ->where('is_active', true)
+                ->whereNull('deleted_at')
+                ->get(['id', 'area_department_id']);
 
-            // Nenhuma MC com budget → devolve lista vazia
-            if (empty($mcIdsWithBudget)) {
+            if ($activeUploads->isEmpty()) {
                 return response()->json(['departments' => []]);
+            }
+
+            $allHaveArea = $activeUploads->every(fn ($u) => $u->area_department_id !== null);
+
+            if ($allHaveArea) {
+                // Caminho rápido: filtra departamentos direto via coluna
+                $areaDepartmentIds = $activeUploads
+                    ->pluck('area_department_id')
+                    ->unique()
+                    ->values()
+                    ->all();
+            } else {
+                // Fallback: deriva via BudgetItem.management_class_id
+                $mcIdsWithBudget = \App\Models\BudgetItem::query()
+                    ->whereHas('upload', fn ($q) => $q->where('year', $year)
+                        ->where('is_active', true)
+                        ->whereNull('deleted_at'))
+                    ->whereNotNull('management_class_id')
+                    ->distinct()
+                    ->pluck('management_class_id')
+                    ->all();
+
+                if (empty($mcIdsWithBudget)) {
+                    return response()->json(['departments' => []]);
+                }
             }
         }
 
         // Departamentos = sintéticos nível 3 (8.1.DD). Ignora 8 e 8.1 que são
         // raiz/agregador — só os 11 departamentos de negócio.
-        $departments = ManagementClass::query()
+        $departmentsQuery = ManagementClass::query()
             ->notDeleted()
             ->where('accepts_entries', false)
             ->where('code', 'like', '8.1._%')
-            ->whereRaw('LENGTH(code) = ?', [6]) // "8.1.XX" — LENGTH é portável MySQL+SQLite
+            ->whereRaw('LENGTH(code) = ?', [6]); // "8.1.XX" — LENGTH é portável MySQL+SQLite
+
+        // Caminho rápido (Fase 5): filtra direto pelos area_department_id
+        // dos uploads ativos do ano.
+        if ($areaDepartmentIds !== null) {
+            $departmentsQuery->whereIn('id', $areaDepartmentIds);
+        }
+
+        $departments = $departmentsQuery
             ->orderBy('sort_order')
             ->orderBy('code')
             ->get(['id', 'code', 'name']);

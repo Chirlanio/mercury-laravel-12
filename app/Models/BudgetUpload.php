@@ -29,6 +29,7 @@ class BudgetUpload extends Model
     protected $fillable = [
         'year',
         'scope_label',
+        'area_department_id',
         'version_label',
         'major_version',
         'minor_version',
@@ -66,6 +67,17 @@ class BudgetUpload extends Model
     public function items(): HasMany
     {
         return $this->hasMany(BudgetItem::class);
+    }
+
+    /**
+     * Departamento gerencial (sintético 8.1.DD) que representa a "Área" do
+     * orçamento — Marketing, Operações, Fiscal, Comercial, etc. Opcional
+     * em uploads legacy; obrigatório para uploads novos (validado no
+     * controller, não no banco).
+     */
+    public function areaDepartment(): BelongsTo
+    {
+        return $this->belongsTo(ManagementClass::class, 'area_department_id');
     }
 
     public function statusHistories(): HasMany
