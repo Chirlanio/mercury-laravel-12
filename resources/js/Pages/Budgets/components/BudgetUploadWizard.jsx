@@ -399,6 +399,7 @@ export default function BudgetUploadWizard({ show, onClose, enums = {}, selects 
                     effectiveImportableRows={effectiveImportableRows}
                     enums={enums}
                     errors={errors}
+                    departments={departments}
                 />
             )}
         </StandardModal>
@@ -584,7 +585,7 @@ function UnresolvedRow({ type, entry, selected, onChange }) {
 // ============================================================
 // STEP 3 — Confirm
 // ============================================================
-function ConfirmStep({ header, setHeader, preview, effectiveImportableRows, enums, errors }) {
+function ConfirmStep({ header, setHeader, preview, effectiveImportableRows, enums, errors, departments = [] }) {
     return (
         <>
             <StandardModal.Section title="Confirmação do import">

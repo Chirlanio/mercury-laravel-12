@@ -658,7 +658,7 @@ function AlertsBanner({ alerts }) {
     const iconColor = hasExceeded ? 'text-red-600' : 'text-amber-600';
 
     return (
-        <div className={`mt-6 border rounded-lg p-4 ${bannerColor}`}>
+        <div className={`mt-6 mb-6 border rounded-lg p-4 ${bannerColor}`}>
             <div className="flex items-start gap-3">
                 <ExclamationTriangleIcon className={`w-6 h-6 shrink-0 mt-0.5 ${iconColor}`} />
                 <div className="flex-1">

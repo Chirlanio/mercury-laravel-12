@@ -1,8 +1,8 @@
 # Roadmap — Pendências do Módulo Orçamento (Budgets)
 
-**Data:** 2026-04-20
-**Estado atual:** Fases 1–4 concluídas + integração com OrderPayments (C1+C2+C3a).
-**Pendentes:** 3 features principais + 3 melhorias recomendadas.
+**Data:** 2026-04-21
+**Estado atual:** Fases 1–7 concluídas + integração OrderPayments (C1+C2+C3a+C3b) + todas 3 melhorias (8/9/10) entregues.
+**Pendente único:** C3c (tornar cost_center_id + accounting_class_id NOT NULL em order_payments — aguarda classificação manual das 12 OPs antigas).
 
 ---
 
@@ -78,54 +78,29 @@
 
 ## Melhorias recomendadas (não críticas)
 
-### 8 — Editor inline de BudgetItem [UX]
+### 8 — Editor inline de BudgetItem [UX] ✅ CONCLUÍDA 2026-04-21
 
-**Motivação.** Hoje só dá pra substituir via upload novo. Ajustar 1 valor → re-upload da planilha inteira → nova versão minor. Peso operacional alto para correções pontuais.
+**Entregue.** `BudgetItemController::update` + `EditItemModal` com 12 meses + descrições + supplier. Auditoria via `Auditable` trait (log_activity). Recálculo automático de `year_total` do item + `total_year` do upload.
 
-**Escopo.**
-
-1. `BudgetItemController::update` + policy (quem pode editar items do budget ativo?)
-2. Modal edição (single item): ajustar valores mensais, supplier, descrição
-3. Tabela no Dashboard/Show com ✏ ao lado de cada linha
-4. Auditar mudanças (nova tabela `budget_item_histories` ou reusar `budget_status_histories`)
-5. Impacto: itens editados não mudam o `budget_upload.total_year` até recálculo manual (ou trigger)
-
-**Risco.** Médio. Mexer em orçamento ativo é sensível — precisa audit trail forte.
-
-**Estimativa.** 3 commits.
+Commits: `d2dff5a feat(budgets): Melhoria 8` e `407cc0e fix(budgets): EditItemModal recebe campos de texto + 12 meses`.
 
 ---
 
-### 9 — Comparativo entre versões [ANALÍTICO]
+### 9 — Comparativo entre versões [ANALÍTICO] ✅ CONCLUÍDA 2026-04-21
 
-**Motivação.** Quando há upload "ajuste" (v1.01, v1.02), o user não tem visão de o que mudou entre versões. Útil em auditoria.
+**Entregue.** `BudgetDiffService` com identidade lógica (AC + MC + CC + store). Página `/budgets/compare?v1=X&v2=Y` com tabs (Adicionadas/Removidas/Alteradas/Resumo). Endpoint retorna diff estruturado + totais + deltas mensais. Gate por `(year, scope_label)` igual.
 
-**Escopo.**
-
-1. Service que calcula diff entre 2 uploads (linhas novas, removidas, alteradas, totais por mês)
-2. Página `/budgets/compare?v1=X&v2=Y` com tabela lado-a-lado
-3. Limitação: só compara uploads do mesmo `(year, scope_label)`
-
-**Risco.** Baixo. Read-only, não altera estado.
-
-**Estimativa.** 2 commits.
+Commit: `181027d feat(budgets): Melhoria 9`. Tests: 8 assertions em `BudgetCompareTest`.
 
 ---
 
-### 10 — Lixeira de BudgetUpload [ADMIN]
+### 10 — Lixeira de BudgetUpload [ADMIN] ✅ CONCLUÍDA 2026-04-21
 
-**Motivação.** Upload soft-deleted some do dashboard. Se o user deletou por engano ou quer reativar, não tem UI.
+**Entregue.** Rota `/budgets/trash` (permission `MANAGE_BUDGETS`) lista uploads soft-deletados com motivo + quem/quando. Botão "Restaurar" zera `deleted_at/by/reason` mantendo `is_active=false`. Botão "Excluir definitivamente" destrói upload + items via FK cascade, restrito a `super_admin`. Botão "Lixeira" adicionado ao header do Index.
 
-**Escopo.**
+Commit: `d203ba5 feat(budgets): Melhoria 10`. Tests: 9 passed / 41 assertions em `BudgetTrashTest`.
 
-1. Página `/budgets/trash` (só admin+)
-2. Listagem de uploads deletados com motivo + quem/quando
-3. Botão "Restaurar" (retira `deleted_at`, não reativa — precisa upload novo para ativar)
-4. Botão "Excluir definitivamente" (destrutivo — policy exige super_admin)
-
-**Risco.** Baixo. Soft-delete já existe.
-
-**Estimativa.** 1 commit.
+**Fix colateral.** `BudgetController::forceDelete` usava `method_exists($user->role, 'value')` — falso pra `BackedEnum` porque `value` é property readonly, não método. Trocado por `$role instanceof BackedEnum ? $role->value : …`. Bug invisível na branch `admin` do check (admin já caía no 403 correto), aparecia só ao testar super_admin.
 
 ---
 
@@ -136,21 +111,24 @@
 | 1 | Fase 5 (Área) | ✅ Concluída 2026-04-21 | Arquitetural |
 | 2 | Fase 6 (Export) | ✅ Concluída 2026-04-21 | Feature |
 | 3 | Fase 7 (AC fallback) | ✅ Decidido 2026-04-21 (Opção A + hint UX) | UX |
-| 4 | Melhoria 8 (Edit inline) | ⏳ Pendente | UX |
-| 5 | Melhoria 9 (Comparativo) | ⏳ Pendente | Analítico |
-| 6 | Melhoria 10 (Lixeira) | ⏳ Pendente | Admin |
+| 4 | Melhoria 8 (Edit inline) | ✅ Concluída 2026-04-21 | UX |
+| 5 | Melhoria 9 (Comparativo) | ✅ Concluída 2026-04-21 | Analítico |
+| 6 | Melhoria 10 (Lixeira) | ✅ Concluída 2026-04-21 | Admin |
+| 7 | C3b (backfill OPs antigas) | ✅ Concluída 2026-04-21 | Integração |
+| 8 | C3c (NOT NULL em order_payments) | ⏳ Aguarda classificação das 12 OPs antigas | Integração |
 
-Fases 5-7 fecham o pacote original do roadmap Budgets (Fase 5 oficial). Melhorias 8-10 são incrementos separados, sem dependência estrita, podem entrar em qualquer ordem.
+Todo o pacote planejado está entregue. Única pendência: após classificar manualmente via modal "Editar" o último lote de OPs que ficaram sem CC/AC na integração inicial, rodar migration para tornar `order_payments.cost_center_id` e `order_payments.accounting_class_id` NOT NULL.
 
 ---
 
 ## Estado atual dos módulos envolvidos
 
-**budget_uploads** — schema completo, falta `area_department_id`.
-**budget_items** — schema completo.
-**budget_status_histories** — schema completo (recovered após drop manual).
-**order_payments** — integração funcional (C1+C2+C3a). Falta C3b (backfill) + C3c (NOT NULL).
-**management_classes** — seed 11 deptos + 169 analíticas. Endpoint `/departments` funcional.
+**budget_uploads** — schema completo, `area_department_id` populado (FK obrigatória em novos uploads).
+**budget_items** — schema completo, editável inline (Melhoria 8).
+**budget_status_histories** — schema completo.
+**order_payments** — integração funcional (C1+C2+C3a+C3b). Falta só C3c (NOT NULL).
+**management_classes** — seed 11 deptos + 169 analíticas. Endpoint `/departments?year=Y` usa `area_department_id` direto (O(1)).
+**Rotas Budgets** — 18+ endpoints: index, statistics, dashboard, consumption, show, store, update, destroy, restore, force-delete, trash, compare, export, download, template, items-for-cost-center, accounting-classes-for-cost-center, items update (inline).
 
 ---
 
