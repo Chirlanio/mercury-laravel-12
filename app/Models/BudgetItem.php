@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,9 +11,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * Linha de um orçamento — 1 linha por (CC + AC + MC + store opcional) com
  * os 12 valores mensais e total calculado.
+ *
+ * Usa Auditable para registrar edições pontuais (Melhoria 8 do roadmap):
+ * cada update gera uma linha em activity_logs com before/after, acessível
+ * no audit trail do projeto.
  */
 class BudgetItem extends Model
 {
+    use Auditable;
     protected $fillable = [
         'budget_upload_id',
         'accounting_class_id',

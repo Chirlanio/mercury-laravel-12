@@ -1,5 +1,6 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
+import axios from 'axios';
 import {
     BanknotesIcon,
     CheckCircleIcon,
@@ -10,7 +11,11 @@ import {
     ArrowDownTrayIcon,
     CalendarIcon,
     TagIcon,
+    PencilSquareIcon,
 } from '@heroicons/react/24/outline';
+import StandardModal from '@/Components/StandardModal';
+import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
+import { maskMoney, parseMoney } from '@/Hooks/useMasks';
 import {
     ResponsiveContainer,
     BarChart,
@@ -43,6 +48,9 @@ const TABS = [
 
 export default function Dashboard({ budget, consumption }) {
     const [activeTab, setActiveTab] = useState('by_cost_center');
+    const [editingItem, setEditingItem] = useState(null);
+    const { hasPermission } = usePermissions();
+    const canEdit = hasPermission(PERMISSIONS.UPLOAD_BUDGETS);
 
     const statusCounts = useMemo(() => {
         const counts = { ok: 0, warning: 0, exceeded: 0 };
@@ -230,12 +238,27 @@ export default function Dashboard({ budget, consumption }) {
                                 />
                             )}
                             {activeTab === 'by_item' && (
-                                <ItemsTable rows={consumption?.by_item || []} />
+                                <ItemsTable
+                                    rows={consumption?.by_item || []}
+                                    canEdit={canEdit}
+                                    onEdit={setEditingItem}
+                                />
                             )}
                         </div>
                     </div>
                 </div>
             </div>
+
+            {editingItem && (
+                <EditItemModal
+                    item={editingItem}
+                    onClose={() => setEditingItem(null)}
+                    onSaved={() => {
+                        setEditingItem(null);
+                        router.reload({ only: ['consumption'] });
+                    }}
+                />
+            )}
         </>
     );
 }
@@ -315,7 +338,7 @@ function AggregationTable({ rows, dimensionLabel, showItemsCount }) {
     );
 }
 
-function ItemsTable({ rows }) {
+function ItemsTable({ rows, canEdit, onEdit }) {
     if (rows.length === 0) {
         return (
             <EmptyState
@@ -341,6 +364,7 @@ function ItemsTable({ rows }) {
                         <th className="px-2 py-2 text-right font-medium">Realizado</th>
                         <th className="px-2 py-2 text-right font-medium">Disponível</th>
                         <th className="px-2 py-2 text-right font-medium w-44">Utilização</th>
+                        {canEdit && <th className="px-2 py-2 w-10"></th>}
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -376,11 +400,171 @@ function ItemsTable({ rows }) {
                             <td className="px-2 py-1.5">
                                 <UtilizationBar pct={row.utilization_pct} status={row.status} />
                             </td>
+                            {canEdit && (
+                                <td className="px-2 py-1.5 text-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => onEdit(row)}
+                                        className="text-indigo-600 hover:text-indigo-800"
+                                        title="Editar linha"
+                                    >
+                                        <PencilSquareIcon className="h-4 w-4" />
+                                    </button>
+                                </td>
+                            )}
                         </tr>
                     ))}
                 </tbody>
             </table>
         </div>
+    );
+}
+
+/**
+ * Modal de edição inline de BudgetItem. Edita valores mensais + campos
+ * de texto (supplier, descrições). FKs (CC/AC/MC/loja) ficam read-only —
+ * mudanças estruturais exigem novo upload.
+ */
+function EditItemModal({ item, onClose, onSaved }) {
+    const [form, setForm] = useState(() => ({
+        supplier: item.supplier || '',
+        account_description: item.account_description || '',
+        class_description: item.class_description || '',
+        justification: item.justification || '',
+        months: (() => {
+            const out = {};
+            for (let m = 1; m <= 12; m++) {
+                const val = item[`month_${String(m).padStart(2, '0')}_value`] ?? (item.months?.[m]);
+                out[m] = val != null ? maskMoney(String(Math.round(parseFloat(val) * 100))) : '';
+            }
+            return out;
+        })(),
+    }));
+    const [processing, setProcessing] = useState(false);
+    const [errors, setErrors] = useState({});
+
+    const yearTotal = useMemo(() => {
+        return Object.values(form.months).reduce((s, v) => s + parseMoney(v || '0'), 0);
+    }, [form.months]);
+
+    const handleSubmit = () => {
+        setProcessing(true);
+        setErrors({});
+        const payload = {
+            supplier: form.supplier,
+            account_description: form.account_description,
+            class_description: form.class_description,
+            justification: form.justification,
+        };
+        for (let m = 1; m <= 12; m++) {
+            payload[`month_${String(m).padStart(2, '0')}_value`] = parseMoney(form.months[m] || '0');
+        }
+        axios.patch(route('budget-items.update', item.id), payload)
+            .then(() => onSaved())
+            .catch((err) => {
+                setErrors(err.response?.data?.errors || {});
+                setProcessing(false);
+            });
+    };
+
+    const MONTH_LABELS_FULL = [
+        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+    ];
+
+    return (
+        <StandardModal
+            show={true}
+            onClose={onClose}
+            title="Editar linha do orçamento"
+            headerColor="bg-amber-600"
+            maxWidth="5xl"
+            onSubmit={handleSubmit}
+            footer={
+                <StandardModal.Footer
+                    onCancel={onClose}
+                    onSubmit="submit"
+                    submitLabel={processing ? 'Salvando…' : 'Salvar alterações'}
+                    submitColor="bg-amber-600 hover:bg-amber-700"
+                    processing={processing}
+                />
+            }
+        >
+            <StandardModal.Section title="Contexto (somente leitura)" icon="🔒">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                    <StandardModal.MiniField label="Conta Contábil" value={item.accounting_class?.name || '—'} />
+                    <StandardModal.MiniField label="Conta Gerencial" value={item.management_class?.name || '—'} />
+                    <StandardModal.MiniField label="Centro de Custo" value={item.cost_center?.name || '—'} />
+                    <StandardModal.MiniField label="Loja" value={item.store?.name || '—'} />
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                    Para alterar conta/CC/MC/loja, faça novo upload do orçamento.
+                </p>
+            </StandardModal.Section>
+
+            <StandardModal.Section title="Dados do fornecedor / descrição" icon="🏷">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Fornecedor</label>
+                        <input type="text" value={form.supplier}
+                            onChange={(e) => setForm({ ...form, supplier: e.target.value })}
+                            maxLength={255}
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" />
+                        {errors.supplier && <p className="mt-1 text-xs text-red-600">{errors.supplier[0]}</p>}
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Descrição da Conta</label>
+                        <input type="text" value={form.account_description}
+                            onChange={(e) => setForm({ ...form, account_description: e.target.value })}
+                            maxLength={255}
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Descrição da Classe</label>
+                        <input type="text" value={form.class_description}
+                            onChange={(e) => setForm({ ...form, class_description: e.target.value })}
+                            maxLength={255}
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Justificativa</label>
+                        <textarea value={form.justification}
+                            onChange={(e) => setForm({ ...form, justification: e.target.value })}
+                            rows={2} maxLength={2000}
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" />
+                    </div>
+                </div>
+            </StandardModal.Section>
+
+            <StandardModal.Section title="Valores mensais" icon="💰">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {MONTH_LABELS_FULL.map((name, idx) => {
+                        const m = idx + 1;
+                        return (
+                            <div key={m}>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">{name}</label>
+                                <div className="relative">
+                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-xs">R$</span>
+                                    <input type="text" value={form.months[m]}
+                                        onChange={(e) => setForm({
+                                            ...form,
+                                            months: { ...form.months, [m]: maskMoney(e.target.value) },
+                                        })}
+                                        placeholder="0,00"
+                                        className="w-full pl-8 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" />
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+                <div className="mt-4 bg-indigo-50 border border-indigo-200 rounded p-3 flex justify-between items-center">
+                    <span className="text-sm font-medium text-indigo-900">Total Anual</span>
+                    <span className="text-xl font-bold text-indigo-700 font-mono">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(yearTotal)}
+                    </span>
+                </div>
+            </StandardModal.Section>
+        </StandardModal>
     );
 }
 

@@ -1151,6 +1151,8 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/budgets/preview', [\App\Http\Controllers\BudgetController::class, 'preview'])->name('budgets.preview');
             Route::post('/budgets/import', [\App\Http\Controllers\BudgetController::class, 'import'])->name('budgets.import');
             Route::put('/budgets/{budget}', [\App\Http\Controllers\BudgetController::class, 'update'])->whereNumber('budget')->name('budgets.update');
+            // Edição inline de items (Melhoria 8) — mesma permission que upload
+            Route::patch('/budget-items/{budgetItem}', [\App\Http\Controllers\BudgetItemController::class, 'update'])->whereNumber('budgetItem')->name('budget-items.update');
         });
 
         Route::middleware('permission:'.Permission::DELETE_BUDGETS->value)->group(function () {
