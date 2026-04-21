@@ -7,6 +7,7 @@ import {
     FireIcon,
     ChartBarIcon,
     ArrowLeftIcon,
+    ArrowDownTrayIcon,
     CalendarIcon,
     TagIcon,
 } from '@heroicons/react/24/outline';
@@ -144,6 +145,13 @@ export default function Dashboard({ budget, consumption }) {
                                 )}
                             </div>
                         </div>
+                        <a
+                            href={route('budgets.export', budget.id)}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+                        >
+                            <ArrowDownTrayIcon className="h-4 w-4" />
+                            Exportar xlsx
+                        </a>
                     </div>
 
                     <StatisticsGrid cards={statisticsCards} cols={6} />

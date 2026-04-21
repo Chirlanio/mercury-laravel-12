@@ -1142,6 +1142,10 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/budgets/{budget}/download', [\App\Http\Controllers\BudgetController::class, 'download'])->whereNumber('budget')->name('budgets.download');
         });
 
+        Route::middleware('permission:'.Permission::EXPORT_BUDGETS->value)->group(function () {
+            Route::get('/budgets/{budget}/export', [\App\Http\Controllers\BudgetController::class, 'export'])->whereNumber('budget')->name('budgets.export');
+        });
+
         Route::middleware('permission:'.Permission::UPLOAD_BUDGETS->value)->group(function () {
             Route::post('/budgets', [\App\Http\Controllers\BudgetController::class, 'store'])->name('budgets.store');
             Route::post('/budgets/preview', [\App\Http\Controllers\BudgetController::class, 'preview'])->name('budgets.preview');

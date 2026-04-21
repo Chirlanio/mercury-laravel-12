@@ -185,6 +185,31 @@ class BudgetController extends Controller
     }
 
     /**
+     * Export consolidado xlsx multi-sheet — Fase 6.
+     *
+     * 6 sheets: Resumo, Por CC, Por AC, Por Área, Por Mês, Detalhe.
+     * Reusa BudgetConsumptionService para cálculos — mesmos números do
+     * dashboard batem linha a linha no xlsx.
+     */
+    public function export(BudgetUpload $budget): HttpResponse
+    {
+        if ($budget->isDeleted()) {
+            abort(404);
+        }
+
+        $filename = sprintf(
+            'orcamento_%s_%d_v%s_%s.xlsx',
+            \Illuminate\Support\Str::slug($budget->scope_label),
+            $budget->year,
+            $budget->version_label,
+            now()->format('Ymd-His')
+        );
+
+        return \App\Exports\BudgetExport::fromBudget($budget, $this->consumption)
+            ->download($filename);
+    }
+
+    /**
      * JSON do consumo — útil para polling/refresh sem recarregar a página.
      */
     public function consumptionJson(BudgetUpload $budget): JsonResponse
