@@ -31,7 +31,52 @@ class BudgetController extends Controller
         private BudgetFileStorageService $storage,
         private BudgetImportService $importService,
         private BudgetConsumptionService $consumption,
+        private \App\Services\BudgetDiffService $diffService,
     ) {}
+
+    /**
+     * Comparativo entre 2 versões de BudgetUpload (Melhoria 9 do roadmap).
+     *
+     * Query params:
+     *   - v1 (int, obrigatório): id do upload "base"
+     *   - v2 (int, obrigatório): id do upload "comparado"
+     *
+     * Devem ser do mesmo year + scope_label. Validação em BudgetDiffService.
+     * Página Inertia renderiza o diff lado a lado.
+     */
+    public function compare(Request $request): Response
+    {
+        $v1Id = $request->integer('v1');
+        $v2Id = $request->integer('v2');
+
+        if (! $v1Id || ! $v2Id) {
+            return Inertia::render('Budgets/Compare', [
+                'error' => 'Selecione duas versões para comparar.',
+                'diff' => null,
+            ]);
+        }
+
+        $v1 = BudgetUpload::find($v1Id);
+        $v2 = BudgetUpload::find($v2Id);
+
+        if (! $v1 || ! $v2) {
+            abort(404);
+        }
+
+        try {
+            $diff = $this->diffService->diff($v1, $v2);
+        } catch (ValidationException $e) {
+            return Inertia::render('Budgets/Compare', [
+                'error' => collect($e->errors())->flatten()->first() ?? 'Erro na comparação.',
+                'diff' => null,
+            ]);
+        }
+
+        return Inertia::render('Budgets/Compare', [
+            'diff' => $diff,
+            'error' => null,
+        ]);
+    }
 
     /**
      * Dashboard de consumo previsto × realizado para um budget.

@@ -1136,6 +1136,10 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/budgets/accounting-classes-for-cost-center/{costCenter}', [\App\Http\Controllers\BudgetController::class, 'accountingClassesForCostCenter'])->whereNumber('costCenter')->name('budgets.accounting-classes-for-cost-center');
         });
 
+        // Comparativo entre versões (Melhoria 9) — antes da rota {budget}
+        // para não conflitar com o wildcard.
+        Route::get('/budgets/compare', [\App\Http\Controllers\BudgetController::class, 'compare'])->name('budgets.compare');
+
         Route::get('/budgets/{budget}', [\App\Http\Controllers\BudgetController::class, 'show'])->whereNumber('budget')->name('budgets.show');
 
         Route::middleware('permission:'.Permission::DOWNLOAD_BUDGETS->value)->group(function () {

@@ -13,6 +13,7 @@ import {
     ClockIcon,
     CloudArrowUpIcon,
     ChartBarIcon,
+    ArrowsRightLeftIcon,
 } from '@heroicons/react/24/outline';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
@@ -63,6 +64,8 @@ export default function Index({ budgets, filters = {}, statistics = {}, enums = 
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleteReason, setDeleteReason] = useState('');
     const [deleteProcessing, setDeleteProcessing] = useState(false);
+    const [compareTarget, setCompareTarget] = useState(null); // budget selecionado como v1
+    const [compareV2Id, setCompareV2Id] = useState('');
 
     const handleDelete = () => {
         if (!deleteTarget) return;
@@ -211,6 +214,15 @@ export default function Index({ budgets, filters = {}, statistics = {}, enums = 
                             onClick={() => window.location.href = route('budgets.download', b.id)}
                         />
                     )}
+                    <ActionButtons.Custom
+                        variant="warning"
+                        icon={ArrowsRightLeftIcon}
+                        title="Comparar com outra versão"
+                        onClick={() => {
+                            setCompareTarget(b);
+                            setCompareV2Id('');
+                        }}
+                    />
                 </div>
             ),
         },
@@ -549,6 +561,67 @@ export default function Index({ budgets, filters = {}, statistics = {}, enums = 
                 enums={enums}
                 selects={selects}
             />
+
+            {/* -------- Compare Modal -------- */}
+            <StandardModal
+                show={compareTarget !== null}
+                onClose={() => { setCompareTarget(null); setCompareV2Id(''); }}
+                title="Comparar versões"
+                subtitle={compareTarget
+                    ? `Base: v${compareTarget.version_label} — ${compareTarget.scope_label} ${compareTarget.year}`
+                    : ''}
+                headerColor="bg-amber-600"
+                headerIcon={<ArrowsRightLeftIcon className="h-6 w-6" />}
+                maxWidth="md"
+                footer={
+                    <StandardModal.Footer
+                        onCancel={() => { setCompareTarget(null); setCompareV2Id(''); }}
+                        onSubmit={() => {
+                            if (!compareTarget || !compareV2Id) return;
+                            window.location.href = route('budgets.compare') + `?v1=${compareTarget.id}&v2=${compareV2Id}`;
+                        }}
+                        submitLabel="Comparar"
+                        submitColor="bg-amber-600 hover:bg-amber-700"
+                        disabled={!compareV2Id}
+                    />
+                }
+            >
+                {compareTarget && (() => {
+                    const peers = (budgets.data || []).filter(
+                        b => b.id !== compareTarget.id
+                            && b.year === compareTarget.year
+                            && b.scope_label === compareTarget.scope_label
+                    );
+                    if (peers.length === 0) {
+                        return (
+                            <div className="text-sm text-gray-600">
+                                Nenhuma outra versão encontrada para <strong>{compareTarget.scope_label} {compareTarget.year}</strong>.
+                                Comparativos exigem 2 versões do mesmo escopo e ano.
+                            </div>
+                        );
+                    }
+                    return (
+                        <div>
+                            <InputLabel value="Comparar com:" className="mb-1" />
+                            <select
+                                value={compareV2Id}
+                                onChange={(e) => setCompareV2Id(e.target.value)}
+                                className="w-full rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm"
+                            >
+                                <option value="">Selecione uma versão</option>
+                                {peers.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                        v{p.version_label} {p.is_active ? '(ativa)' : ''} · {p.created_at}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="mt-2 text-xs text-gray-500">
+                                O comparativo mostra linhas adicionadas, removidas e alteradas entre as duas versões.
+                            </p>
+                        </div>
+                    );
+                })()}
+            </StandardModal>
         </>
     );
 }
