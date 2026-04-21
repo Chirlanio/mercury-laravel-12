@@ -76,6 +76,7 @@ export default function Index({
     const [search, setSearch] = useState(filters.search || '');
     const [statusFilter, setStatusFilter] = useState(filters.status || '');
     const [storeFilter, setStoreFilter] = useState(filters.store_id || '');
+    const [unclassifiedFilter, setUnclassifiedFilter] = useState(!!filters.unclassified);
     const [viewMode, setViewMode] = useState('kanban');
     const [transitionError, setTransitionError] = useState('');
     const [detailOrderId, setDetailOrderId] = useState(null);
@@ -105,7 +106,10 @@ export default function Index({
 
     const applyFilters = () => {
         router.get(route('order-payments.index'), {
-            search: search || undefined, status: statusFilter || undefined, store_id: storeFilter || undefined,
+            search: search || undefined,
+            status: statusFilter || undefined,
+            store_id: storeFilter || undefined,
+            unclassified: unclassifiedFilter ? 1 : undefined,
         }, { preserveState: true });
     };
 
@@ -230,6 +234,7 @@ export default function Index({
                     {/* Filters */}
                     <Filters search={search} setSearch={setSearch} statusFilter={statusFilter}
                         setStatusFilter={setStatusFilter} storeFilter={storeFilter} setStoreFilter={setStoreFilter}
+                        unclassifiedFilter={unclassifiedFilter} setUnclassifiedFilter={setUnclassifiedFilter}
                         statusOptions={statusOptions} stores={selects.stores || []} onApply={applyFilters} />
 
                     {/* Kanban */}
@@ -1283,7 +1288,8 @@ function TableView({ payments, canEdit, statusOptions, onTransition, onDetail, o
 // ============================================================
 // SHARED COMPONENTS
 // ============================================================
-function Filters({ search, setSearch, statusFilter, setStatusFilter, storeFilter, setStoreFilter, statusOptions, stores, onApply }) {
+function Filters({ search, setSearch, statusFilter, setStatusFilter, storeFilter, setStoreFilter,
+    unclassifiedFilter, setUnclassifiedFilter, statusOptions, stores, onApply }) {
     return (
         <div className="bg-white shadow rounded-lg p-4 mb-6">
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -1304,6 +1310,23 @@ function Filters({ search, setSearch, statusFilter, setStatusFilter, storeFilter
                     {stores.map(s => <option key={s.id} value={s.id}>{s.code} - {s.name}</option>)}
                 </select>
                 <Button variant="primary" onClick={onApply} icon={MagnifyingGlassIcon}>Filtrar</Button>
+            </div>
+            <div className="mt-3 flex items-center">
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        checked={unclassifiedFilter}
+                        onChange={e => {
+                            setUnclassifiedFilter(e.target.checked);
+                            setTimeout(onApply, 0);
+                        }}
+                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span>Mostrar apenas OPs sem classificação orçamentária</span>
+                    <span className="text-xs text-gray-500">
+                        (sem vínculo a item de orçamento — precisam de CC/AC para aparecer no Realizado)
+                    </span>
+                </label>
             </div>
         </div>
     );

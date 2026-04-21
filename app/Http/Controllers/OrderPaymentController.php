@@ -58,6 +58,7 @@ class OrderPaymentController extends Controller
         private OrderPaymentTransitionService $transitionService,
         private OrderPaymentDeleteService $deleteService,
         private OrderPaymentAllocationService $allocationService,
+        private \App\Services\OrderPaymentBudgetResolver $budgetResolver,
     ) {}
 
     /**
@@ -97,6 +98,13 @@ class OrderPaymentController extends Controller
 
         if ($request->filled('store_id')) {
             $query->forStore($request->store_id);
+        }
+
+        // Filtro "sem classificação" — OPs sem vínculo a budget (C3b).
+        // Útil para localizar OPs que precisam de classificação manual
+        // após o comando de backfill ter processado as automáticas.
+        if ($request->boolean('unclassified')) {
+            $query->whereNull('budget_item_id');
         }
 
         if ($request->filled('search')) {
@@ -152,7 +160,7 @@ class OrderPaymentController extends Controller
         return Inertia::render('OrderPayments/Index', [
             'payments' => $payments,
             'selects' => $selects,
-            'filters' => $request->only(['search', 'status', 'store_id']),
+            'filters' => $request->only(['search', 'status', 'store_id', 'unclassified']),
             'statusOptions' => OrderPayment::STATUS_LABELS,
             'kanbanData' => $kanbanData,
             'kanbanCards' => $kanbanCards,
@@ -206,10 +214,10 @@ class OrderPaymentController extends Controller
 
         // Deriva cost_center_id da ManagementClass quando a UI usa a cascata
         // Área→Gerencial→CC (o CC não vem no payload, vem embutido na MC).
-        $validated['cost_center_id'] = $this->resolveCostCenterId($validated);
+        $validated['cost_center_id'] = $this->budgetResolver->resolveCostCenterId($validated);
 
         // Auto-resolve budget_item_id pelo trio (CC, AC, ano da competência)
-        $validated['budget_item_id'] = $this->resolveBudgetItemId($validated);
+        $validated['budget_item_id'] = $this->budgetResolver->resolveBudgetItemId($validated);
 
         $order = DB::transaction(function () use ($validated) {
             $totalValue = $validated['total_value'];
@@ -368,9 +376,9 @@ class OrderPaymentController extends Controller
                 'competence_date' => $validated['competence_date'] ?? $orderPayment->competence_date,
                 'date_payment' => $validated['date_payment'] ?? $orderPayment->date_payment,
             ];
-            $validated['cost_center_id'] = $this->resolveCostCenterId($mergedForResolve);
+            $validated['cost_center_id'] = $this->budgetResolver->resolveCostCenterId($mergedForResolve);
             $mergedForResolve['cost_center_id'] = $validated['cost_center_id'];
-            $validated['budget_item_id'] = $this->resolveBudgetItemId($mergedForResolve);
+            $validated['budget_item_id'] = $this->budgetResolver->resolveBudgetItemId($mergedForResolve);
         }
 
         DB::transaction(function () use ($orderPayment, $validated) {
@@ -869,61 +877,5 @@ class OrderPaymentController extends Controller
             'deleted_at' => $p->deleted_at?->format('d/m/Y H:i'),
             'delete_reason' => $p->delete_reason,
         ]);
-    }
-
-    /**
-     * Resolve o cost_center_id quando a UI enviar a cascata
-     * Área → Gerencial → CC — nesse caso o CC é derivado da ManagementClass
-     * selecionada (já pré-vinculada no seed de management_classes).
-     *
-     * Se o payload já trouxer cost_center_id explícito e não houver
-     * management_class_id, mantém o que veio. Se houver conflito (cost_center_id
-     * explícito ≠ cost_center_id da MC), a MC ganha — é a fonte autoritária
-     * do vínculo conforme a taxonomia gerencial.
-     */
-    protected function resolveCostCenterId(array $attrs): ?int
-    {
-        $mcId = $attrs['management_class_id'] ?? null;
-        $ccExplicit = $attrs['cost_center_id'] ?? null;
-
-        if ($mcId) {
-            $mcCc = ManagementClass::whereKey($mcId)->value('cost_center_id');
-            if ($mcCc) {
-                return $mcCc;
-            }
-        }
-
-        return $ccExplicit;
-    }
-
-    /**
-     * Resolve o budget_item_id a partir do trio (cost_center_id,
-     * accounting_class_id, ano da competência). Retorna null se falta algum
-     * dos dois códigos, ou se não há budget ativo que case com o par no ano.
-     *
-     * O ano vem de competence_date quando informado; fallback para
-     * date_payment. Esse fallback alinha o regime contábil natural — a OP
-     * que não tem competência explícita cai no orçamento do ano do caixa.
-     */
-    protected function resolveBudgetItemId(array $attrs): ?int
-    {
-        $ccId = $attrs['cost_center_id'] ?? null;
-        $acId = $attrs['accounting_class_id'] ?? null;
-
-        if (! $ccId || ! $acId) {
-            return null;
-        }
-
-        $dateSource = $attrs['competence_date'] ?? $attrs['date_payment'] ?? null;
-        if (! $dateSource) {
-            return null;
-        }
-        $year = (int) date('Y', is_string($dateSource) ? strtotime($dateSource) : $dateSource->timestamp);
-
-        return BudgetItem::query()
-            ->where('cost_center_id', $ccId)
-            ->where('accounting_class_id', $acId)
-            ->whereHas('upload', fn ($q) => $q->where('year', $year)->where('is_active', true))
-            ->value('id');
     }
 }
