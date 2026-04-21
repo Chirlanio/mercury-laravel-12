@@ -79,6 +79,26 @@ class BudgetConsumptionService
                     ? ['id' => $item->store->id, 'code' => $item->store->code, 'name' => $item->store->name]
                     : null,
                 'supplier' => $item->supplier,
+                // Campos de texto — necessários para o editor inline
+                // (Melhoria 8). No dashboard eles não aparecem visualmente
+                // mas alimentam o modal de edição.
+                'justification' => $item->justification,
+                'account_description' => $item->account_description,
+                'class_description' => $item->class_description,
+                // 12 valores mensais — mesmos nomes das colunas do DB,
+                // o modal de edição lê diretamente sem conversão.
+                'month_01_value' => (float) $item->month_01_value,
+                'month_02_value' => (float) $item->month_02_value,
+                'month_03_value' => (float) $item->month_03_value,
+                'month_04_value' => (float) $item->month_04_value,
+                'month_05_value' => (float) $item->month_05_value,
+                'month_06_value' => (float) $item->month_06_value,
+                'month_07_value' => (float) $item->month_07_value,
+                'month_08_value' => (float) $item->month_08_value,
+                'month_09_value' => (float) $item->month_09_value,
+                'month_10_value' => (float) $item->month_10_value,
+                'month_11_value' => (float) $item->month_11_value,
+                'month_12_value' => (float) $item->month_12_value,
                 'forecast' => round($forecast, 2),
                 'committed' => round($committed, 2),
                 'realized' => round($realized, 2),
