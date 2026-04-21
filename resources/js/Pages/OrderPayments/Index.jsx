@@ -1422,7 +1422,7 @@ function AccountingClassSelect({ value, onChange, options, loading, hasCostCente
         : loading
         ? 'Carregando contas contábeis…'
         : options.length === 0
-        ? 'Nenhuma conta contábil com orçamento ativo neste CC para o ano.'
+        ? 'Nenhuma conta contábil com orçamento ativo neste CC para o ano. Se for despesa transversal (viagens, eventos, fretes, etc.), selecione a classe gerencial "Geral" da área em vez da loja específica.'
         : null;
 
     return (

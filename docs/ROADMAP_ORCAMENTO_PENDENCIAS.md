@@ -59,18 +59,20 @@
 
 ---
 
-### Fase 7 — AC Fallback no form de OP [DECISÃO PENDENTE]
+### Fase 7 — AC Fallback no form de OP [DECIDIDO: Opção A · 2026-04-21]
 
-**Problema identificado.** No form de OrderPayment, ao escolher MC de loja específica (ex: "Comercial - Arezzo Kennedy" → CC 8), o dropdown AC mostra só 1 opção (Internet), porque as outras ACs (Eventos, Fretes, Uber…) estão alocadas só no CC 15 (Comercial - Geral). UX parece "bug" pro user.
+**Problema identificado.** No form de OrderPayment, ao escolher MC de loja específica (ex: "Comercial - Arezzo Kennedy" → CC 8), o dropdown AC mostra só 1 opção (Internet), porque as outras ACs (Eventos, Fretes, Uber…) estão alocadas só no CC 15 (Comercial - Geral).
 
-**Opções.**
+**Decisão.** Manter comportamento atual (Opção A). Despesas transversais (viagens, eventos, fretes, etc.) devem usar a MC "Geral" da área, não a MC da loja específica. Isso preserva a rastreabilidade orçamentária — cada centavo consumido sai do CC correto.
 
-- **(A) Manter**: documentar que despesas transversais usam MC "Geral", não específica de loja.
-- **(B) Expandir dropdown**: quando user está em CC de loja, incluir ACs do CC "Geral" do **mesmo departamento** como sub-seção ("Compartilhadas com Geral").
+**Implementação.**
+- Hint UX atualizado no `AccountingClassSelect` (OrderPayments/Index.jsx) — quando a lista aparece vazia num CC de loja, explica ao user a convenção "Geral".
+- Sem mudanças de arquitetura/endpoint.
 
-**Pré-requisito.** Fase 5 (área explícita) torna o fallback trivial — basta procurar o CC "Geral" do mesmo department.
-
-**Estimativa.** 1 commit depois da decisão + Fase 5.
+**Por que Opção A foi escolhida (decisão de negócio, 2026-04-21).**
+- Preserva a fidelidade do orçamento ao CC.
+- Evita que usuário crie OP num CC de loja mas consuma orçamento do CC Geral (difícil de auditar).
+- Hint educacional na UI resolve o atrito de descoberta.
 
 ---
 
@@ -129,16 +131,16 @@
 
 ## Sequência recomendada
 
-| Ordem | Fase | Dependência | Tipo |
+| Ordem | Fase | Status | Tipo |
 |---|---|---|---|
-| 1 | Fase 5 (Área) | — | Arquitetural |
-| 2 | Fase 6 (Export) | Fase 5 (útil mas não bloqueia) | Feature |
-| 3 | Fase 7 (AC fallback) | Fase 5 (obrigatório) + decisão | UX |
-| 4 | Melhoria 8 (Edit inline) | — | UX |
-| 5 | Melhoria 9 (Comparativo) | — | Analítico |
-| 6 | Melhoria 10 (Lixeira) | — | Admin |
+| 1 | Fase 5 (Área) | ✅ Concluída 2026-04-21 | Arquitetural |
+| 2 | Fase 6 (Export) | ✅ Concluída 2026-04-21 | Feature |
+| 3 | Fase 7 (AC fallback) | ✅ Decidido 2026-04-21 (Opção A + hint UX) | UX |
+| 4 | Melhoria 8 (Edit inline) | ⏳ Pendente | UX |
+| 5 | Melhoria 9 (Comparativo) | ⏳ Pendente | Analítico |
+| 6 | Melhoria 10 (Lixeira) | ⏳ Pendente | Admin |
 
-Fases 1–3 fazem sentido como um pacote (fechamento da Fase 5 oficial do roadmap Budgets). Melhorias 8–10 são incrementos separados, sem dependência estrita.
+Fases 5-7 fecham o pacote original do roadmap Budgets (Fase 5 oficial). Melhorias 8-10 são incrementos separados, sem dependência estrita, podem entrar em qualquer ordem.
 
 ---
 
