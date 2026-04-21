@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { useState, useMemo } from 'react';
 import axios from 'axios';
 import {
@@ -14,6 +14,7 @@ import {
     CloudArrowUpIcon,
     ChartBarIcon,
     ArrowsRightLeftIcon,
+    TrashIcon,
 } from '@heroicons/react/24/outline';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
@@ -34,6 +35,7 @@ export default function Index({ budgets, filters = {}, statistics = {}, enums = 
     const { hasPermission } = usePermissions();
     const canDownload = hasPermission(PERMISSIONS.DOWNLOAD_BUDGETS);
     const canDelete = hasPermission(PERMISSIONS.DELETE_BUDGETS);
+    const canManage = hasPermission(PERMISSIONS.MANAGE_BUDGETS);
     const canUpload = hasPermission(PERMISSIONS.UPLOAD_BUDGETS);
     const canViewConsumption = hasPermission(PERMISSIONS.VIEW_BUDGET_CONSUMPTION);
 
@@ -241,15 +243,27 @@ export default function Index({ budgets, filters = {}, statistics = {}, enums = 
                                 Orçamento anual por escopo com versionamento e consumo previsto × realizado.
                             </p>
                         </div>
-                        {canUpload && (
-                            <Button
-                                variant="primary"
-                                icon={CloudArrowUpIcon}
-                                onClick={() => openModal('upload')}
-                            >
-                                Novo Upload
-                            </Button>
-                        )}
+                        <div className="flex items-center gap-2">
+                            {canManage && (
+                                <Link
+                                    href={route('budgets.trash')}
+                                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                                    title="Lixeira de orçamentos"
+                                >
+                                    <TrashIcon className="w-4 h-4" />
+                                    Lixeira
+                                </Link>
+                            )}
+                            {canUpload && (
+                                <Button
+                                    variant="primary"
+                                    icon={CloudArrowUpIcon}
+                                    onClick={() => openModal('upload')}
+                                >
+                                    Novo Upload
+                                </Button>
+                            )}
+                        </div>
                     </div>
 
                     <StatisticsGrid cards={statisticsCards} cols={5} />

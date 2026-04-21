@@ -19,6 +19,7 @@ use App\Services\BudgetService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -33,6 +34,110 @@ class BudgetController extends Controller
         private BudgetConsumptionService $consumption,
         private \App\Services\BudgetDiffService $diffService,
     ) {}
+
+    /**
+     * Lixeira — lista BudgetUploads soft-deletados (Melhoria 10).
+     *
+     * Só para users com MANAGE_BUDGETS. Mostra motivo + quem/quando
+     * deletou para decisão de restore ou exclusão física.
+     */
+    public function trash(): Response
+    {
+        $trashed = BudgetUpload::query()
+            ->with([
+                'deletedBy:id,name',
+                'createdBy:id,name',
+                'areaDepartment:id,code,name',
+            ])
+            ->whereNotNull('deleted_at')
+            ->orderByDesc('deleted_at')
+            ->get()
+            ->map(fn ($u) => [
+                'id' => $u->id,
+                'year' => $u->year,
+                'scope_label' => $u->scope_label,
+                'version_label' => $u->version_label,
+                'upload_type' => $u->upload_type instanceof \BackedEnum ? $u->upload_type->value : (string) $u->upload_type,
+                'area' => $u->areaDepartment
+                    ? ['code' => $u->areaDepartment->code, 'name' => $u->areaDepartment->name]
+                    : null,
+                'total_year' => (float) $u->total_year,
+                'items_count' => (int) $u->items_count,
+                'deleted_at' => $u->deleted_at?->format('d/m/Y H:i'),
+                'deleted_by' => $u->deletedBy?->name,
+                'deleted_reason' => $u->deleted_reason,
+                'created_at' => $u->created_at?->format('d/m/Y H:i'),
+                'created_by' => $u->createdBy?->name,
+            ])
+            ->values();
+
+        return Inertia::render('Budgets/Trash', [
+            'trashed' => $trashed,
+        ]);
+    }
+
+    /**
+     * Restaura um BudgetUpload soft-deletado. Zera deleted_at/reason/by
+     * mas NÃO reativa (is_active segue false — precisa upload novo para
+     * voltar a ser a versão ativa do escopo/ano).
+     */
+    public function restore(int $id): RedirectResponse
+    {
+        $upload = BudgetUpload::findOrFail($id);
+
+        if (! $upload->isDeleted()) {
+            return back()->withErrors([
+                'id' => 'Esta versão não está excluída.',
+            ]);
+        }
+
+        $upload->forceFill([
+            'deleted_at' => null,
+            'deleted_by_user_id' => null,
+            'deleted_reason' => null,
+            'is_active' => false,
+            'updated_by_user_id' => auth()->id(),
+        ])->save();
+
+        return redirect()
+            ->route('budgets.trash')
+            ->with('success', "Versão v{$upload->version_label} restaurada. Ativa um novo upload para torná-la a versão vigente.");
+    }
+
+    /**
+     * Exclusão física (destrutiva — apaga registro + items + histories
+     * via cascade). Só super_admin pode — proteção contra ação irreversível.
+     */
+    public function forceDelete(int $id): RedirectResponse
+    {
+        $user = auth()->user();
+        $role = $user?->role;
+        // Role pode ser Role enum (BackedEnum) ou DynamicRole (objeto com ->value) ou string.
+        $roleValue = $role instanceof \BackedEnum
+            ? $role->value
+            : (is_object($role) ? ($role->value ?? null) : (is_string($role) ? $role : null));
+
+        if ($roleValue !== 'super_admin') {
+            abort(403, 'Apenas super admin pode excluir definitivamente.');
+        }
+
+        $upload = BudgetUpload::findOrFail($id);
+
+        if (! $upload->isDeleted()) {
+            return back()->withErrors([
+                'id' => 'Antes da exclusão física, faça soft-delete.',
+            ]);
+        }
+
+        // cascade delete em budget_items + budget_status_histories via FKs
+        DB::transaction(function () use ($upload) {
+            $upload->delete();
+        });
+
+        return redirect()
+            ->route('budgets.trash')
+            ->with('success', 'Versão excluída definitivamente.');
+    }
 
     /**
      * Comparativo entre 2 versões de BudgetUpload (Melhoria 9 do roadmap).

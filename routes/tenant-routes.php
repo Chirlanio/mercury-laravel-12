@@ -1140,6 +1140,13 @@ Route::middleware(['auth'])->group(function () {
         // para não conflitar com o wildcard.
         Route::get('/budgets/compare', [\App\Http\Controllers\BudgetController::class, 'compare'])->name('budgets.compare');
 
+        // Lixeira administrativa (Melhoria 10) — antes da rota {budget}
+        Route::middleware('permission:'.Permission::MANAGE_BUDGETS->value)->group(function () {
+            Route::get('/budgets/trash', [\App\Http\Controllers\BudgetController::class, 'trash'])->name('budgets.trash');
+            Route::post('/budgets/{budget}/restore', [\App\Http\Controllers\BudgetController::class, 'restore'])->whereNumber('budget')->name('budgets.restore');
+            Route::delete('/budgets/{budget}/force', [\App\Http\Controllers\BudgetController::class, 'forceDelete'])->whereNumber('budget')->name('budgets.force-delete');
+        });
+
         Route::get('/budgets/{budget}', [\App\Http\Controllers\BudgetController::class, 'show'])->whereNumber('budget')->name('budgets.show');
 
         Route::middleware('permission:'.Permission::DOWNLOAD_BUDGETS->value)->group(function () {
