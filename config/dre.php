@@ -21,5 +21,5 @@ return [
      * Override via env DRE_DEFAULT_SALE_ACCOUNT_CODE. Se null/não-existente,
      * SaleToDreProjector faz skip com log warning.
      */
-    'default_sale_account_code' => env('DRE_DEFAULT_SALE_ACCOUNT_CODE', '3.1.1.01.00001'),
+    'default_sale_account_code' => env('DRE_DEFAULT_SALE_ACCOUNT_CODE', '3.1.1.01.00012'),
 ];
