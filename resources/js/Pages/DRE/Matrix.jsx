@@ -5,26 +5,30 @@ import {
     DocumentTextIcon,
     TableCellsIcon,
 } from '@heroicons/react/24/outline';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import KpiCards from '@/Components/DRE/KpiCards';
 import MatrixTable from '@/Components/DRE/MatrixTable';
 import DrillModal from '@/Components/DRE/DrillModal';
 import ChartsPanel from '@/Components/DRE/ChartsPanel';
+import Button from '@/Components/Button';
+import TextInput from '@/Components/TextInput';
+import InputLabel from '@/Components/InputLabel';
+import Checkbox from '@/Components/Checkbox';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import { yearMonthsBetween } from '@/lib/dre';
 
 /**
- * Tela principal da DRE gerencial.
+ * Tela principal da DRE gerencial — realizado × orçado × ano anterior.
  *
- * Substitui o stub do prompt 7. UI completa com filtros sincronizados via
- * URL, seletor de escopo (Geral/Rede/Loja), KPIs, matriz mensal com sticky
- * headers e drill modal.
+ * Estrutura segue o padrão do projeto:
+ *   - Sem wrapper `<AuthenticatedLayout>` (app.jsx aplica automaticamente).
+ *   - Container `py-12` + `max-w-full mx-auto px-4 sm:px-6 lg:px-8`.
+ *   - Botões (export + filtros + escopo) via `<Button>` do projeto.
+ *   - Filtros via `TextInput` + `InputLabel` + `Checkbox`.
  *
- * Convenções:
+ * UX específica:
  *   - Filtros vivem na URL (preserveState + preserveScroll).
  *   - Drill em state local (useState), sem URL.
- *   - Acentuação completa PT-BR.
- *   - Nunca localStorage/sessionStorage.
+ *   - Tabs internas (Mensal/Anual/Gráficos) são state local.
  */
 export default function Matrix({
     filters,
@@ -46,7 +50,6 @@ export default function Matrix({
         const latest = activeClosings[0].closed_up_to_date;
         if (!latest) return [];
 
-        // Gera YMs fechados = desde início do filtro até o último fechamento.
         return yearMonthsBetween(filters?.start_date, latest);
     }, [closedPeriods, filters?.start_date]);
 
@@ -63,13 +66,12 @@ export default function Matrix({
     };
 
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="DRE Gerencial" />
 
-            <div className="py-6">
-                <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
-                    {/* Header */}
-                    <div className="flex items-center justify-between">
+            <div className="py-12">
+                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="mb-6 flex justify-between items-center">
                         <div>
                             <h1 className="text-2xl font-semibold text-gray-900">
                                 DRE Gerencial
@@ -79,60 +81,63 @@ export default function Matrix({
                             </p>
                         </div>
                         {canExport && (
-                            <div className="flex items-center gap-2">
-                                <a
-                                    href={buildExportUrl('dre.matrix.export.xlsx', filters)}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                                    title="Exportar XLSX"
-                                >
-                                    <TableCellsIcon className="h-4 w-4" />
-                                    XLSX
+                            <div className="flex gap-2">
+                                <a href={buildExportUrl('dre.matrix.export.xlsx', filters)} className="contents">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        icon={TableCellsIcon}
+                                        type="button"
+                                    >
+                                        XLSX
+                                    </Button>
                                 </a>
-                                <a
-                                    href={buildExportUrl('dre.matrix.export.pdf', filters)}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                                    title="Exportar PDF"
-                                >
-                                    <DocumentTextIcon className="h-4 w-4" />
-                                    PDF
+                                <a href={buildExportUrl('dre.matrix.export.pdf', filters)} className="contents">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        icon={DocumentTextIcon}
+                                        type="button"
+                                    >
+                                        PDF
+                                    </Button>
                                 </a>
                             </div>
                         )}
                     </div>
 
-                    {/* Seletor de escopo */}
-                    <ScopeSelector
-                        scope={filters?.scope}
-                        onChange={(scope) => applyFilter({ scope, store_ids: [], network_ids: [] })}
-                    />
-
-                    {/* Filtros */}
-                    <FiltersBar
-                        filters={filters}
-                        availableStores={availableStores}
-                        availableNetworks={availableNetworks}
-                        availableBudgetVersions={availableBudgetVersions}
-                        onApply={applyFilter}
-                    />
-
-                    {/* Banner de período fechado */}
-                    {closedYearMonths.length > 0 && (
-                        <ClosedPeriodBanner
-                            yearMonths={closedYearMonths}
-                            latest={closedPeriods?.[0]}
+                    <div className="space-y-4">
+                        <ScopeSelector
+                            scope={filters?.scope}
+                            onChange={(scope) =>
+                                applyFilter({ scope, store_ids: [], network_ids: [] })
+                            }
                         />
-                    )}
 
-                    {/* KPIs */}
-                    <KpiCards kpis={kpis} />
+                        <FiltersBar
+                            filters={filters}
+                            availableStores={availableStores}
+                            availableNetworks={availableNetworks}
+                            availableBudgetVersions={availableBudgetVersions}
+                            onApply={applyFilter}
+                        />
 
-                    {/* Tabs */}
-                    <Tabs
-                        filters={filters}
-                        matrix={matrix}
-                        closedYearMonths={closedYearMonths}
-                        onCellClick={handleCellClick}
-                    />
+                        {closedYearMonths.length > 0 && (
+                            <ClosedPeriodBanner
+                                yearMonths={closedYearMonths}
+                                latest={closedPeriods?.[0]}
+                            />
+                        )}
+
+                        <KpiCards kpis={kpis} />
+
+                        <Tabs
+                            filters={filters}
+                            matrix={matrix}
+                            closedYearMonths={closedYearMonths}
+                            onCellClick={handleCellClick}
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -143,12 +148,12 @@ export default function Matrix({
                 yearMonth={drillTarget?.yearMonth}
                 filter={filters}
             />
-        </AuthenticatedLayout>
+        </>
     );
 }
 
 // ---------------------------------------------------------------------
-// Scope selector
+// Scope selector — toggle de visão Geral / Rede / Loja
 // ---------------------------------------------------------------------
 
 function ScopeSelector({ scope = 'general', onChange }) {
@@ -162,18 +167,14 @@ function ScopeSelector({ scope = 'general', onChange }) {
         <div className="bg-white shadow-sm rounded-lg p-3 flex items-center gap-2">
             <span className="text-xs font-medium text-gray-600 mr-2">Visão:</span>
             {options.map((opt) => (
-                <button
+                <Button
                     key={opt.value}
-                    type="button"
+                    variant={scope === opt.value ? 'primary' : 'light'}
+                    size="xs"
                     onClick={() => onChange(opt.value)}
-                    className={`px-3 py-1 text-sm rounded-md transition ${
-                        scope === opt.value
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
                 >
                     {opt.label}
-                </button>
+                </Button>
             ))}
         </div>
     );
@@ -208,38 +209,35 @@ function FiltersBar({
     };
 
     return (
-        <div className="bg-white shadow-sm rounded-lg p-4 space-y-3">
+        <div className="bg-white shadow-sm rounded-lg p-4 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                 <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Data inicial
-                    </label>
-                    <input
+                    <InputLabel htmlFor="matrix-start-date" value="Data inicial" />
+                    <TextInput
+                        id="matrix-start-date"
                         type="date"
                         value={draft.start_date}
                         onChange={(e) => setDraft({ ...draft, start_date: e.target.value })}
-                        className="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full text-sm"
+                        className="mt-1 block w-full text-sm"
                     />
                 </div>
                 <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Data final
-                    </label>
-                    <input
+                    <InputLabel htmlFor="matrix-end-date" value="Data final" />
+                    <TextInput
+                        id="matrix-end-date"
                         type="date"
                         value={draft.end_date}
                         onChange={(e) => setDraft({ ...draft, end_date: e.target.value })}
-                        className="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full text-sm"
+                        className="mt-1 block w-full text-sm"
                     />
                 </div>
                 <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Versão Orçado
-                    </label>
+                    <InputLabel htmlFor="matrix-budget-version" value="Versão Orçado" />
                     <select
+                        id="matrix-budget-version"
                         value={draft.budget_version}
                         onChange={(e) => setDraft({ ...draft, budget_version: e.target.value })}
-                        className="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full text-sm"
+                        className="mt-1 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full text-sm"
                     >
                         <option value="">Todas</option>
                         {(availableBudgetVersions || []).map((v) => (
@@ -249,37 +247,29 @@ function FiltersBar({
                         ))}
                     </select>
                 </div>
-                <div className="flex items-end gap-2">
-                    <button
-                        type="button"
-                        onClick={() => onApply(draft)}
-                        className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700"
-                    >
-                        Aplicar
-                    </button>
+                <div className="md:col-span-2 flex items-end">
+                    <Button variant="primary" size="sm" onClick={() => onApply(draft)}>
+                        Aplicar filtros
+                    </Button>
                 </div>
             </div>
 
-            <div className="flex items-center gap-6">
-                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                        type="checkbox"
+            <div className="flex flex-wrap items-center gap-6">
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <Checkbox
                         checked={!!draft.compare_previous_year}
                         onChange={(e) =>
                             setDraft({ ...draft, compare_previous_year: e.target.checked })
                         }
-                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                     />
                     Comparar com ano anterior
                 </label>
-                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                        type="checkbox"
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <Checkbox
                         checked={!!draft.include_unclassified}
                         onChange={(e) =>
                             setDraft({ ...draft, include_unclassified: e.target.checked })
                         }
-                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                     />
                     Mostrar contas não classificadas
                 </label>
@@ -313,8 +303,8 @@ function ScopeMultiSelect({ label, options = [], selectedIds = [], onToggle }) {
 
     return (
         <div>
-            <label className="block text-xs font-medium text-gray-600 mb-2">{label}</label>
-            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+            <InputLabel value={label} />
+            <div className="mt-1 flex flex-wrap gap-2 max-h-32 overflow-y-auto">
                 {options.map((opt) => {
                     const active = selected.has(opt.id);
                     return (
@@ -409,7 +399,8 @@ function Tabs({ filters, matrix, closedYearMonths, onCellClick }) {
 
             {active === 'yearly' && (
                 <div className="bg-white shadow-sm rounded-lg p-6 text-sm text-gray-600">
-                    Visão consolidada anual será acrescentada no prompt 13 (polimento + gráficos).
+                    Visão consolidada anual virá em iteração futura. Use a aba "Matriz Mensal"
+                    ou exporte em XLSX para totais anuais.
                 </div>
             )}
 
@@ -425,7 +416,6 @@ function Tabs({ filters, matrix, closedYearMonths, onCellClick }) {
 // ---------------------------------------------------------------------
 
 function cleanFilter(filter) {
-    // Remove keys vazias para manter a URL compacta.
     const out = {};
     for (const [k, v] of Object.entries(filter)) {
         if (v === null || v === undefined || v === '') continue;
