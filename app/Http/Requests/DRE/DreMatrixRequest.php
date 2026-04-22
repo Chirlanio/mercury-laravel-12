@@ -23,6 +23,21 @@ use Illuminate\Validation\Rule;
  */
 class DreMatrixRequest extends FormRequest
 {
+    /**
+     * Defaults para acesso via sidebar (sem query params) — evita 422 ao
+     * clicar em "DRE Gerencial" pela primeira vez. Default é o ano corrente
+     * do 1º de janeiro até hoje; o usuário ajusta o período pelo FiltersBar.
+     */
+    protected function prepareForValidation(): void
+    {
+        if (blank($this->input('start_date'))) {
+            $this->merge(['start_date' => now()->startOfYear()->format('Y-m-d')]);
+        }
+        if (blank($this->input('end_date'))) {
+            $this->merge(['end_date' => now()->format('Y-m-d')]);
+        }
+    }
+
     public function authorize(): bool
     {
         $user = $this->user();

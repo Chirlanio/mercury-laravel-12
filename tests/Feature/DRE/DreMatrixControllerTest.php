@@ -87,12 +87,15 @@ class DreMatrixControllerTest extends TestCase
             ->assertSessionHasErrors('end_date');
     }
 
-    public function test_missing_dates_returns_validation_error(): void
+    public function test_missing_dates_applies_defaults(): void
     {
+        // Sidebar dispara GET /dre/matrix sem query params — o FormRequest
+        // aplica defaults (ano corrente até hoje) em prepareForValidation()
+        // ao invés de redirecionar com erro.
         $this->actingAs($this->adminUser)
             ->get(route('dre.matrix.show', []))
-            ->assertStatus(302)
-            ->assertSessionHasErrors(['start_date', 'end_date']);
+            ->assertStatus(200)
+            ->assertInertia(fn ($page) => $page->component('DRE/Matrix'));
     }
 
     public function test_invalid_date_format_returns_422(): void
