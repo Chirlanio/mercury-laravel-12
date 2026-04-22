@@ -2,15 +2,13 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import {
     PlusIcon,
-    PencilIcon,
-    TrashIcon,
     ArrowUpIcon,
     ArrowDownIcon,
     ArrowsUpDownIcon,
     CheckCircleIcon,
 } from '@heroicons/react/24/outline';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Button from '@/Components/Button';
+import ActionButtons from '@/Components/ActionButtons';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import EmptyState from '@/Components/Shared/EmptyState';
 import DeleteConfirmModal from '@/Components/Shared/DeleteConfirmModal';
@@ -18,9 +16,15 @@ import DeleteConfirmModal from '@/Components/Shared/DeleteConfirmModal';
 /**
  * Listagem ordenada das linhas da DRE gerencial.
  *
- * Ordem: sort_order ASC + is_subtotal ASC (analíticas antes de subtotais no mesmo sort_order).
- * Reorder: setas ↑/↓ + botão "Salvar ordem" envia POST /dre/management-lines/reorder.
- * Os testes e o projeto não têm biblioteca de drag-and-drop — setas como fallback são suficientes.
+ * Reorder é client-side (setas ↑/↓ em cada linha + botão "Salvar ordem" que
+ * envia POST /dre/management-lines/reorder). Sem busca/paginação porque o
+ * volume é pequeno (≈20 linhas) e o reorder exige tudo visível ao mesmo
+ * tempo. Por isso a tabela é renderizada "raw" — usa-se `DataTable` em
+ * listagens paginadas do servidor.
+ *
+ * Visualmente espelha o shell do `DataTable` (`bg-white shadow-sm rounded-lg`)
+ * e usa `ActionButtons` + `ActionButtons.Custom` na coluna de Ações para
+ * consistência com o resto do sistema.
  */
 export default function ManagementLinesIndex({ lines, can, natureOptions }) {
     const { flash } = usePage().props;
@@ -76,12 +80,12 @@ export default function ManagementLinesIndex({ lines, can, natureOptions }) {
     };
 
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="Plano Gerencial da DRE" />
 
-            <div className="py-8">
+            <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between mb-6">
+                    <div className="mb-6 flex justify-between items-center">
                         <div>
                             <h1 className="text-2xl font-semibold text-gray-900">
                                 Plano Gerencial da DRE
@@ -129,138 +133,131 @@ export default function ManagementLinesIndex({ lines, can, natureOptions }) {
                             description="Comece criando as linhas da DRE executiva."
                         />
                     ) : (
-                        <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 w-12">
-                                            #
-                                        </th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 w-20">
-                                            Ordem
-                                        </th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 w-24">
-                                            Código
-                                        </th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">
-                                            Rótulo
-                                        </th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 w-28">
-                                            Natureza
-                                        </th>
-                                        <th className="px-3 py-2 text-center text-xs font-semibold text-gray-600 w-20">
-                                            Subtotal
-                                        </th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 w-28">
-                                            Acumula até
-                                        </th>
-                                        <th className="px-3 py-2 text-center text-xs font-semibold text-gray-600 w-20">
-                                            Ativa
-                                        </th>
-                                        {can?.manage && (
-                                            <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600 w-36">
-                                                Ações
+                        <div className="bg-white overflow-hidden shadow-sm rounded-lg">
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                                                #
                                             </th>
-                                        )}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {ordered.map((line, idx) => (
-                                        <tr
-                                            key={line.id}
-                                            className={
-                                                line.is_subtotal
-                                                    ? 'bg-gray-50 font-semibold'
-                                                    : ''
-                                            }
-                                        >
-                                            <td className="px-3 py-2 text-sm text-gray-500 tabular-nums">
-                                                {idx + 1}
-                                            </td>
-                                            <td className="px-3 py-2 text-sm text-gray-700 tabular-nums">
-                                                {line.sort_order}
-                                            </td>
-                                            <td className="px-3 py-2 text-sm text-gray-700 font-mono">
-                                                {line.code}
-                                            </td>
-                                            <td className="px-3 py-2 text-sm text-gray-900">
-                                                {line.level_1}
-                                            </td>
-                                            <td className="px-3 py-2 text-sm">
-                                                <StatusBadge
-                                                    variant={natureBadgeVariant(line.nature)}
-                                                    dot
-                                                >
-                                                    {natureLabel[line.nature] || line.nature}
-                                                </StatusBadge>
-                                            </td>
-                                            <td className="px-3 py-2 text-center">
-                                                {line.is_subtotal ? (
-                                                    <CheckCircleIcon className="h-5 w-5 text-indigo-600 inline" />
-                                                ) : (
-                                                    <span className="text-gray-300">—</span>
-                                                )}
-                                            </td>
-                                            <td className="px-3 py-2 text-sm text-gray-700 tabular-nums">
-                                                {line.accumulate_until_sort_order ?? '—'}
-                                            </td>
-                                            <td className="px-3 py-2 text-center">
-                                                {line.is_active ? (
-                                                    <StatusBadge variant="success" dot>
-                                                        Sim
-                                                    </StatusBadge>
-                                                ) : (
-                                                    <StatusBadge variant="gray" dot>
-                                                        Não
-                                                    </StatusBadge>
-                                                )}
-                                            </td>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                                                Ordem
+                                            </th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+                                                Código
+                                            </th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Rótulo
+                                            </th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+                                                Natureza
+                                            </th>
+                                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                                                Subtotal
+                                            </th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+                                                Acumula até
+                                            </th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                                                Status
+                                            </th>
                                             {can?.manage && (
-                                                <td className="px-3 py-2 text-right">
-                                                    <div className="flex justify-end gap-1">
-                                                        <button
-                                                            type="button"
-                                                            title="Mover acima"
-                                                            className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-30"
-                                                            disabled={idx === 0}
-                                                            onClick={() => move(idx, -1)}
-                                                        >
-                                                            <ArrowUpIcon className="h-4 w-4" />
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            title="Mover abaixo"
-                                                            className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-30"
-                                                            disabled={idx === ordered.length - 1}
-                                                            onClick={() => move(idx, 1)}
-                                                        >
-                                                            <ArrowDownIcon className="h-4 w-4" />
-                                                        </button>
-                                                        <Link
-                                                            href={route(
-                                                                'dre.management-lines.edit',
-                                                                line.id
-                                                            )}
-                                                            className="p-1 text-indigo-600 hover:text-indigo-800"
-                                                            title="Editar"
-                                                        >
-                                                            <PencilIcon className="h-4 w-4" />
-                                                        </Link>
-                                                        <button
-                                                            type="button"
-                                                            className="p-1 text-red-600 hover:text-red-800"
-                                                            title="Excluir"
-                                                            onClick={() => setDeleteTarget(line)}
-                                                        >
-                                                            <TrashIcon className="h-4 w-4" />
-                                                        </button>
-                                                    </div>
-                                                </td>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-56">
+                                                    Ações
+                                                </th>
                                             )}
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {ordered.map((line, idx) => (
+                                            <tr
+                                                key={line.id}
+                                                className={
+                                                    line.is_subtotal ? 'bg-gray-50' : ''
+                                                }
+                                            >
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 tabular-nums">
+                                                    {idx + 1}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 tabular-nums">
+                                                    {line.sort_order}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
+                                                    {line.code}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                    <span
+                                                        className={
+                                                            line.is_subtotal
+                                                                ? 'font-semibold'
+                                                                : ''
+                                                        }
+                                                    >
+                                                        {line.level_1}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                    <StatusBadge
+                                                        variant={natureBadgeVariant(line.nature)}
+                                                        dot
+                                                    >
+                                                        {natureLabel[line.nature] || line.nature}
+                                                    </StatusBadge>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                    {line.is_subtotal ? (
+                                                        <CheckCircleIcon className="h-5 w-5 text-indigo-600 inline" />
+                                                    ) : (
+                                                        <span className="text-gray-300">—</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 tabular-nums">
+                                                    {line.accumulate_until_sort_order ?? '—'}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <StatusBadge
+                                                        variant={line.is_active ? 'success' : 'gray'}
+                                                        dot
+                                                    >
+                                                        {line.is_active ? 'Ativa' : 'Inativa'}
+                                                    </StatusBadge>
+                                                </td>
+                                                {can?.manage && (
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <ActionButtons
+                                                            onEdit={() =>
+                                                                router.visit(
+                                                                    route(
+                                                                        'dre.management-lines.edit',
+                                                                        line.id
+                                                                    )
+                                                                )
+                                                            }
+                                                            onDelete={() => setDeleteTarget(line)}
+                                                        >
+                                                            <ActionButtons.Custom
+                                                                variant="light"
+                                                                icon={ArrowUpIcon}
+                                                                title="Mover acima"
+                                                                onClick={() => move(idx, -1)}
+                                                                disabled={idx === 0}
+                                                            />
+                                                            <ActionButtons.Custom
+                                                                variant="light"
+                                                                icon={ArrowDownIcon}
+                                                                title="Mover abaixo"
+                                                                onClick={() => move(idx, 1)}
+                                                                disabled={idx === ordered.length - 1}
+                                                            />
+                                                        </ActionButtons>
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -282,6 +279,6 @@ export default function ManagementLinesIndex({ lines, can, natureOptions }) {
                 }
                 warningMessage="A linha será marcada como excluída (soft delete). Mapeamentos vigentes impedem a exclusão."
             />
-        </AuthenticatedLayout>
+        </>
     );
 }
