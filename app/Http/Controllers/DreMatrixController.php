@@ -149,8 +149,10 @@ class DreMatrixController extends Controller
 
     private function availableStores(): array
     {
+        // `stores` não tem `deleted_at` — é tabela derivada de CIGAM, sem
+        // soft delete. Inativas ficam com status_id!=1; não filtramos aqui
+        // pra manter contexto histórico nas matrizes do DRE.
         return Store::query()
-            ->whereNull('deleted_at')
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'network_id'])
             ->map(fn (Store $s) => [
