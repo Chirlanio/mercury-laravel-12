@@ -1,6 +1,5 @@
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { ArrowUpTrayIcon, DocumentArrowUpIcon, ExclamationTriangleIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { ArrowUpTrayIcon, ArrowDownTrayIcon, DocumentArrowUpIcon, ExclamationTriangleIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import Button from '@/Components/Button';
 import InputLabel from '@/Components/InputLabel';
 import InputError from '@/Components/InputError';
@@ -32,11 +31,11 @@ export default function Actuals({ flash }) {
     };
 
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="Importar realizado DRE" />
 
-            <div className="py-10">
-                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+            <div className="py-12">
+                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
                     <div className="flex items-center gap-3">
                         <div className="rounded-lg bg-indigo-100 p-3">
                             <DocumentArrowUpIcon className="h-6 w-6 text-indigo-600" />
@@ -55,7 +54,18 @@ export default function Actuals({ flash }) {
                         className="bg-white shadow-sm rounded-lg p-6 space-y-4 border border-gray-200"
                     >
                         <div>
-                            <InputLabel htmlFor="file" value="Arquivo XLSX" />
+                            <div className="flex items-center justify-between">
+                                <InputLabel htmlFor="file" value="Arquivo XLSX" />
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="xs"
+                                    icon={ArrowDownTrayIcon}
+                                    onClick={() => window.location.href = route('dre.imports.actuals.template')}
+                                >
+                                    Baixar modelo
+                                </Button>
+                            </div>
                             <input
                                 id="file"
                                 type="file"
@@ -83,7 +93,7 @@ export default function Actuals({ flash }) {
                             <Button
                                 type="submit"
                                 variant="primary"
-                                icon={<ArrowUpTrayIcon className="h-4 w-4" />}
+                                icon={ArrowUpTrayIcon}
                                 loading={processing}
                                 disabled={!data.file || processing}
                             >
@@ -112,6 +122,6 @@ export default function Actuals({ flash }) {
                     )}
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }

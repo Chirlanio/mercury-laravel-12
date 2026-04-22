@@ -7,9 +7,10 @@ import {
     ArrowPathIcon,
     ExclamationTriangleIcon,
     CheckCircleIcon,
+    DocumentArrowUpIcon,
 } from '@heroicons/react/24/outline';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Button from '@/Components/Button';
+import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import DataTable from '@/Components/DataTable';
 import StandardModal from '@/Components/StandardModal';
 import StatusBadge from '@/Components/Shared/StatusBadge';
@@ -30,6 +31,8 @@ import TextInput from '@/Components/TextInput';
  *     da página inteira antes do usuário confirmar.
  */
 export default function Index({ periods, lastActiveId, lastClosedUpTo }) {
+    const { hasPermission } = usePermissions();
+    const canImportActuals = hasPermission(PERMISSIONS.IMPORT_DRE_ACTUALS);
     const [closeModalOpen, setCloseModalOpen] = useState(false);
     const [reopenTarget, setReopenTarget] = useState(null);
     const [preview, setPreview] = useState(null);
@@ -99,11 +102,11 @@ export default function Index({ periods, lastActiveId, lastClosedUpTo }) {
                 label: 'Status',
                 render: (p) =>
                     p.is_active ? (
-                        <StatusBadge variant="success" icon={<LockClosedIcon className="h-3 w-3" />}>
+                        <StatusBadge variant="success" icon={LockClosedIcon}>
                             Ativo
                         </StatusBadge>
                     ) : (
-                        <StatusBadge variant="warning" icon={<LockOpenIcon className="h-3 w-3" />}>
+                        <StatusBadge variant="warning" icon={LockOpenIcon}>
                             Reaberto
                         </StatusBadge>
                     ),
@@ -144,7 +147,7 @@ export default function Index({ periods, lastActiveId, lastClosedUpTo }) {
                         <Button
                             variant="outline"
                             size="xs"
-                            icon={<LockOpenIcon className="h-3 w-3" />}
+                            icon={LockOpenIcon}
                             onClick={() => startReopen(p)}
                         >
                             Reabrir
@@ -158,11 +161,11 @@ export default function Index({ periods, lastActiveId, lastClosedUpTo }) {
     );
 
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="Fechamentos DRE" />
 
-            <div className="py-10">
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+            <div className="py-12">
+                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">Fechamentos DRE</h1>
@@ -178,13 +181,27 @@ export default function Index({ periods, lastActiveId, lastClosedUpTo }) {
                                 </p>
                             )}
                         </div>
-                        <Button
-                            variant="primary"
-                            icon={<LockClosedIcon className="h-4 w-4" />}
-                            onClick={() => setCloseModalOpen(true)}
-                        >
-                            Fechar período
-                        </Button>
+                        <div className="flex items-center gap-2 shrink-0">
+                            {canImportActuals && (
+                                <Button
+                                    variant="secondary"
+                                    icon={DocumentArrowUpIcon}
+                                    onClick={() => router.get(route('dre.imports.actuals'))}
+                                    className="whitespace-nowrap"
+                                    title="Lançar ajustes manuais (depreciação, provisões, IRPJ/CSLL etc.) antes de fechar"
+                                >
+                                    Importar realizado
+                                </Button>
+                            )}
+                            <Button
+                                variant="primary"
+                                icon={LockClosedIcon}
+                                onClick={() => setCloseModalOpen(true)}
+                                className="whitespace-nowrap"
+                            >
+                                Fechar período
+                            </Button>
+                        </div>
                     </div>
 
                     <DataTable columns={columns} data={periods} emptyMessage="Nenhum fechamento ainda." />
@@ -371,7 +388,7 @@ export default function Index({ periods, lastActiveId, lastClosedUpTo }) {
                     </p>
                 </StandardModal.Section>
             </StandardModal>
-        </AuthenticatedLayout>
+        </>
     );
 }
 

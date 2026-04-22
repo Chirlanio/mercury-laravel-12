@@ -1,6 +1,5 @@
 import { Head, useForm } from '@inertiajs/react';
 import { ArrowUpTrayIcon, BookOpenIcon } from '@heroicons/react/24/outline';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Button from '@/Components/Button';
 import TextInput from '@/Components/TextInput';
 import InputLabel from '@/Components/InputLabel';
@@ -45,11 +44,11 @@ export default function Chart({ flash }) {
         : null;
 
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="Importar plano de contas" />
 
-            <div className="py-10">
-                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+            <div className="py-12">
+                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
                     <div className="flex items-center gap-3">
                         <div className="rounded-lg bg-slate-100 p-3">
                             <BookOpenIcon className="h-6 w-6 text-slate-600" />
@@ -106,7 +105,7 @@ export default function Chart({ flash }) {
                             <Button
                                 type="submit"
                                 variant="dark"
-                                icon={<ArrowUpTrayIcon className="h-4 w-4" />}
+                                icon={ArrowUpTrayIcon}
                                 loading={processing}
                                 disabled={!data.file || processing}
                             >
@@ -124,6 +123,6 @@ export default function Chart({ flash }) {
                     )}
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </>
     );
 }

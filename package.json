@@ -4,7 +4,8 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "docs:pdf": "node scripts/build-docs-pdf.mjs"
     },
     "devDependencies": {
         "@headlessui/react": "^2.0.0",
@@ -15,6 +16,7 @@
         "axios": "^1.11.0",
         "concurrently": "^9.0.1",
         "laravel-vite-plugin": "^2.0.0",
+        "md-to-pdf": "^5.2.5",
         "postcss": "^8.4.31",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",

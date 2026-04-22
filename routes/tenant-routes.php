@@ -1300,13 +1300,10 @@ Route::middleware(['auth'])->group(function () {
 
         Route::middleware('permission:'.Permission::IMPORT_DRE_ACTUALS->value)->group(function () {
             Route::get('/dre/imports/actuals', [\App\Http\Controllers\DreImportController::class, 'actualsForm'])->name('dre.imports.actuals');
+            Route::get('/dre/imports/actuals/template', [\App\Http\Controllers\DreImportController::class, 'actualsTemplate'])->name('dre.imports.actuals.template');
             Route::post('/dre/imports/actuals', [\App\Http\Controllers\DreImportController::class, 'actualsStore'])->name('dre.imports.actuals.store');
         });
 
-        Route::middleware('permission:'.Permission::IMPORT_DRE_BUDGETS->value)->group(function () {
-            Route::get('/dre/imports/budgets', [\App\Http\Controllers\DreImportController::class, 'budgetsForm'])->name('dre.imports.budgets');
-            Route::post('/dre/imports/budgets', [\App\Http\Controllers\DreImportController::class, 'budgetsStore'])->name('dre.imports.budgets.store');
-        });
     });
 
     // ==========================================

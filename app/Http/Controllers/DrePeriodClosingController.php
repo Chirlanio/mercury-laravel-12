@@ -36,7 +36,7 @@ class DrePeriodClosingController extends Controller
 
     public function index(): Response
     {
-        $periods = DrePeriodClosing::query()
+        $rows = DrePeriodClosing::query()
             ->with(['closedBy:id,name', 'reopenedBy:id,name'])
             ->orderByDesc('closed_up_to_date')
             ->limit(50)
@@ -51,9 +51,23 @@ class DrePeriodClosingController extends Controller
                 'reopened_by' => $p->reopenedBy?->name,
                 'reopen_reason' => $p->reopen_reason,
                 'is_active' => $p->reopened_at === null,
-            ]);
+            ])
+            ->values();
 
-        $last = $periods->first(fn ($p) => $p['is_active']);
+        $last = $rows->first(fn ($p) => $p['is_active']);
+
+        // DataTable consome shape de paginação Laravel; wrappamos a coleção
+        // em {data, total, ...} mesmo sem paginar (volume sempre ≤ 50).
+        $periods = [
+            'data' => $rows->all(),
+            'total' => $rows->count(),
+            'from' => $rows->isEmpty() ? 0 : 1,
+            'to' => $rows->count(),
+            'per_page' => $rows->count(),
+            'current_page' => 1,
+            'last_page' => 1,
+            'links' => [],
+        ];
 
         return Inertia::render('DRE/Periods/Index', [
             'periods' => $periods,
@@ -113,15 +127,25 @@ class DrePeriodClosingController extends Controller
                 && $u->hasPermissionTo(Permission::MANAGE_DRE_PERIODS->value));
 
         if ($recipients->isNotEmpty()) {
-            Notification::send(
-                $recipients,
-                new DrePeriodReopenedNotification(
-                    closing: $period->fresh(),
-                    reopenedBy: $user,
-                    reason: (string) $request->input('reason'),
-                    report: $report,
-                ),
-            );
+            // Salvaguarda: notificação é best-effort. Falha de mailer (rate
+            // limit, smtp down) não pode reverter um reopen já consolidado.
+            try {
+                Notification::send(
+                    $recipients,
+                    new DrePeriodReopenedNotification(
+                        closing: $period->fresh(),
+                        reopenedBy: $user,
+                        reason: (string) $request->input('reason'),
+                        report: $report,
+                    ),
+                );
+            } catch (\Throwable $e) {
+                \Log::warning('DRE reopen: falha ao enfileirar notificação', [
+                    'closing_id' => $period->id,
+                    'recipients' => $recipients->pluck('id')->all(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         return redirect()

@@ -91,9 +91,9 @@ class NetworkController extends ConfigController
 
     protected function canDelete($model): bool|string
     {
-        $count = $model->users()->count();
+        $count = $model->stores()->count();
         if ($count > 0) {
-            return "Esta rede está sendo usada por {$count} usuário(s) e não pode ser excluída.";
+            return "Esta rede possui {$count} loja(s) vinculada(s) e não pode ser excluída.";
         }
         return true;
     }

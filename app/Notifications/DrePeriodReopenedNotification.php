@@ -6,6 +6,7 @@ use App\Models\DrePeriodClosing;
 use App\Models\User;
 use App\Services\DRE\ReopenReport;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -15,8 +16,11 @@ use Illuminate\Notifications\Notification;
  * Inclui justificativa + diffs consolidados (até 20 primeiras linhas, link
  * na tela para o full). Propagado por `mail` + `database` — stakeholders
  * com notification center ativo veem na navbar.
+ *
+ * `ShouldQueue` evita que rate limit do SMTP (ex: Mailtrap free) ou
+ * indisponibilidade do mailer trave a request HTTP de reopen.
  */
-class DrePeriodReopenedNotification extends Notification
+class DrePeriodReopenedNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 

@@ -18,11 +18,11 @@ class Network extends Model
     ];
 
     /**
-     * Get the users for the network.
+     * Get the stores for the network.
      */
-    public function users(): HasMany
+    public function stores(): HasMany
     {
-        return $this->hasMany(User::class);
+        return $this->hasMany(Store::class);
     }
 
     /**

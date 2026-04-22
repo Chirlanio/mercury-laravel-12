@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Services\DRE\ChartOfAccountsImporter;
 use App\Services\DRE\DreActualsImporter;
-use App\Services\DRE\DreBudgetsImporter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -84,6 +83,54 @@ class DreImportController extends Controller
         ]);
     }
 
+    /**
+     * Template xlsx pré-formatado com todos os cabeçalhos aceitos.
+     * Mesmo padrão de `BudgetController::template()`.
+     */
+    public function actualsTemplate(Request $request)
+    {
+        abort_unless(
+            $request->user()?->hasPermissionTo('dre.import_actuals'),
+            403
+        );
+
+        $headings = [
+            'entry_date', 'store_code', 'account_code', 'cost_center_code',
+            'amount', 'document', 'description', 'external_id',
+        ];
+
+        $exampleRows = [
+            [
+                '2026-04-15', 'Z421', '4.2.1.04.00032', '421',
+                '350.00', 'NF-12345', 'Telefonia móvel — abril/2026', 'TEL-2026-04-Z421',
+            ],
+            [
+                '2026-04-20', 'Z425', '4.2.1.04.00032', '425',
+                '180.50', '', 'Recarga celular gerência', '',
+            ],
+        ];
+
+        $export = new class($exampleRows, $headings) implements \Maatwebsite\Excel\Concerns\FromArray, \Maatwebsite\Excel\Concerns\WithHeadings {
+            public function __construct(public array $rows, public array $headings) {}
+
+            public function array(): array
+            {
+                return $this->rows;
+            }
+
+            public function headings(): array
+            {
+                return $this->headings;
+            }
+        };
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            $export,
+            'template-dre-realizado.xlsx',
+            \Maatwebsite\Excel\Excel::XLSX
+        );
+    }
+
     public function actualsStore(Request $request, DreActualsImporter $importer): RedirectResponse
     {
         abort_unless(
@@ -106,45 +153,8 @@ class DreImportController extends Controller
             ->with('import_report', $report->toArray());
     }
 
-    // ------------------------------------------------------------------
-    // Budgets (orçado manual)
-    // ------------------------------------------------------------------
-
-    public function budgetsForm(Request $request): Response
-    {
-        abort_unless(
-            $request->user()?->hasPermissionTo('dre.import_budgets'),
-            403
-        );
-
-        return Inertia::render('DRE/Imports/Budgets', [
-            'flash' => [
-                'import_report' => session('import_report'),
-            ],
-        ]);
-    }
-
-    public function budgetsStore(Request $request, DreBudgetsImporter $importer): RedirectResponse
-    {
-        abort_unless(
-            $request->user()?->hasPermissionTo('dre.import_budgets'),
-            403
-        );
-
-        $data = $request->validate([
-            'file' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:20480'],
-            'budget_version' => ['required', 'string', 'max:30'],
-            'dry_run' => ['nullable', 'boolean'],
-        ]);
-
-        $path = $data['file']->getRealPath();
-        $version = $data['budget_version'];
-        $dryRun = (bool) ($data['dry_run'] ?? false);
-
-        $report = $importer->import($path, $version, $dryRun);
-
-        return redirect()
-            ->route('dre.imports.budgets')
-            ->with('import_report', $report->toArray());
-    }
+    // Importar Orçado DRE foi removido da UI para evitar duplicidade com o
+    // módulo Budgets (`BudgetUpload` → `BudgetToDreProjector` → `dre_budgets`).
+    // Orçados manuais excepcionais agora só pelo command CLI:
+    //   php artisan dre:import-budgets <path> --version=<label>
 }
