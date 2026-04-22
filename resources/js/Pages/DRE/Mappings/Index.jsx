@@ -1,30 +1,31 @@
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import {
-    MagnifyingGlassIcon,
     ExclamationTriangleIcon,
     DocumentIcon,
-    FolderIcon,
     ArrowPathIcon,
     Squares2X2Icon,
+    TrashIcon,
 } from '@heroicons/react/24/outline';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Button from '@/Components/Button';
-import TextInput from '@/Components/TextInput';
+import DataTable from '@/Components/DataTable';
+import ActionButtons from '@/Components/ActionButtons';
 import Checkbox from '@/Components/Checkbox';
-import StatusBadge from '@/Components/Shared/StatusBadge';
 import EmptyState from '@/Components/Shared/EmptyState';
 import ManagementLinePicker from '@/Components/DRE/ManagementLinePicker';
 import BulkAssignModal from '@/Components/DRE/BulkAssignModal';
 
 /**
- * Tela central de mapeamento conta → linha gerencial.
+ * Tela central de mapeamento conta contábil → linha gerencial da DRE.
  *
- * Layout:
- *   - Filtros no topo (busca, grupo, CC, linha gerencial, "só não mapeadas")
- *   - Tabela com contas analíticas e mapping vigente embutido
- *   - Edição inline via select da linha + select de CC por linha
- *   - Seleção múltipla com bulk assign via modal
+ * Usa `DataTable` do projeto (busca embutida via query param `search`,
+ * pagination e `selectable`). Os filtros de domínio (grupo contábil, linha
+ * gerencial, só não-mapeadas) ficam num painel separado acima — DataTable
+ * não sabe sobre filtros específicos de DRE.
+ *
+ * Edição inline: selects por linha atualizam o mapping (PUT/POST) via
+ * `router` com `preserveScroll`. Sem modais — mapping é operação granular
+ * de ajuste contínuo, não CRUD discreto.
  */
 export default function MappingsIndex({
     accounts,
@@ -35,22 +36,13 @@ export default function MappingsIndex({
     can,
 }) {
     const [localFilters, setLocalFilters] = useState({
-        search: filters.search ?? '',
         account_group: filters.account_group ?? '',
         cost_center_id: filters.cost_center_id ?? '',
         management_line_id: filters.management_line_id ?? '',
         only_unmapped: filters.only_unmapped ?? false,
     });
-    const [selectedIds, setSelectedIds] = useState(new Set());
+    const [selectedIds, setSelectedIds] = useState([]);
     const [bulkOpen, setBulkOpen] = useState(false);
-
-    const lineLabelById = useMemo(() => {
-        const map = {};
-        (managementLines || []).forEach((l) => {
-            map[l.id] = l.label;
-        });
-        return map;
-    }, [managementLines]);
 
     const ccLabelById = useMemo(() => {
         const map = {};
@@ -60,41 +52,51 @@ export default function MappingsIndex({
         return map;
     }, [costCenters]);
 
-    const applyFilters = () => {
-        router.get(route('dre.mappings.index'), localFilters, {
-            preserveScroll: true,
-            preserveState: true,
+    const lineLabelById = useMemo(() => {
+        const map = {};
+        (managementLines || []).forEach((l) => {
+            map[l.id] = l.label;
         });
+        return map;
+    }, [managementLines]);
+
+    const applyFilters = () => {
+        router.get(
+            route('dre.mappings.index'),
+            { ...buildFilterParams(filters), ...localFilters },
+            {
+                preserveScroll: true,
+                preserveState: true,
+            }
+        );
     };
 
     const clearFilters = () => {
         const empty = {
-            search: '',
             account_group: '',
             cost_center_id: '',
             management_line_id: '',
             only_unmapped: false,
         };
         setLocalFilters(empty);
-        router.get(route('dre.mappings.index'), empty, {
+        // Preserva só search (DataTable controla) e per_page.
+        const kept = {};
+        if (filters.search) kept.search = filters.search;
+        if (filters.per_page) kept.per_page = filters.per_page;
+        router.get(route('dre.mappings.index'), kept, {
             preserveScroll: true,
             preserveState: true,
         });
     };
 
-    const toggleRow = (id) => {
-        const next = new Set(selectedIds);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        setSelectedIds(next);
-    };
-
-    const toggleAll = () => {
-        if (selectedIds.size === accounts.data.length) {
-            setSelectedIds(new Set());
-        } else {
-            setSelectedIds(new Set(accounts.data.map((a) => a.id)));
-        }
+    const toggleOnlyUnmapped = (checked) => {
+        const next = { ...localFilters, only_unmapped: checked };
+        setLocalFilters(next);
+        router.get(
+            route('dre.mappings.index'),
+            { ...buildFilterParams(filters), ...next },
+            { preserveScroll: true, preserveState: true }
+        );
     };
 
     const updateMapping = (account, patch) => {
@@ -102,9 +104,7 @@ export default function MappingsIndex({
         if (account.mapping) {
             router.put(
                 route('dre.mappings.update', account.mapping.id),
-                {
-                    ...patch,
-                },
+                { ...patch },
                 { preserveScroll: true, preserveState: true }
             );
         } else if (patch.dre_management_line_id) {
@@ -129,13 +129,137 @@ export default function MappingsIndex({
         });
     };
 
+    // Flatten para o formato esperado pelo DataTable.
+    const tableData = useMemo(
+        () => ({
+            data: accounts.data,
+            links: accounts.links,
+            per_page: accounts.meta?.per_page ?? 25,
+            from: accounts.meta?.from ?? 0,
+            to: accounts.meta?.to ?? 0,
+            total: accounts.meta?.total ?? 0,
+            current_page: accounts.meta?.current_page ?? 1,
+        }),
+        [accounts]
+    );
+
+    const columns = useMemo(() => {
+        const cols = [
+            {
+                key: 'account',
+                label: 'Conta',
+                render: (account) => {
+                    const indentPx = (account.classification_level || 0) * 12;
+                    return (
+                        <div
+                            className="flex items-center gap-2"
+                            style={{ paddingLeft: `${indentPx}px` }}
+                        >
+                            <span className="font-mono text-xs text-gray-500">
+                                {account.code}
+                            </span>
+                            <span className="text-gray-900">{account.name}</span>
+                        </div>
+                    );
+                },
+            },
+            {
+                key: 'type',
+                label: 'Tipo',
+                render: () => (
+                    <DocumentIcon
+                        className="h-4 w-4 text-gray-400"
+                        title="Analítica"
+                    />
+                ),
+            },
+            {
+                key: 'management_line',
+                label: 'Linha Gerencial',
+                render: (account) =>
+                    can?.manage ? (
+                        <ManagementLinePicker
+                            lines={managementLines}
+                            value={account.mapping?.dre_management_line_id ?? null}
+                            onChange={(v) =>
+                                updateMapping(account, { dre_management_line_id: v })
+                            }
+                            placeholder="— não mapeada —"
+                        />
+                    ) : account.mapping ? (
+                        <span className="text-gray-900">
+                            {lineLabelById[account.mapping.dre_management_line_id] || '—'}
+                        </span>
+                    ) : (
+                        <span className="text-red-600 text-xs font-medium">Pendente</span>
+                    ),
+            },
+            {
+                key: 'cost_center',
+                label: 'Centro de Custo',
+                render: (account) => {
+                    const mapped = account.mapping !== null;
+                    return can?.manage && mapped ? (
+                        <select
+                            value={account.mapping.cost_center_id ?? ''}
+                            onChange={(e) =>
+                                updateMapping(account, {
+                                    cost_center_id:
+                                        e.target.value === ''
+                                            ? null
+                                            : Number(e.target.value),
+                                })
+                            }
+                            className="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm text-sm w-full"
+                        >
+                            <option value="">(coringa — qualquer CC)</option>
+                            {costCenters.map((cc) => (
+                                <option key={cc.id} value={cc.id}>
+                                    {cc.label || `${cc.code} — ${cc.name}`}
+                                </option>
+                            ))}
+                        </select>
+                    ) : account.mapping?.cost_center_id ? (
+                        <span className="text-gray-700 text-sm">
+                            {ccLabelById[account.mapping.cost_center_id]}
+                        </span>
+                    ) : (
+                        <span className="text-gray-400 text-sm">—</span>
+                    );
+                },
+            },
+        ];
+
+        if (can?.manage) {
+            cols.push({
+                key: 'actions',
+                label: 'Ações',
+                render: (account) =>
+                    account.mapping ? (
+                        <ActionButtons>
+                            <ActionButtons.Custom
+                                variant="danger"
+                                icon={TrashIcon}
+                                title="Remover mapeamento"
+                                onClick={() => removeMapping(account)}
+                            />
+                        </ActionButtons>
+                    ) : (
+                        <span className="text-gray-300 text-sm">—</span>
+                    ),
+            });
+        }
+
+        return cols;
+    }, [can, managementLines, costCenters, ccLabelById, lineLabelById]);
+
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="Mapeamento da DRE" />
 
-            <div className="py-8">
+            <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between mb-6">
+                    <div className="mb-6 flex justify-between items-center">
                         <div>
                             <h1 className="text-2xl font-semibold text-gray-900">
                                 Mapeamento da DRE
@@ -147,50 +271,33 @@ export default function MappingsIndex({
                         </div>
                         <div className="flex gap-2">
                             <Link href={route('dre.mappings.unmapped')}>
-                                <Button variant="warning" size="sm" icon={ExclamationTriangleIcon}>
+                                <Button
+                                    variant="warning"
+                                    size="sm"
+                                    icon={ExclamationTriangleIcon}
+                                >
                                     Não Mapeadas
                                 </Button>
                             </Link>
-                            {can?.manage && selectedIds.size > 0 && (
+                            {can?.manage && selectedIds.length > 0 && (
                                 <Button
                                     variant="primary"
                                     size="sm"
                                     icon={Squares2X2Icon}
                                     onClick={() => setBulkOpen(true)}
                                 >
-                                    Mapear em lote ({selectedIds.size})
+                                    Mapear em lote ({selectedIds.length})
                                 </Button>
                             )}
                         </div>
                     </div>
 
-                    {/* Filtros */}
+                    {/* Filtros de domínio (grupo + linha + só não-mapeadas) */}
                     <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                            <div className="md:col-span-2">
-                                <label className="block text-xs font-medium text-gray-600 mb-1">
-                                    Busca
-                                </label>
-                                <div className="relative">
-                                    <MagnifyingGlassIcon className="absolute top-2.5 left-3 h-4 w-4 text-gray-400" />
-                                    <TextInput
-                                        placeholder="Código, código reduzido ou nome"
-                                        value={localFilters.search}
-                                        onChange={(e) =>
-                                            setLocalFilters({
-                                                ...localFilters,
-                                                search: e.target.value,
-                                            })
-                                        }
-                                        onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
-                                        className="pl-9 w-full"
-                                    />
-                                </div>
-                            </div>
-
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                             <div>
                                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                                    Grupo
+                                    Grupo contábil
                                 </label>
                                 <select
                                     value={localFilters.account_group}
@@ -213,7 +320,7 @@ export default function MappingsIndex({
 
                             <div>
                                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                                    Linha Gerencial
+                                    Linha gerencial
                                 </label>
                                 <ManagementLinePicker
                                     lines={managementLines}
@@ -232,8 +339,22 @@ export default function MappingsIndex({
                                 />
                             </div>
 
+                            <div className="flex items-end">
+                                <label className="inline-flex items-center gap-2 text-sm">
+                                    <Checkbox
+                                        checked={localFilters.only_unmapped}
+                                        onChange={(e) => toggleOnlyUnmapped(e.target.checked)}
+                                    />
+                                    Só <strong>não mapeadas</strong>
+                                </label>
+                            </div>
+
                             <div className="flex items-end gap-2">
-                                <Button variant="primary" size="sm" onClick={applyFilters}>
+                                <Button
+                                    variant="primary"
+                                    size="sm"
+                                    onClick={applyFilters}
+                                >
                                     Filtrar
                                 </Button>
                                 <Button
@@ -246,24 +367,6 @@ export default function MappingsIndex({
                                 </Button>
                             </div>
                         </div>
-
-                        <div className="mt-3 flex items-center gap-4">
-                            <label className="inline-flex items-center gap-2 text-sm">
-                                <Checkbox
-                                    checked={localFilters.only_unmapped}
-                                    onChange={(e) => {
-                                        const checked = e.target.checked;
-                                        const next = { ...localFilters, only_unmapped: checked };
-                                        setLocalFilters(next);
-                                        router.get(route('dre.mappings.index'), next, {
-                                            preserveScroll: true,
-                                            preserveState: true,
-                                        });
-                                    }}
-                                />
-                                Mostrar só <strong>não mapeadas</strong>
-                            </label>
-                        </div>
                     </div>
 
                     {/* Tabela */}
@@ -273,203 +376,15 @@ export default function MappingsIndex({
                             description="Ajuste os filtros ou verifique se há contas analíticas de grupos 3, 4 e 5 cadastradas."
                         />
                     ) : (
-                        <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        {can?.manage && (
-                                            <th className="px-3 py-2 w-10">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={
-                                                        selectedIds.size ===
-                                                            accounts.data.length &&
-                                                        accounts.data.length > 0
-                                                    }
-                                                    onChange={toggleAll}
-                                                    className="rounded border-gray-300"
-                                                />
-                                            </th>
-                                        )}
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">
-                                            Conta
-                                        </th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 w-14">
-                                            Tipo
-                                        </th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 w-60">
-                                            Linha Gerencial
-                                        </th>
-                                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 w-60">
-                                            Centro de Custo
-                                        </th>
-                                        {can?.manage && (
-                                            <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600 w-20">
-                                                Ações
-                                            </th>
-                                        )}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {accounts.data.map((account) => {
-                                        const mapped = account.mapping !== null;
-                                        const indentPx = (account.classification_level || 0) * 12;
-                                        return (
-                                            <tr key={account.id}>
-                                                {can?.manage && (
-                                                    <td className="px-3 py-2">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={selectedIds.has(account.id)}
-                                                            onChange={() => toggleRow(account.id)}
-                                                            className="rounded border-gray-300"
-                                                        />
-                                                    </td>
-                                                )}
-                                                <td
-                                                    className="px-3 py-2 text-sm"
-                                                    style={{ paddingLeft: `${12 + indentPx}px` }}
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-mono text-xs text-gray-500">
-                                                            {account.code}
-                                                        </span>
-                                                        <span className="text-gray-900">
-                                                            {account.name}
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-3 py-2">
-                                                    <DocumentIcon
-                                                        className="h-4 w-4 text-gray-400"
-                                                        title="Analítica"
-                                                    />
-                                                </td>
-                                                <td className="px-3 py-2 text-sm">
-                                                    {can?.manage ? (
-                                                        <ManagementLinePicker
-                                                            lines={managementLines}
-                                                            value={
-                                                                account.mapping
-                                                                    ?.dre_management_line_id ??
-                                                                null
-                                                            }
-                                                            onChange={(v) =>
-                                                                updateMapping(account, {
-                                                                    dre_management_line_id: v,
-                                                                })
-                                                            }
-                                                            placeholder="— não mapeada —"
-                                                        />
-                                                    ) : mapped ? (
-                                                        <StatusBadge variant="success" dot>
-                                                            {lineLabelById[
-                                                                account.mapping
-                                                                    .dre_management_line_id
-                                                            ] || '—'}
-                                                        </StatusBadge>
-                                                    ) : (
-                                                        <StatusBadge variant="danger" dot>
-                                                            Pendente
-                                                        </StatusBadge>
-                                                    )}
-                                                </td>
-                                                <td className="px-3 py-2 text-sm">
-                                                    {can?.manage && mapped ? (
-                                                        <select
-                                                            value={
-                                                                account.mapping.cost_center_id ??
-                                                                ''
-                                                            }
-                                                            onChange={(e) =>
-                                                                updateMapping(account, {
-                                                                    cost_center_id:
-                                                                        e.target.value === ''
-                                                                            ? null
-                                                                            : Number(
-                                                                                  e.target.value
-                                                                              ),
-                                                                })
-                                                            }
-                                                            className="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm text-sm w-full"
-                                                        >
-                                                            <option value="">
-                                                                (coringa — qualquer CC)
-                                                            </option>
-                                                            {costCenters.map((cc) => (
-                                                                <option key={cc.id} value={cc.id}>
-                                                                    {cc.label ||
-                                                                        `${cc.code} — ${cc.name}`}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    ) : account.mapping?.cost_center_id ? (
-                                                        <span className="text-gray-700">
-                                                            {
-                                                                ccLabelById[
-                                                                    account.mapping.cost_center_id
-                                                                ]
-                                                            }
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-gray-400">—</span>
-                                                    )}
-                                                </td>
-                                                {can?.manage && (
-                                                    <td className="px-3 py-2 text-right text-sm">
-                                                        {mapped && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    removeMapping(account)
-                                                                }
-                                                                className="text-red-600 hover:text-red-800 text-xs"
-                                                                title="Remover mapeamento"
-                                                            >
-                                                                Remover
-                                                            </button>
-                                                        )}
-                                                    </td>
-                                                )}
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-
-                            {/* Paginação simples */}
-                            {accounts.meta.last_page > 1 && (
-                                <div className="px-4 py-3 border-t flex items-center justify-between text-sm text-gray-600">
-                                    <span>
-                                        Página {accounts.meta.current_page} de{' '}
-                                        {accounts.meta.last_page}
-                                    </span>
-                                    <div className="flex gap-2">
-                                        {accounts.links.map((link, idx) => (
-                                            <button
-                                                key={idx}
-                                                disabled={!link.url || link.active}
-                                                onClick={() =>
-                                                    link.url &&
-                                                    router.get(link.url, {}, {
-                                                        preserveScroll: true,
-                                                        preserveState: true,
-                                                    })
-                                                }
-                                                className={`px-2 py-1 rounded ${
-                                                    link.active
-                                                        ? 'bg-indigo-600 text-white'
-                                                        : link.url
-                                                        ? 'text-indigo-600 hover:bg-indigo-50'
-                                                        : 'text-gray-300'
-                                                }`}
-                                                dangerouslySetInnerHTML={{ __html: link.label }}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                        <DataTable
+                            columns={columns}
+                            data={tableData}
+                            searchPlaceholder="Código, código reduzido ou nome"
+                            emptyMessage="Nenhuma conta encontrada."
+                            selectable={can?.manage}
+                            selectedIds={selectedIds}
+                            onSelectionChange={setSelectedIds}
+                        />
                     )}
                 </div>
             </div>
@@ -477,10 +392,20 @@ export default function MappingsIndex({
             <BulkAssignModal
                 show={bulkOpen}
                 onClose={() => setBulkOpen(false)}
-                selectedAccountIds={Array.from(selectedIds)}
+                selectedAccountIds={selectedIds}
                 managementLines={managementLines}
                 costCenters={costCenters}
             />
-        </AuthenticatedLayout>
+        </>
     );
+}
+
+/**
+ * Remove chaves null/undefined/empty — evita sujar a URL após apply.
+ */
+function buildFilterParams(filters) {
+    const out = {};
+    if (filters.search) out.search = filters.search;
+    if (filters.per_page) out.per_page = filters.per_page;
+    return out;
 }
