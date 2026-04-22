@@ -110,27 +110,30 @@ class DreDevSeeder extends Seeder
             'created_by_user_id' => $admin->id,
         ]);
 
-        $line = DreManagementLine::query()
-            ->where('code', 'L99_UNCLASSIFIED')
-            ->firstOrFail();
+        // Mappings usam linhas reais do plano executivo 20 para que a matriz
+        // mostre valores nas linhas corretas (antes usava L99_UNCLASSIFIED,
+        // o que fazia todo o movimento cair na linha-fantasma).
+        $lineReceita = DreManagementLine::query()->where('code', 'L01')->firstOrFail();       // Faturamento Bruto
+        $lineCustos = DreManagementLine::query()->where('code', 'L08')->firstOrFail();        // Custos Indiretos
+        $lineDespesas = DreManagementLine::query()->where('code', 'L10')->firstOrFail();      // Despesas Gerais (SG&A)
 
-        // Mapping específico (com CC)
+        // Mapping específico (com CC) — receita por loja via revenue->CC
         DreMapping::create([
             'chart_of_account_id' => $expense1->id,
             'cost_center_id' => $cc->id,
-            'dre_management_line_id' => $line->id,
-            'effective_from' => now()->subMonths(6)->startOfMonth()->format('Y-m-d'),
+            'dre_management_line_id' => $lineCustos->id,
+            'effective_from' => now()->startOfYear()->format('Y-m-d'),
             'effective_to' => null,
             'created_by_user_id' => $admin->id,
             'updated_by_user_id' => $admin->id,
         ]);
 
-        // Mapping coringa (sem CC) — usa receita
+        // Mapping coringa (sem CC) — receita em Faturamento Bruto
         DreMapping::create([
             'chart_of_account_id' => $revenue->id,
             'cost_center_id' => null,
-            'dre_management_line_id' => $line->id,
-            'effective_from' => now()->subMonths(6)->startOfMonth()->format('Y-m-d'),
+            'dre_management_line_id' => $lineReceita->id,
+            'effective_from' => now()->startOfYear()->format('Y-m-d'),
             'effective_to' => null,
             'created_by_user_id' => $admin->id,
             'updated_by_user_id' => $admin->id,
@@ -140,7 +143,7 @@ class DreDevSeeder extends Seeder
         DreMapping::create([
             'chart_of_account_id' => $expense2->id,
             'cost_center_id' => null,
-            'dre_management_line_id' => $line->id,
+            'dre_management_line_id' => $lineDespesas->id,
             'effective_from' => now()->subYear()->startOfMonth()->format('Y-m-d'),
             'effective_to' => now()->subMonths(7)->endOfMonth()->format('Y-m-d'),
             'created_by_user_id' => $admin->id,

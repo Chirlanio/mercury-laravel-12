@@ -108,13 +108,18 @@ export default function MappingsIndex({
                 { preserveScroll: true, preserveState: true }
             );
         } else if (patch.dre_management_line_id) {
+            // `effective_from = 1º de janeiro do ano corrente` para cobrir
+            // os lançamentos já importados no ano (OPs, Sales, imports).
+            // Sem isso, o resolver (que exige effective_from <= entry_date)
+            // joga todos os lançamentos de janeiro até hoje em L99, mesmo
+            // com a conta mapeada — tela fica zerada nos meses anteriores.
             router.post(
                 route('dre.mappings.store'),
                 {
                     chart_of_account_id: account.id,
                     cost_center_id: patch.cost_center_id ?? null,
                     dre_management_line_id: patch.dre_management_line_id,
-                    effective_from: todayLocalIso(),
+                    effective_from: startOfYearLocalIso(),
                 },
                 { preserveScroll: true, preserveState: true }
             );
@@ -422,4 +427,13 @@ function todayLocalIso() {
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
+}
+
+/**
+ * 1º de janeiro do ano corrente (YYYY-01-01 local). Default pro
+ * `effective_from` de novos mappings para cobrir lançamentos do ano
+ * inteiro sem exigir backfill manual.
+ */
+function startOfYearLocalIso() {
+    return `${new Date().getFullYear()}-01-01`;
 }
