@@ -114,7 +114,7 @@ export default function MappingsIndex({
                     chart_of_account_id: account.id,
                     cost_center_id: patch.cost_center_id ?? null,
                     dre_management_line_id: patch.dre_management_line_id,
-                    effective_from: new Date().toISOString().slice(0, 10),
+                    effective_from: todayLocalIso(),
                 },
                 { preserveScroll: true, preserveState: true }
             );
@@ -408,4 +408,18 @@ function buildFilterParams(filters) {
     if (filters.search) out.search = filters.search;
     if (filters.per_page) out.per_page = filters.per_page;
     return out;
+}
+
+/**
+ * Data de hoje no fuso local em formato YYYY-MM-DD. `toISOString()`
+ * sempre retorna UTC, o que em horário de Brasília (UTC-3) pode gerar
+ * um dia futuro entre 21:00 e 23:59 — a mapping nasceria com
+ * `effective_from` amanhã e sumiria do `list()` (que filtra por hoje).
+ */
+function todayLocalIso() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
 }
