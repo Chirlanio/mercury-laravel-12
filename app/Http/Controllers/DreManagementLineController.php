@@ -52,18 +52,10 @@ class DreManagementLineController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function store(StoreDreManagementLineRequest $request): RedirectResponse
     {
         $this->authorize('create', DreManagementLine::class);
 
-        return Inertia::render('DRE/ManagementLines/Edit', [
-            'line' => null,
-            'natureOptions' => $this->natureOptions(),
-        ]);
-    }
-
-    public function store(StoreDreManagementLineRequest $request): RedirectResponse
-    {
         $data = $request->validated();
         $data['created_by_user_id'] = $request->user()?->id;
 
@@ -73,18 +65,10 @@ class DreManagementLineController extends Controller
             ->with('flash.success', 'Linha gerencial criada.');
     }
 
-    public function edit(DreManagementLine $managementLine): Response
+    public function update(UpdateDreManagementLineRequest $request, DreManagementLine $managementLine): RedirectResponse
     {
         $this->authorize('update', $managementLine);
 
-        return Inertia::render('DRE/ManagementLines/Edit', [
-            'line' => $this->serialize($managementLine),
-            'natureOptions' => $this->natureOptions(),
-        ]);
-    }
-
-    public function update(UpdateDreManagementLineRequest $request, DreManagementLine $managementLine): RedirectResponse
-    {
         $data = $request->validated();
         $data['updated_by_user_id'] = $request->user()?->id;
 

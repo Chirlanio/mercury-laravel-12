@@ -1262,10 +1262,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/dre/management-lines', [\App\Http\Controllers\DreManagementLineController::class, 'index'])->name('dre.management-lines.index');
 
         Route::middleware('permission:'.Permission::MANAGE_DRE_STRUCTURE->value)->group(function () {
-            Route::get('/dre/management-lines/create', [\App\Http\Controllers\DreManagementLineController::class, 'create'])->name('dre.management-lines.create');
             Route::post('/dre/management-lines', [\App\Http\Controllers\DreManagementLineController::class, 'store'])->name('dre.management-lines.store');
             Route::post('/dre/management-lines/reorder', [\App\Http\Controllers\DreManagementLineController::class, 'reorder'])->name('dre.management-lines.reorder');
-            Route::get('/dre/management-lines/{managementLine}/edit', [\App\Http\Controllers\DreManagementLineController::class, 'edit'])->whereNumber('managementLine')->name('dre.management-lines.edit');
             Route::put('/dre/management-lines/{managementLine}', [\App\Http\Controllers\DreManagementLineController::class, 'update'])->whereNumber('managementLine')->name('dre.management-lines.update');
             Route::delete('/dre/management-lines/{managementLine}', [\App\Http\Controllers\DreManagementLineController::class, 'destroy'])->whereNumber('managementLine')->name('dre.management-lines.destroy');
         });

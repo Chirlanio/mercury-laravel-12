@@ -1,4 +1,4 @@
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import {
     PlusIcon,
@@ -6,31 +6,56 @@ import {
     ArrowDownIcon,
     ArrowsUpDownIcon,
     CheckCircleIcon,
+    PencilSquareIcon,
 } from '@heroicons/react/24/outline';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
+import StandardModal from '@/Components/StandardModal';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import EmptyState from '@/Components/Shared/EmptyState';
 import DeleteConfirmModal from '@/Components/Shared/DeleteConfirmModal';
+import TextInput from '@/Components/TextInput';
+import InputLabel from '@/Components/InputLabel';
+import InputError from '@/Components/InputError';
+import Checkbox from '@/Components/Checkbox';
+import useModalManager from '@/Hooks/useModalManager';
 
 /**
- * Listagem ordenada das linhas da DRE gerencial.
+ * Listagem ordenada + CRUD de linhas da DRE gerencial.
  *
- * Reorder é client-side (setas ↑/↓ em cada linha + botão "Salvar ordem" que
- * envia POST /dre/management-lines/reorder). Sem busca/paginação porque o
- * volume é pequeno (≈20 linhas) e o reorder exige tudo visível ao mesmo
- * tempo. Por isso a tabela é renderizada "raw" — usa-se `DataTable` em
- * listagens paginadas do servidor.
+ * Create/Edit via `StandardModal` (padrão do projeto — ver
+ * `AccountingClasses/Index.jsx`). Sem páginas dedicadas de create/edit.
  *
- * Visualmente espelha o shell do `DataTable` (`bg-white shadow-sm rounded-lg`)
- * e usa `ActionButtons` + `ActionButtons.Custom` na coluna de Ações para
- * consistência com o resto do sistema.
+ * Reorder é client-side (setas ↑/↓ + botão "Salvar ordem" → POST
+ * /dre/management-lines/reorder). Sem busca/paginação porque o volume é
+ * pequeno (≈20 linhas) e o reorder exige tudo visível ao mesmo tempo.
  */
 export default function ManagementLinesIndex({ lines, can, natureOptions }) {
     const { flash } = usePage().props;
+    const { modals, selected, openModal, closeModal } = useModalManager(['create', 'edit']);
+
     const [ordered, setOrdered] = useState(() => [...lines]);
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [isDirty, setIsDirty] = useState(false);
+
+    const emptyForm = {
+        code: '',
+        sort_order: (lines.length + 1) * 10,
+        is_subtotal: false,
+        accumulate_until_sort_order: null,
+        level_1: '',
+        nature: 'expense',
+        is_active: true,
+        notes: '',
+    };
+
+    const [createForm, setCreateForm] = useState(emptyForm);
+    const [createErrors, setCreateErrors] = useState({});
+    const [createProcessing, setCreateProcessing] = useState(false);
+
+    const [editForm, setEditForm] = useState({});
+    const [editErrors, setEditErrors] = useState({});
+    const [editProcessing, setEditProcessing] = useState(false);
 
     const natureLabel = useMemo(() => {
         const map = {};
@@ -39,6 +64,10 @@ export default function ManagementLinesIndex({ lines, can, natureOptions }) {
         });
         return map;
     }, [natureOptions]);
+
+    // ------------------------------------------------------------------
+    // Reorder
+    // ------------------------------------------------------------------
 
     const move = (index, delta) => {
         const next = [...ordered];
@@ -65,6 +94,70 @@ export default function ManagementLinesIndex({ lines, can, natureOptions }) {
         );
     };
 
+    // ------------------------------------------------------------------
+    // Create
+    // ------------------------------------------------------------------
+
+    const handleCreateOpen = () => {
+        setCreateForm({ ...emptyForm, sort_order: (lines.length + 1) * 10 });
+        setCreateErrors({});
+        openModal('create');
+    };
+
+    const handleCreateSubmit = (e) => {
+        e.preventDefault();
+        setCreateProcessing(true);
+        setCreateErrors({});
+
+        router.post(route('dre.management-lines.store'), createForm, {
+            preserveScroll: true,
+            onSuccess: () => {
+                closeModal('create');
+                setCreateForm(emptyForm);
+            },
+            onError: (errors) => setCreateErrors(errors),
+            onFinish: () => setCreateProcessing(false),
+        });
+    };
+
+    // ------------------------------------------------------------------
+    // Edit
+    // ------------------------------------------------------------------
+
+    const handleEditOpen = (line) => {
+        setEditForm({
+            id: line.id,
+            code: line.code ?? '',
+            sort_order: line.sort_order ?? 1,
+            is_subtotal: line.is_subtotal ?? false,
+            accumulate_until_sort_order: line.accumulate_until_sort_order ?? null,
+            level_1: line.level_1 ?? '',
+            nature: line.nature ?? 'expense',
+            is_active: line.is_active ?? true,
+            notes: line.notes ?? '',
+        });
+        setEditErrors({});
+        openModal('edit', line);
+    };
+
+    const handleEditSubmit = (e) => {
+        e.preventDefault();
+        setEditProcessing(true);
+        setEditErrors({});
+
+        const { id, ...payload } = editForm;
+        router.put(route('dre.management-lines.update', id), payload, {
+            preserveScroll: true,
+            onSuccess: () => closeModal('edit'),
+            onError: (errors) => setEditErrors(errors),
+            onFinish: () => setEditProcessing(false),
+        });
+    };
+
+    // ------------------------------------------------------------------
+    // Delete
+    // ------------------------------------------------------------------
+
     const confirmDelete = () => {
         if (!deleteTarget) return;
         router.delete(route('dre.management-lines.destroy', deleteTarget.id), {
@@ -72,6 +165,10 @@ export default function ManagementLinesIndex({ lines, can, natureOptions }) {
             onSuccess: () => setDeleteTarget(null),
         });
     };
+
+    // ------------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------------
 
     const natureBadgeVariant = (nature) => {
         if (nature === 'revenue') return 'success';
@@ -118,11 +215,14 @@ export default function ManagementLinesIndex({ lines, can, natureOptions }) {
                                         </Button>
                                     </>
                                 )}
-                                <Link href={route('dre.management-lines.create')}>
-                                    <Button variant="primary" size="sm" icon={PlusIcon}>
-                                        Nova linha
-                                    </Button>
-                                </Link>
+                                <Button
+                                    variant="primary"
+                                    size="sm"
+                                    icon={PlusIcon}
+                                    onClick={handleCreateOpen}
+                                >
+                                    Nova linha
+                                </Button>
                             </div>
                         )}
                     </div>
@@ -173,9 +273,7 @@ export default function ManagementLinesIndex({ lines, can, natureOptions }) {
                                         {ordered.map((line, idx) => (
                                             <tr
                                                 key={line.id}
-                                                className={
-                                                    line.is_subtotal ? 'bg-gray-50' : ''
-                                                }
+                                                className={line.is_subtotal ? 'bg-gray-50' : ''}
                                             >
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 tabular-nums">
                                                     {idx + 1}
@@ -188,11 +286,7 @@ export default function ManagementLinesIndex({ lines, can, natureOptions }) {
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                                     <span
-                                                        className={
-                                                            line.is_subtotal
-                                                                ? 'font-semibold'
-                                                                : ''
-                                                        }
+                                                        className={line.is_subtotal ? 'font-semibold' : ''}
                                                     >
                                                         {line.level_1}
                                                     </span>
@@ -226,14 +320,7 @@ export default function ManagementLinesIndex({ lines, can, natureOptions }) {
                                                 {can?.manage && (
                                                     <td className="px-6 py-4 whitespace-nowrap">
                                                         <ActionButtons
-                                                            onEdit={() =>
-                                                                router.visit(
-                                                                    route(
-                                                                        'dre.management-lines.edit',
-                                                                        line.id
-                                                                    )
-                                                                )
-                                                            }
+                                                            onEdit={() => handleEditOpen(line)}
                                                             onDelete={() => setDeleteTarget(line)}
                                                         >
                                                             <ActionButtons.Custom
@@ -263,6 +350,59 @@ export default function ManagementLinesIndex({ lines, can, natureOptions }) {
                 </div>
             </div>
 
+            {/* -------- Create Modal -------- */}
+            <StandardModal
+                show={modals.create}
+                onClose={() => closeModal('create')}
+                title="Nova Linha da DRE"
+                headerColor="bg-indigo-600"
+                headerIcon={<PlusIcon className="h-6 w-6 text-white" />}
+                maxWidth="2xl"
+                onSubmit={handleCreateSubmit}
+                footer={
+                    <StandardModal.Footer
+                        onCancel={() => closeModal('create')}
+                        onSubmit="submit"
+                        submitLabel="Cadastrar"
+                        processing={createProcessing}
+                    />
+                }
+            >
+                <ManagementLineFormFields
+                    form={createForm}
+                    errors={createErrors}
+                    onChange={(patch) => setCreateForm({ ...createForm, ...patch })}
+                    natureOptions={natureOptions}
+                />
+            </StandardModal>
+
+            {/* -------- Edit Modal -------- */}
+            <StandardModal
+                show={modals.edit}
+                onClose={() => closeModal('edit')}
+                title={selected?.level_1 ? `Editar "${selected.level_1}"` : 'Editar linha'}
+                headerColor="bg-amber-600"
+                headerIcon={<PencilSquareIcon className="h-6 w-6 text-white" />}
+                maxWidth="2xl"
+                onSubmit={handleEditSubmit}
+                footer={
+                    <StandardModal.Footer
+                        onCancel={() => closeModal('edit')}
+                        onSubmit="submit"
+                        submitLabel="Salvar"
+                        processing={editProcessing}
+                    />
+                }
+            >
+                <ManagementLineFormFields
+                    form={editForm}
+                    errors={editErrors}
+                    onChange={(patch) => setEditForm({ ...editForm, ...patch })}
+                    natureOptions={natureOptions}
+                />
+            </StandardModal>
+
+            {/* -------- Delete Confirm -------- */}
             <DeleteConfirmModal
                 show={deleteTarget !== null}
                 onClose={() => setDeleteTarget(null)}
@@ -279,6 +419,150 @@ export default function ManagementLinesIndex({ lines, can, natureOptions }) {
                 }
                 warningMessage="A linha será marcada como excluída (soft delete). Mapeamentos vigentes impedem a exclusão."
             />
+        </>
+    );
+}
+
+// ----------------------------------------------------------------------
+// Fields subcomponent — reutilizado entre create e edit.
+// ----------------------------------------------------------------------
+
+function ManagementLineFormFields({ form, errors, onChange, natureOptions }) {
+    return (
+        <>
+            <StandardModal.Section title="Dados gerais">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <InputLabel htmlFor="code" value="Código" />
+                        <TextInput
+                            id="code"
+                            className="w-full mt-1"
+                            value={form.code}
+                            onChange={(e) => onChange({ code: e.target.value })}
+                            placeholder="Ex: L21"
+                            maxLength={20}
+                            required
+                        />
+                        <InputError className="mt-1" message={errors.code} />
+                    </div>
+
+                    <div>
+                        <InputLabel htmlFor="sort_order" value="Ordem" />
+                        <TextInput
+                            id="sort_order"
+                            type="number"
+                            min="1"
+                            className="w-full mt-1"
+                            value={form.sort_order}
+                            onChange={(e) =>
+                                onChange({
+                                    sort_order: parseInt(e.target.value, 10) || 1,
+                                })
+                            }
+                            required
+                        />
+                        <InputError className="mt-1" message={errors.sort_order} />
+                    </div>
+                </div>
+
+                <div className="mt-4">
+                    <InputLabel htmlFor="level_1" value="Rótulo (level_1)" />
+                    <TextInput
+                        id="level_1"
+                        className="w-full mt-1"
+                        value={form.level_1}
+                        onChange={(e) => onChange({ level_1: e.target.value })}
+                        placeholder="Ex: (+) Faturamento Bruto"
+                        required
+                    />
+                    <InputError className="mt-1" message={errors.level_1} />
+                </div>
+
+                <div className="mt-4">
+                    <InputLabel htmlFor="nature" value="Natureza" />
+                    <select
+                        id="nature"
+                        value={form.nature}
+                        onChange={(e) => onChange({ nature: e.target.value })}
+                        className="mt-1 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full"
+                    >
+                        {(natureOptions || []).map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                            </option>
+                        ))}
+                    </select>
+                    <InputError className="mt-1" message={errors.nature} />
+                </div>
+            </StandardModal.Section>
+
+            <StandardModal.Section title="Subtotal">
+                <div className="flex items-start gap-3">
+                    <Checkbox
+                        id="is_subtotal"
+                        checked={form.is_subtotal}
+                        onChange={(e) => onChange({ is_subtotal: e.target.checked })}
+                    />
+                    <div>
+                        <InputLabel htmlFor="is_subtotal" value="É subtotal?" className="!mb-0" />
+                        <p className="text-xs text-gray-500 mt-1">
+                            Subtotais acumulam linhas anteriores até a ordem configurada
+                            abaixo (ex: EBITDA acumula até o sort_order da Depreciação).
+                        </p>
+                    </div>
+                </div>
+
+                {form.is_subtotal && (
+                    <div className="mt-4">
+                        <InputLabel
+                            htmlFor="accumulate_until_sort_order"
+                            value="Acumular até a ordem"
+                        />
+                        <TextInput
+                            id="accumulate_until_sort_order"
+                            type="number"
+                            min="1"
+                            className="w-full mt-1"
+                            value={form.accumulate_until_sort_order ?? ''}
+                            onChange={(e) =>
+                                onChange({
+                                    accumulate_until_sort_order:
+                                        e.target.value === ''
+                                            ? null
+                                            : parseInt(e.target.value, 10),
+                                })
+                            }
+                        />
+                        <InputError
+                            className="mt-1"
+                            message={errors.accumulate_until_sort_order}
+                        />
+                    </div>
+                )}
+            </StandardModal.Section>
+
+            <StandardModal.Section title="Detalhes">
+                <div className="flex items-center gap-2">
+                    <Checkbox
+                        id="is_active"
+                        checked={form.is_active}
+                        onChange={(e) => onChange({ is_active: e.target.checked })}
+                    />
+                    <InputLabel htmlFor="is_active" value="Ativa" className="!mb-0" />
+                </div>
+
+                <div className="mt-4">
+                    <InputLabel htmlFor="notes" value="Observações" />
+                    <textarea
+                        id="notes"
+                        rows="3"
+                        className="mt-1 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full text-sm"
+                        value={form.notes ?? ''}
+                        onChange={(e) => onChange({ notes: e.target.value })}
+                    />
+                    <InputError className="mt-1" message={errors.notes} />
+                </div>
+            </StandardModal.Section>
         </>
     );
 }
