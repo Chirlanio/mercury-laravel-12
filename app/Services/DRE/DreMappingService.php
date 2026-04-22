@@ -71,10 +71,14 @@ class DreMappingService
                 });
             }
         });
+        // Expressões SQL — addSelect com array associativo é tratado como
+        // lista de colunas (sem aliases), o que faria `m_active.id`
+        // sobrescrever `chart_of_accounts.id` e zerar o PK dos registros
+        // não-mapeados. Usar DB::raw com AS explícito garante os aliases.
         $query->addSelect([
-            'active_mapping_id' => 'm_active.id',
-            'active_mapping_cost_center_id' => 'm_active.cost_center_id',
-            'active_mapping_line_id' => 'm_active.dre_management_line_id',
+            DB::raw('m_active.id AS active_mapping_id'),
+            DB::raw('m_active.cost_center_id AS active_mapping_cost_center_id'),
+            DB::raw('m_active.dre_management_line_id AS active_mapping_line_id'),
         ]);
 
         if ($filter->search) {
