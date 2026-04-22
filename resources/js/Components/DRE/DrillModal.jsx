@@ -67,15 +67,10 @@ export default function DrillModal({ show, onClose, line, yearMonth, filter }) {
             headerIcon={<MagnifyingGlassIcon className="h-5 w-5 text-white" />}
             maxWidth="4xl"
             footer={
-                <div className="flex justify-end gap-2">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    >
-                        Fechar
-                    </button>
-                </div>
+                <StandardModal.Footer
+                    onCancel={onClose}
+                    cancelLabel="Fechar"
+                />
             }
         >
             <StandardModal.Section title="Contas contribuintes">

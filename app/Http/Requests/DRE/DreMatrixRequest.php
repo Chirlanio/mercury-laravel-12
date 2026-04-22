@@ -36,6 +36,17 @@ class DreMatrixRequest extends FormRequest
         if (blank($this->input('end_date'))) {
             $this->merge(['end_date' => now()->format('Y-m-d')]);
         }
+
+        // Axios (drill endpoint) e `router.get` do Inertia serializam boolean
+        // JS como string "true"/"false" no query param. A regra `boolean` do
+        // Laravel só aceita true/false/1/0/"1"/"0" — "true"/"false" falham.
+        // Coercer antes de validar.
+        foreach (['include_unclassified', 'compare_previous_year'] as $key) {
+            $value = $this->input($key);
+            if (is_string($value) && in_array(strtolower($value), ['true', 'false'], true)) {
+                $this->merge([$key => strtolower($value) === 'true']);
+            }
+        }
     }
 
     public function authorize(): bool
