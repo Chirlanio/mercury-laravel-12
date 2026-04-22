@@ -112,19 +112,26 @@ export default function DrillModal({ show, onClose, line, yearMonth, filter }) {
                                 {contributors.map((c, idx) => (
                                     <tr key={`${c.chart_of_account?.id ?? '?'}-${c.cost_center?.id ?? 'null'}-${idx}`}>
                                         <td className="px-3 py-2">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-mono text-xs text-gray-500">
+                                            <div>
+                                                <div className="font-mono text-xs text-gray-500">
                                                     {c.chart_of_account?.code ?? '—'}
-                                                </span>
-                                                <span className="text-gray-900">
+                                                </div>
+                                                <div className="text-gray-900 text-sm">
                                                     {c.chart_of_account?.name ?? '—'}
-                                                </span>
+                                                </div>
                                             </div>
                                         </td>
-                                        <td className="px-3 py-2 text-gray-600">
-                                            {c.cost_center
-                                                ? `${c.cost_center.code} — ${c.cost_center.name}`
-                                                : <span className="text-gray-400">Qualquer CC</span>}
+                                        <td className="px-3 py-2 text-gray-600 text-sm">
+                                            {c.cost_center ? (
+                                                <div>
+                                                    <div className="font-mono text-xs text-gray-500">
+                                                        {c.cost_center.code}
+                                                    </div>
+                                                    <div>{c.cost_center.name}</div>
+                                                </div>
+                                            ) : (
+                                                <span className="text-gray-400">Qualquer CC</span>
+                                            )}
                                         </td>
                                         <td className={`px-3 py-2 text-right tabular-nums ${
                                             Number(c.actual) < 0 ? 'text-red-700' : 'text-gray-900'
