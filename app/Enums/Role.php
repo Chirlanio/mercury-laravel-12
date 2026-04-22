@@ -6,6 +6,9 @@ enum Role: string
 {
     case SUPER_ADMIN = 'super_admin';
     case ADMIN = 'admin';
+    case FINANCE = 'finance';
+    case ACCOUNTING = 'accounting';
+    case FISCAL = 'fiscal';
     case SUPPORT = 'support';
     case USER = 'user';
     case DRIVER = 'drivers';
@@ -15,6 +18,9 @@ enum Role: string
         return match ($this) {
             self::SUPER_ADMIN => 'Super Administrador',
             self::ADMIN => 'Administrador',
+            self::FINANCE => 'Financeira',
+            self::ACCOUNTING => 'Contabilidade',
+            self::FISCAL => 'Fiscal',
             self::SUPPORT => 'Suporte',
             self::USER => 'Usuário',
             self::DRIVER => 'Motorista',
@@ -23,11 +29,17 @@ enum Role: string
 
     public function hasPermission(Role $requiredRole): bool
     {
+        // Escala com gaps intencionais (1, 2, 8, 9, 10) — deixa espaço para
+        // adicionar roles intermediárias no futuro sem shift em cascata.
         $hierarchy = [
             self::USER->value => 1,
+            self::DRIVER->value => 1,
             self::SUPPORT->value => 2,
-            self::ADMIN->value => 3,
-            self::SUPER_ADMIN->value => 4,
+            self::FINANCE->value => 8,
+            self::ACCOUNTING->value => 8,
+            self::FISCAL->value => 8,
+            self::ADMIN->value => 9,
+            self::SUPER_ADMIN->value => 10,
         ];
 
         return $hierarchy[$this->value] >= $hierarchy[$requiredRole->value];
@@ -582,6 +594,149 @@ enum Role: string
                 // (não edita linhas gerenciais nem mappings).
                 Permission::VIEW_DRE->value,
                 Permission::VIEW_DRE_PENDING_ACCOUNTS->value,
+            ],
+            self::FINANCE => [
+                // Financeira — contas a pagar, orçamentos, imports de realizado DRE.
+                // Não edita plano de contas (fica em Contabilidade), não fecha período.
+                Permission::VIEW_OWN_PROFILE->value,
+                Permission::EDIT_OWN_PROFILE->value,
+                Permission::ACCESS_DASHBOARD->value,
+
+                // Ordens de pagamento (CRUD)
+                Permission::VIEW_ORDER_PAYMENTS->value,
+                Permission::CREATE_ORDER_PAYMENTS->value,
+                Permission::EDIT_ORDER_PAYMENTS->value,
+                Permission::DELETE_ORDER_PAYMENTS->value,
+
+                // Fornecedores (CRUD)
+                Permission::VIEW_SUPPLIERS->value,
+                Permission::CREATE_SUPPLIERS->value,
+                Permission::EDIT_SUPPLIERS->value,
+
+                // Ordens de compra (view)
+                Permission::VIEW_PURCHASE_ORDERS->value,
+                Permission::EXPORT_PURCHASE_ORDERS->value,
+
+                // Centros de custo, plano contábil, plano gerencial (view only)
+                Permission::VIEW_COST_CENTERS->value,
+                Permission::EXPORT_COST_CENTERS->value,
+                Permission::VIEW_ACCOUNTING_CLASSES->value,
+                Permission::EXPORT_ACCOUNTING_CLASSES->value,
+                Permission::VIEW_MANAGEMENT_CLASSES->value,
+                Permission::EXPORT_MANAGEMENT_CLASSES->value,
+
+                // Orçamentos (full CRUD + consumo)
+                Permission::VIEW_BUDGETS->value,
+                Permission::UPLOAD_BUDGETS->value,
+                Permission::DOWNLOAD_BUDGETS->value,
+                Permission::DELETE_BUDGETS->value,
+                Permission::MANAGE_BUDGETS->value,
+                Permission::EXPORT_BUDGETS->value,
+                Permission::VIEW_BUDGET_CONSUMPTION->value,
+
+                // DRE: matriz + imports + pendências + export (sem estrutura/mappings/fechamento)
+                Permission::VIEW_DRE->value,
+                Permission::VIEW_DRE_PENDING_ACCOUNTS->value,
+                Permission::IMPORT_DRE_ACTUALS->value,
+                Permission::IMPORT_DRE_BUDGETS->value,
+                Permission::EXPORT_DRE->value,
+
+                // Dados operacionais de leitura pra contexto
+                Permission::VIEW_SALES->value,
+                Permission::VIEW_MOVEMENTS->value,
+                Permission::VIEW_REVERSALS->value,
+                Permission::VIEW_RETURNS->value,
+            ],
+            self::ACCOUNTING => [
+                // Contabilidade — plano de contas, classes gerenciais, centros de
+                // custo, mapeamentos e estrutura DRE. Só visualiza lançamentos.
+                Permission::VIEW_OWN_PROFILE->value,
+                Permission::EDIT_OWN_PROFILE->value,
+                Permission::ACCESS_DASHBOARD->value,
+
+                // Plano de contas (CRUD + import/export)
+                Permission::VIEW_ACCOUNTING_CLASSES->value,
+                Permission::CREATE_ACCOUNTING_CLASSES->value,
+                Permission::EDIT_ACCOUNTING_CLASSES->value,
+                Permission::MANAGE_ACCOUNTING_CLASSES->value,
+                Permission::IMPORT_ACCOUNTING_CLASSES->value,
+                Permission::EXPORT_ACCOUNTING_CLASSES->value,
+
+                // Plano gerencial (CRUD + import/export)
+                Permission::VIEW_MANAGEMENT_CLASSES->value,
+                Permission::CREATE_MANAGEMENT_CLASSES->value,
+                Permission::EDIT_MANAGEMENT_CLASSES->value,
+                Permission::MANAGE_MANAGEMENT_CLASSES->value,
+                Permission::IMPORT_MANAGEMENT_CLASSES->value,
+                Permission::EXPORT_MANAGEMENT_CLASSES->value,
+
+                // Centros de custo (CRUD + import/export)
+                Permission::VIEW_COST_CENTERS->value,
+                Permission::CREATE_COST_CENTERS->value,
+                Permission::EDIT_COST_CENTERS->value,
+                Permission::MANAGE_COST_CENTERS->value,
+                Permission::IMPORT_COST_CENTERS->value,
+                Permission::EXPORT_COST_CENTERS->value,
+
+                // DRE: estrutura + mappings + pendências + view + export (sem imports/fechamento)
+                Permission::VIEW_DRE->value,
+                Permission::MANAGE_DRE_STRUCTURE->value,
+                Permission::MANAGE_DRE_MAPPINGS->value,
+                Permission::VIEW_DRE_PENDING_ACCOUNTS->value,
+                Permission::EXPORT_DRE->value,
+
+                // Orçamentos (view) + OPs (view) + movimentos (view) — contexto contábil.
+                Permission::VIEW_BUDGETS->value,
+                Permission::VIEW_ORDER_PAYMENTS->value,
+                Permission::VIEW_SUPPLIERS->value,
+                Permission::VIEW_SALES->value,
+                Permission::VIEW_MOVEMENTS->value,
+            ],
+            self::FISCAL => [
+                // Fiscal — NF, movimentações, estornos, devoluções. Escrita nessas
+                // operações; só leitura em orçamento/plano contábil.
+                Permission::VIEW_OWN_PROFILE->value,
+                Permission::EDIT_OWN_PROFILE->value,
+                Permission::ACCESS_DASHBOARD->value,
+
+                // Movimentações (CRUD)
+                Permission::VIEW_MOVEMENTS->value,
+                Permission::SYNC_MOVEMENTS->value,
+
+                // Estornos (full lifecycle)
+                Permission::VIEW_REVERSALS->value,
+                Permission::CREATE_REVERSALS->value,
+                Permission::EDIT_REVERSALS->value,
+                Permission::APPROVE_REVERSALS->value,
+                Permission::PROCESS_REVERSALS->value,
+                Permission::MANAGE_REVERSALS->value,
+                Permission::IMPORT_REVERSALS->value,
+                Permission::EXPORT_REVERSALS->value,
+                Permission::MANAGE_REVERSAL_REASONS->value,
+
+                // Devoluções / Trocas (full lifecycle)
+                Permission::VIEW_RETURNS->value,
+                Permission::CREATE_RETURNS->value,
+                Permission::EDIT_RETURNS->value,
+                Permission::APPROVE_RETURNS->value,
+                Permission::PROCESS_RETURNS->value,
+                Permission::CANCEL_RETURNS->value,
+                Permission::MANAGE_RETURNS->value,
+                Permission::IMPORT_RETURNS->value,
+                Permission::EXPORT_RETURNS->value,
+                Permission::MANAGE_RETURN_REASONS->value,
+
+                // Vendas, OPs, Fornecedores, plano (view) — contexto fiscal
+                Permission::VIEW_SALES->value,
+                Permission::VIEW_ORDER_PAYMENTS->value,
+                Permission::VIEW_SUPPLIERS->value,
+                Permission::VIEW_ACCOUNTING_CLASSES->value,
+                Permission::VIEW_COST_CENTERS->value,
+                Permission::VIEW_MANAGEMENT_CLASSES->value,
+
+                // DRE: matriz + export (leitura executiva)
+                Permission::VIEW_DRE->value,
+                Permission::EXPORT_DRE->value,
             ],
             self::USER => [
                 // Apenas próprio perfil
