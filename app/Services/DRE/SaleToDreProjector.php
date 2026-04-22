@@ -36,6 +36,64 @@ class SaleToDreProjector
 
     public function project(Sale $sale): ?DreActual
     {
+        return DB::transaction(fn () => $this->projectRaw($sale));
+    }
+
+    /**
+     * Projeta várias Sales numa única transação. Usado pelo
+     * `MovementSyncService::refreshSalesSummary()` após insert/update em
+     * bulk via `DB::table()` — chamada raw não dispara observer, então
+     * a projeção precisa ser pedida explicitamente.
+     *
+     * @param  iterable<int>  $saleIds  IDs das Sales inseridas/atualizadas.
+     * @return array{projected:int, skipped:int}
+     */
+    public function projectBatch(iterable $saleIds): array
+    {
+        $ids = collect($saleIds)->filter()->unique()->values()->all();
+        if (empty($ids)) {
+            return ['projected' => 0, 'skipped' => 0];
+        }
+
+        // Reset dos caches — config pode ter mudado entre batches.
+        $this->fallbackAccountIdCache = null;
+        $this->fallbackResolved = false;
+
+        $projected = 0;
+        $skipped = 0;
+
+        DB::transaction(function () use ($ids, &$projected, &$skipped) {
+            Sale::query()
+                ->whereIn('id', $ids)
+                ->chunkById(500, function ($batch) use (&$projected, &$skipped) {
+                    foreach ($batch as $sale) {
+                        try {
+                            $r = $this->projectRaw($sale);
+                            if ($r !== null) {
+                                $projected++;
+                            } else {
+                                $skipped++;
+                            }
+                        } catch (\Throwable $e) {
+                            Log::warning('SaleToDreProjector::projectBatch Sale id='.$sale->id.' falhou', [
+                                'error' => $e->getMessage(),
+                            ]);
+                            $skipped++;
+                        }
+                    }
+                });
+        });
+
+        return ['projected' => $projected, 'skipped' => $skipped];
+    }
+
+    /**
+     * Lógica pura de projeção — sem transaction wrap. Usada tanto pelo
+     * `project()` (que abre sua própria transaction) quanto pelo
+     * `projectBatch()` (que abre uma transaction única para todo o lote).
+     */
+    private function projectRaw(Sale $sale): ?DreActual
+    {
         $accountId = $this->resolveAccountId($sale);
         if ($accountId === null) {
             Log::warning('SaleToDreProjector: conta de receita não resolvida para Sale id='.$sale->id, [
@@ -66,12 +124,10 @@ class SaleToDreProjector
             'reported_in_closed_period' => $reportedInClosed,
         ];
 
-        return DB::transaction(function () use ($sale, $attrs) {
-            return DreActual::updateOrCreate(
-                ['source_type' => Sale::class, 'source_id' => $sale->id],
-                $attrs,
-            );
-        });
+        return DreActual::updateOrCreate(
+            ['source_type' => Sale::class, 'source_id' => $sale->id],
+            $attrs,
+        );
     }
 
     public function unproject(Sale $sale): void
@@ -94,19 +150,24 @@ class SaleToDreProjector
         $this->fallbackAccountIdCache = null;
         $this->fallbackResolved = false;
 
-        Sale::query()->chunkById(500, function ($batch) use ($report) {
-            foreach ($batch as $sale) {
-                try {
-                    $result = $this->project($sale);
-                    if ($result) {
-                        $report->projected++;
-                    } else {
-                        $report->addSkip("Sale id={$sale->id}: conta de receita não resolvida.");
+        // Wrap em 1 transação única — 214k INSERTs individuais sem wrap
+        // custavam ~7h40min. Com single transaction + projectRaw, queda
+        // significativa no número de commits.
+        DB::transaction(function () use ($report) {
+            Sale::query()->chunkById(500, function ($batch) use ($report) {
+                foreach ($batch as $sale) {
+                    try {
+                        $result = $this->projectRaw($sale);
+                        if ($result) {
+                            $report->projected++;
+                        } else {
+                            $report->addSkip("Sale id={$sale->id}: conta de receita não resolvida.");
+                        }
+                    } catch (\Throwable $e) {
+                        $report->addSkip("Sale id={$sale->id}: {$e->getMessage()}");
                     }
-                } catch (\Throwable $e) {
-                    $report->addSkip("Sale id={$sale->id}: {$e->getMessage()}");
                 }
-            }
+            });
         });
 
         return $report;

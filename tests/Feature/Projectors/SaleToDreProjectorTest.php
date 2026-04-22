@@ -192,6 +192,75 @@ class SaleToDreProjectorTest extends TestCase
     }
 
     // -----------------------------------------------------------------
+    // projectBatch — hook chamado pelo MovementSyncService::refreshSalesSummary
+    // -----------------------------------------------------------------
+
+    public function test_project_batch_creates_dre_actuals_for_multiple_sales(): void
+    {
+        $storeAccount = ChartOfAccount::factory()->revenue()->analytical()->create([
+            'code' => 'TST.BATCH.01',
+        ]);
+        $store = Store::factory()->create(['sale_chart_of_account_id' => $storeAccount->id]);
+
+        $s1 = $this->makeSale($store, totalSales: 100);
+        $s2 = $this->makeSale($store, totalSales: 200);
+        $s3 = $this->makeSale($store, totalSales: 300);
+
+        // Limpa dre_actuals dos observers (created) pra testar só projectBatch.
+        DreActual::where('source', DreActual::SOURCE_SALE)->delete();
+        $this->assertSame(0, DreActual::where('source', DreActual::SOURCE_SALE)->count());
+
+        $report = app(SaleToDreProjector::class)->projectBatch([$s1->id, $s2->id, $s3->id]);
+
+        $this->assertSame(3, $report['projected']);
+        $this->assertSame(0, $report['skipped']);
+        $this->assertSame(3, DreActual::where('source', DreActual::SOURCE_SALE)->count());
+    }
+
+    public function test_project_batch_is_idempotent(): void
+    {
+        $storeAccount = ChartOfAccount::factory()->revenue()->analytical()->create([
+            'code' => 'TST.BATCH.02',
+        ]);
+        $store = Store::factory()->create(['sale_chart_of_account_id' => $storeAccount->id]);
+
+        $sale = $this->makeSale($store, totalSales: 150);
+
+        // Primeira chamada — cria.
+        app(SaleToDreProjector::class)->projectBatch([$sale->id]);
+        $this->assertSame(1, DreActual::where('source_id', $sale->id)->count());
+
+        // Segunda chamada com mesmo ID — updateOrCreate por (source_type, source_id)
+        // deve atualizar, não duplicar.
+        app(SaleToDreProjector::class)->projectBatch([$sale->id]);
+        $this->assertSame(1, DreActual::where('source_id', $sale->id)->count());
+    }
+
+    public function test_project_batch_handles_empty_input(): void
+    {
+        $report = app(SaleToDreProjector::class)->projectBatch([]);
+        $this->assertSame(0, $report['projected']);
+        $this->assertSame(0, $report['skipped']);
+    }
+
+    public function test_project_batch_skips_sales_without_resolvable_account(): void
+    {
+        config(['dre.default_sale_account_code' => 'NONEXISTENT.BATCH.XYZ']);
+
+        $store = Store::factory()->create(['sale_chart_of_account_id' => null]);
+        $sale = $this->makeSale($store, totalSales: 100);
+
+        // Limpa projeção automática do observer.
+        DreActual::where('source_id', $sale->id)->delete();
+
+        $report = app(SaleToDreProjector::class)->projectBatch([$sale->id]);
+
+        $this->assertSame(0, $report['projected']);
+        $this->assertSame(1, $report['skipped']);
+        $this->assertDatabaseMissing('dre_actuals', ['source_id' => $sale->id]);
+    }
+
+    // -----------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------
 

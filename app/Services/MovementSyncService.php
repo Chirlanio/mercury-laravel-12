@@ -247,8 +247,9 @@ class MovementSyncService
         $inserted = 0;
         $updated = 0;
         $skipped = 0;
+        $touchedSaleIds = [];
 
-        $base->chunk(self::SALES_UPSERT_CHUNK, function ($rows) use (&$inserted, &$updated, &$skipped) {
+        $base->chunk(self::SALES_UPSERT_CHUNK, function ($rows) use (&$inserted, &$updated, &$skipped, &$touchedSaleIds) {
             foreach ($rows as $row) {
                 if (! $row->store_id) {
                     $skipped++;
@@ -264,30 +265,59 @@ class MovementSyncService
                     'updated_at' => now(),
                 ];
 
-                $affected = DB::table('sales')
+                // SELECT id primeiro — precisamos do PK pra projetar em DRE
+                // depois (`DB::table::update` não retorna o ID).
+                $existingId = DB::table('sales')
                     ->where('store_id', $row->store_id)
                     ->where('date_sales', $row->movement_date)
                     ->when($row->employee_id, fn ($q) => $q->where('employee_id', $row->employee_id))
                     ->when(! $row->employee_id, fn ($q) => $q->whereNull('employee_id'))
-                    ->update($data);
+                    ->value('id');
 
-                if ($affected > 0) {
+                if ($existingId) {
+                    DB::table('sales')->where('id', $existingId)->update($data);
+                    $touchedSaleIds[] = (int) $existingId;
                     $updated++;
                 } else {
-                    DB::table('sales')->insert(array_merge($data, [
+                    $newId = DB::table('sales')->insertGetId(array_merge($data, [
                         'store_id' => $row->store_id,
                         'employee_id' => $row->employee_id,
                         'date_sales' => $row->movement_date,
                         'created_at' => now(),
                     ]));
+                    $touchedSaleIds[] = (int) $newId;
                     $inserted++;
                 }
             }
         });
 
-        Log::info('Sales summary refreshed', compact('inserted', 'updated', 'skipped'));
+        // Hook DRE — projeta Sales recém-upserted em `dre_actuals`. Bulk via
+        // `DB::table` não dispara observer, então pedimos explicitamente.
+        // Idempotente (updateOrCreate por source_type+source_id) e wrap em
+        // 1 transação única. Falhas isoladas não quebram o sync — apenas
+        // logam. DRE é serviço secundário ao fluxo operacional.
+        $dreProjected = 0;
+        $dreSkipped = 0;
+        if (! empty($touchedSaleIds)) {
+            try {
+                $report = app(\App\Services\DRE\SaleToDreProjector::class)
+                    ->projectBatch($touchedSaleIds);
+                $dreProjected = $report['projected'];
+                $dreSkipped = $report['skipped'];
+            } catch (\Throwable $e) {
+                Log::warning('Sales→DRE projection falhou (sync continua normal)', [
+                    'error' => $e->getMessage(),
+                    'sale_count' => count($touchedSaleIds),
+                ]);
+            }
+        }
 
-        return compact('inserted', 'updated', 'skipped');
+        Log::info('Sales summary refreshed', compact('inserted', 'updated', 'skipped', 'dreProjected', 'dreSkipped'));
+
+        return compact('inserted', 'updated', 'skipped') + [
+            'dre_projected' => $dreProjected,
+            'dre_skipped' => $dreSkipped,
+        ];
     }
 
     // =============================================
