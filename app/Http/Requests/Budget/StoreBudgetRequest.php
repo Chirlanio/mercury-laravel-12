@@ -36,7 +36,7 @@ class StoreBudgetRequest extends FormRequest
             'notes' => 'nullable|string|max:2000',
             'file' => 'required|file|mimes:xlsx,xls,csv|max:10240', // 10MB
             'items' => 'required|array|min:1',
-            'items.*.accounting_class_id' => 'required|integer|exists:accounting_classes,id',
+            'items.*.accounting_class_id' => 'required|integer|exists:chart_of_accounts,id',
             'items.*.management_class_id' => 'required|integer|exists:management_classes,id',
             'items.*.cost_center_id' => 'required|integer|exists:cost_centers,id',
             'items.*.store_id' => 'nullable|integer|exists:stores,id',

@@ -18,7 +18,7 @@ class StoreManagementClassRequest extends FormRequest
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
             'parent_id' => 'nullable|integer|exists:management_classes,id',
-            'accounting_class_id' => 'nullable|integer|exists:accounting_classes,id',
+            'accounting_class_id' => 'nullable|integer|exists:chart_of_accounts,id',
             'cost_center_id' => 'nullable|integer|exists:cost_centers,id',
             'accepts_entries' => 'nullable|boolean',
             'sort_order' => 'nullable|integer|min:0',

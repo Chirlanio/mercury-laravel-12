@@ -115,7 +115,10 @@
       "Bash(venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('services/taneia_service.py'\\).read\\(\\)\\); print\\('OK'\\)\")",
       "Bash(venv/Scripts/python.exe -c ' *)",
       "Bash(tee \"C:/xampp/htdocs/mercury-laravel/storage/app/tmp_analyze_result.txt\")",
-      "Bash(npx --no-install eslint resources/js/Pages/Budgets/components/BudgetUploadWizard.jsx)"
+      "Bash(npx --no-install eslint resources/js/Pages/Budgets/components/BudgetUploadWizard.jsx)",
+      "Bash(pip install *)",
+      "Bash(/c/Users/MSDEV/AppData/Roaming/Python/Python311/Scripts/git-filter-repo.exe --invert-paths --path \"storage/tenantmeia-sola/app/models/\" --force)",
+      "Bash(C:\\\\\\\\Users\\\\\\\\MSDEV\\\\\\\\php84\\\\\\\\php.exe -d memory_limit=1G artisan test --filter=DreActualsImportTest)"
     ],
     "deny": [],
     "ask": []

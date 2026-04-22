@@ -240,6 +240,15 @@ enum Role: string
                 Permission::MANAGE_BUDGETS->value,
                 Permission::EXPORT_BUDGETS->value,
                 Permission::VIEW_BUDGET_CONSUMPTION->value,
+                // DRE (todas)
+                Permission::VIEW_DRE->value,
+                Permission::MANAGE_DRE_STRUCTURE->value,
+                Permission::MANAGE_DRE_MAPPINGS->value,
+                Permission::VIEW_DRE_PENDING_ACCOUNTS->value,
+                Permission::IMPORT_DRE_ACTUALS->value,
+                Permission::IMPORT_DRE_BUDGETS->value,
+                Permission::MANAGE_DRE_PERIODS->value,
+                Permission::EXPORT_DRE->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -442,6 +451,15 @@ enum Role: string
                 Permission::MANAGE_BUDGETS->value,
                 Permission::EXPORT_BUDGETS->value,
                 Permission::VIEW_BUDGET_CONSUMPTION->value,
+                // DRE (todas — admin financeiro)
+                Permission::VIEW_DRE->value,
+                Permission::MANAGE_DRE_STRUCTURE->value,
+                Permission::MANAGE_DRE_MAPPINGS->value,
+                Permission::VIEW_DRE_PENDING_ACCOUNTS->value,
+                Permission::IMPORT_DRE_ACTUALS->value,
+                Permission::IMPORT_DRE_BUDGETS->value,
+                Permission::MANAGE_DRE_PERIODS->value,
+                Permission::EXPORT_DRE->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -560,6 +578,10 @@ enum Role: string
                 Permission::DOWNLOAD_BUDGETS->value,
                 Permission::EXPORT_BUDGETS->value,
                 Permission::VIEW_BUDGET_CONSUMPTION->value,
+                // DRE — support só visualiza matriz e fila de pendências
+                // (não edita linhas gerenciais nem mappings).
+                Permission::VIEW_DRE->value,
+                Permission::VIEW_DRE_PENDING_ACCOUNTS->value,
             ],
             self::USER => [
                 // Apenas próprio perfil

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -22,10 +23,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class CostCenter extends Model
 {
-    use Auditable;
+    use Auditable, HasFactory;
 
     protected $fillable = [
         'code',
+        'reduced_code',
         'name',
         'description',
         'area_id',
@@ -33,6 +35,9 @@ class CostCenter extends Model
         'default_accounting_class_id',
         'manager_id',
         'is_active',
+        'external_source',
+        'balance_nature',
+        'imported_at',
         'created_by_user_id',
         'updated_by_user_id',
         'deleted_at',
@@ -42,6 +47,7 @@ class CostCenter extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'imported_at' => 'datetime',
         'deleted_at' => 'datetime',
     ];
 

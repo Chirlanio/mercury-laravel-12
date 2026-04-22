@@ -105,11 +105,11 @@ class AccountingClassImportExportTest extends TestCase
 
         $this->assertEquals(1, $result['created']);
         $this->assertEquals(1, $result['updated']);
-        $this->assertDatabaseHas('accounting_classes', [
+        $this->assertDatabaseHas('chart_of_accounts', [
             'code' => 'IMP-NEW',
             'name' => 'Nova',
         ]);
-        $this->assertDatabaseHas('accounting_classes', [
+        $this->assertDatabaseHas('chart_of_accounts', [
             'code' => 'IMP-UPD',
             'name' => 'Nome Atualizado',
         ]);
@@ -178,11 +178,11 @@ class AccountingClassImportExportTest extends TestCase
         $result = $service->import($path, $this->adminUser);
 
         $this->assertEquals(2, $result['created']);
-        $this->assertDatabaseHas('accounting_classes', [
+        $this->assertDatabaseHas('chart_of_accounts', [
             'code' => 'IMP-D',
             'nature' => 'debit',
         ]);
-        $this->assertDatabaseHas('accounting_classes', [
+        $this->assertDatabaseHas('chart_of_accounts', [
             'code' => 'IMP-C',
             'nature' => 'credit',
         ]);

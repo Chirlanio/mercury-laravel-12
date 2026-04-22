@@ -18,7 +18,7 @@ class UpdateManagementClassRequest extends FormRequest
             'name' => 'sometimes|required|string|max:255',
             'description' => 'sometimes|nullable|string|max:1000',
             'parent_id' => 'sometimes|nullable|integer|exists:management_classes,id',
-            'accounting_class_id' => 'sometimes|nullable|integer|exists:accounting_classes,id',
+            'accounting_class_id' => 'sometimes|nullable|integer|exists:chart_of_accounts,id',
             'cost_center_id' => 'sometimes|nullable|integer|exists:cost_centers,id',
             'accepts_entries' => 'sometimes|boolean',
             'sort_order' => 'sometimes|integer|min:0',

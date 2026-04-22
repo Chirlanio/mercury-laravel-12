@@ -35,7 +35,7 @@ class ImportBudgetRequest extends FormRequest
             // Mapping do usuário: chaves são os codes da planilha, valores IDs
             'mapping' => 'nullable|array',
             'mapping.accounting_class' => 'nullable|array',
-            'mapping.accounting_class.*' => 'integer|exists:accounting_classes,id',
+            'mapping.accounting_class.*' => 'integer|exists:chart_of_accounts,id',
             'mapping.management_class' => 'nullable|array',
             'mapping.management_class.*' => 'integer|exists:management_classes,id',
             'mapping.cost_center' => 'nullable|array',

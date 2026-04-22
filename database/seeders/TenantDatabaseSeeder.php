@@ -35,6 +35,9 @@ class TenantDatabaseSeeder extends Seeder
             TypeMovimentSeeder::class,
             PositionLevelSeeder::class,
 
+            // DRE — estrutura gerencial executiva (20 linhas fixas)
+            DreManagementLineSeeder::class,
+
             // Access levels (needed before navigation provisioning)
             AdditionalAccessLevelsSeeder::class,
 

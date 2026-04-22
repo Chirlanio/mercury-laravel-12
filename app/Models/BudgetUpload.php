@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\BudgetUploadType;
 use App\Traits\Auditable;
+use App\Traits\InvalidatesDreCacheOnChange;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,7 +25,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class BudgetUpload extends Model
 {
-    use Auditable;
+    use Auditable, InvalidatesDreCacheOnChange;
 
     protected $fillable = [
         'year',

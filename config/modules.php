@@ -281,4 +281,11 @@ return [
         'icon' => 'BanknotesIcon',
         'dependencies' => ['accounting_classes', 'management_classes', 'cost_centers'],
     ],
+    'dre' => [
+        'name' => 'DRE Gerencial',
+        'description' => 'Demonstrativo do Resultado do Exercício — matriz executiva com realizado × orçado × ano anterior, mapeamento conta contábil → linha gerencial e fechamento de períodos.',
+        'routes' => ['dre.*'],
+        'icon' => 'ChartBarIcon',
+        'dependencies' => ['accounting_classes', 'cost_centers'],
+    ],
 ];

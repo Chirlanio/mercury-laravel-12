@@ -250,6 +250,16 @@ export const PERMISSIONS = {
     MANAGE_BUDGETS: 'budgets.manage',
     EXPORT_BUDGETS: 'budgets.export',
     VIEW_BUDGET_CONSUMPTION: 'budgets.view_consumption',
+
+    // DRE
+    VIEW_DRE: 'dre.view',
+    MANAGE_DRE_STRUCTURE: 'dre.manage_structure',
+    MANAGE_DRE_MAPPINGS: 'dre.manage_mappings',
+    VIEW_DRE_PENDING_ACCOUNTS: 'dre.view_pending_accounts',
+    IMPORT_DRE_ACTUALS: 'dre.import_actuals',
+    IMPORT_DRE_BUDGETS: 'dre.import_budgets',
+    MANAGE_DRE_PERIODS: 'dre.manage_periods',
+    EXPORT_DRE: 'dre.export',
 };
 
 export const ROLES = {

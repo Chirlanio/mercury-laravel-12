@@ -20,7 +20,7 @@ class UpdateAccountingClassRequest extends FormRequest
             'code' => 'sometimes|required|string|max:30',
             'name' => 'sometimes|required|string|max:255',
             'description' => 'sometimes|nullable|string|max:1000',
-            'parent_id' => 'sometimes|nullable|integer|exists:accounting_classes,id',
+            'parent_id' => 'sometimes|nullable|integer|exists:chart_of_accounts,id',
             'nature' => ['sometimes', 'required', Rule::in(array_column(AccountingNature::cases(), 'value'))],
             'dre_group' => ['sometimes', 'required', Rule::in(array_column(DreGroup::cases(), 'value'))],
             'accepts_entries' => 'sometimes|boolean',

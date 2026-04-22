@@ -96,3 +96,21 @@ Schedule::command('budgets:alert')
     ->dailyAt('09:00')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/budgets-alert.log'));
+
+// DRE rebuild — reconciliação defensiva semanal (domingo 03:00).
+// Prompt 8 do playbook: caso observer tenha falhado silenciosamente em
+// algum saving ao longo da semana, o rebuild traz o estado de volta ao
+// canônico. Só reprojeta OrderPayment (fonte principal); Sale tende a ser
+// mais estável, mas pode ser incluído trocando para --source=all.
+Schedule::command('dre:rebuild-actuals --source=ORDER_PAYMENT --force')
+    ->weeklyOn(0, '03:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/dre-rebuild.log'));
+
+// DRE warm-up — aquece cache da matriz (mês corrente + 12 meses móveis)
+// todo dia 05:50, 10 minutos antes do sync CIGAM das 06:00. Garante que o
+// time financeiro abra a tela com cache hit em vez de pagar a query pesada.
+Schedule::command('dre:warm-cache')
+    ->dailyAt('05:50')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/dre-warm.log'));

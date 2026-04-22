@@ -262,6 +262,16 @@ enum Permission: string
     case EXPORT_BUDGETS = 'budgets.export';
     case VIEW_BUDGET_CONSUMPTION = 'budgets.view_consumption';
 
+    // DRE — Demonstrativo de Resultado do Exercício
+    case VIEW_DRE = 'dre.view';
+    case MANAGE_DRE_STRUCTURE = 'dre.manage_structure';
+    case MANAGE_DRE_MAPPINGS = 'dre.manage_mappings';
+    case VIEW_DRE_PENDING_ACCOUNTS = 'dre.view_pending_accounts';
+    case IMPORT_DRE_ACTUALS = 'dre.import_actuals';
+    case IMPORT_DRE_BUDGETS = 'dre.import_budgets';
+    case MANAGE_DRE_PERIODS = 'dre.manage_periods';
+    case EXPORT_DRE = 'dre.export';
+
     public function label(): string
     {
         return match ($this) {
@@ -480,6 +490,15 @@ enum Permission: string
             self::MANAGE_BUDGETS => 'Gerenciar orçamentos de todos os escopos',
             self::EXPORT_BUDGETS => 'Exportar orçamento consolidado (com consumo realizado)',
             self::VIEW_BUDGET_CONSUMPTION => 'Visualizar dashboard de consumo previsto × realizado',
+
+            self::VIEW_DRE => 'Visualizar DRE gerencial',
+            self::MANAGE_DRE_STRUCTURE => 'Gerenciar estrutura da DRE (linhas gerenciais)',
+            self::MANAGE_DRE_MAPPINGS => 'Gerenciar de-para conta contábil → linha gerencial',
+            self::VIEW_DRE_PENDING_ACCOUNTS => 'Visualizar fila de contas pendentes de mapeamento',
+            self::IMPORT_DRE_ACTUALS => 'Importar realizado manual da DRE (XLSX)',
+            self::IMPORT_DRE_BUDGETS => 'Importar orçado manual da DRE (XLSX)',
+            self::MANAGE_DRE_PERIODS => 'Fechar e reabrir períodos da DRE',
+            self::EXPORT_DRE => 'Exportar matriz DRE em XLSX/PDF',
         };
     }
 
@@ -701,6 +720,15 @@ enum Permission: string
             self::MANAGE_BUDGETS => 'Permite gerenciar orçamentos de todos os escopos (sem filtro de área)',
             self::EXPORT_BUDGETS => 'Permite exportar orçamento consolidado em Excel (com colunas de previsto × realizado lado a lado)',
             self::VIEW_BUDGET_CONSUMPTION => 'Permite acessar o dashboard de consumo previsto × realizado, com alertas de utilização',
+
+            self::VIEW_DRE => 'Permite visualizar a matriz gerencial da DRE (realizado × orçado × ano anterior), por período/loja/rede',
+            self::MANAGE_DRE_STRUCTURE => 'Permite criar, editar, reordenar e remover linhas do plano gerencial da DRE (ex: EBITDA, Headcount, Lucro Líquido)',
+            self::MANAGE_DRE_MAPPINGS => 'Permite criar o de-para entre conta contábil analítica (+ centro de custo opcional) e linha gerencial da DRE. Atribuições em lote também usam essa permissão',
+            self::VIEW_DRE_PENDING_ACCOUNTS => 'Permite visualizar a fila de contas analíticas de resultado (grupos 3/4/5) que ainda não têm mapeamento vigente',
+            self::IMPORT_DRE_ACTUALS => 'Permite importar realizado manual (balancete externo, cash movements fora do ERP) via XLSX para dre_actuals com source=MANUAL_IMPORT',
+            self::IMPORT_DRE_BUDGETS => 'Permite importar orçado manual via XLSX para dre_budgets (alternativa ao fluxo Budgets → projeção automática)',
+            self::MANAGE_DRE_PERIODS => 'Permite fechar períodos (gera snapshots imutáveis) e reabrir fechamentos (com justificativa obrigatória e diff consolidado). Fechar bloqueia edição de mappings/imports no período.',
+            self::EXPORT_DRE => 'Permite exportar a matriz DRE (mesmo filtro aplicado na tela) como XLSX multi-sheet ou PDF A4 landscape para compartilhamento externo.',
         };
     }
 

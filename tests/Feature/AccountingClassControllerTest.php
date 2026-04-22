@@ -38,9 +38,9 @@ class AccountingClassControllerTest extends TestCase
         // in-memory, a migration de seed executa automaticamente.
         // Reseed real (Grupo Meia Sola): 80 analíticas + 21 sintéticos
         $this->assertGreaterThanOrEqual(100, AccountingClass::count());
-        $this->assertDatabaseHas('accounting_classes', ['code' => '3.1.1.01.00012']); // Receita de Vendas
-        $this->assertDatabaseHas('accounting_classes', ['code' => '4.2.1.04.00083']); // Telefonia
-        $this->assertDatabaseHas('accounting_classes', ['code' => '4.2.1.05.00053']); // Juros Passivo
+        $this->assertDatabaseHas('chart_of_accounts', ['code' => '3.1.1.01.00012']); // Receita de Vendas
+        $this->assertDatabaseHas('chart_of_accounts', ['code' => '4.2.1.04.00083']); // Telefonia
+        $this->assertDatabaseHas('chart_of_accounts', ['code' => '4.2.1.05.00053']); // Juros Passivo
     }
 
     public function test_admin_can_view_index(): void
@@ -90,7 +90,7 @@ class AccountingClassControllerTest extends TestCase
 
         $response->assertRedirect();
         $response->assertSessionHas('success');
-        $this->assertDatabaseHas('accounting_classes', [
+        $this->assertDatabaseHas('chart_of_accounts', [
             'code' => 'NEW-100',
             'name' => 'Nova Conta',
             'nature' => 'debit',
@@ -141,7 +141,7 @@ class AccountingClassControllerTest extends TestCase
         ]);
 
         $response->assertRedirect();
-        $this->assertDatabaseHas('accounting_classes', [
+        $this->assertDatabaseHas('chart_of_accounts', [
             'code' => 'GROUP-1.01',
             'parent_id' => $group->id,
         ]);

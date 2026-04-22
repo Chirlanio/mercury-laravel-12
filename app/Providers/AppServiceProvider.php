@@ -50,6 +50,14 @@ class AppServiceProvider extends ServiceProvider
         // container can't autowire — bind via the static factory that reads
         // from config('services.taneia').
         $this->app->singleton(TaneiaClient::class, fn () => TaneiaClient::fromConfig());
+
+        // DRE — leitor de períodos fechados. Concreto é o reader de snapshot
+        // (prompt 11). `NullClosedPeriodReader` fica disponível no container
+        // para testes que queiram desligar o overlay.
+        $this->app->bind(
+            \App\Services\DRE\Contracts\ClosedPeriodReader::class,
+            \App\Services\DRE\DrePeriodSnapshotReader::class,
+        );
     }
 
     /**
@@ -123,6 +131,17 @@ class AppServiceProvider extends ServiceProvider
         CentralMenu::observe(CentralMenuObserver::class);
         CentralPage::observe(CentralPageObserver::class);
         CentralMenuPageDefault::observe(CentralMenuPageDefaultObserver::class);
+
+        // DRE — dispara AnalyticalAccountCreated em contas novas de
+        // resultado (grupos 3, 4, 5). Usado pela fila de pendências.
+        \App\Models\ChartOfAccount::observe(\App\Observers\ChartOfAccountObserver::class);
+
+        // DRE — projetores automáticos para dre_actuals (prompt 8).
+        \App\Models\OrderPayment::observe(\App\Observers\OrderPaymentDreObserver::class);
+        \App\Models\Sale::observe(\App\Observers\SaleDreObserver::class);
+
+        // DRE — ponte Budgets → dre_budgets quando upload fica ativo (prompt 10).
+        \App\Models\BudgetUpload::observe(\App\Observers\BudgetUploadDreObserver::class);
     }
 
     protected function registerHelpdeskListeners(): void

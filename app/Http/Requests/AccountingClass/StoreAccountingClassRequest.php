@@ -20,7 +20,7 @@ class StoreAccountingClassRequest extends FormRequest
             'code' => 'required|string|max:30',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
-            'parent_id' => 'nullable|integer|exists:accounting_classes,id',
+            'parent_id' => 'nullable|integer|exists:chart_of_accounts,id',
             'nature' => ['required', Rule::in(array_column(AccountingNature::cases(), 'value'))],
             'dre_group' => ['required', Rule::in(array_column(DreGroup::cases(), 'value'))],
             'accepts_entries' => 'nullable|boolean',

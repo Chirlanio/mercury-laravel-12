@@ -692,14 +692,14 @@ export default function Index({ accountingClasses, filters = {}, statistics = {}
                 headerIcon={<DocumentArrowUpIcon className="h-6 w-6" />}
                 maxWidth="4xl"
                 footer={(
-                    <div className="flex justify-between items-center w-full">
-                        <p className="text-xs text-gray-500">
+                    <div className="flex justify-between items-center gap-4 px-6 py-4 border-t bg-gray-50 rounded-b-xl shrink-0">
+                        <p className="text-xs text-gray-500 flex-1 leading-relaxed">
                             Cabeçalhos aceitos: <code>codigo</code>, <code>nome</code>,{' '}
                             <code>descricao</code>, <code>codigo_pai</code>,{' '}
                             <code>natureza</code>, <code>grupo_dre</code>,{' '}
                             <code>aceita_lancamento</code>, <code>ativo</code>
                         </p>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 shrink-0">
                             <Button variant="secondary" onClick={() => closeModal('import')}>
                                 Cancelar
                             </Button>

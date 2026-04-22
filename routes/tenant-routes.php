@@ -1236,6 +1236,82 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ==========================================
+    // DRE — Demonstrativo de Resultado do Exercício
+    // ==========================================
+
+    // Matriz executiva (relatório principal) ---------------------------
+    // Tela real vem no prompt 9 do playbook; no prompt 7 entregamos só a
+    // camada HTTP + stub React de wiring.
+    Route::middleware(['tenant.module:dre', 'permission:'.Permission::VIEW_DRE->value])->group(function () {
+        Route::get('/dre/matrix', [\App\Http\Controllers\DreMatrixController::class, 'show'])->name('dre.matrix.show');
+        Route::get('/dre/matrix/drill/{line}', [\App\Http\Controllers\DreMatrixController::class, 'drill'])
+            ->whereNumber('line')
+            ->name('dre.matrix.drill');
+
+        // Exports protegidos por permission dedicada.
+        Route::middleware('permission:'.Permission::EXPORT_DRE->value)->group(function () {
+            Route::get('/dre/matrix/export/xlsx', [\App\Http\Controllers\DreMatrixController::class, 'exportXlsx'])
+                ->name('dre.matrix.export.xlsx');
+            Route::get('/dre/matrix/export/pdf', [\App\Http\Controllers\DreMatrixController::class, 'exportPdf'])
+                ->name('dre.matrix.export.pdf');
+        });
+    });
+
+    // CRUD do plano gerencial (linhas da DRE) --------------------------
+    Route::middleware(['permission:'.Permission::VIEW_DRE->value])->group(function () {
+        Route::get('/dre/management-lines', [\App\Http\Controllers\DreManagementLineController::class, 'index'])->name('dre.management-lines.index');
+
+        Route::middleware('permission:'.Permission::MANAGE_DRE_STRUCTURE->value)->group(function () {
+            Route::get('/dre/management-lines/create', [\App\Http\Controllers\DreManagementLineController::class, 'create'])->name('dre.management-lines.create');
+            Route::post('/dre/management-lines', [\App\Http\Controllers\DreManagementLineController::class, 'store'])->name('dre.management-lines.store');
+            Route::post('/dre/management-lines/reorder', [\App\Http\Controllers\DreManagementLineController::class, 'reorder'])->name('dre.management-lines.reorder');
+            Route::get('/dre/management-lines/{managementLine}/edit', [\App\Http\Controllers\DreManagementLineController::class, 'edit'])->whereNumber('managementLine')->name('dre.management-lines.edit');
+            Route::put('/dre/management-lines/{managementLine}', [\App\Http\Controllers\DreManagementLineController::class, 'update'])->whereNumber('managementLine')->name('dre.management-lines.update');
+            Route::delete('/dre/management-lines/{managementLine}', [\App\Http\Controllers\DreManagementLineController::class, 'destroy'])->whereNumber('managementLine')->name('dre.management-lines.destroy');
+        });
+    });
+
+    // CRUD de mappings (de-para conta → linha gerencial) ---------------
+    Route::middleware(['permission:'.Permission::VIEW_DRE->value])->group(function () {
+        Route::get('/dre/mappings', [\App\Http\Controllers\DreMappingController::class, 'index'])->name('dre.mappings.index');
+        Route::get('/dre/mappings/unmapped', [\App\Http\Controllers\DreMappingController::class, 'unmapped'])->name('dre.mappings.unmapped');
+        Route::get('/dre/mappings/search-accounts', [\App\Http\Controllers\DreMappingController::class, 'searchAccounts'])->name('dre.mappings.search-accounts');
+
+        Route::middleware('permission:'.Permission::MANAGE_DRE_MAPPINGS->value)->group(function () {
+            Route::post('/dre/mappings', [\App\Http\Controllers\DreMappingController::class, 'store'])->name('dre.mappings.store');
+            Route::post('/dre/mappings/bulk', [\App\Http\Controllers\DreMappingController::class, 'bulk'])->name('dre.mappings.bulk');
+            Route::put('/dre/mappings/{mapping}', [\App\Http\Controllers\DreMappingController::class, 'update'])->whereNumber('mapping')->name('dre.mappings.update');
+            Route::delete('/dre/mappings/{mapping}', [\App\Http\Controllers\DreMappingController::class, 'destroy'])->whereNumber('mapping')->name('dre.mappings.destroy');
+        });
+    });
+
+    // Fechamento de períodos (imutabilidade via snapshot) --------------
+    Route::middleware(['tenant.module:dre', 'permission:'.Permission::MANAGE_DRE_PERIODS->value])->group(function () {
+        Route::get('/dre/periods', [\App\Http\Controllers\DrePeriodClosingController::class, 'index'])->name('dre.periods.index');
+        Route::post('/dre/periods', [\App\Http\Controllers\DrePeriodClosingController::class, 'store'])->name('dre.periods.store');
+        Route::get('/dre/periods/{period}/preview', [\App\Http\Controllers\DrePeriodClosingController::class, 'previewReopen'])
+            ->whereNumber('period')->name('dre.periods.preview');
+        Route::patch('/dre/periods/{period}/reopen', [\App\Http\Controllers\DrePeriodClosingController::class, 'reopen'])
+            ->whereNumber('period')->name('dre.periods.reopen');
+    });
+
+    // Imports manuais (actuals/budgets/chart) --------------------------
+    Route::middleware(['tenant.module:dre', 'permission:'.Permission::VIEW_DRE->value])->group(function () {
+        Route::get('/dre/imports/chart', [\App\Http\Controllers\DreImportController::class, 'chartForm'])->name('dre.imports.chart');
+        Route::post('/dre/imports/chart', [\App\Http\Controllers\DreImportController::class, 'chartStore'])->name('dre.imports.chart.store');
+
+        Route::middleware('permission:'.Permission::IMPORT_DRE_ACTUALS->value)->group(function () {
+            Route::get('/dre/imports/actuals', [\App\Http\Controllers\DreImportController::class, 'actualsForm'])->name('dre.imports.actuals');
+            Route::post('/dre/imports/actuals', [\App\Http\Controllers\DreImportController::class, 'actualsStore'])->name('dre.imports.actuals.store');
+        });
+
+        Route::middleware('permission:'.Permission::IMPORT_DRE_BUDGETS->value)->group(function () {
+            Route::get('/dre/imports/budgets', [\App\Http\Controllers\DreImportController::class, 'budgetsForm'])->name('dre.imports.budgets');
+            Route::post('/dre/imports/budgets', [\App\Http\Controllers\DreImportController::class, 'budgetsStore'])->name('dre.imports.budgets.store');
+        });
+    });
+
+    // ==========================================
     // Trainings (Treinamentos)
     // ==========================================
     Route::middleware(['tenant.module:training', 'permission:'.Permission::VIEW_TRAININGS->value])->group(function () {
