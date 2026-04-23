@@ -159,24 +159,71 @@ class CustomerController extends Controller
     }
 
     /**
-     * Dispara um sync manual. O schedule diário (04:00) continua
-     * rodando; este é para cenários de urgência pós-cadastro de cliente
-     * novo no CIGAM.
+     * Dispara um sync manual — SÍNCRONO no tenant atual.
+     *
+     * Roda inline no HTTP request com limite de 50s (abaixo do timeout
+     * default de 60s), processando chunks de 1000 registros via
+     * keyset pagination. Se ultrapassar o limite, retorna com flash
+     * "warning" indicando quantos foram processados e o usuário pode
+     * clicar novamente para continuar de onde parou (próximo keyset).
+     *
+     * Por que síncrono em vez de queue:
+     *  - `composer dev` sobe queue:listen mas `php artisan serve` avulso
+     *    não sobe. Síncrono garante feedback imediato em qualquer setup.
+     *  - Para syncs grandes (>50k clientes), use o comando CLI direto:
+     *    `php artisan customers:sync --chunk=2000` (sem time limit).
      */
     public function sync(Request $request, CustomerSyncService $service): RedirectResponse
     {
         if (! $service->isAvailable()) {
             return redirect()->back()->withErrors([
-                'sync' => 'Conexão CIGAM indisponível. Tente novamente em alguns minutos.',
+                'sync' => 'Conexão CIGAM indisponível. Verifique as credenciais CIGAM_DB_* em .env ou tente novamente em alguns minutos.',
             ]);
         }
 
-        // Dispatch assíncrono via command (kickoff rápido — não espera terminar)
-        \Illuminate\Support\Facades\Artisan::queue('customers:sync', [
-            '--chunk' => 1000,
-        ]);
+        set_time_limit(120);
+        $hardDeadline = microtime(true) + 50.0;
 
-        return redirect()->back()->with('success', 'Sincronização iniciada em background. Pode levar alguns minutos.');
+        $log = $service->start('full', $request->user()->id);
+        $lastCode = null;
+        $totalInserted = 0;
+        $totalUpdated = 0;
+        $totalProcessed = 0;
+
+        try {
+            while (true) {
+                $result = $service->processChunk($log->id, $lastCode, 1000);
+                $totalInserted += $result['inserted'];
+                $totalUpdated += $result['updated'];
+                $totalProcessed += $result['processed'];
+                $lastCode = $result['last_code'];
+
+                if (! $result['has_more'] || $result['cancelled']) {
+                    break;
+                }
+
+                if (microtime(true) >= $hardDeadline) {
+                    return redirect()->back()->with('warning', sprintf(
+                        'Sincronização parcial: %d processados (%d novos, %d atualizados). Clique em "Sincronizar" novamente para continuar de onde parou.',
+                        $totalProcessed, $totalInserted, $totalUpdated,
+                    ));
+                }
+            }
+
+            return redirect()->back()->with('success', sprintf(
+                'Sincronização concluída: %d processados (%d novos, %d atualizados).',
+                $totalProcessed, $totalInserted, $totalUpdated,
+            ));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Customer sync failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return redirect()->back()->withErrors([
+                'sync' => 'Erro ao sincronizar: '.$e->getMessage(),
+            ]);
+        }
     }
 
     // ==================================================================
