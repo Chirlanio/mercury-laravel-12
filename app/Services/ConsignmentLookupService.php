@@ -106,8 +106,10 @@ class ConsignmentLookupService
             ->where('is_active', true);
 
         if ($isEan13) {
-            // EAN-13 exato — busca via variant
-            $builder->whereHas('variants', fn ($q) => $q->where('barcode', $digitsOnly));
+            // EAN-13 exato — no Mercury/CIGAM o EAN real fica em
+            // product_variants.aux_reference (barcode guarda o ref+size
+            // concatenado). Nem toda variante tem EAN válido.
+            $builder->whereHas('variants', fn ($q) => $q->where('aux_reference', $digitsOnly));
         } else {
             $like = '%'.$query.'%';
             $builder->where(function ($q) use ($query, $like) {
@@ -166,7 +168,8 @@ class ConsignmentLookupService
         ?string $sizeCigamCode = null,
         ?string $refSize = null,
     ): ?array {
-        // 1. ref_size → product_variants.barcode (padrão Mercury/CIGAM)
+        // 1. ref_size → product_variants.barcode (padrão Mercury/CIGAM;
+        //    barcode na verdade armazena a concatenação ref+size, não EAN)
         if ($refSize) {
             $variant = ProductVariant::query()
                 ->with(['product', 'size'])
@@ -179,11 +182,14 @@ class ConsignmentLookupService
             }
         }
 
-        // 2. EAN numérico (movements.barcode)
+        // 2. EAN numérico → product_variants.aux_reference
+        //    (Mercury/CIGAM armazena EAN aqui; nem toda variante tem
+        //    EAN válido — por isso só tenta se o barcode do movement
+        //    não for igual ao refSize, que já falhou no passo 1)
         if ($barcode && $barcode !== $refSize) {
             $variant = ProductVariant::query()
                 ->with(['product', 'size'])
-                ->where('barcode', $barcode)
+                ->where('aux_reference', $barcode)
                 ->where('is_active', true)
                 ->first();
 

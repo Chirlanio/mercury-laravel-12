@@ -42,16 +42,20 @@ class ConsignmentLookupTest extends TestCase
             'is_active' => true,
         ]);
 
+        // Mercury/CIGAM: barcode = concat ref+size (não é EAN);
+        // aux_reference = EAN real quando existir (opcional).
         $this->variant36 = ProductVariant::create([
             'product_id' => $this->product->id,
-            'barcode' => '1234567890123',
+            'barcode' => 'SAND-001U36',        // concat ref+size
+            'aux_reference' => '1234567890123', // EAN-13 real
             'size_cigam_code' => 'U36',
             'is_active' => true,
         ]);
 
         $this->variant37 = ProductVariant::create([
             'product_id' => $this->product->id,
-            'barcode' => '1234567890130',
+            'barcode' => 'SAND-001U37',
+            'aux_reference' => '1234567890130',
             'size_cigam_code' => 'U37',
             'is_active' => true,
         ]);
