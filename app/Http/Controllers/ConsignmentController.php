@@ -201,7 +201,10 @@ class ConsignmentController extends Controller
             'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
             'items.*.product_variant_id' => ['nullable', 'integer', 'exists:product_variants,id'],
             'items.*.reference' => ['nullable', 'string', 'max:50'],
-            'items.*.barcode' => ['nullable', 'string', 'max:14'],
+            // Mercury/CIGAM usa barcode = ref_size concatenado
+            // (ex: 'A1340000010002U35' = 17 chars). Aceita até 32 pra
+            // acomodar variações — não é EAN-13 puro.
+            'items.*.barcode' => ['nullable', 'string', 'max:32'],
             'items.*.size_label' => ['nullable', 'string', 'max:20'],
             'items.*.size_cigam_code' => ['nullable', 'string', 'max:10'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
