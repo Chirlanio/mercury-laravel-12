@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\Permission;
+use App\Jobs\SyncCustomersFromCigamJob;
 use App\Models\Customer;
 use App\Models\CustomerSyncLog;
 use App\Services\CustomerSyncService;
@@ -159,71 +160,62 @@ class CustomerController extends Controller
     }
 
     /**
-     * Dispara um sync manual — SÍNCRONO no tenant atual.
+     * Dispara um sync manual. A resposta HTTP volta IMEDIATAMENTE e
+     * o trabalho roda em background via dispatchAfterResponse — o PHP
+     * continua processando após terminar de enviar o response.
      *
-     * Roda inline no HTTP request com limite de 50s (abaixo do timeout
-     * default de 60s), processando chunks de 1000 registros via
-     * keyset pagination. Se ultrapassar o limite, retorna com flash
-     * "warning" indicando quantos foram processados e o usuário pode
-     * clicar novamente para continuar de onde parou (próximo keyset).
+     * Isso evita 2 problemas sérios:
+     *  1. Browser pendurado esperando os ~50s do sync (UX ruim)
+     *  2. PHP session lock bloqueando toda navegação do usuário
+     *     durante o sync (o Laravel trava a session ao escrever nela)
      *
-     * Por que síncrono em vez de queue:
-     *  - `composer dev` sobe queue:listen mas `php artisan serve` avulso
-     *    não sobe. Síncrono garante feedback imediato em qualquer setup.
-     *  - Para syncs grandes (>50k clientes), use o comando CLI direto:
-     *    `php artisan customers:sync --chunk=2000` (sem time limit).
+     * O progresso pode ser acompanhado em tempo real pelo modal
+     * "Histórico de Sincronizações" (polling a cada 3s).
+     *
+     * Para syncs muito grandes (>50k), o CLI ainda é recomendado:
+     *   php artisan customers:sync --chunk=2000
      */
     public function sync(Request $request, CustomerSyncService $service): RedirectResponse
     {
         if (! $service->isAvailable()) {
             return redirect()->back()->withErrors([
-                'sync' => 'Conexão CIGAM indisponível. Verifique as credenciais CIGAM_DB_* em .env ou tente novamente em alguns minutos.',
+                'sync' => 'Conexão CIGAM indisponível. Verifique as credenciais CIGAM_DB_* em .env.',
             ]);
         }
 
-        set_time_limit(120);
-        $hardDeadline = microtime(true) + 50.0;
+        // Bloqueia múltiplos syncs paralelos — se já tem um em running,
+        // devolve aviso em vez de criar outro log concorrente.
+        $running = CustomerSyncLog::whereIn('status', ['pending', 'running'])->first();
+        if ($running) {
+            return redirect()->back()->with('warning', sprintf(
+                'Já existe uma sincronização em andamento (Sync #%d). Acompanhe o progresso em "Histórico".',
+                $running->id,
+            ));
+        }
 
         $log = $service->start('full', $request->user()->id);
-        $lastCode = null;
-        $totalInserted = 0;
-        $totalUpdated = 0;
-        $totalProcessed = 0;
 
-        try {
-            while (true) {
-                $result = $service->processChunk($log->id, $lastCode, 1000);
-                $totalInserted += $result['inserted'];
-                $totalUpdated += $result['updated'];
-                $totalProcessed += $result['processed'];
-                $lastCode = $result['last_code'];
+        // dispatchAfterResponse — roda no mesmo processo PHP, mas
+        // depois da resposta HTTP ter sido enviada ao cliente. Não
+        // depende de queue worker externo.
+        SyncCustomersFromCigamJob::dispatchAfterResponse($log->id, 1000);
 
-                if (! $result['has_more'] || $result['cancelled']) {
-                    break;
-                }
+        return redirect()->back()->with('success', sprintf(
+            'Sincronização #%d iniciada em background. Acompanhe o progresso em "Histórico".',
+            $log->id,
+        ));
+    }
 
-                if (microtime(true) >= $hardDeadline) {
-                    return redirect()->back()->with('warning', sprintf(
-                        'Sincronização parcial: %d processados (%d novos, %d atualizados). Clique em "Sincronizar" novamente para continuar de onde parou.',
-                        $totalProcessed, $totalInserted, $totalUpdated,
-                    ));
-                }
-            }
+    /**
+     * Cancela um sync em andamento. O próximo processChunk vai detectar
+     * o status e abortar graciosamente — nenhum `DELETE` é feito, logs
+     * e dados já gravados permanecem.
+     */
+    public function cancelSync(int $log, CustomerSyncService $service): RedirectResponse
+    {
+        $service->cancel($log);
 
-            return redirect()->back()->with('success', sprintf(
-                'Sincronização concluída: %d processados (%d novos, %d atualizados).',
-                $totalProcessed, $totalInserted, $totalUpdated,
-            ));
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Customer sync failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return redirect()->back()->withErrors([
-                'sync' => 'Erro ao sincronizar: '.$e->getMessage(),
-            ]);
-        }
+        return redirect()->back()->with('success', 'Sincronização cancelada. Registros já processados foram mantidos.');
     }
 
     // ==================================================================

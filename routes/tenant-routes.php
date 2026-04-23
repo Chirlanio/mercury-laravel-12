@@ -1150,6 +1150,7 @@ Route::middleware(['auth'])->group(function () {
         // Sync manual — permissão SYNC_CUSTOMERS (admin+)
         Route::middleware('permission:'.Permission::SYNC_CUSTOMERS->value)->group(function () {
             Route::post('/customers/sync', [\App\Http\Controllers\CustomerController::class, 'sync'])->name('customers.sync');
+            Route::post('/customers/sync/{log}/cancel', [\App\Http\Controllers\CustomerController::class, 'cancelSync'])->whereNumber('log')->name('customers.sync.cancel');
         });
     });
 

@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { router } from '@inertiajs/react';
 import {
     ClockIcon,
     CheckCircleIcon,
     XCircleIcon,
     PlayCircleIcon,
     CloudArrowDownIcon,
+    StopCircleIcon,
 } from '@heroicons/react/24/outline';
 import StandardModal from '@/Components/StandardModal';
 import StatusBadge from '@/Components/Shared/StatusBadge';
+import Button from '@/Components/Button';
 
 const STATUS_MAP = {
     running: { label: 'Em execução', color: 'info', icon: PlayCircleIcon },
@@ -23,32 +26,63 @@ const STATUS_MAP = {
  * Mostra: status, duração, contagens (inseridos/atualizados/pulados/erros)
  * e quem disparou (manual vs schedule). Atualiza on-demand via fetch.
  */
-export default function SyncHistoryModal({ show, onClose }) {
+export default function SyncHistoryModal({ show, onClose, canSync = false }) {
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [cancelling, setCancelling] = useState(null);
+    const pollRef = useRef(null);
 
+    const fetchLogs = async (signal) => {
+        try {
+            const response = await fetch(route('customers.sync-history'), {
+                headers: { Accept: 'application/json' },
+                signal,
+            });
+            if (!response.ok) throw new Error();
+            const json = await response.json();
+            setLogs(json.logs || []);
+        } catch (e) {
+            if (e.name !== 'AbortError') setLogs([]);
+        }
+    };
+
+    // Busca inicial + auto-polling a cada 3s quando há sync em execução.
     useEffect(() => {
-        if (!show) return;
+        if (!show) {
+            if (pollRef.current) clearInterval(pollRef.current);
+            return;
+        }
 
-        let cancelled = false;
+        const controller = new AbortController();
         setLoading(true);
 
-        fetch(route('customers.sync-history'), {
-            headers: { Accept: 'application/json' },
-        })
-            .then((r) => (r.ok ? r.json() : Promise.reject()))
-            .then((json) => {
-                if (!cancelled) setLogs(json.logs || []);
-            })
-            .catch(() => {
-                if (!cancelled) setLogs([]);
-            })
-            .finally(() => {
-                if (!cancelled) setLoading(false);
-            });
+        fetchLogs(controller.signal).finally(() => setLoading(false));
 
-        return () => { cancelled = true; };
-    }, [show]);
+        // Polling — roda sempre enquanto o modal está aberto. O custo é
+        // irrisório (query leve de 30 rows) e garante feedback imediato.
+        pollRef.current = setInterval(() => {
+            const hasActive = logs.some((l) => l.status === 'running' || l.status === 'pending');
+            if (hasActive) {
+                fetchLogs();
+            }
+        }, 3000);
+
+        return () => {
+            controller.abort();
+            if (pollRef.current) clearInterval(pollRef.current);
+        };
+    }, [show, logs.length]);
+
+    const handleCancel = (logId) => {
+        setCancelling(logId);
+        router.post(route('customers.sync.cancel', logId), {}, {
+            preserveScroll: true,
+            onFinish: () => {
+                setCancelling(null);
+                fetchLogs();
+            },
+        });
+    };
 
     const formatDateTime = (iso) =>
         iso ? new Date(iso).toLocaleString('pt-BR') : '—';
@@ -125,6 +159,17 @@ export default function SyncHistoryModal({ show, onClose }) {
                                             )}
                                         </div>
                                     </div>
+                                    {canSync && (log.status === 'running' || log.status === 'pending') && (
+                                        <Button
+                                            variant="danger"
+                                            size="sm"
+                                            onClick={() => handleCancel(log.id)}
+                                            disabled={cancelling === log.id}
+                                        >
+                                            <StopCircleIcon className="w-4 h-4 mr-1" />
+                                            {cancelling === log.id ? 'Cancelando…' : 'Cancelar'}
+                                        </Button>
+                                    )}
                                 </div>
 
                                 {/* Contagens — grid responsivo */}

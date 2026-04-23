@@ -315,6 +315,7 @@ export default function Index({
             <SyncHistoryModal
                 show={modals.history}
                 onClose={() => closeModal('history')}
+                canSync={canSync}
             />
 
             <ConfirmDialogComponent />

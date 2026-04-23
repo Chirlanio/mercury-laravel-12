@@ -234,4 +234,39 @@ class CustomerControllerTest extends TestCase
 
         $this->assertSame('schedule', $response->json('logs.0.triggered'));
     }
+
+    // ------------------------------------------------------------------
+    // cancelSync
+    // ------------------------------------------------------------------
+
+    public function test_cancel_sync_marks_log_as_cancelled(): void
+    {
+        $log = \App\Models\CustomerSyncLog::create([
+            'sync_type' => 'full',
+            'status' => 'running',
+            'started_at' => now(),
+        ]);
+
+        $this->actingAs($this->adminUser)
+            ->post(route('customers.sync.cancel', $log->id))
+            ->assertRedirect();
+
+        $log->refresh();
+        $this->assertSame('cancelled', $log->status);
+        $this->assertNotNull($log->completed_at);
+    }
+
+    public function test_cancel_sync_requires_permission(): void
+    {
+        $log = \App\Models\CustomerSyncLog::create([
+            'sync_type' => 'full',
+            'status' => 'running',
+            'started_at' => now(),
+        ]);
+
+        // regularUser não tem SYNC_CUSTOMERS
+        $this->actingAs($this->regularUser)
+            ->post(route('customers.sync.cancel', $log->id))
+            ->assertForbidden();
+    }
 }
