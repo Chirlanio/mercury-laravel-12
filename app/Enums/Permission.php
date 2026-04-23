@@ -282,6 +282,18 @@ enum Permission: string
     case MANAGE_DRE_PERIODS = 'dre.manage_periods';
     case EXPORT_DRE = 'dre.export';
 
+    // Consignações (Cliente / Influencer / E-commerce)
+    case VIEW_CONSIGNMENTS = 'consignments.view';
+    case CREATE_CONSIGNMENTS = 'consignments.create';
+    case EDIT_CONSIGNMENTS = 'consignments.edit';
+    case DELETE_CONSIGNMENTS = 'consignments.delete';
+    case MANAGE_CONSIGNMENTS = 'consignments.manage';
+    case REGISTER_CONSIGNMENT_RETURN = 'consignments.register_return';
+    case COMPLETE_CONSIGNMENT = 'consignments.complete';
+    case CANCEL_CONSIGNMENT = 'consignments.cancel';
+    case EXPORT_CONSIGNMENTS = 'consignments.export';
+    case OVERRIDE_CONSIGNMENT_LOCK = 'consignments.override_lock';
+
     public function label(): string
     {
         return match ($this) {
@@ -519,6 +531,17 @@ enum Permission: string
             self::IMPORT_DRE_BUDGETS => 'Importar orçado manual da DRE (XLSX)',
             self::MANAGE_DRE_PERIODS => 'Fechar e reabrir períodos da DRE',
             self::EXPORT_DRE => 'Exportar matriz DRE em XLSX/PDF',
+
+            self::VIEW_CONSIGNMENTS => 'Visualizar consignações',
+            self::CREATE_CONSIGNMENTS => 'Criar consignações',
+            self::EDIT_CONSIGNMENTS => 'Editar consignações',
+            self::DELETE_CONSIGNMENTS => 'Excluir consignações',
+            self::MANAGE_CONSIGNMENTS => 'Gerenciar consignações (todas as lojas)',
+            self::REGISTER_CONSIGNMENT_RETURN => 'Lançar nota de retorno de consignação',
+            self::COMPLETE_CONSIGNMENT => 'Finalizar consignação',
+            self::CANCEL_CONSIGNMENT => 'Cancelar consignação',
+            self::EXPORT_CONSIGNMENTS => 'Exportar consignações (XLSX/PDF)',
+            self::OVERRIDE_CONSIGNMENT_LOCK => 'Ignorar bloqueio de inadimplência e editar finalizadas',
         };
     }
 
@@ -759,6 +782,17 @@ enum Permission: string
             self::IMPORT_DRE_BUDGETS => 'Permite importar orçado manual via XLSX para dre_budgets (alternativa ao fluxo Budgets → projeção automática)',
             self::MANAGE_DRE_PERIODS => 'Permite fechar períodos (gera snapshots imutáveis) e reabrir fechamentos (com justificativa obrigatória e diff consolidado). Fechar bloqueia edição de mappings/imports no período.',
             self::EXPORT_DRE => 'Permite exportar a matriz DRE (mesmo filtro aplicado na tela) como XLSX multi-sheet ou PDF A4 landscape para compartilhamento externo.',
+
+            self::VIEW_CONSIGNMENTS => 'Permite visualizar consignações. Sem MANAGE_CONSIGNMENTS, o usuário só vê consignações da sua loja',
+            self::CREATE_CONSIGNMENTS => 'Permite criar novas consignações. Sem MANAGE_CONSIGNMENTS, só para a própria loja',
+            self::EDIT_CONSIGNMENTS => 'Permite editar consignações em aberto (draft, pending, partially_returned, overdue). Inclui marcar itens como vendidos. Finalizadas/canceladas só com OVERRIDE_CONSIGNMENT_LOCK',
+            self::DELETE_CONSIGNMENTS => 'Permite excluir consignações (soft delete). Bloqueado se tiver nota de retorno já lançada',
+            self::MANAGE_CONSIGNMENTS => 'Permite gerenciar consignações em qualquer loja. Sem essa permissão o usuário só gerencia consignações da própria loja',
+            self::REGISTER_CONSIGNMENT_RETURN => 'Permite lançar nota fiscal de retorno (movement_code=21) e conferir diff dos itens contra a NF de saída',
+            self::COMPLETE_CONSIGNMENT => 'Permite finalizar consignação (estado terminal). Itens pendentes precisam ser marcados como perdidos (shrinkage) com justificativa',
+            self::CANCEL_CONSIGNMENT => 'Permite cancelar consignação (estado terminal). Exige motivo. Cancelamento não retorna itens ao estoque — é apenas registro',
+            self::EXPORT_CONSIGNMENTS => 'Permite exportar consignações para Excel (2 abas: cabeçalhos + itens) ou PDF comprovante individual',
+            self::OVERRIDE_CONSIGNMENT_LOCK => 'Permite (a) criar consignação para destinatário com outra em atraso (override do bloqueio por inadimplência) e (b) editar consignações já finalizadas ou canceladas. Exige justificativa que fica no histórico.',
         };
     }
 

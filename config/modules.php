@@ -295,4 +295,11 @@ return [
         'icon' => 'ChartBarIcon',
         'dependencies' => ['accounting_classes', 'cost_centers'],
     ],
+    'consignments' => [
+        'name' => 'Consignações',
+        'description' => 'Controle de consignações (Cliente, Influencer, E-commerce). Vinculação obrigatória com catálogo de produtos e notas fiscais do CIGAM (movement_code 20 saída / 21 retorno), validação de itens de retorno e bloqueio por inadimplência.',
+        'routes' => ['consignments.*'],
+        'icon' => 'ArchiveBoxArrowDownIcon',
+        'dependencies' => ['products', 'employees', 'stores'],
+    ],
 ];

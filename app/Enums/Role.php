@@ -270,6 +270,17 @@ enum Role: string
                 Permission::ISSUE_COUPON_CODE->value,
                 Permission::IMPORT_COUPONS->value,
                 Permission::EXPORT_COUPONS->value,
+                // Consignações (todas)
+                Permission::VIEW_CONSIGNMENTS->value,
+                Permission::CREATE_CONSIGNMENTS->value,
+                Permission::EDIT_CONSIGNMENTS->value,
+                Permission::DELETE_CONSIGNMENTS->value,
+                Permission::MANAGE_CONSIGNMENTS->value,
+                Permission::REGISTER_CONSIGNMENT_RETURN->value,
+                Permission::COMPLETE_CONSIGNMENT->value,
+                Permission::CANCEL_CONSIGNMENT->value,
+                Permission::EXPORT_CONSIGNMENTS->value,
+                Permission::OVERRIDE_CONSIGNMENT_LOCK->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -490,6 +501,17 @@ enum Role: string
                 Permission::ISSUE_COUPON_CODE->value,
                 Permission::IMPORT_COUPONS->value,
                 Permission::EXPORT_COUPONS->value,
+                // Consignações (todas)
+                Permission::VIEW_CONSIGNMENTS->value,
+                Permission::CREATE_CONSIGNMENTS->value,
+                Permission::EDIT_CONSIGNMENTS->value,
+                Permission::DELETE_CONSIGNMENTS->value,
+                Permission::MANAGE_CONSIGNMENTS->value,
+                Permission::REGISTER_CONSIGNMENT_RETURN->value,
+                Permission::COMPLETE_CONSIGNMENT->value,
+                Permission::CANCEL_CONSIGNMENT->value,
+                Permission::EXPORT_CONSIGNMENTS->value,
+                Permission::OVERRIDE_CONSIGNMENT_LOCK->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -621,6 +643,15 @@ enum Role: string
                 Permission::EDIT_COUPONS->value,
                 Permission::ISSUE_COUPON_CODE->value,
                 Permission::EXPORT_COUPONS->value,
+                // Consignações — support cadastra/edita, lança retorno, finaliza
+                // e exporta, mas não cancela nem tem override. Escopo por loja
+                // automático pela ausência de MANAGE_CONSIGNMENTS.
+                Permission::VIEW_CONSIGNMENTS->value,
+                Permission::CREATE_CONSIGNMENTS->value,
+                Permission::EDIT_CONSIGNMENTS->value,
+                Permission::REGISTER_CONSIGNMENT_RETURN->value,
+                Permission::COMPLETE_CONSIGNMENT->value,
+                Permission::EXPORT_CONSIGNMENTS->value,
             ],
             self::FINANCE => [
                 // Financeira — contas a pagar, orçamentos, imports de realizado DRE.
@@ -796,6 +827,14 @@ enum Role: string
                 // para a própria loja; edição/emissão com SUPPORT/ADMIN)
                 Permission::VIEW_COUPONS->value,
                 Permission::CREATE_COUPONS->value,
+                // Consignações — vendedor cria/edita consignação para a
+                // própria loja e lança retorno. Finalizar e cancelar ficam
+                // com SUPPORT/ADMIN. Escopo por loja automático pela ausência
+                // de MANAGE_CONSIGNMENTS.
+                Permission::VIEW_CONSIGNMENTS->value,
+                Permission::CREATE_CONSIGNMENTS->value,
+                Permission::EDIT_CONSIGNMENTS->value,
+                Permission::REGISTER_CONSIGNMENT_RETURN->value,
             ],
             self::DRIVER => [
                 // Perfil próprio
