@@ -51,9 +51,12 @@ class ConsignmentServiceTest extends TestCase
             'is_active' => true,
         ]);
 
+        // barcode = concat ref+size (padrão CIGAM);
+        // aux_reference = EAN-13 real (quando existir)
         $this->variant = ProductVariant::create([
             'product_id' => $this->product->id,
-            'barcode' => '1234567890123',
+            'barcode' => 'REF-001U36',
+            'aux_reference' => '1234567890123',
             'size_cigam_code' => 'U36',
             'is_active' => true,
         ]);
