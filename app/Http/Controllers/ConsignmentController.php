@@ -481,6 +481,22 @@ class ConsignmentController extends Controller
         return response()->json($result);
     }
 
+    /**
+     * Lista colaboradores ativos da loja selecionada — usado pelo select
+     * "Consultor(a) responsável" no modal de criação. Filtro server-side
+     * evita expor todos os colaboradores do tenant no frontend.
+     */
+    public function lookupEmployees(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'store_id' => ['required', 'integer', 'exists:stores,id'],
+        ]);
+
+        return response()->json([
+            'employees' => $this->lookup->employeesByStore((int) $data['store_id']),
+        ]);
+    }
+
     // ==================================================================
     // Exports (XLSX + PDF comprovante com QR Code)
     // ==================================================================

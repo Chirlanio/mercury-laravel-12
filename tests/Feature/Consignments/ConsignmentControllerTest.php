@@ -388,6 +388,32 @@ class ConsignmentControllerTest extends TestCase
             ->assertJsonPath('items.0.product_id', $this->product->id);
     }
 
+    public function test_lookup_employees_returns_active_employees_of_store(): void
+    {
+        // Cria funcionários ativos na loja alvo
+        $this->createTestEmployee(['store_id' => 'Z421', 'name' => 'Maria Silva', 'cpf' => '11111111111']);
+        $this->createTestEmployee(['store_id' => 'Z421', 'name' => 'João Souza', 'cpf' => '22222222222']);
+        // E um na outra loja — não deve aparecer
+        $otherStore = Store::factory()->create(['code' => 'Z499']);
+        $this->createTestEmployee(['store_id' => 'Z499', 'name' => 'Outra Loja', 'cpf' => '33333333333']);
+
+        $response = $this->actingAs($this->adminUser)
+            ->getJson(route('consignments.lookup.employees', ['store_id' => $this->store->id]))
+            ->assertOk();
+
+        $names = collect($response->json('employees'))->pluck('name')->all();
+        $this->assertContains('Maria Silva', $names);
+        $this->assertContains('João Souza', $names);
+        $this->assertNotContains('Outra Loja', $names);
+    }
+
+    public function test_lookup_employees_requires_valid_store(): void
+    {
+        $this->actingAs($this->adminUser)
+            ->getJson(route('consignments.lookup.employees', ['store_id' => 99999]))
+            ->assertStatus(422);
+    }
+
     public function test_lookup_return_invoice_uses_code_21(): void
     {
         Movement::create([

@@ -34,6 +34,8 @@ export default function CreateConsignmentModal({
     canOverrideLock = false,
 }) {
     const [step, setStep] = useState(1);
+    const [employees, setEmployees] = useState([]);
+    const [loadingEmployees, setLoadingEmployees] = useState(false);
 
     const { data, setData, post, processing, errors, reset, setError, clearErrors } = useForm({
         type: 'cliente',
@@ -55,10 +57,44 @@ export default function CreateConsignmentModal({
     useEffect(() => {
         if (!show) {
             setStep(1);
+            setEmployees([]);
             reset();
             clearErrors();
         }
     }, [show]);
+
+    // Carrega consultores quando a loja muda. Reseta employee_id
+    // para evitar submeter ID de outra loja.
+    useEffect(() => {
+        if (!show || !data.store_id) {
+            setEmployees([]);
+            return;
+        }
+
+        let cancelled = false;
+        setLoadingEmployees(true);
+
+        fetch(route('consignments.lookup.employees', { store_id: data.store_id }), {
+            headers: { Accept: 'application/json' },
+        })
+            .then((r) => (r.ok ? r.json() : Promise.reject()))
+            .then((json) => {
+                if (cancelled) return;
+                setEmployees(json.employees || []);
+                // Se o consultor previamente selecionado não está na nova loja, limpa
+                if (data.employee_id && !(json.employees || []).some((e) => String(e.id) === String(data.employee_id))) {
+                    setData('employee_id', '');
+                }
+            })
+            .catch(() => {
+                if (!cancelled) setEmployees([]);
+            })
+            .finally(() => {
+                if (!cancelled) setLoadingEmployees(false);
+            });
+
+        return () => { cancelled = true; };
+    }, [show, data.store_id]);
 
     const typeRequiresEmployee = data.type === 'cliente';
 
@@ -225,17 +261,33 @@ export default function CreateConsignmentModal({
                     {typeRequiresEmployee && (
                         <div>
                             <InputLabel value="Consultor(a) responsável *" />
-                            <TextInput
-                                type="number"
+                            <select
                                 value={data.employee_id}
                                 onChange={(e) => setData('employee_id', e.target.value)}
-                                placeholder="ID do colaborador"
-                                className="mt-1 block w-full"
-                            />
+                                disabled={!data.store_id || loadingEmployees}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 min-h-[44px] disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            >
+                                <option value="">
+                                    {!data.store_id
+                                        ? 'Selecione a loja primeiro…'
+                                        : loadingEmployees
+                                            ? 'Carregando colaboradores…'
+                                            : employees.length === 0
+                                                ? 'Nenhum colaborador ativo nesta loja'
+                                                : 'Selecione…'}
+                                </option>
+                                {employees.map((emp) => (
+                                    <option key={emp.id} value={emp.id}>
+                                        {emp.name}
+                                    </option>
+                                ))}
+                            </select>
                             <InputError message={errors.employee_id} className="mt-1" />
-                            <p className="mt-1 text-xs text-gray-500">
-                                Informe o ID do(a) consultor(a) vinculado(a) à loja. Campo de autocomplete virá em fase futura.
-                            </p>
+                            {data.store_id && !loadingEmployees && employees.length === 0 && (
+                                <p className="mt-1 text-xs text-amber-700">
+                                    Sem colaboradores ativos cadastrados para esta loja. Verifique o cadastro em Colaboradores.
+                                </p>
+                            )}
                         </div>
                     )}
 

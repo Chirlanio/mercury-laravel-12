@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\Employee;
 use App\Models\Movement;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\Store;
 use Illuminate\Support\Collection;
 
 /**
@@ -25,6 +27,47 @@ class ConsignmentLookupService
 
     /** Movement code para NF de retorno */
     public const MOVEMENT_CODE_RETURN = 21;
+
+    // ==================================================================
+    // Consultores (employees) por loja — filtro do select no modal
+    // ==================================================================
+
+    /**
+     * Colaboradores ativos de uma loja. Aceita store_id (bigint FK) ou
+     * store_code (varchar 'Z421'). O modal envia store_id porque esse é
+     * o valor que ele já tem no state do React.
+     *
+     * Observação: Employee.store_id na tabela é VARCHAR com o CODE da
+     * loja (não é FK para stores.id — herança da v1). Por isso traduzimos.
+     *
+     * @return Collection<int, array{id:int, name:string}>
+     */
+    public function employeesByStore(int|string|null $storeIdOrCode): Collection
+    {
+        if (! $storeIdOrCode) {
+            return collect();
+        }
+
+        // Se veio um int, resolve para o code via Store; se veio string, usa direto.
+        $storeCode = is_int($storeIdOrCode) || ctype_digit((string) $storeIdOrCode)
+            ? Store::query()->where('id', (int) $storeIdOrCode)->value('code')
+            : (string) $storeIdOrCode;
+
+        if (! $storeCode) {
+            return collect();
+        }
+
+        return Employee::query()
+            ->where('store_id', $storeCode)
+            ->where('status_id', 2) // 2 = Ativo
+            ->orderBy('name')
+            ->get(['id', 'name', 'short_name'])
+            ->map(fn (Employee $e) => [
+                'id' => $e->id,
+                'name' => $e->name,
+                'short_name' => $e->short_name,
+            ]);
+    }
 
     // ==================================================================
     // Produtos — autocomplete e EAN (regra M8)

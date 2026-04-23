@@ -1150,6 +1150,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/consignments/lookup/products', [\App\Http\Controllers\ConsignmentController::class, 'lookupProducts'])->name('consignments.lookup.products');
         Route::get('/consignments/lookup/outbound-invoice', [\App\Http\Controllers\ConsignmentController::class, 'lookupOutboundInvoice'])->name('consignments.lookup.outbound-invoice');
         Route::get('/consignments/lookup/return-invoice', [\App\Http\Controllers\ConsignmentController::class, 'lookupReturnInvoice'])->name('consignments.lookup.return-invoice');
+        Route::get('/consignments/lookup/employees', [\App\Http\Controllers\ConsignmentController::class, 'lookupEmployees'])->name('consignments.lookup.employees');
 
         Route::get('/consignments/{consignment}', [\App\Http\Controllers\ConsignmentController::class, 'show'])->whereNumber('consignment')->name('consignments.show');
 
