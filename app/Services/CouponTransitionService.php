@@ -26,7 +26,7 @@ use Illuminate\Validation\ValidationException;
  * Permissões por transição:
  *  - draft → requested: exige EDIT_COUPONS ou CREATE_COUPONS (autor do rascunho)
  *  - requested → issued: exige ISSUE_COUPON_CODE + coupon_site preenchido no context
- *  - issued → active: exige ISSUE_COUPON_CODE
+ *  - issued → active: exige ISSUE_COUPON_CODE (UI) OU sem actor (command coupons:activate-due)
  *  - * → cancelled: exige EDIT_COUPONS ou MANAGE_COUPONS + motivo
  *  - * → expired: automático (command coupons:expire-stale), actor = null aceito
  *
@@ -66,14 +66,20 @@ class CouponTransitionService
             ]);
         }
 
-        // Expiração automática pode rodar sem actor (command agendado)
-        if ($target !== CouponStatus::EXPIRED) {
-            if ($actor === null) {
+        // Transições automáticas (rodadas por commands agendados sem usuário) são permitidas
+        // para EXPIRED (coupons:expire-stale) e ACTIVE (coupons:activate-due).
+        $canRunWithoutActor = in_array($target, [
+            CouponStatus::EXPIRED,
+            CouponStatus::ACTIVE,
+        ], true);
+
+        if ($actor === null) {
+            if (! $canRunWithoutActor) {
                 throw ValidationException::withMessages([
                     'actor' => 'Usuário responsável pela transição é obrigatório.',
                 ]);
             }
-
+        } else {
             $this->authorizeTransition($current, $target, $actor);
         }
 
@@ -172,11 +178,25 @@ class CouponTransitionService
     }
 
     /**
-     * Convenience — transiciona issued→active.
+     * Convenience — transiciona issued→active (manual, via UI).
      */
     public function activate(Coupon $coupon, User $actor, ?string $note = null): Coupon
     {
         return $this->transition($coupon, CouponStatus::ACTIVE, $actor, $note);
+    }
+
+    /**
+     * Convenience — ativação automática (sem actor) via command coupons:activate-due.
+     * Usado quando valid_from já chegou e o e-commerce não ativou manualmente.
+     */
+    public function activateAutomatically(Coupon $coupon): Coupon
+    {
+        return $this->transition(
+            $coupon,
+            CouponStatus::ACTIVE,
+            null,
+            'Ativado automaticamente (valid_from atingido)'
+        );
     }
 
     /**

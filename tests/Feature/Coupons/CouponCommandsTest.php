@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Coupons;
 
+use App\Console\Commands\CouponsActivateDueCommand;
 use App\Console\Commands\CouponsExpireStaleCommand;
 use App\Console\Commands\CouponsRemindPendingCommand;
 use App\Enums\CouponStatus;
@@ -44,6 +45,15 @@ class CouponCommandsTest extends TestCase
     protected function remindCommand(): CouponsRemindPendingCommand
     {
         $cmd = app(CouponsRemindPendingCommand::class);
+        $input = new ArrayInput([]);
+        $cmd->setOutput(new \Illuminate\Console\OutputStyle($input, new BufferedOutput()));
+
+        return $cmd;
+    }
+
+    protected function activateCommand(): CouponsActivateDueCommand
+    {
+        $cmd = app(CouponsActivateDueCommand::class);
         $input = new ArrayInput([]);
         $cmd->setOutput(new \Illuminate\Console\OutputStyle($input, new BufferedOutput()));
 
@@ -208,5 +218,130 @@ class CouponCommandsTest extends TestCase
         $count = $cmd->scanTenant(3);
 
         $this->assertGreaterThan(0, $count);
+    }
+
+    // ==================================================================
+    // coupons:activate-due
+    // ==================================================================
+
+    public function test_activate_due_activates_issued_with_past_valid_from(): void
+    {
+        $cmd = $this->activateCommand();
+        $transition = app(CouponTransitionService::class);
+
+        $coupon = $this->makeCoupon([
+            'status' => CouponStatus::ISSUED,
+            'valid_from' => now()->subDay()->toDateString(),
+            'coupon_site' => 'TEST'.uniqid(),
+            'issued_at' => now()->subDay(),
+        ]);
+
+        $count = $cmd->scanTenant($transition);
+
+        $this->assertSame(1, $count);
+        $this->assertSame(CouponStatus::ACTIVE, $coupon->fresh()->status);
+        $this->assertNotNull($coupon->fresh()->activated_at);
+    }
+
+    public function test_activate_due_activates_issued_with_today_valid_from(): void
+    {
+        $cmd = $this->activateCommand();
+        $transition = app(CouponTransitionService::class);
+
+        $coupon = $this->makeCoupon([
+            'status' => CouponStatus::ISSUED,
+            'valid_from' => now()->toDateString(),
+            'coupon_site' => 'TEST'.uniqid(),
+            'issued_at' => now(),
+        ]);
+
+        $count = $cmd->scanTenant($transition);
+
+        $this->assertSame(1, $count);
+        $this->assertSame(CouponStatus::ACTIVE, $coupon->fresh()->status);
+    }
+
+    public function test_activate_due_activates_issued_with_null_valid_from(): void
+    {
+        $cmd = $this->activateCommand();
+        $transition = app(CouponTransitionService::class);
+
+        // valid_from NULL = "vale imediatamente" (decisão do produto)
+        $coupon = $this->makeCoupon([
+            'status' => CouponStatus::ISSUED,
+            'valid_from' => null,
+            'coupon_site' => 'TEST'.uniqid(),
+            'issued_at' => now(),
+        ]);
+
+        $count = $cmd->scanTenant($transition);
+
+        $this->assertSame(1, $count);
+        $this->assertSame(CouponStatus::ACTIVE, $coupon->fresh()->status);
+    }
+
+    public function test_activate_due_skips_issued_with_future_valid_from(): void
+    {
+        $cmd = $this->activateCommand();
+        $transition = app(CouponTransitionService::class);
+
+        $coupon = $this->makeCoupon([
+            'status' => CouponStatus::ISSUED,
+            'valid_from' => now()->addDays(3)->toDateString(),
+            'coupon_site' => 'TEST'.uniqid(),
+            'issued_at' => now(),
+        ]);
+
+        $count = $cmd->scanTenant($transition);
+
+        $this->assertSame(0, $count);
+        $this->assertSame(CouponStatus::ISSUED, $coupon->fresh()->status);
+    }
+
+    public function test_activate_due_ignores_other_statuses(): void
+    {
+        $cmd = $this->activateCommand();
+        $transition = app(CouponTransitionService::class);
+
+        // Draft, requested, active, expired, cancelled — todos com valid_from passado.
+        // Nenhum deve ser tocado (filtro só pega issued).
+        $draft = $this->makeCoupon([
+            'status' => CouponStatus::DRAFT,
+            'valid_from' => now()->subDay()->toDateString(),
+        ]);
+        $requested = $this->makeCoupon([
+            'status' => CouponStatus::REQUESTED,
+            'valid_from' => now()->subDay()->toDateString(),
+        ]);
+        $alreadyActive = $this->makeCoupon([
+            'status' => CouponStatus::ACTIVE,
+            'valid_from' => now()->subDay()->toDateString(),
+        ]);
+
+        $count = $cmd->scanTenant($transition);
+
+        $this->assertSame(0, $count);
+        $this->assertSame(CouponStatus::DRAFT, $draft->fresh()->status);
+        $this->assertSame(CouponStatus::REQUESTED, $requested->fresh()->status);
+        $this->assertSame(CouponStatus::ACTIVE, $alreadyActive->fresh()->status);
+    }
+
+    public function test_activate_due_is_idempotent(): void
+    {
+        $cmd = $this->activateCommand();
+        $transition = app(CouponTransitionService::class);
+
+        $this->makeCoupon([
+            'status' => CouponStatus::ISSUED,
+            'valid_from' => now()->subDay()->toDateString(),
+            'coupon_site' => 'TEST'.uniqid(),
+            'issued_at' => now()->subDay(),
+        ]);
+
+        $first = $cmd->scanTenant($transition);
+        $second = $cmd->scanTenant($transition);
+
+        $this->assertSame(1, $first);
+        $this->assertSame(0, $second);
     }
 }

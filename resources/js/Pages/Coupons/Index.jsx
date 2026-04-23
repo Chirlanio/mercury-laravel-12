@@ -18,6 +18,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
+import { useConfirm } from '@/Hooks/useConfirm';
 import useCoupons from '@/Hooks/useCoupons';
 import { maskCpf } from '@/Hooks/useMasks';
 import Button from '@/Components/Button';
@@ -76,6 +77,7 @@ export default function Index({
     const canEdit = hasPermission(PERMISSIONS.EDIT_COUPONS);
     const canDelete = hasPermission(PERMISSIONS.DELETE_COUPONS);
     const canIssue = can.issue ?? hasPermission(PERMISSIONS.ISSUE_COUPON_CODE);
+    const canActivate = canIssue || hasPermission(PERMISSIONS.MANAGE_COUPONS);
     const canCancel = canEdit || hasPermission(PERMISSIONS.MANAGE_COUPONS) || canDelete;
     const canExport = can.export ?? hasPermission(PERMISSIONS.EXPORT_COUPONS);
     const canImport = hasPermission(PERMISSIONS.IMPORT_COUPONS);
@@ -83,6 +85,8 @@ export default function Index({
     const { modals, selected, openModal, closeModal } = useModalManager([
         'create', 'detail', 'edit', 'issue', 'cancel', 'import',
     ]);
+
+    const { confirm, ConfirmDialogComponent } = useConfirm();
 
     const lookup = useCoupons();
 
@@ -247,6 +251,26 @@ export default function Index({
             onSuccess: () => closeModal('issue'),
             onError: (errors) => setIssueErrors(errors),
             onFinish: () => setIssueProcessing(false),
+        });
+    };
+
+    // ------------------------------------------------------------------
+    // Activate (issued → active) — manual; complementa o command coupons:activate-due
+    // ------------------------------------------------------------------
+    const handleActivate = async (row) => {
+        if (!row?.id) return;
+        const ok = await confirm({
+            title: 'Ativar cupom',
+            message: `Deseja ativar o cupom "${row.coupon_site || row.suggested_coupon || '#' + row.id}"? Após ativado, ele estará disponível para uso.`,
+            confirmText: 'Sim, ativar',
+            type: 'success',
+        });
+        if (!ok) return;
+
+        router.post(route('coupons.transition', row.id), {
+            to_status: 'active',
+        }, {
+            preserveScroll: true,
         });
     };
 
@@ -512,6 +536,14 @@ export default function Index({
                             variant="info"
                             title="Emitir código"
                             onClick={() => openIssue(row)}
+                        />
+                    )}
+                    {canActivate && row.status === 'issued' && (
+                        <ActionButtons.Custom
+                            icon={CheckCircleIcon}
+                            variant="success"
+                            title="Ativar cupom"
+                            onClick={() => handleActivate(row)}
                         />
                     )}
                     {canCancel && !['cancelled', 'expired'].includes(row.status) && (
@@ -1395,6 +1427,8 @@ export default function Index({
                     </>
                 )}
             </StandardModal>
+
+            <ConfirmDialogComponent />
         </>
     );
 }

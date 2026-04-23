@@ -97,6 +97,15 @@ Schedule::command('budgets:alert')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/budgets-alert.log'));
 
+// Coupons — ativa cupons em issued cujo valid_from já chegou (ou sem
+// valid_from). Roda antes do expire-stale para que cupons recém-ativados
+// possam ser expirados no mesmo ciclo se valid_until também já passou.
+// Resolve o caso "e-commerce esqueceu de ativar manualmente".
+Schedule::command('coupons:activate-due')
+    ->dailyAt('05:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/coupons-activate.log'));
+
 // Coupons — marca cupons com valid_until vencido como expirados.
 // Roda antes do expediente para que a listagem do dia já reflita o estado.
 Schedule::command('coupons:expire-stale')
