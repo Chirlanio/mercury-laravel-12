@@ -72,6 +72,7 @@ use App\Http\Controllers\LgpdController;
 use App\Http\Controllers\MedicalCertificateController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\MovementController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderPaymentController;
 use App\Http\Controllers\OvertimeRecordController;
 use App\Http\Controllers\PersonnelMovementController;
@@ -150,6 +151,16 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])
         ->middleware('permission:'.Permission::EDIT_OWN_PROFILE->value)
         ->name('profile.destroy');
+});
+
+// ==========================================
+// Notifications (sino do header — pessoal, sem permission guard)
+// ==========================================
+Route::middleware('auth')->prefix('notifications')->name('notifications.')->group(function () {
+    Route::get('/recent', [NotificationController::class, 'recent'])->name('recent');
+    Route::get('/unread-count', [NotificationController::class, 'unreadCount'])->name('unread-count');
+    Route::post('/{id}/read', [NotificationController::class, 'markAsRead'])->name('mark-read');
+    Route::post('/read-all', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
 });
 
 // ==========================================

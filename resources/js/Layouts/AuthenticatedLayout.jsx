@@ -5,6 +5,7 @@ import ResponsiveNavLink from "@/Components/ResponsiveNavLink";
 import Sidebar from "@/Components/Sidebar";
 import UserAvatar from "@/Components/UserAvatar";
 import FloatingChat from "@/Components/Chat/FloatingChat";
+import HeaderActions from "@/Components/Shared/HeaderActions";
 import { usePermissions, PERMISSIONS } from "@/Hooks/usePermissions";
 import { Link, usePage } from "@inertiajs/react";
 import { useState, useEffect } from "react";
@@ -72,7 +73,7 @@ export default function AuthenticatedLayout({ children }) {
                 }`}
             >
                 <nav className="border-b border-gray-100 bg-white">
-                    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                    <div className="w-full px-4 sm:px-6 lg:px-8">
                         <div className="flex h-16 justify-between">
                             <div className="flex">
                                 {/* Mobile sidebar toggle */}
@@ -104,7 +105,9 @@ export default function AuthenticatedLayout({ children }) {
                                 </div>
                             </div>
 
-                            <div className="hidden sm:ms-6 sm:flex sm:items-center">
+                            <div className="hidden sm:ms-6 sm:flex sm:items-center sm:gap-2">
+                                <HeaderActions />
+
                                 <div className="relative ms-3">
                                     <Dropdown>
                                         <Dropdown.Trigger>
@@ -167,7 +170,8 @@ export default function AuthenticatedLayout({ children }) {
                                 </div>
                             </div>
 
-                            <div className="-me-2 flex items-center sm:hidden">
+                            <div className="-me-2 flex items-center gap-1 sm:hidden">
+                                <HeaderActions />
                                 <button
                                     onClick={() =>
                                         setShowingNavigationDropdown(
