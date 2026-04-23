@@ -159,25 +159,22 @@ class CustomerController extends Controller
     }
 
     /**
-     * Dispara um sync manual — INLINE em batch curto (~15s ou 5000
-     * registros por click).
+     * Dispara um sync manual em **processo desacoplado** via popen +
+     * `start /B` (mesmo padrão do ProductController).
      *
-     * Por que inline e não background:
-     *  - `php artisan serve` no Windows é SINGLE-THREADED: um único
-     *    worker atende todas as requests. Background via
-     *    dispatchAfterResponse mantém o worker ocupado e bloqueia
-     *    toda navegação até terminar.
-     *  - Inline com batch curto garante worker liberado rápido,
-     *    resposta em poucos segundos, usuário pode navegar, e o
-     *    histórico reflete o progresso em tempo real.
+     * Fluxo:
+     *  1. Valida CIGAM disponível
+     *  2. Marca logs pendurados > 30min como failed (defesa contra processo morto)
+     *  3. Rejeita se já existe sync em running
+     *  4. Cria log inicial + spawna processo filho (sem esperar)
+     *  5. Retorna imediatamente com flash success
      *
-     * Como continua de onde parou: se houver log em 'running'/'pending'
-     * (criado em clique anterior), retoma dele; senão cria log novo.
-     * O cursor (último cigam_code) é inferido do Customer mais
-     * recentemente sincronizado dentro desse log.
-     *
-     * Para syncs muito grandes (>10k), use CLI (sem time limit):
-     *   php artisan customers:sync --chunk=2000
+     * Por que funciona no `artisan serve` single-threaded:
+     *  - `start /B "" <cmd>` (Windows) desacopla completamente do pai
+     *  - `pclose(popen(...))` fecha o stream antes do filho terminar
+     *  - Worker HTTP é liberado instantaneamente
+     *  - Processo filho roda até o fim atualizando customer_sync_logs
+     *  - Modal "Histórico" faz polling a cada 3s mostrando progresso
      */
     public function sync(Request $request, CustomerSyncService $service): RedirectResponse
     {
@@ -187,82 +184,60 @@ class CustomerController extends Controller
             ]);
         }
 
-        // Retoma log existente ou cria novo
-        $log = CustomerSyncLog::whereIn('status', ['pending', 'running'])
-            ->latest('id')
-            ->first()
-            ?? $service->start('full', $request->user()->id);
+        // Logs pendurados > 30min viram failed (processo pode ter morrido)
+        CustomerSyncLog::whereIn('status', ['running', 'pending'])
+            ->where('started_at', '<', now()->subMinutes(30))
+            ->each(fn ($log) => $log->update([
+                'status' => 'failed',
+                'completed_at' => now(),
+                'error_details' => array_merge($log->error_details ?? [], [
+                    ['reason' => 'Processo encerrado automaticamente após 30min sem resposta'],
+                ]),
+            ]));
 
-        // Cursor: último cigam_code processado dentro deste log.
-        $lastCode = Customer::query()
-            ->whereNotNull('synced_at')
-            ->where('synced_at', '>=', $log->started_at)
-            ->orderByDesc('cigam_code')
-            ->value('cigam_code');
-
-        // Limite por click: 15s OU 10 chunks de 500 = 5000 registros
-        set_time_limit(30);
-        $hardDeadline = microtime(true) + 15.0;
-        $maxChunks = 10;
-
-        $chunks = 0;
-        $batchProcessed = 0;
-        $batchInserted = 0;
-        $batchUpdated = 0;
-        $done = false;
-
-        try {
-            while (true) {
-                $result = $service->processChunk($log->id, $lastCode, 500);
-                $chunks++;
-                $batchProcessed += $result['processed'];
-                $batchInserted += $result['inserted'];
-                $batchUpdated += $result['updated'];
-                $lastCode = $result['last_code'];
-
-                if (! $result['has_more'] || $result['cancelled']) {
-                    $done = true;
-                    break;
-                }
-
-                if ($chunks >= $maxChunks || microtime(true) >= $hardDeadline) {
-                    break;
-                }
-            }
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Customer sync batch failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return redirect()->back()->withErrors([
-                'sync' => 'Erro ao sincronizar: '.$e->getMessage(),
-            ]);
-        }
-
-        $fresh = $log->fresh();
-
-        if ($done) {
-            return redirect()->back()->with('success', sprintf(
-                'Sincronização #%d concluída. Total: %d processados, %d novos, %d atualizados.',
-                $log->id,
-                (int) $fresh->processed_records,
-                (int) $fresh->inserted_records,
-                (int) $fresh->updated_records,
+        // Rejeita se já tem sync ativo
+        $running = CustomerSyncLog::whereIn('status', ['running', 'pending'])->first();
+        if ($running) {
+            return redirect()->back()->with('warning', sprintf(
+                'Já existe uma sincronização em andamento (Sync #%d). Acompanhe em "Histórico".',
+                $running->id,
             ));
         }
 
-        $totalEstimate = (int) $fresh->total_records;
-        $processed = (int) $fresh->processed_records;
-        $pct = $totalEstimate > 0 ? round(($processed / $totalEstimate) * 100) : null;
+        $log = $service->start('full', $request->user()->id);
 
-        return redirect()->back()->with('warning', sprintf(
-            'Progresso parcial — Sync #%d: %d/%d%s. Clique em "Sincronizar" novamente para continuar.',
+        $this->spawnSyncProcess($log->id, $request->user()->id);
+
+        return redirect()->back()->with('success', sprintf(
+            'Sincronização #%d iniciada. Acompanhe o progresso em "Histórico" (atualização automática a cada 3s).',
             $log->id,
-            $processed,
-            $totalEstimate,
-            $pct !== null ? " ({$pct}%)" : '',
         ));
+    }
+
+    /**
+     * Spawna `php artisan customers:sync` como processo desacoplado
+     * no Windows via `start /B`. Padrão idêntico ao
+     * ProductController::spawnSyncProcess — validado em produção.
+     */
+    protected function spawnSyncProcess(int $logId, int $userId): void
+    {
+        $php = config('app.php_binary', 'C:\\Users\\MSDEV\\php84\\php.exe');
+        $artisan = base_path('artisan');
+        $tenantId = tenant('id');
+
+        $args = [
+            $php, $artisan, 'customers:sync',
+            '--tenant='.$tenantId,
+            '--log-id='.$logId,
+            '--user-id='.$userId,
+            '--chunk=1000',
+        ];
+
+        $cmd = implode(' ', array_map('escapeshellarg', $args));
+
+        // Windows: `start /B "" <cmd>` roda sem janela; pclose(popen(...))
+        // desconecta o stream, liberando o worker HTTP imediatamente.
+        pclose(popen("start /B \"\" {$cmd}", 'r'));
     }
 
     /**

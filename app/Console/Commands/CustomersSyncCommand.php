@@ -22,7 +22,9 @@ class CustomersSyncCommand extends Command
 {
     protected $signature = 'customers:sync
                             {--tenant= : Roda apenas no tenant informado}
-                            {--chunk=500 : Tamanho do chunk (1-5000)}';
+                            {--chunk=500 : Tamanho do chunk (1-5000)}
+                            {--log-id= : Retoma um log existente (usado pelo spawn do controller)}
+                            {--user-id= : Atribui a um usuário ao criar novo log}';
 
     protected $description = 'Sincroniza clientes da view CIGAM msl_dcliente_.';
 
@@ -38,6 +40,8 @@ class CustomersSyncCommand extends Command
 
         $chunkSize = max(1, min(5000, (int) $this->option('chunk')));
         $tenantFilter = $this->option('tenant');
+        $logId = $this->option('log-id') ? (int) $this->option('log-id') : null;
+        $userId = $this->option('user-id') ? (int) $this->option('user-id') : null;
 
         $tenantsQuery = Tenant::query();
         if ($tenantFilter) {
@@ -59,8 +63,8 @@ class CustomersSyncCommand extends Command
             $this->info("Tenant: {$tenant->id}");
 
             try {
-                $tenant->run(function () use ($service, $chunkSize, &$grandInserted, &$grandUpdated, &$grandErrors) {
-                    $result = $this->scanTenant($service, $chunkSize);
+                $tenant->run(function () use ($service, $chunkSize, $logId, $userId, &$grandInserted, &$grandUpdated, &$grandErrors) {
+                    $result = $this->scanTenant($service, $chunkSize, $logId, $userId);
                     $grandInserted += $result['inserted'];
                     $grandUpdated += $result['updated'];
                     $grandErrors += $result['errors'];
@@ -83,22 +87,50 @@ class CustomersSyncCommand extends Command
     /**
      * Processa 1 tenant — loop de chunks até has_more=false.
      *
+     * Se $logId for fornecido (spawn via controller), retoma o log
+     * existente em vez de criar novo. Se $userId for fornecido ao criar
+     * novo log, atribui como started_by_user_id.
+     *
      * @return array{inserted: int, updated: int, errors: int}
      */
-    public function scanTenant(CustomerSyncService $service, int $chunkSize = 500): array
-    {
+    public function scanTenant(
+        CustomerSyncService $service,
+        int $chunkSize = 500,
+        ?int $logId = null,
+        ?int $userId = null,
+    ): array {
         if (! Schema::hasTable('customers') || ! Schema::hasTable('customer_sync_logs')) {
             $this->warn('  Módulo customers não instalado — pulando');
 
             return ['inserted' => 0, 'updated' => 0, 'errors' => 0];
         }
 
-        $log = $service->start('full');
-        $this->line("  Sync #{$log->id} iniciado (total: {$log->total_records})");
+        // Retoma log ou cria novo
+        if ($logId) {
+            $log = \App\Models\CustomerSyncLog::find($logId);
+            if (! $log) {
+                $this->error("  Log #{$logId} não encontrado — abortando");
+
+                return ['inserted' => 0, 'updated' => 0, 'errors' => 1];
+            }
+            $this->line("  Sync #{$log->id} retomado (status: {$log->status})");
+        } else {
+            $log = $service->start('full', $userId);
+            $this->line("  Sync #{$log->id} iniciado (total: {$log->total_records})");
+        }
 
         $totalInserted = 0;
         $totalUpdated = 0;
         $lastCode = null;
+
+        // Se retomando, determina o cursor pelo último customer sincronizado
+        if ($logId) {
+            $lastCode = \App\Models\Customer::query()
+                ->whereNotNull('synced_at')
+                ->where('synced_at', '>=', $log->started_at)
+                ->orderByDesc('cigam_code')
+                ->value('cigam_code');
+        }
 
         while (true) {
             $result = $service->processChunk($log->id, $lastCode, $chunkSize);
