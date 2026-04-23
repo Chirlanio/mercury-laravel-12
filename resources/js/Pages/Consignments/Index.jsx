@@ -13,6 +13,7 @@ import {
     DocumentArrowDownIcon,
     EyeIcon,
     CurrencyDollarIcon,
+    ChartBarIcon,
 } from '@heroicons/react/24/outline';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
@@ -334,10 +335,16 @@ export default function Index({
                             </p>
                         </div>
                         <div className="flex gap-2 shrink-0">
+                            <Link href={route('consignments.dashboard')}>
+                                <Button variant="secondary" title="Dashboard" aria-label="Dashboard" className="min-h-[44px]">
+                                    <ChartBarIcon className="w-4 h-4 sm:mr-2" />
+                                    <span className="hidden sm:inline">Dashboard</span>
+                                </Button>
+                            </Link>
                             {canExport && (
                                 <a
-                                    href={route('consignments.index', { ...filters, export: 1 })}
-                                    title="Exportar"
+                                    href={route('consignments.export', filters)}
+                                    title="Exportar XLSX"
                                     className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-300 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50 min-h-[44px]"
                                 >
                                     <DocumentArrowDownIcon className="h-4 w-4" />

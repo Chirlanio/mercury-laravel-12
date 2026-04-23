@@ -1138,6 +1138,13 @@ Route::middleware(['auth'])->group(function () {
     // ==========================================
     Route::middleware(['tenant.module:consignments', 'permission:'.Permission::VIEW_CONSIGNMENTS->value])->group(function () {
         Route::get('/consignments', [\App\Http\Controllers\ConsignmentController::class, 'index'])->name('consignments.index');
+        Route::get('/consignments/dashboard', [\App\Http\Controllers\ConsignmentController::class, 'dashboard'])->name('consignments.dashboard');
+
+        // Export (antes de {consignment} — evita conflito com wildcard)
+        Route::middleware('permission:'.Permission::EXPORT_CONSIGNMENTS->value)->group(function () {
+            Route::get('/consignments/export', [\App\Http\Controllers\ConsignmentController::class, 'export'])->name('consignments.export');
+            Route::get('/consignments/{consignment}/pdf', [\App\Http\Controllers\ConsignmentController::class, 'exportPdf'])->whereNumber('consignment')->name('consignments.pdf');
+        });
 
         // AJAX lookups — produtos (M8) + NF saída/retorno CIGAM
         Route::get('/consignments/lookup/products', [\App\Http\Controllers\ConsignmentController::class, 'lookupProducts'])->name('consignments.lookup.products');

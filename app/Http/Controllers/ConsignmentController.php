@@ -9,6 +9,7 @@ use App\Models\Consignment;
 use App\Models\Employee;
 use App\Models\Store;
 use App\Models\User;
+use App\Services\ConsignmentExportService;
 use App\Services\ConsignmentLookupService;
 use App\Services\ConsignmentReturnService;
 use App\Services\ConsignmentService;
@@ -19,6 +20,8 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /**
  * Controller de Consignações (Cliente / Influencer / E-commerce).
@@ -37,6 +40,7 @@ class ConsignmentController extends Controller
         private ConsignmentLookupService $lookup,
         private ConsignmentTransitionService $transitions,
         private ConsignmentReturnService $returnService,
+        private ConsignmentExportService $exportService,
     ) {
     }
 
@@ -296,6 +300,135 @@ class ConsignmentController extends Controller
     }
 
     // ==================================================================
+    // Dashboard — gráficos recharts
+    // ==================================================================
+
+    public function dashboard(Request $request): Response
+    {
+        $scopedStoreId = $this->resolveScopedStoreId($request->user());
+
+        return Inertia::render('Consignments/Dashboard', [
+            'analytics' => $this->buildAnalytics($scopedStoreId),
+            'statistics' => $this->buildStatistics($scopedStoreId),
+            'isStoreScoped' => $scopedStoreId !== null,
+            'scopedStoreId' => $scopedStoreId,
+            'typeOptions' => ConsignmentType::labels(),
+            'statusOptions' => ConsignmentStatus::labels(),
+            'statusColors' => ConsignmentStatus::colors(),
+        ]);
+    }
+
+    /**
+     * 4 agregações para os gráficos:
+     *  1. evolução mensal (últimos 12 meses) — line
+     *  2. distribuição por tipo — pie
+     *  3. top 10 destinatários por volume — bar horizontal
+     *  4. taxa de retorno por consultor(a) (finalizadas / total) — bar
+     */
+    protected function buildAnalytics(?int $scopedStoreId): array
+    {
+        $base = fn () => Consignment::query()->notDeleted()
+            ->when($scopedStoreId, fn ($q) => $q->where('store_id', $scopedStoreId));
+
+        $driver = Consignment::query()->getConnection()->getDriverName();
+        $monthExpr = $driver === 'sqlite'
+            ? "strftime('%Y-%m', created_at)"
+            : "DATE_FORMAT(created_at, '%Y-%m')";
+
+        // 1. Evolução mensal (últimos 12 meses)
+        $byMonth = $base()
+            ->selectRaw("{$monthExpr} as ym, COUNT(*) as total, COALESCE(SUM(outbound_total_value), 0) as value")
+            ->where('created_at', '>=', now()->subMonths(11)->startOfMonth())
+            ->groupBy('ym')
+            ->orderBy('ym')
+            ->get();
+
+        $mesAbrev = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+        $monthSeries = $byMonth->map(function ($r) use ($mesAbrev) {
+            [$year, $month] = explode('-', (string) $r->ym);
+
+            return [
+                'month' => ($mesAbrev[(int) $month - 1] ?? $month).'/'.$year,
+                'total' => (int) $r->total,
+                'value' => (float) $r->value,
+            ];
+        })->values();
+
+        // 2. Distribuição por tipo
+        $byType = $base()
+            ->selectRaw('type, COUNT(*) as total, COALESCE(SUM(outbound_total_value), 0) as value')
+            ->groupBy('type')
+            ->get()
+            ->map(function ($r) {
+                $type = $r->type instanceof ConsignmentType
+                    ? $r->type
+                    : ConsignmentType::tryFrom((string) $r->type);
+
+                return [
+                    'type' => $type?->value ?? (string) $r->type,
+                    'label' => $type?->label() ?? (string) $r->type,
+                    'color' => $type?->color() ?? 'gray',
+                    'total' => (int) $r->total,
+                    'value' => (float) $r->value,
+                ];
+            })->values();
+
+        // 3. Top 10 destinatários por volume (count de consignações)
+        $byRecipient = $base()
+            ->whereNotNull('recipient_document_clean')
+            ->selectRaw('recipient_name, recipient_document_clean, COUNT(*) as total, COALESCE(SUM(outbound_total_value), 0) as value')
+            ->groupBy('recipient_name', 'recipient_document_clean')
+            ->orderByDesc('total')
+            ->limit(10)
+            ->get()
+            ->map(fn ($r) => [
+                'name' => $r->recipient_name,
+                'total' => (int) $r->total,
+                'value' => (float) $r->value,
+            ])->values();
+
+        // 4. Taxa de retorno por consultor(a) — só tipos que têm employee
+        $byEmployee = $base()
+            ->whereNotNull('employee_id')
+            ->selectRaw('
+                employee_id,
+                COUNT(*) as total,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as completed_count,
+                COALESCE(SUM(returned_total_value), 0) as returned_value,
+                COALESCE(SUM(outbound_total_value), 0) as outbound_value
+            ', [ConsignmentStatus::COMPLETED->value])
+            ->groupBy('employee_id')
+            ->orderByDesc('total')
+            ->limit(10)
+            ->get();
+
+        $employeeNames = \App\Models\Employee::whereIn('id', $byEmployee->pluck('employee_id'))
+            ->pluck('name', 'id');
+
+        $byEmployeeData = $byEmployee->map(function ($r) use ($employeeNames) {
+            $outbound = (float) $r->outbound_value;
+            $returned = (float) $r->returned_value;
+            $returnRate = $outbound > 0 ? round(($returned / $outbound) * 100, 1) : 0.0;
+
+            return [
+                'employee_id' => $r->employee_id,
+                'name' => $employeeNames[$r->employee_id] ?? "ID {$r->employee_id}",
+                'total' => (int) $r->total,
+                'completed' => (int) $r->completed_count,
+                'return_rate' => $returnRate,
+            ];
+        })->values();
+
+        return [
+            'by_month' => $monthSeries,
+            'by_type' => $byType,
+            'by_recipient' => $byRecipient,
+            'by_employee' => $byEmployeeData,
+        ];
+    }
+
+    // ==================================================================
     // AJAX lookups (M8 — catálogo de produtos + CIGAM)
     // ==================================================================
 
@@ -346,6 +479,66 @@ class ConsignmentController extends Controller
         );
 
         return response()->json($result);
+    }
+
+    // ==================================================================
+    // Exports (XLSX + PDF comprovante com QR Code)
+    // ==================================================================
+
+    public function export(Request $request): BinaryFileResponse
+    {
+        $user = $request->user();
+        $scopedStoreId = $this->resolveScopedStoreId($user);
+
+        $query = Consignment::query()
+            ->with(['store', 'employee', 'items'])
+            ->notDeleted()
+            ->latest();
+
+        if ($scopedStoreId) {
+            $query->where('store_id', $scopedStoreId);
+        } elseif ($request->filled('store_id')) {
+            $query->where('store_id', (int) $request->store_id);
+        }
+
+        if ($request->filled('type')) {
+            $query->where('type', $request->type);
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        } elseif (! $request->boolean('include_terminal')) {
+            $query->whereNotIn('status', [
+                ConsignmentStatus::COMPLETED->value,
+                ConsignmentStatus::CANCELLED->value,
+            ]);
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('recipient_name', 'like', "%{$search}%")
+                    ->orWhere('recipient_document_clean', 'like', "%{$search}%")
+                    ->orWhere('outbound_invoice_number', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('outbound_invoice_date', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('outbound_invoice_date', '<=', $request->date_to);
+        }
+
+        return $this->exportService->exportExcel($query);
+    }
+
+    public function exportPdf(Consignment $consignment, Request $request): HttpResponse
+    {
+        $this->ensureCanView($request->user(), $consignment);
+
+        return $this->exportService->exportPdf($consignment);
     }
 
     // ==================================================================
