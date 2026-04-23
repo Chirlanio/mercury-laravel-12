@@ -1134,6 +1134,38 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ==========================================
+    // Consignments (Cliente / Influencer / E-commerce)
+    // ==========================================
+    Route::middleware(['tenant.module:consignments', 'permission:'.Permission::VIEW_CONSIGNMENTS->value])->group(function () {
+        Route::get('/consignments', [\App\Http\Controllers\ConsignmentController::class, 'index'])->name('consignments.index');
+
+        // AJAX lookups — produtos (M8) + NF saída/retorno CIGAM
+        Route::get('/consignments/lookup/products', [\App\Http\Controllers\ConsignmentController::class, 'lookupProducts'])->name('consignments.lookup.products');
+        Route::get('/consignments/lookup/outbound-invoice', [\App\Http\Controllers\ConsignmentController::class, 'lookupOutboundInvoice'])->name('consignments.lookup.outbound-invoice');
+        Route::get('/consignments/lookup/return-invoice', [\App\Http\Controllers\ConsignmentController::class, 'lookupReturnInvoice'])->name('consignments.lookup.return-invoice');
+
+        Route::get('/consignments/{consignment}', [\App\Http\Controllers\ConsignmentController::class, 'show'])->whereNumber('consignment')->name('consignments.show');
+
+        Route::middleware('permission:'.Permission::CREATE_CONSIGNMENTS->value)->group(function () {
+            Route::post('/consignments', [\App\Http\Controllers\ConsignmentController::class, 'store'])->name('consignments.store');
+        });
+
+        Route::middleware('permission:'.Permission::EDIT_CONSIGNMENTS->value)->group(function () {
+            Route::put('/consignments/{consignment}', [\App\Http\Controllers\ConsignmentController::class, 'update'])->whereNumber('consignment')->name('consignments.update');
+            // Transições — permissão específica por transição é checada no ConsignmentTransitionService
+            Route::post('/consignments/{consignment}/transition', [\App\Http\Controllers\ConsignmentController::class, 'transition'])->whereNumber('consignment')->name('consignments.transition');
+        });
+
+        Route::middleware('permission:'.Permission::REGISTER_CONSIGNMENT_RETURN->value)->group(function () {
+            Route::post('/consignments/{consignment}/returns', [\App\Http\Controllers\ConsignmentController::class, 'registerReturn'])->whereNumber('consignment')->name('consignments.returns.store');
+        });
+
+        Route::middleware('permission:'.Permission::DELETE_CONSIGNMENTS->value)->group(function () {
+            Route::delete('/consignments/{consignment}', [\App\Http\Controllers\ConsignmentController::class, 'destroy'])->whereNumber('consignment')->name('consignments.destroy');
+        });
+    });
+
+    // ==========================================
     // Accounting Classes (Plano de Contas — fundação do DRE)
     // ==========================================
     Route::middleware(['tenant.module:accounting_classes', 'permission:'.Permission::VIEW_ACCOUNTING_CLASSES->value])->group(function () {
