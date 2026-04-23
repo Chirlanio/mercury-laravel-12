@@ -130,6 +130,36 @@ class ConsignmentLookupTest extends TestCase
         $this->assertEquals($this->variant37->id, $resolved['variant']->id);
     }
 
+    public function test_resolve_by_ref_size_as_variant_barcode(): void
+    {
+        // Padrão Mercury: product_variants.barcode armazena
+        // movements.ref_size (ref + size concatenados sem pipe).
+        // Ex: "A1340000010002U35".
+        $product = Product::create([
+            'reference' => 'A1340000010002',
+            'description' => 'Sandália real data',
+            'sale_price' => 159.90,
+            'is_active' => true,
+        ]);
+
+        $variant = ProductVariant::create([
+            'product_id' => $product->id,
+            'barcode' => 'A1340000010002U35',
+            'size_cigam_code' => 'U35',
+            'is_active' => true,
+        ]);
+
+        $resolved = $this->service->resolveProductVariant(
+            reference: null,
+            barcode: '7900312942582', // EAN numérico diferente do stored
+            refSize: 'A1340000010002U35',
+        );
+
+        $this->assertNotNull($resolved, 'Deveria resolver via ref_size = product_variants.barcode');
+        $this->assertEquals($product->id, $resolved['product']->id);
+        $this->assertEquals($variant->id, $resolved['variant']->id);
+    }
+
     public function test_resolve_returns_null_for_unknown(): void
     {
         $resolved = $this->service->resolveProductVariant(

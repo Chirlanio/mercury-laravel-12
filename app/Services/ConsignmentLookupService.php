@@ -142,10 +142,20 @@ class ConsignmentLookupService
     }
 
     /**
-     * Resolve uma tupla (reference, size_cigam_code ou barcode) em
-     * product + variant. Usado pelo lookup da NF de saída ao popular
-     * itens automaticamente — retorna null quando não encontrado para
-     * marcar como "órfão" na resposta.
+     * Resolve product + variant a partir de dados do CIGAM. Usado pelo
+     * lookup de NF para popular itens automaticamente.
+     *
+     * Estratégia em ordem de tentativa (para lidar com variações de
+     * como o CIGAM armazena o identificador):
+     *  1. `ref_size` como barcode do variant (padrão Mercury — o sync
+     *     de produtos grava `movements.ref_size` em
+     *     `product_variants.barcode`). Este é o caminho feliz.
+     *  2. `barcode` do movement (EAN numérico). Alguns tenants podem
+     *     ter populado assim.
+     *  3. `reference` + `size_cigam_code` — fallback por pesquisa
+     *     direta em products + variants.
+     *
+     * Retorna null quando nada resolve → item vira "órfão" (regra M8).
      *
      * @return array{product: Product, variant: ?ProductVariant}|null
      */
@@ -153,8 +163,23 @@ class ConsignmentLookupService
         ?string $reference = null,
         ?string $barcode = null,
         ?string $sizeCigamCode = null,
+        ?string $refSize = null,
     ): ?array {
-        if ($barcode) {
+        // 1. ref_size → product_variants.barcode (padrão Mercury/CIGAM)
+        if ($refSize) {
+            $variant = ProductVariant::query()
+                ->with('product')
+                ->where('barcode', $refSize)
+                ->where('is_active', true)
+                ->first();
+
+            if ($variant && $variant->product) {
+                return ['product' => $variant->product, 'variant' => $variant];
+            }
+        }
+
+        // 2. EAN numérico (movements.barcode)
+        if ($barcode && $barcode !== $refSize) {
             $variant = ProductVariant::query()
                 ->with('product')
                 ->where('barcode', $barcode)
@@ -166,6 +191,7 @@ class ConsignmentLookupService
             }
         }
 
+        // 3. Fallback por reference + size
         if ($reference) {
             $product = Product::query()
                 ->where('reference', $reference)
@@ -314,12 +340,15 @@ class ConsignmentLookupService
         $orphans = [];
 
         foreach ($movements as $m) {
-            // ref_size = "REF001|38" (formato CIGAM)
+            // Tentamos primeiro via ref_size direto (padrão Mercury —
+            // product_variants.barcode = ref_size). Se não resolver,
+            // o resolver faz fallback por reference+size extraídos.
             [$reference, $sizeLabel] = $this->splitRefSize($m->ref_size);
 
             $resolved = $this->resolveProductVariant(
                 reference: $reference,
                 barcode: $m->barcode,
+                refSize: $m->ref_size,
             );
 
             $payload = [
