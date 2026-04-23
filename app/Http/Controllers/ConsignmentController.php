@@ -198,18 +198,19 @@ class ConsignmentController extends Controller
             'issue_now' => ['nullable', 'boolean'],
             'override_lock_reason' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:1'],
+            // Consignação é controle, não emite NF — TODOS os itens devem
+            // vir da NF de saída (movement_id obrigatório). Backend nunca
+            // aceita item manual, só populado via lookup CIGAM.
+            'items.*.movement_id' => ['required', 'integer', 'exists:movements,id'],
             'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
             'items.*.product_variant_id' => ['nullable', 'integer', 'exists:product_variants,id'],
             'items.*.reference' => ['nullable', 'string', 'max:50'],
-            // Mercury/CIGAM usa barcode = ref_size concatenado
-            // (ex: 'A1340000010002U35' = 17 chars). Aceita até 32 pra
-            // acomodar variações — não é EAN-13 puro.
+            // Mercury/CIGAM: barcode = ref_size concat (ex: 'A1340000010002U35').
             'items.*.barcode' => ['nullable', 'string', 'max:32'],
             'items.*.size_label' => ['nullable', 'string', 'max:20'],
             'items.*.size_cigam_code' => ['nullable', 'string', 'max:10'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.unit_value' => ['required', 'numeric', 'min:0'],
-            'items.*.movement_id' => ['nullable', 'integer', 'exists:movements,id'],
         ]);
 
         // Scoped user — força store_id para sua loja

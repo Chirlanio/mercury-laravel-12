@@ -126,7 +126,7 @@ export default function RegisterReturnModal({ show, onClose, consignmentSummary 
             subtitle={`Consignação #${consignmentSummary.id} — ${consignmentSummary.recipient_name}`}
             headerColor="bg-emerald-600"
             headerIcon={<ArrowUturnLeftIcon className="h-5 w-5" />}
-            maxWidth="3xl"
+            maxWidth="5xl"
             footer={
                 <StandardModal.Footer>
                     <div className="flex-1" />

@@ -4,8 +4,6 @@ import {
     UserIcon,
     ArchiveBoxIcon,
     CheckCircleIcon,
-    PlusIcon,
-    TrashIcon,
     MagnifyingGlassIcon,
     ExclamationTriangleIcon,
     UserPlusIcon,
@@ -16,8 +14,7 @@ import Button from '@/Components/Button';
 import TextInput from '@/Components/TextInput';
 import InputLabel from '@/Components/InputLabel';
 import InputError from '@/Components/InputError';
-import ProductLookupInline from '@/Components/Shared/ProductLookupInline';
-import { maskMoney, parseMoney, maskCpf } from '@/Hooks/useMasks';
+import { maskCpf } from '@/Hooks/useMasks';
 
 /**
  * Wizard de criação de Consignação em 3 passos.
@@ -197,15 +194,13 @@ export default function CreateConsignmentModal({
         } else if (step === 2) {
             if (!data.outbound_invoice_number?.trim()) errs.outbound_invoice_number = 'Informe o número da NF.';
             if (!data.outbound_invoice_date) errs.outbound_invoice_date = 'Informe a data da NF.';
-            if (!data.items.length) errs.items = 'Adicione pelo menos um item.';
-            data.items.forEach((it, idx) => {
-                if (!it.product_id) {
-                    errs[`items.${idx}.product_id`] = 'Selecione o produto.';
-                }
-                if (!it.quantity || it.quantity < 1) {
-                    errs[`items.${idx}.quantity`] = 'Quantidade inválida.';
-                }
-            });
+            if (!data.items.length) {
+                errs.items = 'Use "Buscar NF" para carregar os itens da nota fiscal de saída.';
+            } else if (data.items.some((it) => !it.movement_id)) {
+                // Defesa: após a refatoração nenhum item sem movement_id
+                // deveria existir no array; se existir, é estado corrompido.
+                errs.items = 'Estado inválido: todos os itens devem vir da NF. Recarregue a NF.';
+            }
         }
 
         if (Object.keys(errs).length) {
@@ -220,33 +215,6 @@ export default function CreateConsignmentModal({
     const prevStep = () => {
         clearErrors();
         setStep(Math.max(1, step - 1));
-    };
-
-    const addItem = () => {
-        setData('items', [
-            ...data.items,
-            {
-                product_id: null,
-                product_variant_id: null,
-                reference: '',
-                barcode: '',
-                size_label: '',
-                size_cigam_code: '',
-                description: '',
-                quantity: 1,
-                unit_value: 0,
-            },
-        ]);
-    };
-
-    const updateItem = (idx, patch) => {
-        const newItems = [...data.items];
-        newItems[idx] = { ...newItems[idx], ...patch };
-        setData('items', newItems);
-    };
-
-    const removeItem = (idx) => {
-        setData('items', data.items.filter((_, i) => i !== idx));
     };
 
     /**
@@ -343,7 +311,7 @@ export default function CreateConsignmentModal({
             subtitle={stepTitles[step - 1]}
             headerColor="bg-indigo-600"
             headerIcon={<HeaderIcon className="h-5 w-5" />}
-            maxWidth="3xl"
+            maxWidth="5xl"
             footer={
                 <StandardModal.Footer>
                     <div className="flex-1" />
@@ -688,11 +656,11 @@ export default function CreateConsignmentModal({
                     </div>
 
                     <div className="border-t pt-4">
-                        <div className="flex items-center justify-between mb-3">
+                        <div className="mb-3">
                             <h3 className="font-medium text-gray-900">Itens da remessa *</h3>
-                            <Button variant="primary" size="sm" onClick={addItem} icon={PlusIcon}>
-                                Adicionar item
-                            </Button>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                                Módulo de controle: os itens vêm integralmente da NF de saída e não podem ser alterados. Para incluir ou excluir, ajuste a NF no CIGAM.
+                            </p>
                         </div>
 
                         {errors.items && (
@@ -701,7 +669,7 @@ export default function CreateConsignmentModal({
 
                         {data.items.length === 0 ? (
                             <div className="text-center py-8 text-gray-500 text-sm border-2 border-dashed rounded-md">
-                                Nenhum item ainda. Clique em "Adicionar item" ou "Buscar NF" para preencher automaticamente.
+                                Nenhum item ainda. Use "Buscar NF" acima para preencher a partir da nota fiscal de saída.
                             </div>
                         ) : (
                             <div className="space-y-3">
@@ -810,27 +778,6 @@ export default function CreateConsignmentModal({
                                                                     </td>
                                                                 ))}
                                                             </tr>
-                                                            <tr>
-                                                                <td className="text-left pr-3 text-[10px] text-gray-400 uppercase font-medium">
-                                                                    Ação
-                                                                </td>
-                                                                {group.entries.map((e) => (
-                                                                    <td
-                                                                        key={`action-${e.idx}`}
-                                                                        className="px-2 py-1 border border-indigo-200 bg-white text-center"
-                                                                    >
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => removeItem(e.idx)}
-                                                                            className="text-gray-300 hover:text-red-600 p-1"
-                                                                            aria-label={`Remover tamanho ${e.sizeDisplay}`}
-                                                                            title={`Excluir tamanho ${e.sizeDisplay} desta consignação`}
-                                                                        >
-                                                                            <TrashIcon className="w-4 h-4 inline" />
-                                                                        </button>
-                                                                    </td>
-                                                                ))}
-                                                            </tr>
                                                         </tbody>
                                                     </table>
                                                 </div>
@@ -849,74 +796,6 @@ export default function CreateConsignmentModal({
                                     });
                                 })()}
 
-                                {/* Itens manuais (sem movement_id) — editáveis, layout individual */}
-                                {data.items.map((item, idx) => {
-                                    if (item.movement_id) return null; // já renderizado na matriz
-
-                                    return (
-                                        <div key={`manual-${idx}`} className="border border-gray-200 rounded-md p-3 bg-gray-50 relative">
-                                            <button
-                                                type="button"
-                                                onClick={() => removeItem(idx)}
-                                                className="absolute top-2 right-2 text-gray-400 hover:text-red-600 p-1"
-                                                aria-label="Remover item"
-                                            >
-                                                <TrashIcon className="w-5 h-5" />
-                                            </button>
-
-                                            <div className="pr-8">
-                                                <ProductLookupInline
-                                                    value={item.product_id ? item : null}
-                                                    onChange={(selection) => {
-                                                        if (selection) {
-                                                            updateItem(idx, {
-                                                                ...selection,
-                                                                unit_value: selection.unit_value ?? item.unit_value,
-                                                            });
-                                                        } else {
-                                                            updateItem(idx, {
-                                                                product_id: null,
-                                                                product_variant_id: null,
-                                                                reference: '',
-                                                                barcode: '',
-                                                                size_cigam_code: '',
-                                                            });
-                                                        }
-                                                    }}
-                                                    lookupUrl={route('consignments.lookup.products')}
-                                                    label={`Item ${idx + 1} · manual`}
-                                                    error={errors[`items.${idx}.product_id`]}
-                                                    required
-                                                />
-
-                                                <div className="mt-3 grid grid-cols-2 gap-3">
-                                                    <div>
-                                                        <InputLabel value="Quantidade *" />
-                                                        <TextInput
-                                                            type="number"
-                                                            min={1}
-                                                            value={item.quantity}
-                                                            onChange={(e) => updateItem(idx, { quantity: Math.max(1, Number(e.target.value)) })}
-                                                            className="mt-1 block w-full"
-                                                            inputMode="numeric"
-                                                        />
-                                                        <InputError message={errors[`items.${idx}.quantity`]} className="mt-1" />
-                                                    </div>
-                                                    <div>
-                                                        <InputLabel value="Valor unitário *" />
-                                                        <TextInput
-                                                            type="text"
-                                                            value={maskMoney((item.unit_value ?? 0) * 100)}
-                                                            onChange={(e) => updateItem(idx, { unit_value: parseMoney(e.target.value) })}
-                                                            className="mt-1 block w-full"
-                                                            inputMode="decimal"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
                             </div>
                         )}
                     </div>

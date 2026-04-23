@@ -30,6 +30,8 @@ class ConsignmentControllerTest extends TestCase
 
     protected ProductVariant $variant;
 
+    protected \App\Models\Movement $movement;
+
     protected int $employeeId;
 
     protected function setUp(): void
@@ -51,11 +53,33 @@ class ConsignmentControllerTest extends TestCase
             'is_active' => true,
         ]);
 
+        // barcode = concat ref+size (padrão CIGAM);
+        // aux_reference = EAN-13 real (opcional)
         $this->variant = ProductVariant::create([
             'product_id' => $this->product->id,
-            'barcode' => '1234567890123',
+            'barcode' => 'REF-001U36',
+            'aux_reference' => '1234567890123',
             'size_cigam_code' => 'U36',
             'is_active' => true,
+        ]);
+
+        // Movement da NF de saída — items da consignação DEVEM vir dela
+        $this->movement = \App\Models\Movement::create([
+            'store_code' => 'Z421',
+            'invoice_number' => '55001',
+            'movement_code' => 20,
+            'movement_date' => '2026-04-23',
+            'movement_time' => '10:00:00',
+            'ref_size' => 'REF-001U36',
+            'barcode' => '1234567890123',
+            'quantity' => 2,
+            'net_quantity' => 2,
+            'sale_price' => 100.00,
+            'realized_value' => 200.00,
+            'net_value' => 200.00,
+            'discount_value' => 0,
+            'entry_exit' => 'S',
+            'synced_at' => now(),
         ]);
 
         config(['queue.default' => 'sync']);
@@ -73,6 +97,7 @@ class ConsignmentControllerTest extends TestCase
             'outbound_invoice_date' => '2026-04-23',
             'items' => [
                 [
+                    'movement_id' => $this->movement->id,
                     'product_id' => $this->product->id,
                     'product_variant_id' => $this->variant->id,
                     'reference' => 'REF-001',
