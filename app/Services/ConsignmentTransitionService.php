@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\ConsignmentStatus;
 use App\Enums\Permission;
+use App\Events\ConsignmentStatusChanged;
 use App\Models\Consignment;
 use App\Models\ConsignmentStatusHistory;
 use App\Models\User;
@@ -124,7 +125,13 @@ class ConsignmentTransitionService
                 'created_at' => now(),
             ]);
 
-            return $consignment->fresh(['items', 'returns', 'statusHistory']);
+            $fresh = $consignment->fresh(['items', 'returns', 'statusHistory']);
+
+            // Dispatch pós-commit. Listeners (auto-discovery) reagem
+            // sem quebrar a transação se falharem.
+            ConsignmentStatusChanged::dispatch($fresh, $current, $target, $actor, $note);
+
+            return $fresh;
         });
     }
 

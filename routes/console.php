@@ -137,3 +137,36 @@ Schedule::command('dre:warm-cache')
     ->dailyAt('05:50')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/dre-warm.log'));
+
+// Consignments — marca como overdue as consignações com prazo vencido.
+// Roda antes do expediente para que a listagem do dia já reflita
+// corretamente os estados. Listener envia notificações ao criador
+// + gerentes MANAGE_CONSIGNMENTS.
+Schedule::command('consignments:mark-overdue')
+    ->dailyAt('06:15')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/consignments-overdue.log'));
+
+// Consignments — lembrete diário para consultor/criador de consignações
+// com prazo a vencer nos próximos 2 dias. Chega no início do expediente
+// para ação preventiva antes de virar overdue.
+Schedule::command('consignments:remind-upcoming --days=2')
+    ->dailyAt('09:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/consignments-remind.log'));
+
+// Consignments — alerta crítico para supervisão (MANAGE_CONSIGNMENTS)
+// de consignações em overdue há 7+ dias. Rodado logo após o reminder
+// com destinatários e mensagem distintos.
+Schedule::command('consignments:overdue-alert --days=7')
+    ->dailyAt('09:05')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/consignments-alert.log'));
+
+// Consignments — reconcilia retornos registrados manualmente com os
+// movements do CIGAM (code=21) após cada sync. Every 15min — mesmo
+// ritmo do movements:sync. Idempotente (whereNull movement_id).
+Schedule::command('consignments:cigam-match')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/consignments-cigam-match.log'));
