@@ -78,7 +78,7 @@ vendor/bin/pint        # Laravel Pint (PHP code style fixer)
 - All render to a single generic page: `resources/js/Pages/Config/Index.jsx`
 - Routes: `/config/{module}` protected by `MANAGE_SETTINGS` permission
 
-**Services** (`app/Services/` — 87 services):
+**Services** (`app/Services/` — 106 services):
 - `AuditLogService` — activity tracking (used via `Auditable` trait on models)
 - `CigamSyncService` — syncs sales from CIGAM PostgreSQL (`msl_fmovimentodiario_` table)
 - `ImageUploadService` — avatar/image handling with `intervention/image`
@@ -86,12 +86,13 @@ vendor/bin/pint        # Laravel Pint (PHP code style fixer)
 - `CentralRoleResolver` — resolves role permissions from central DB with enum fallback and caching
 - `TenantRoleService` — filters allowed roles per tenant settings
 
-**Module Services Pattern** (PurchaseOrders, Reversals, Returns, Vacancies, etc.):
+**Module Services Pattern** (PurchaseOrders, Reversals, Returns, Vacancies, Coupons, etc.):
 - `{Module}Service` — CRUD + business rules (validation, snapshot, dedup)
 - `{Module}TransitionService` — single point of state mutation, enforces permissions per transition, records `{module}_status_histories`
 - `{Module}LookupService` (where applicable) — AJAX lookups, external data resolution
 - `{Module}ExportService` + `{Module}ImportService` — XLSX/PDF export, XLSX/CSV import with upsert
 - Events dispatched post-commit; listeners handle notifications and integrations (e.g. Helpdesk hooks)
+- **Laravel 12 event auto-discovery is enabled by default** (`$shouldDiscoverEvents = true`). Listeners in `app/Listeners/` with typed `handle(Event $e)` are auto-registered — **do NOT also call `Event::listen()` manually** or handlers fire twice. Return/Reversal listeners have this bug; Coupons avoids it.
 
 **Movements (fonte de verdade CIGAM):**
 - Tabela `movements` é source of truth — outros módulos leem, nunca escrevem. Dependentes: Reversals (FK `movement_id`), Returns (FK `movement_id`), PurchaseOrderReceiptItems (FK `matched_movement_id` unique), `sales` (derivada via `refreshSalesSummary()`)
@@ -100,6 +101,13 @@ vendor/bin/pint        # Laravel Pint (PHP code style fixer)
 - `MovementController::buildFilteredQuery()` centraliza filtros da listagem + exports — paridade garantida
 - NF é chave composta (`store_code` + `invoice_number` + `movement_date`), não entidade — número reseta por ano/loja, sempre passe data. `MovementInvoiceService::find()` agrega os items
 - Detalhes em `C:\Users\MSDEV\.claude\projects\C--xampp-htdocs-mercury-laravel\memory\movements_module.md`
+
+**Coupons (paridade v1 `adms_coupons` + melhorias):**
+- 3 tipos com regras condicionais: Consultor/MS Indica exigem `store_code + employee_id`; Influencer exige `city + social_media_id`; MS Indica **restrito a lojas administrativas** (`Store.network_id IN [6, 7]` — Z441/Z442/Z443/Z999)
+- **CPF com encryption manual + `cpf_hash` HMAC-SHA256 determinístico** — permite busca/unicidade sem expor CPF em claro. NÃO usa o cast `encrypted` nativo (conflita com mutator que recalcula o hash)
+- Unicidade varia por tipo (via `CouponService::ensureUnique()`, não via DB constraint — MySQL não trata `NULL=NULL`): Consultor/MsIndica por `(cpf_hash, type, store_code)` permite cupons em lojas diferentes; Influencer por `(cpf_hash, type)`
+- Config module auxiliar `SocialMedia` com `link_type` (`url`|`username`) + `link_placeholder` — valida link do Influencer contextualmente (YouTube exige URL, Instagram aceita @user ou URL)
+- Análise completa em `docs/ANALISE_MODULO_COUPONS.md`
 
 ### Frontend Structure
 
