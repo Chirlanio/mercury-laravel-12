@@ -126,6 +126,39 @@ class CustomerController extends Controller
     }
 
     /**
+     * Últimas sincronizações executadas (todas as origens — manual,
+     * schedule, CLI). Serve o painel "Histórico de Sincronizações" no
+     * frontend. Retorna no máximo 30 registros.
+     */
+    public function syncHistory(Request $request): JsonResponse
+    {
+        $logs = CustomerSyncLog::query()
+            ->with('startedBy:id,name')
+            ->latest('started_at')
+            ->limit(30)
+            ->get();
+
+        return response()->json([
+            'logs' => $logs->map(fn (CustomerSyncLog $log) => [
+                'id' => $log->id,
+                'sync_type' => $log->sync_type,
+                'status' => $log->status,
+                'total_records' => (int) $log->total_records,
+                'processed_records' => (int) $log->processed_records,
+                'inserted_records' => (int) $log->inserted_records,
+                'updated_records' => (int) $log->updated_records,
+                'skipped_records' => (int) $log->skipped_records,
+                'error_count' => (int) $log->error_count,
+                'started_at' => $log->started_at?->toIso8601String(),
+                'completed_at' => $log->completed_at?->toIso8601String(),
+                'duration_seconds' => $log->duration_seconds,
+                'started_by' => $log->startedBy?->name,
+                'triggered' => $log->started_by_user_id ? 'manual' : 'schedule',
+            ]),
+        ]);
+    }
+
+    /**
      * Dispara um sync manual. O schedule diário (04:00) continua
      * rodando; este é para cenários de urgência pós-cadastro de cliente
      * novo no CIGAM.

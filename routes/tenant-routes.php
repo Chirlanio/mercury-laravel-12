@@ -1142,6 +1142,9 @@ Route::middleware(['auth'])->group(function () {
         // AJAX — autocomplete usado por outros módulos (Consignments)
         Route::get('/customers/lookup', [\App\Http\Controllers\CustomerController::class, 'lookup'])->name('customers.lookup');
 
+        // Histórico de sincronizações (modal AJAX)
+        Route::get('/customers/sync-history', [\App\Http\Controllers\CustomerController::class, 'syncHistory'])->name('customers.sync-history');
+
         Route::get('/customers/{customer}', [\App\Http\Controllers\CustomerController::class, 'show'])->whereNumber('customer')->name('customers.show');
 
         // Sync manual — permissão SYNC_CUSTOMERS (admin+)

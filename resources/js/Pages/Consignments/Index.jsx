@@ -469,7 +469,7 @@ export default function Index({
                 />
             )}
 
-            {ConfirmDialogComponent}
+            <ConfirmDialogComponent />
         </>
     );
 }

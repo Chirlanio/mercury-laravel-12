@@ -181,4 +181,57 @@ class CustomerControllerTest extends TestCase
             ->post(route('customers.sync'))
             ->assertForbidden();
     }
+
+    // ------------------------------------------------------------------
+    // syncHistory
+    // ------------------------------------------------------------------
+
+    public function test_sync_history_returns_recent_logs(): void
+    {
+        \App\Models\CustomerSyncLog::create([
+            'sync_type' => 'full',
+            'status' => 'completed',
+            'total_records' => 100,
+            'processed_records' => 100,
+            'inserted_records' => 30,
+            'updated_records' => 70,
+            'skipped_records' => 0,
+            'error_count' => 0,
+            'started_at' => now()->subMinutes(5),
+            'completed_at' => now(),
+            'started_by_user_id' => $this->adminUser->id,
+        ]);
+
+        $response = $this->actingAs($this->adminUser)
+            ->getJson(route('customers.sync-history'))
+            ->assertOk()
+            ->assertJsonStructure([
+                'logs' => [
+                    ['id', 'sync_type', 'status', 'inserted_records', 'triggered'],
+                ],
+            ]);
+
+        $log = $response->json('logs.0');
+        $this->assertSame('completed', $log['status']);
+        $this->assertSame(30, $log['inserted_records']);
+        $this->assertSame('manual', $log['triggered']);
+        $this->assertSame($this->adminUser->name, $log['started_by']);
+    }
+
+    public function test_sync_history_marks_scheduled_runs(): void
+    {
+        \App\Models\CustomerSyncLog::create([
+            'sync_type' => 'full',
+            'status' => 'completed',
+            'started_at' => now(),
+            'completed_at' => now(),
+            'started_by_user_id' => null, // scheduled run
+        ]);
+
+        $response = $this->actingAs($this->adminUser)
+            ->getJson(route('customers.sync-history'))
+            ->assertOk();
+
+        $this->assertSame('schedule', $response->json('logs.0.triggered'));
+    }
 }

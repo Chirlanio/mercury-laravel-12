@@ -8,6 +8,7 @@ import {
     ArrowPathIcon,
     XMarkIcon,
     MapPinIcon,
+    ClockIcon,
 } from '@heroicons/react/24/outline';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
@@ -20,6 +21,7 @@ import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import TextInput from '@/Components/TextInput';
 import InputLabel from '@/Components/InputLabel';
 import CustomerDetailModal from './Partials/CustomerDetailModal';
+import SyncHistoryModal from './Partials/SyncHistoryModal';
 
 /**
  * Listagem de Clientes — read-only (fonte: CIGAM sync).
@@ -36,7 +38,7 @@ export default function Index({
     const canSync = can.sync ?? hasPermission(PERMISSIONS.SYNC_CUSTOMERS);
     const canExport = can.export ?? hasPermission(PERMISSIONS.EXPORT_CUSTOMERS);
 
-    const { modals, selected, openModal, closeModal } = useModalManager(['detail']);
+    const { modals, selected, openModal, closeModal } = useModalManager(['detail', 'history']);
     const { confirm, ConfirmDialogComponent } = useConfirm();
 
     const [syncing, setSyncing] = useState(false);
@@ -205,9 +207,18 @@ export default function Index({
                             </p>
                         </div>
                         <div className="flex gap-2 shrink-0">
+                            <Button
+                                variant="secondary"
+                                onClick={() => openModal('history')}
+                                title="Histórico de sincronizações"
+                                className="min-h-[44px]"
+                            >
+                                <ClockIcon className="w-4 h-4 sm:mr-2" />
+                                <span className="hidden sm:inline">Histórico</span>
+                            </Button>
                             {canSync && (
                                 <Button
-                                    variant="secondary"
+                                    variant="primary"
                                     onClick={handleSync}
                                     disabled={syncing}
                                     className="min-h-[44px]"
@@ -301,7 +312,12 @@ export default function Index({
                 customer={selected}
             />
 
-            {ConfirmDialogComponent}
+            <SyncHistoryModal
+                show={modals.history}
+                onClose={() => closeModal('history')}
+            />
+
+            <ConfirmDialogComponent />
         </>
     );
 }
