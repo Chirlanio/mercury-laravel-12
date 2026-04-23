@@ -111,7 +111,7 @@ export default function Index({
     const handleSync = async () => {
         const ok = await confirm({
             title: 'Sincronizar clientes',
-            message: 'Isso dispara um novo sync com a view CIGAM msl_dcliente_ em background. Pode levar alguns minutos dependendo do volume. Confirmar?',
+            message: 'Cada clique processa um lote de até 5000 clientes (~15s). Se houver mais, clique novamente para continuar de onde parou. Confirmar?',
             confirmText: 'Sim, sincronizar',
             type: 'info',
         });
@@ -120,6 +120,8 @@ export default function Index({
         setSyncing(true);
         router.post(route('customers.sync'), {}, {
             preserveScroll: true,
+            onSuccess: () => setSyncing(false),
+            onError: () => setSyncing(false),
             onFinish: () => setSyncing(false),
         });
     };

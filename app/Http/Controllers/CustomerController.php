@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Enums\Permission;
-use App\Jobs\SyncCustomersFromCigamJob;
 use App\Models\Customer;
 use App\Models\CustomerSyncLog;
 use App\Services\CustomerSyncService;
@@ -160,19 +159,24 @@ class CustomerController extends Controller
     }
 
     /**
-     * Dispara um sync manual. A resposta HTTP volta IMEDIATAMENTE e
-     * o trabalho roda em background via dispatchAfterResponse — o PHP
-     * continua processando após terminar de enviar o response.
+     * Dispara um sync manual — INLINE em batch curto (~15s ou 5000
+     * registros por click).
      *
-     * Isso evita 2 problemas sérios:
-     *  1. Browser pendurado esperando os ~50s do sync (UX ruim)
-     *  2. PHP session lock bloqueando toda navegação do usuário
-     *     durante o sync (o Laravel trava a session ao escrever nela)
+     * Por que inline e não background:
+     *  - `php artisan serve` no Windows é SINGLE-THREADED: um único
+     *    worker atende todas as requests. Background via
+     *    dispatchAfterResponse mantém o worker ocupado e bloqueia
+     *    toda navegação até terminar.
+     *  - Inline com batch curto garante worker liberado rápido,
+     *    resposta em poucos segundos, usuário pode navegar, e o
+     *    histórico reflete o progresso em tempo real.
      *
-     * O progresso pode ser acompanhado em tempo real pelo modal
-     * "Histórico de Sincronizações" (polling a cada 3s).
+     * Como continua de onde parou: se houver log em 'running'/'pending'
+     * (criado em clique anterior), retoma dele; senão cria log novo.
+     * O cursor (último cigam_code) é inferido do Customer mais
+     * recentemente sincronizado dentro desse log.
      *
-     * Para syncs muito grandes (>50k), o CLI ainda é recomendado:
+     * Para syncs muito grandes (>10k), use CLI (sem time limit):
      *   php artisan customers:sync --chunk=2000
      */
     public function sync(Request $request, CustomerSyncService $service): RedirectResponse
@@ -183,26 +187,81 @@ class CustomerController extends Controller
             ]);
         }
 
-        // Bloqueia múltiplos syncs paralelos — se já tem um em running,
-        // devolve aviso em vez de criar outro log concorrente.
-        $running = CustomerSyncLog::whereIn('status', ['pending', 'running'])->first();
-        if ($running) {
-            return redirect()->back()->with('warning', sprintf(
-                'Já existe uma sincronização em andamento (Sync #%d). Acompanhe o progresso em "Histórico".',
-                $running->id,
+        // Retoma log existente ou cria novo
+        $log = CustomerSyncLog::whereIn('status', ['pending', 'running'])
+            ->latest('id')
+            ->first()
+            ?? $service->start('full', $request->user()->id);
+
+        // Cursor: último cigam_code processado dentro deste log.
+        $lastCode = Customer::query()
+            ->whereNotNull('synced_at')
+            ->where('synced_at', '>=', $log->started_at)
+            ->orderByDesc('cigam_code')
+            ->value('cigam_code');
+
+        // Limite por click: 15s OU 10 chunks de 500 = 5000 registros
+        set_time_limit(30);
+        $hardDeadline = microtime(true) + 15.0;
+        $maxChunks = 10;
+
+        $chunks = 0;
+        $batchProcessed = 0;
+        $batchInserted = 0;
+        $batchUpdated = 0;
+        $done = false;
+
+        try {
+            while (true) {
+                $result = $service->processChunk($log->id, $lastCode, 500);
+                $chunks++;
+                $batchProcessed += $result['processed'];
+                $batchInserted += $result['inserted'];
+                $batchUpdated += $result['updated'];
+                $lastCode = $result['last_code'];
+
+                if (! $result['has_more'] || $result['cancelled']) {
+                    $done = true;
+                    break;
+                }
+
+                if ($chunks >= $maxChunks || microtime(true) >= $hardDeadline) {
+                    break;
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Customer sync batch failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return redirect()->back()->withErrors([
+                'sync' => 'Erro ao sincronizar: '.$e->getMessage(),
+            ]);
+        }
+
+        $fresh = $log->fresh();
+
+        if ($done) {
+            return redirect()->back()->with('success', sprintf(
+                'Sincronização #%d concluída. Total: %d processados, %d novos, %d atualizados.',
+                $log->id,
+                (int) $fresh->processed_records,
+                (int) $fresh->inserted_records,
+                (int) $fresh->updated_records,
             ));
         }
 
-        $log = $service->start('full', $request->user()->id);
+        $totalEstimate = (int) $fresh->total_records;
+        $processed = (int) $fresh->processed_records;
+        $pct = $totalEstimate > 0 ? round(($processed / $totalEstimate) * 100) : null;
 
-        // dispatchAfterResponse — roda no mesmo processo PHP, mas
-        // depois da resposta HTTP ter sido enviada ao cliente. Não
-        // depende de queue worker externo.
-        SyncCustomersFromCigamJob::dispatchAfterResponse($log->id, 1000);
-
-        return redirect()->back()->with('success', sprintf(
-            'Sincronização #%d iniciada em background. Acompanhe o progresso em "Histórico".',
+        return redirect()->back()->with('warning', sprintf(
+            'Progresso parcial — Sync #%d: %d/%d%s. Clique em "Sincronizar" novamente para continuar.',
             $log->id,
+            $processed,
+            $totalEstimate,
+            $pct !== null ? " ({$pct}%)" : '',
         ));
     }
 
