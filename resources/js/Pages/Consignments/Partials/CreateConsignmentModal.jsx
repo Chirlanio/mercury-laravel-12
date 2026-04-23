@@ -8,6 +8,8 @@ import {
     TrashIcon,
     MagnifyingGlassIcon,
     ExclamationTriangleIcon,
+    UserPlusIcon,
+    XMarkIcon,
 } from '@heroicons/react/24/outline';
 import StandardModal from '@/Components/StandardModal';
 import Button from '@/Components/Button';
@@ -41,10 +43,18 @@ export default function CreateConsignmentModal({
     const [loadingEmployees, setLoadingEmployees] = useState(false);
     const [lookupState, setLookupState] = useState({ loading: false, error: null, notFound: false, orphans: [] });
 
+    // Autocomplete de cliente (M12)
+    const [customerQuery, setCustomerQuery] = useState('');
+    const [customerResults, setCustomerResults] = useState([]);
+    const [customerLoading, setCustomerLoading] = useState(false);
+    const [showCustomerResults, setShowCustomerResults] = useState(false);
+    const [selectedCustomerLabel, setSelectedCustomerLabel] = useState(null);
+
     const { data, setData, post, processing, errors, reset, setError, clearErrors } = useForm({
         type: 'cliente',
         store_id: '',
         employee_id: '',
+        customer_id: null,
         recipient_name: '',
         recipient_document: '',
         recipient_phone: '',
@@ -63,10 +73,78 @@ export default function CreateConsignmentModal({
             setStep(1);
             setEmployees([]);
             setLookupState({ loading: false, error: null, notFound: false, orphans: [] });
+            setCustomerQuery('');
+            setCustomerResults([]);
+            setShowCustomerResults(false);
+            setSelectedCustomerLabel(null);
             reset();
             clearErrors();
         }
     }, [show]);
+
+    // Autocomplete de cliente com debounce 300ms. Busca em name/cpf/
+    // mobile/email/cigam_code. Ao selecionar, popula name/doc/phone/email.
+    useEffect(() => {
+        if (!show || selectedCustomerLabel) return;
+        if (customerQuery.trim().length < 2) {
+            setCustomerResults([]);
+            setShowCustomerResults(false);
+            return;
+        }
+
+        const handle = setTimeout(async () => {
+            setCustomerLoading(true);
+            try {
+                const url = new URL(route('customers.lookup'), window.location.origin);
+                url.searchParams.set('q', customerQuery.trim());
+                url.searchParams.set('limit', '10');
+
+                const response = await fetch(url.toString(), {
+                    headers: { Accept: 'application/json' },
+                });
+                if (!response.ok) throw new Error();
+
+                const json = await response.json();
+                setCustomerResults(json.results || []);
+                setShowCustomerResults(true);
+            } catch {
+                setCustomerResults([]);
+                setShowCustomerResults(false);
+            } finally {
+                setCustomerLoading(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(handle);
+    }, [show, customerQuery, selectedCustomerLabel]);
+
+    const selectCustomer = (customer) => {
+        setData((prev) => ({
+            ...prev,
+            customer_id: customer.id,
+            recipient_name: customer.name,
+            recipient_document: customer.formatted_cpf || customer.cpf || '',
+            recipient_phone: customer.formatted_mobile || '',
+            recipient_email: customer.email || '',
+        }));
+        setSelectedCustomerLabel(`${customer.name} · ${customer.formatted_cpf || customer.cigam_code}`);
+        setCustomerQuery('');
+        setCustomerResults([]);
+        setShowCustomerResults(false);
+    };
+
+    const clearCustomerSelection = () => {
+        setData((prev) => ({
+            ...prev,
+            customer_id: null,
+            recipient_name: '',
+            recipient_document: '',
+            recipient_phone: '',
+            recipient_email: '',
+        }));
+        setSelectedCustomerLabel(null);
+        setCustomerQuery('');
+    };
 
     // Carrega consultores quando a loja muda. Reseta employee_id
     // para evitar submeter ID de outra loja.
@@ -367,6 +445,73 @@ export default function CreateConsignmentModal({
                             )}
                         </div>
                     )}
+
+                    {/* Autocomplete de cliente cadastrado (M12) */}
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-md p-3">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                            <InputLabel value="Cliente cadastrado (opcional)" className="!text-indigo-900" />
+                            {selectedCustomerLabel && (
+                                <button
+                                    type="button"
+                                    onClick={clearCustomerSelection}
+                                    className="text-xs text-indigo-700 hover:text-indigo-900 flex items-center gap-1"
+                                >
+                                    <XMarkIcon className="w-3 h-3" />
+                                    Limpar
+                                </button>
+                            )}
+                        </div>
+
+                        {selectedCustomerLabel ? (
+                            <div className="bg-white border border-indigo-300 rounded-md px-3 py-2 flex items-center gap-2">
+                                <UserPlusIcon className="w-5 h-5 text-indigo-600 shrink-0" />
+                                <span className="text-sm text-gray-900 truncate">{selectedCustomerLabel}</span>
+                            </div>
+                        ) : (
+                            <div className="relative">
+                                <TextInput
+                                    type="text"
+                                    value={customerQuery}
+                                    onChange={(e) => setCustomerQuery(e.target.value)}
+                                    onFocus={() => customerResults.length > 0 && setShowCustomerResults(true)}
+                                    onBlur={() => setTimeout(() => setShowCustomerResults(false), 200)}
+                                    placeholder="Buscar por nome, CPF, e-mail ou telefone…"
+                                    className="block w-full"
+                                    inputMode="search"
+                                />
+                                {showCustomerResults && (
+                                    <div className="absolute z-40 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 max-h-64 overflow-y-auto">
+                                        {customerLoading && (
+                                            <div className="p-3 text-sm text-gray-500 text-center">Buscando…</div>
+                                        )}
+                                        {!customerLoading && customerResults.length === 0 && (
+                                            <div className="p-3 text-sm text-gray-500 text-center">
+                                                Nenhum cliente encontrado. Preencha os dados manualmente abaixo.
+                                            </div>
+                                        )}
+                                        {!customerLoading && customerResults.map((cust) => (
+                                            <button
+                                                key={cust.id}
+                                                type="button"
+                                                onClick={() => selectCustomer(cust)}
+                                                className="w-full text-left px-4 py-3 hover:bg-indigo-50 border-b border-gray-100 last:border-0 min-h-[44px]"
+                                            >
+                                                <div className="font-medium text-gray-900">{cust.name}</div>
+                                                <div className="text-xs text-gray-500 flex flex-wrap gap-x-3">
+                                                    {cust.formatted_cpf && <span>{cust.formatted_cpf}</span>}
+                                                    {cust.primary_contact && <span>{cust.formatted_mobile}</span>}
+                                                    {cust.email && <span className="truncate max-w-[200px]">{cust.email}</span>}
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                <p className="mt-1 text-xs text-indigo-700">
+                                    Selecione um cliente já sincronizado do CIGAM ou preencha manualmente.
+                                </p>
+                            </div>
+                        )}
+                    </div>
 
                     <div>
                         <InputLabel value="Nome do destinatário *" />

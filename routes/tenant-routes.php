@@ -1134,6 +1134,23 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ==========================================
+    // Customers (sincronizado do CIGAM)
+    // ==========================================
+    Route::middleware(['tenant.module:customers', 'permission:'.Permission::VIEW_CUSTOMERS->value])->group(function () {
+        Route::get('/customers', [\App\Http\Controllers\CustomerController::class, 'index'])->name('customers.index');
+
+        // AJAX — autocomplete usado por outros módulos (Consignments)
+        Route::get('/customers/lookup', [\App\Http\Controllers\CustomerController::class, 'lookup'])->name('customers.lookup');
+
+        Route::get('/customers/{customer}', [\App\Http\Controllers\CustomerController::class, 'show'])->whereNumber('customer')->name('customers.show');
+
+        // Sync manual — permissão SYNC_CUSTOMERS (admin+)
+        Route::middleware('permission:'.Permission::SYNC_CUSTOMERS->value)->group(function () {
+            Route::post('/customers/sync', [\App\Http\Controllers\CustomerController::class, 'sync'])->name('customers.sync');
+        });
+    });
+
+    // ==========================================
     // Consignments (Cliente / Influencer / E-commerce)
     // ==========================================
     Route::middleware(['tenant.module:consignments', 'permission:'.Permission::VIEW_CONSIGNMENTS->value])->group(function () {
