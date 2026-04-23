@@ -1021,7 +1021,10 @@ export default function Index({
                                     <StandardModal.Field label="Campanha" value={selected.campaign_name} />
                                 )}
                                 {selected.valid_until && (
-                                    <StandardModal.Field label="Validade" value={`${selected.valid_from || '—'} → ${selected.valid_until}`} />
+                                    <StandardModal.Field
+                                        label="Validade"
+                                        value={`${selected.valid_from_display || '—'} → ${selected.valid_until_display || '—'}`}
+                                    />
                                 )}
                                 {selected.usage_count > 0 && (
                                     <StandardModal.Field

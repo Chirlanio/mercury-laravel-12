@@ -271,7 +271,7 @@ class CouponController extends Controller
                 'beneficiary_name' => $c->beneficiary_name,
                 'coupon_site' => $c->coupon_site,
                 'suggested_coupon' => $c->suggested_coupon,
-                'created_at' => $c->created_at?->format('Y-m-d'),
+                'created_at' => $c->created_at?->format('d/m/Y'),
             ])->all(),
         ]);
     }
@@ -644,13 +644,17 @@ class CouponController extends Controller
             'suggested_coupon' => $c->suggested_coupon,
             'coupon_site' => $c->coupon_site,
             'campaign_name' => $c->campaign_name,
+            // valid_from/valid_until em Y-m-d (ISO) pois viram valor de
+            // <input type="date"> no modal de edit — display formatado no frontend.
             'valid_from' => $c->valid_from?->format('Y-m-d'),
             'valid_until' => $c->valid_until?->format('Y-m-d'),
+            'valid_from_display' => $c->valid_from?->format('d/m/Y'),
+            'valid_until_display' => $c->valid_until?->format('d/m/Y'),
             'usage_count' => (int) $c->usage_count,
             'max_uses' => $c->max_uses,
-            'created_at' => $c->created_at?->format('Y-m-d H:i'),
-            'requested_at' => $c->requested_at?->format('Y-m-d H:i'),
-            'issued_at' => $c->issued_at?->format('Y-m-d H:i'),
+            'created_at' => $c->created_at?->format('d/m/Y H:i'),
+            'requested_at' => $c->requested_at?->format('d/m/Y H:i'),
+            'issued_at' => $c->issued_at?->format('d/m/Y H:i'),
             'created_by_name' => $c->createdBy?->name,
             'is_deleted' => $c->is_deleted,
         ];
@@ -664,11 +668,11 @@ class CouponController extends Controller
             // Detalhes adicionais visíveis só no modal
             'cpf' => $c->cpf,
             'notes' => $c->notes,
-            'cancelled_at' => $c->cancelled_at?->format('Y-m-d H:i'),
+            'cancelled_at' => $c->cancelled_at?->format('d/m/Y H:i'),
             'cancelled_reason' => $c->cancelled_reason,
-            'expired_at' => $c->expired_at?->format('Y-m-d H:i'),
-            'activated_at' => $c->activated_at?->format('Y-m-d H:i'),
-            'deleted_at' => $c->deleted_at?->format('Y-m-d H:i'),
+            'expired_at' => $c->expired_at?->format('d/m/Y H:i'),
+            'activated_at' => $c->activated_at?->format('d/m/Y H:i'),
+            'deleted_at' => $c->deleted_at?->format('d/m/Y H:i'),
             'deleted_reason' => $c->deleted_reason,
             'issued_by_name' => $c->issuedBy?->name,
             'updated_by_name' => $c->updatedBy?->name,
@@ -682,7 +686,7 @@ class CouponController extends Controller
                 'to_status_color' => $h->to_status->color(),
                 'note' => $h->note,
                 'changed_by_name' => $h->changedBy?->name,
-                'created_at' => $h->created_at?->format('Y-m-d H:i'),
+                'created_at' => $h->created_at?->format('d/m/Y H:i'),
             ])->all(),
         ]);
     }
