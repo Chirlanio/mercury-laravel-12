@@ -125,7 +125,7 @@ export default function Index({ movements, stores, movementTypes, filters, cigam
                                     onChange={(e) => handleFilterChange('store_code', e.target.value)}
                                     className="w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                     <option value="">Todas</option>
-                                    {stores.map(s => <option key={s.code} value={s.code}>{s.code} - {s.name}</option>)}
+                                    {stores.map(s => <option key={s.code} value={s.code}>{s.name}</option>)}
                                 </select>
                             </div>
                             <div>
