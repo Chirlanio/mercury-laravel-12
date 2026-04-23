@@ -145,15 +145,16 @@ class ConsignmentLookupService
      * Resolve product + variant a partir de dados do CIGAM. Usado pelo
      * lookup de NF para popular itens automaticamente.
      *
-     * Estratégia em ordem de tentativa (para lidar com variações de
-     * como o CIGAM armazena o identificador):
+     * Estratégia em ordem de tentativa:
      *  1. `ref_size` como barcode do variant (padrão Mercury — o sync
      *     de produtos grava `movements.ref_size` em
-     *     `product_variants.barcode`). Este é o caminho feliz.
-     *  2. `barcode` do movement (EAN numérico). Alguns tenants podem
-     *     ter populado assim.
-     *  3. `reference` + `size_cigam_code` — fallback por pesquisa
-     *     direta em products + variants.
+     *     `product_variants.barcode`).
+     *  2. `barcode` do movement (EAN numérico).
+     *  3. `reference` + `size_cigam_code` — fallback.
+     *
+     * Carrega sempre `product` + `size` (product_sizes via
+     * size_cigam_code → cigam_code) para que o caller tenha o nome
+     * humano do tamanho disponível (product_sizes.name = "35", "36"...).
      *
      * Retorna null quando nada resolve → item vira "órfão" (regra M8).
      *
@@ -168,7 +169,7 @@ class ConsignmentLookupService
         // 1. ref_size → product_variants.barcode (padrão Mercury/CIGAM)
         if ($refSize) {
             $variant = ProductVariant::query()
-                ->with('product')
+                ->with(['product', 'size'])
                 ->where('barcode', $refSize)
                 ->where('is_active', true)
                 ->first();
@@ -181,7 +182,7 @@ class ConsignmentLookupService
         // 2. EAN numérico (movements.barcode)
         if ($barcode && $barcode !== $refSize) {
             $variant = ProductVariant::query()
-                ->with('product')
+                ->with(['product', 'size'])
                 ->where('barcode', $barcode)
                 ->where('is_active', true)
                 ->first();
@@ -201,6 +202,7 @@ class ConsignmentLookupService
             if ($product) {
                 $variant = $sizeCigamCode
                     ? ProductVariant::query()
+                        ->with('size')
                         ->where('product_id', $product->id)
                         ->where('size_cigam_code', $sizeCigamCode)
                         ->first()
@@ -340,38 +342,57 @@ class ConsignmentLookupService
         $orphans = [];
 
         foreach ($movements as $m) {
-            // Tentamos primeiro via ref_size direto (padrão Mercury —
-            // product_variants.barcode = ref_size). Se não resolver,
-            // o resolver faz fallback por reference+size extraídos.
-            [$reference, $sizeLabel] = $this->splitRefSize($m->ref_size);
+            // splitRefSize retorna fallback quando CIGAM usar formato
+            // com pipe. No padrão Mercury (sem pipe), usamos refSize
+            // direto no resolver para casar product_variants.barcode.
+            [$fallbackRef, $fallbackSize] = $this->splitRefSize($m->ref_size);
 
             $resolved = $this->resolveProductVariant(
-                reference: $reference,
+                reference: $fallbackRef,
                 barcode: $m->barcode,
                 refSize: $m->ref_size,
             );
 
-            $payload = [
-                'movement_id' => $m->id,
-                'reference' => $reference,
-                'size_label' => $sizeLabel,
-                'barcode' => $m->barcode,
-                'quantity' => (int) $m->quantity,
-                'unit_value' => (float) $m->sale_price,
-                'total_value' => (float) $m->realized_value,
-            ];
-
             if ($resolved) {
-                $items[] = array_merge($payload, [
-                    'product_id' => $resolved['product']->id,
-                    'product_variant_id' => $resolved['variant']?->id,
-                    'description' => $resolved['product']->description,
-                    'size_cigam_code' => $resolved['variant']?->size_cigam_code,
-                ]);
+                // Usa nomes REAIS via join:
+                //   - reference ← products.reference ('A1340000010002')
+                //   - size_label ← product_sizes.name ('35') via
+                //     product_variants.size_cigam_code → product_sizes.cigam_code
+                //   - size_cigam_code ← product_variants.size_cigam_code (código interno, ex: '3')
+                //
+                // Estrutura CIGAM: size_cigam_code é código numérico
+                // compacto ('3'); o tamanho humano ('35') vive em
+                // product_sizes.name com cigam_code=size_cigam_code.
+                $product = $resolved['product'];
+                $variant = $resolved['variant'];
+                $sizeCigam = $variant?->size_cigam_code;
+                $sizeLabel = $variant?->size?->name ?? $fallbackSize;
+
+                $items[] = [
+                    'movement_id' => $m->id,
+                    'product_id' => $product->id,
+                    'product_variant_id' => $variant?->id,
+                    'reference' => $product->reference,  // products.reference (real)
+                    'description' => $product->description,
+                    'barcode' => $variant?->barcode ?? $m->barcode,
+                    'size_cigam_code' => $sizeCigam,
+                    'size_label' => $sizeLabel,          // product_sizes.name (humano)
+                    'quantity' => (int) $m->quantity,
+                    'unit_value' => (float) $m->sale_price,
+                    'total_value' => (float) $m->realized_value,
+                ];
             } else {
                 // Regra M8: produto inexistente no catálogo bloqueia o
                 // cadastro. Front mostra os órfãos para o usuário resolver.
-                $orphans[] = $payload;
+                $orphans[] = [
+                    'movement_id' => $m->id,
+                    'reference' => $fallbackRef,
+                    'size_label' => $fallbackSize,
+                    'barcode' => $m->barcode,
+                    'quantity' => (int) $m->quantity,
+                    'unit_value' => (float) $m->sale_price,
+                    'total_value' => (float) $m->realized_value,
+                ];
             }
         }
 

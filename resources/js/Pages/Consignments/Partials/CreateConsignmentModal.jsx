@@ -705,75 +705,156 @@ export default function CreateConsignmentModal({
                             </div>
                         ) : (
                             <div className="space-y-3">
-                                {data.items.map((item, idx) => {
-                                    const fromNf = Boolean(item.movement_id);
-                                    const sizeDisplay = item.size_label
-                                        || (item.size_cigam_code ? item.size_cigam_code.replace(/^U/, '') : null);
-                                    const lineTotal = Number(item.quantity || 0) * Number(item.unit_value || 0);
+                                {/* Itens da NF — agrupados por referência em formato matriz (ref × tamanhos) */}
+                                {(() => {
+                                    const nfEntries = data.items
+                                        .map((item, idx) => ({ item, idx }))
+                                        .filter(({ item }) => Boolean(item.movement_id));
 
-                                    if (fromNf) {
-                                        // Item da NF — read-only com referência + tamanho + qty + valor
+                                    if (nfEntries.length === 0) return null;
+
+                                    // Agrupa por reference
+                                    const groups = {};
+                                    for (const entry of nfEntries) {
+                                        const key = entry.item.reference || `__unknown_${entry.idx}`;
+                                        if (!groups[key]) {
+                                            groups[key] = {
+                                                reference: entry.item.reference || '—',
+                                                description: entry.item.description || '',
+                                                unit_value: Number(entry.item.unit_value || 0),
+                                                entries: [],
+                                            };
+                                        }
+                                        groups[key].entries.push({
+                                            idx: entry.idx,
+                                            item: entry.item,
+                                            sizeDisplay: entry.item.size_label
+                                                || (entry.item.size_cigam_code ? entry.item.size_cigam_code.replace(/^U/, '') : '—'),
+                                        });
+                                    }
+
+                                    // Ordena cada grupo por tamanho (numérico quando possível)
+                                    Object.values(groups).forEach((g) => {
+                                        g.entries.sort((a, b) => {
+                                            const na = parseInt(a.sizeDisplay, 10);
+                                            const nb = parseInt(b.sizeDisplay, 10);
+                                            if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+                                            return String(a.sizeDisplay).localeCompare(String(b.sizeDisplay));
+                                        });
+                                    });
+
+                                    return Object.values(groups).map((group, groupIdx) => {
+                                        const totalPieces = group.entries.reduce((s, e) => s + Number(e.item.quantity || 0), 0);
+                                        const subtotal = group.entries.reduce(
+                                            (s, e) => s + Number(e.item.quantity || 0) * Number(e.item.unit_value || 0),
+                                            0,
+                                        );
+
                                         return (
                                             <div
-                                                key={idx}
-                                                className="border border-indigo-200 bg-indigo-50/40 rounded-md p-3 relative"
+                                                key={`nf-${group.reference}-${groupIdx}`}
+                                                className="border border-indigo-200 bg-indigo-50/40 rounded-md p-3"
                                             >
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeItem(idx)}
-                                                    className="absolute top-2 right-2 text-gray-400 hover:text-red-600 p-1"
-                                                    aria-label="Remover item"
-                                                    title="Remover da consignação"
-                                                >
-                                                    <TrashIcon className="w-5 h-5" />
-                                                </button>
-
-                                                <div className="pr-8 flex items-start gap-3 flex-wrap">
-                                                    <div className="flex-1 min-w-0">
+                                                {/* Header do grupo */}
+                                                <div className="flex items-start justify-between gap-3 flex-wrap">
+                                                    <div className="min-w-0 flex-1">
                                                         <div className="text-xs text-indigo-700 uppercase font-medium">
-                                                            Item {idx + 1} · da NF
+                                                            Da NF
                                                         </div>
-                                                        <div className="mt-1 font-semibold text-gray-900 truncate">
-                                                            {item.reference || '—'}
-                                                            {sizeDisplay && (
-                                                                <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">
-                                                                    Tam. {sizeDisplay}
-                                                                </span>
-                                                            )}
+                                                        <div className="mt-0.5 font-semibold text-gray-900 truncate">
+                                                            {group.reference}
                                                         </div>
-                                                        {item.description && (
-                                                            <div className="text-xs text-gray-600 truncate mt-0.5">
-                                                                {item.description}
+                                                        {group.description && (
+                                                            <div className="text-xs text-gray-600 truncate">
+                                                                {group.description}
                                                             </div>
                                                         )}
                                                     </div>
-
-                                                    <div className="flex gap-4 text-sm shrink-0">
-                                                        <div className="text-center">
-                                                            <div className="text-[10px] text-gray-500 uppercase">Qtd</div>
-                                                            <div className="font-bold text-gray-900">{item.quantity}</div>
-                                                        </div>
-                                                        <div className="text-center">
-                                                            <div className="text-[10px] text-gray-500 uppercase">Unit.</div>
-                                                            <div className="font-bold text-gray-900">
-                                                                R$ {Number(item.unit_value || 0).toFixed(2).replace('.', ',')}
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-center">
-                                                            <div className="text-[10px] text-gray-500 uppercase">Total</div>
-                                                            <div className="font-bold text-indigo-700">
-                                                                R$ {lineTotal.toFixed(2).replace('.', ',')}
-                                                            </div>
+                                                    <div className="text-right shrink-0">
+                                                        <div className="text-[10px] text-gray-500 uppercase">Unit.</div>
+                                                        <div className="font-bold text-gray-900">
+                                                            R$ {group.unit_value.toFixed(2).replace('.', ',')}
                                                         </div>
                                                     </div>
                                                 </div>
+
+                                                {/* Matriz tamanhos × qty */}
+                                                <div className="mt-3 overflow-x-auto">
+                                                    <table className="min-w-max border-collapse">
+                                                        <thead>
+                                                            <tr>
+                                                                <th className="text-left pr-3 text-[10px] text-gray-600 uppercase font-medium">
+                                                                    Tam.
+                                                                </th>
+                                                                {group.entries.map((e) => (
+                                                                    <th
+                                                                        key={`size-${e.idx}`}
+                                                                        className="px-3 py-1.5 border border-indigo-200 bg-white text-sm font-semibold text-gray-900 min-w-[48px]"
+                                                                    >
+                                                                        {e.sizeDisplay}
+                                                                    </th>
+                                                                ))}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <tr>
+                                                                <td className="text-left pr-3 text-[10px] text-gray-600 uppercase font-medium">
+                                                                    Qtd
+                                                                </td>
+                                                                {group.entries.map((e) => (
+                                                                    <td
+                                                                        key={`qty-${e.idx}`}
+                                                                        className="px-3 py-2 border border-indigo-200 bg-white text-center text-sm font-bold text-gray-900"
+                                                                    >
+                                                                        {e.item.quantity}
+                                                                    </td>
+                                                                ))}
+                                                            </tr>
+                                                            <tr>
+                                                                <td className="text-left pr-3 text-[10px] text-gray-400 uppercase font-medium">
+                                                                    Ação
+                                                                </td>
+                                                                {group.entries.map((e) => (
+                                                                    <td
+                                                                        key={`action-${e.idx}`}
+                                                                        className="px-2 py-1 border border-indigo-200 bg-white text-center"
+                                                                    >
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => removeItem(e.idx)}
+                                                                            className="text-gray-300 hover:text-red-600 p-1"
+                                                                            aria-label={`Remover tamanho ${e.sizeDisplay}`}
+                                                                            title={`Excluir tamanho ${e.sizeDisplay} desta consignação`}
+                                                                        >
+                                                                            <TrashIcon className="w-4 h-4 inline" />
+                                                                        </button>
+                                                                    </td>
+                                                                ))}
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+
+                                                {/* Totais do grupo */}
+                                                <div className="mt-3 flex justify-between items-center text-sm border-t border-indigo-100 pt-2">
+                                                    <span className="text-gray-700">
+                                                        <strong>{totalPieces}</strong> peça(s)
+                                                    </span>
+                                                    <span className="font-bold text-indigo-700">
+                                                        Subtotal: R$ {subtotal.toFixed(2).replace('.', ',')}
+                                                    </span>
+                                                </div>
                                             </div>
                                         );
-                                    }
+                                    });
+                                })()}
 
-                                    // Item manual — editável
+                                {/* Itens manuais (sem movement_id) — editáveis, layout individual */}
+                                {data.items.map((item, idx) => {
+                                    if (item.movement_id) return null; // já renderizado na matriz
+
                                     return (
-                                        <div key={idx} className="border border-gray-200 rounded-md p-3 bg-gray-50 relative">
+                                        <div key={`manual-${idx}`} className="border border-gray-200 rounded-md p-3 bg-gray-50 relative">
                                             <button
                                                 type="button"
                                                 onClick={() => removeItem(idx)}
