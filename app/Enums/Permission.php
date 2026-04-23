@@ -282,6 +282,11 @@ enum Permission: string
     case MANAGE_DRE_PERIODS = 'dre.manage_periods';
     case EXPORT_DRE = 'dre.export';
 
+    // Clientes (sincronizados do CIGAM — módulo majoritariamente read-only)
+    case VIEW_CUSTOMERS = 'customers.view';
+    case EXPORT_CUSTOMERS = 'customers.export';
+    case SYNC_CUSTOMERS = 'customers.sync';
+
     // Consignações (Cliente / Influencer / E-commerce)
     case VIEW_CONSIGNMENTS = 'consignments.view';
     case CREATE_CONSIGNMENTS = 'consignments.create';
@@ -531,6 +536,10 @@ enum Permission: string
             self::IMPORT_DRE_BUDGETS => 'Importar orçado manual da DRE (XLSX)',
             self::MANAGE_DRE_PERIODS => 'Fechar e reabrir períodos da DRE',
             self::EXPORT_DRE => 'Exportar matriz DRE em XLSX/PDF',
+
+            self::VIEW_CUSTOMERS => 'Visualizar clientes',
+            self::EXPORT_CUSTOMERS => 'Exportar clientes',
+            self::SYNC_CUSTOMERS => 'Disparar sincronização manual com CIGAM',
 
             self::VIEW_CONSIGNMENTS => 'Visualizar consignações',
             self::CREATE_CONSIGNMENTS => 'Criar consignações',
@@ -782,6 +791,10 @@ enum Permission: string
             self::IMPORT_DRE_BUDGETS => 'Permite importar orçado manual via XLSX para dre_budgets (alternativa ao fluxo Budgets → projeção automática)',
             self::MANAGE_DRE_PERIODS => 'Permite fechar períodos (gera snapshots imutáveis) e reabrir fechamentos (com justificativa obrigatória e diff consolidado). Fechar bloqueia edição de mappings/imports no período.',
             self::EXPORT_DRE => 'Permite exportar a matriz DRE (mesmo filtro aplicado na tela) como XLSX multi-sheet ou PDF A4 landscape para compartilhamento externo.',
+
+            self::VIEW_CUSTOMERS => 'Permite visualizar clientes sincronizados do CIGAM. Módulo majoritariamente read-only — edição acontece no ERP',
+            self::EXPORT_CUSTOMERS => 'Permite exportar base de clientes em Excel/CSV (mascara CPF)',
+            self::SYNC_CUSTOMERS => 'Permite disparar sync manual com CIGAM fora do schedule padrão (dailyAt 04:00)',
 
             self::VIEW_CONSIGNMENTS => 'Permite visualizar consignações. Sem MANAGE_CONSIGNMENTS, o usuário só vê consignações da sua loja',
             self::CREATE_CONSIGNMENTS => 'Permite criar novas consignações. Sem MANAGE_CONSIGNMENTS, só para a própria loja',

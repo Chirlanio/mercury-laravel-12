@@ -170,3 +170,12 @@ Schedule::command('consignments:cigam-match')
     ->everyFifteenMinutes()
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/consignments-cigam-match.log'));
+
+// Customers — sincroniza view CIGAM msl_dcliente_. Roda dailyAt 04:00
+// (antes do movements:sync das 06:00) porque a base de clientes raramente
+// muda de hora em hora — diário é suficiente. Idempotente (upsert por
+// cigam_code). Pula tenants sem o módulo instalado.
+Schedule::command('customers:sync')
+    ->dailyAt('04:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/customers-sync.log'));

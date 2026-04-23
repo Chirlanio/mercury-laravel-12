@@ -302,4 +302,11 @@ return [
         'icon' => 'ArchiveBoxArrowDownIcon',
         'dependencies' => ['products', 'employees', 'stores'],
     ],
+    'customers' => [
+        'name' => 'Clientes',
+        'description' => 'Base de clientes sincronizada do CIGAM (view msl_dcliente_). Majoritariamente read-only — escrita acontece no ERP. Usado como fonte de autocomplete ao cadastrar consignações e relatórios de vendas por cliente.',
+        'routes' => ['customers.*'],
+        'icon' => 'UserGroupIcon',
+        'dependencies' => [],
+    ],
 ];

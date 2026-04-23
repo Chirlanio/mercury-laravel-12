@@ -281,6 +281,10 @@ enum Role: string
                 Permission::CANCEL_CONSIGNMENT->value,
                 Permission::EXPORT_CONSIGNMENTS->value,
                 Permission::OVERRIDE_CONSIGNMENT_LOCK->value,
+                // Clientes (todas)
+                Permission::VIEW_CUSTOMERS->value,
+                Permission::EXPORT_CUSTOMERS->value,
+                Permission::SYNC_CUSTOMERS->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -512,6 +516,10 @@ enum Role: string
                 Permission::CANCEL_CONSIGNMENT->value,
                 Permission::EXPORT_CONSIGNMENTS->value,
                 Permission::OVERRIDE_CONSIGNMENT_LOCK->value,
+                // Clientes (todas — admin pode disparar sync)
+                Permission::VIEW_CUSTOMERS->value,
+                Permission::EXPORT_CUSTOMERS->value,
+                Permission::SYNC_CUSTOMERS->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -652,6 +660,9 @@ enum Role: string
                 Permission::REGISTER_CONSIGNMENT_RETURN->value,
                 Permission::COMPLETE_CONSIGNMENT->value,
                 Permission::EXPORT_CONSIGNMENTS->value,
+                // Clientes — view + export (sync fica com admin+)
+                Permission::VIEW_CUSTOMERS->value,
+                Permission::EXPORT_CUSTOMERS->value,
             ],
             self::FINANCE => [
                 // Financeira — contas a pagar, orçamentos, imports de realizado DRE.
@@ -835,6 +846,8 @@ enum Role: string
                 Permission::CREATE_CONSIGNMENTS->value,
                 Permission::EDIT_CONSIGNMENTS->value,
                 Permission::REGISTER_CONSIGNMENT_RETURN->value,
+                // Clientes — view apenas (vendedor busca cliente ao cadastrar consignação)
+                Permission::VIEW_CUSTOMERS->value,
             ],
             self::DRIVER => [
                 // Perfil próprio
