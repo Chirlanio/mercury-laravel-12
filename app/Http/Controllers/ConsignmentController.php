@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\ConsignmentStatus;
 use App\Enums\ConsignmentType;
 use App\Enums\Permission;
+use App\Enums\Role;
 use App\Models\Consignment;
 use App\Models\Employee;
 use App\Models\Store;
@@ -128,8 +129,29 @@ class ConsignmentController extends Controller
                 'register_return' => $user?->hasPermissionTo(Permission::REGISTER_CONSIGNMENT_RETURN->value) ?? false,
                 'override_lock' => $user?->hasPermissionTo(Permission::OVERRIDE_CONSIGNMENT_LOCK->value) ?? false,
                 'export' => $user?->hasPermissionTo(Permission::EXPORT_CONSIGNMENTS->value) ?? false,
+                'edit_return_period' => $this->canEditReturnPeriod($user),
             ],
         ]);
+    }
+
+    /**
+     * Apenas usuários com hierarquia >= 8 (Finance/Accounting/Fiscal/
+     * Admin/Super_admin) podem alterar o prazo de retorno. Operacional
+     * (User/Support) usa o padrão de 7 dias — regra definida em 2026-04-23
+     * pra evitar que loja estenda prazo sem autorização financeira.
+     */
+    protected function canEditReturnPeriod(?User $user): bool
+    {
+        if (! $user || ! $user->role) {
+            return false;
+        }
+
+        $role = $user->role instanceof Role ? $user->role : Role::tryFrom($user->role);
+        if (! $role) {
+            return false;
+        }
+
+        return $role->hasPermission(Role::FINANCE);
     }
 
     public function show(Consignment $consignment, Request $request): JsonResponse
@@ -192,6 +214,11 @@ class ConsignmentController extends Controller
             abort(403, 'Você só pode criar consignações para a sua loja.');
         }
 
+        // Hierarquia < 8 não altera prazo — força o default do tipo
+        if (array_key_exists('return_period_days', $data) && ! $this->canEditReturnPeriod($user)) {
+            unset($data['return_period_days']);
+        }
+
         try {
             $this->service->create($data, $user);
         } catch (ValidationException $e) {
@@ -216,6 +243,11 @@ class ConsignmentController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
             'expected_return_date' => ['nullable', 'date'],
         ]);
+
+        // Hierarquia < 8 não altera prazo via expected_return_date
+        if (array_key_exists('expected_return_date', $data) && ! $this->canEditReturnPeriod($request->user())) {
+            unset($data['expected_return_date']);
+        }
 
         $consignment->update(array_merge($data, [
             'updated_by_user_id' => $request->user()->id,

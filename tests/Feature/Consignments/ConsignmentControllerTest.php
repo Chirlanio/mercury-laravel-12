@@ -171,6 +171,48 @@ class ConsignmentControllerTest extends TestCase
         $this->assertDatabaseCount('consignment_items', 1);
     }
 
+    // ------------------------------------------------------------------
+    // Hierarquia < 8 não pode alterar prazo de retorno
+    // ------------------------------------------------------------------
+
+    public function test_admin_can_edit_return_period_payload(): void
+    {
+        // ADMIN tem hierarquia 9 >= 8
+        $this->actingAs($this->adminUser)
+            ->post(route('consignments.store'), $this->validStorePayload([
+                'return_period_days' => 15,
+            ]))
+            ->assertRedirect();
+
+        $this->assertEquals(15, \App\Models\Consignment::first()->return_period_days);
+    }
+
+    public function test_regular_user_cannot_override_return_period(): void
+    {
+        // USER hierarquia 1 < 8 — o valor 30 é ignorado, volta pro default 7
+        $this->actingAs($this->regularUser)
+            ->post(route('consignments.store'), $this->validStorePayload([
+                'return_period_days' => 30,
+            ]))
+            ->assertRedirect();
+
+        $this->assertEquals(7, \App\Models\Consignment::first()->return_period_days);
+    }
+
+    public function test_index_exposes_can_edit_return_period_true_for_admin(): void
+    {
+        $this->actingAs($this->adminUser)
+            ->get(route('consignments.index'))
+            ->assertInertia(fn ($page) => $page->where('can.edit_return_period', true));
+    }
+
+    public function test_index_exposes_can_edit_return_period_false_for_regular_user(): void
+    {
+        $this->actingAs($this->regularUser)
+            ->get(route('consignments.index'))
+            ->assertInertia(fn ($page) => $page->where('can.edit_return_period', false));
+    }
+
     public function test_store_rejects_without_items(): void
     {
         $this->actingAs($this->adminUser)

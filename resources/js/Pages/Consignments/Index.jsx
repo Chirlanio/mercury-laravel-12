@@ -450,6 +450,7 @@ export default function Index({
                     typeOptions={typeOptions}
                     selects={selects}
                     canOverrideLock={canOverrideLock}
+                    canEditReturnPeriod={can.edit_return_period ?? false}
                 />
             )}
 

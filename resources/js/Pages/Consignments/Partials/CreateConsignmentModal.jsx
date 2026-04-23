@@ -6,6 +6,8 @@ import {
     CheckCircleIcon,
     PlusIcon,
     TrashIcon,
+    MagnifyingGlassIcon,
+    ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import StandardModal from '@/Components/StandardModal';
 import Button from '@/Components/Button';
@@ -32,10 +34,12 @@ export default function CreateConsignmentModal({
     typeOptions = {},
     selects = {},
     canOverrideLock = false,
+    canEditReturnPeriod = false,
 }) {
     const [step, setStep] = useState(1);
     const [employees, setEmployees] = useState([]);
     const [loadingEmployees, setLoadingEmployees] = useState(false);
+    const [lookupState, setLookupState] = useState({ loading: false, error: null, notFound: false, orphans: [] });
 
     const { data, setData, post, processing, errors, reset, setError, clearErrors } = useForm({
         type: 'cliente',
@@ -58,6 +62,7 @@ export default function CreateConsignmentModal({
         if (!show) {
             setStep(1);
             setEmployees([]);
+            setLookupState({ loading: false, error: null, notFound: false, orphans: [] });
             reset();
             clearErrors();
         }
@@ -164,6 +169,78 @@ export default function CreateConsignmentModal({
 
     const removeItem = (idx) => {
         setData('items', data.items.filter((_, i) => i !== idx));
+    };
+
+    /**
+     * Busca a NF no CIGAM (movements code=20) pela combinação
+     * loja + número + data e popula os itens automaticamente. Se
+     * algum item não existe no catálogo, mostra como órfão (regra M8).
+     */
+    const lookupInvoice = async () => {
+        const selectedStore = (selects.stores || []).find((s) => String(s.id) === String(data.store_id));
+        if (!selectedStore) {
+            setLookupState({ loading: false, error: 'Selecione a loja primeiro.', notFound: false, orphans: [] });
+            return;
+        }
+        if (!data.outbound_invoice_number?.trim()) {
+            setLookupState({ loading: false, error: 'Informe o número da NF.', notFound: false, orphans: [] });
+            return;
+        }
+        if (!data.outbound_invoice_date) {
+            setLookupState({ loading: false, error: 'Informe a data da NF.', notFound: false, orphans: [] });
+            return;
+        }
+
+        setLookupState({ loading: true, error: null, notFound: false, orphans: [] });
+
+        try {
+            const url = new URL(route('consignments.lookup.outbound-invoice'), window.location.origin);
+            url.searchParams.set('invoice_number', data.outbound_invoice_number.trim());
+            url.searchParams.set('store_code', selectedStore.code);
+            url.searchParams.set('movement_date', data.outbound_invoice_date);
+
+            const response = await fetch(url.toString(), {
+                headers: { Accept: 'application/json' },
+            });
+
+            if (!response.ok) throw new Error('Falha na busca');
+
+            const payload = await response.json();
+
+            if (!payload.found) {
+                setLookupState({ loading: false, error: null, notFound: true, orphans: [] });
+                return;
+            }
+
+            // Popula itens — substitui os atuais (caller pode adicionar manualmente depois)
+            const resolved = (payload.items || []).map((it) => ({
+                product_id: it.product_id,
+                product_variant_id: it.product_variant_id,
+                movement_id: it.movement_id,
+                reference: it.reference,
+                barcode: it.barcode,
+                size_label: it.size_label,
+                size_cigam_code: it.size_cigam_code,
+                description: it.description,
+                quantity: Math.max(1, Number(it.quantity || 1)),
+                unit_value: Number(it.unit_value || 0),
+            }));
+
+            setData('items', resolved);
+            setLookupState({
+                loading: false,
+                error: null,
+                notFound: false,
+                orphans: payload.orphan_items || [],
+            });
+        } catch (e) {
+            setLookupState({
+                loading: false,
+                error: 'Erro ao buscar a NF. Tente novamente.',
+                notFound: false,
+                orphans: [],
+            });
+        }
     };
 
     const submit = () => {
@@ -392,11 +469,77 @@ export default function CreateConsignmentModal({
                                 min={1}
                                 max={90}
                                 value={data.return_period_days}
-                                onChange={(e) => setData('return_period_days', Number(e.target.value))}
-                                className="mt-1 block w-full"
+                                onChange={(e) => canEditReturnPeriod && setData('return_period_days', Number(e.target.value))}
+                                readOnly={!canEditReturnPeriod}
+                                disabled={!canEditReturnPeriod}
+                                title={
+                                    canEditReturnPeriod
+                                        ? 'Ajuste o prazo de retorno em dias'
+                                        : 'Alteração de prazo exige hierarquia Finance ou superior'
+                                }
+                                className={`mt-1 block w-full ${!canEditReturnPeriod ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                                 inputMode="numeric"
                             />
+                            {!canEditReturnPeriod && (
+                                <p className="mt-1 text-xs text-gray-500">
+                                    Prazo padrão de 7 dias. Ajuste requer perfil Financeiro ou superior.
+                                </p>
+                            )}
                         </div>
+                    </div>
+
+                    {/* Auto-lookup — busca NF no CIGAM por loja+número+data */}
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-md p-3">
+                        <div className="flex items-start gap-2 flex-wrap">
+                            <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium text-indigo-900">
+                                    Buscar itens automaticamente
+                                </div>
+                                <p className="text-xs text-indigo-700 mt-0.5">
+                                    Com loja, número e data preenchidos, o sistema busca a NF no CIGAM e preenche os itens.
+                                </p>
+                            </div>
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={lookupInvoice}
+                                disabled={lookupState.loading || !data.store_id || !data.outbound_invoice_number || !data.outbound_invoice_date}
+                                icon={MagnifyingGlassIcon}
+                            >
+                                {lookupState.loading ? 'Buscando…' : 'Buscar NF'}
+                            </Button>
+                        </div>
+
+                        {lookupState.error && (
+                            <div className="mt-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded p-2">
+                                {lookupState.error}
+                            </div>
+                        )}
+                        {lookupState.notFound && (
+                            <div className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2 flex items-start gap-2">
+                                <ExclamationTriangleIcon className="w-4 h-4 shrink-0 mt-0.5" />
+                                <div>
+                                    NF não encontrada com esta combinação de loja + número + data. Verifique os campos
+                                    ou adicione os itens manualmente abaixo.
+                                </div>
+                            </div>
+                        )}
+                        {lookupState.orphans.length > 0 && (
+                            <div className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">
+                                <strong>Atenção — {lookupState.orphans.length} item(ns) da NF não estão no catálogo:</strong>
+                                <ul className="mt-1 list-disc list-inside">
+                                    {lookupState.orphans.map((it, i) => (
+                                        <li key={i}>
+                                            {it.reference || it.barcode || 'Sem referência'}
+                                            {it.size_label && ` · Tam. ${it.size_label}`}
+                                            {' — '}
+                                            {it.quantity} peça(s)
+                                        </li>
+                                    ))}
+                                </ul>
+                                <p className="mt-1">Cadastre os produtos faltantes no catálogo antes de prosseguir (regra M8).</p>
+                            </div>
+                        )}
                     </div>
 
                     <div className="border-t pt-4">
