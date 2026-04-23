@@ -125,22 +125,22 @@ export default function RegisterReturnModal({ show, onClose, consignmentSummary 
             title="Registrar retorno"
             subtitle={`Consignação #${consignmentSummary.id} — ${consignmentSummary.recipient_name}`}
             headerColor="bg-emerald-600"
-            headerIcon={ArrowUturnLeftIcon}
+            headerIcon={<ArrowUturnLeftIcon className="h-5 w-5" />}
             maxWidth="3xl"
             footer={
-                <StandardModal.Footer
-                    onCancel={onClose}
-                    processing={processing}
-                    customButtons={
-                        <Button
-                            variant="success"
-                            onClick={submit}
-                            disabled={processing || totalItemsSelected === 0}
-                        >
-                            {processing ? 'Registrando…' : `Registrar ${totalItemsSelected} peça(s)`}
-                        </Button>
-                    }
-                />
+                <StandardModal.Footer>
+                    <div className="flex-1" />
+                    <Button variant="secondary" onClick={onClose} disabled={processing}>
+                        Cancelar
+                    </Button>
+                    <Button
+                        variant="success"
+                        onClick={submit}
+                        disabled={processing || totalItemsSelected === 0}
+                    >
+                        {processing ? 'Registrando…' : `Registrar ${totalItemsSelected} peça(s)`}
+                    </Button>
+                </StandardModal.Footer>
             }
         >
             <div className="space-y-4">

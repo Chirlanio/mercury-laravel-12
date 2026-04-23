@@ -137,7 +137,7 @@ export default function CreateConsignmentModal({
         });
     };
 
-    const headerIcon = step === 1 ? UserIcon : step === 2 ? ArchiveBoxIcon : CheckCircleIcon;
+    const HeaderIcon = step === 1 ? UserIcon : step === 2 ? ArchiveBoxIcon : CheckCircleIcon;
     const stepTitles = [
         'Destinatário e tipo',
         'Nota fiscal de saída e itens',
@@ -151,32 +151,30 @@ export default function CreateConsignmentModal({
             title={`Nova Consignação — Passo ${step} de 3`}
             subtitle={stepTitles[step - 1]}
             headerColor="bg-indigo-600"
-            headerIcon={headerIcon}
+            headerIcon={<HeaderIcon className="h-5 w-5" />}
             maxWidth="3xl"
             footer={
-                <StandardModal.Footer
-                    onCancel={onClose}
-                    processing={processing}
-                    customButtons={
-                        <div className="flex gap-2 flex-wrap">
-                            {step > 1 && (
-                                <Button variant="secondary" onClick={prevStep}>
-                                    Voltar
-                                </Button>
-                            )}
-                            {step < 3 && (
-                                <Button variant="primary" onClick={nextStep}>
-                                    Avançar
-                                </Button>
-                            )}
-                            {step === 3 && (
-                                <Button variant="success" onClick={submit} disabled={processing}>
-                                    {processing ? 'Salvando…' : 'Criar consignação'}
-                                </Button>
-                            )}
-                        </div>
-                    }
-                />
+                <StandardModal.Footer>
+                    <div className="flex-1" />
+                    <Button variant="secondary" onClick={onClose} disabled={processing}>
+                        Cancelar
+                    </Button>
+                    {step > 1 && (
+                        <Button variant="secondary" onClick={prevStep} disabled={processing}>
+                            Voltar
+                        </Button>
+                    )}
+                    {step < 3 && (
+                        <Button variant="primary" onClick={nextStep} disabled={processing}>
+                            Avançar
+                        </Button>
+                    )}
+                    {step === 3 && (
+                        <Button variant="success" onClick={submit} disabled={processing}>
+                            {processing ? 'Salvando…' : 'Criar consignação'}
+                        </Button>
+                    )}
+                </StandardModal.Footer>
             }
         >
             {/* Progress bar */}

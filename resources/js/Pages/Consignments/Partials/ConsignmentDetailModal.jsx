@@ -48,11 +48,11 @@ export default function ConsignmentDetailModal({
             title={`Consignação #${c.id}`}
             subtitle={c.recipient_name}
             headerColor="bg-gray-700"
-            headerIcon={EyeIcon}
+            headerIcon={<EyeIcon className="h-5 w-5" />}
             maxWidth="4xl"
             headerBadges={[
-                { label: c.type_label, color: 'info' },
-                { label: c.status_label, color: statusColors[c.status] || 'gray' },
+                { text: c.type_label, className: 'bg-white/20 text-white' },
+                { text: c.status_label, className: 'bg-white/30 text-white font-semibold' },
             ]}
         >
             {/* Abas — horizontal scroll no mobile */}
