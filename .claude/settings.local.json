@@ -118,7 +118,8 @@
       "Bash(npx --no-install eslint resources/js/Pages/Budgets/components/BudgetUploadWizard.jsx)",
       "Bash(pip install *)",
       "Bash(/c/Users/MSDEV/AppData/Roaming/Python/Python311/Scripts/git-filter-repo.exe --invert-paths --path \"storage/tenantmeia-sola/app/models/\" --force)",
-      "Bash(C:\\\\\\\\Users\\\\\\\\MSDEV\\\\\\\\php84\\\\\\\\php.exe -d memory_limit=1G artisan test --filter=DreActualsImportTest)"
+      "Bash(C:\\\\\\\\Users\\\\\\\\MSDEV\\\\\\\\php84\\\\\\\\php.exe -d memory_limit=1G artisan test --filter=DreActualsImportTest)",
+      "Bash(/c/wamp64/bin/php/php8.4.0/php.exe artisan tinker '--execute= *)"
     ],
     "deny": [],
     "ask": []

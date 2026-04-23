@@ -53,6 +53,7 @@ use App\Http\Controllers\Config\ProductSubcollectionController as ConfigProductS
 use App\Http\Controllers\Config\SectorController as ConfigSectorController;
 use App\Http\Controllers\Config\StatusController as ConfigStatusController;
 use App\Http\Controllers\Config\ReturnReasonController as ConfigReturnReasonController;
+use App\Http\Controllers\Config\SocialMediaController as ConfigSocialMediaController;
 use App\Http\Controllers\Config\ReversalReasonController as ConfigReversalReasonController;
 use App\Http\Controllers\Config\StockAdjustmentReasonController as ConfigStockAdjustmentReasonController;
 use App\Http\Controllers\Config\StockAdjustmentStatusController as ConfigStockAdjustmentStatusController;
@@ -376,6 +377,7 @@ Route::middleware(['auth', 'tenant.module:config', 'permission:'.Permission::MAN
     Route::resource('stock-adjustment-reasons', ConfigStockAdjustmentReasonController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('reversal-reasons', ConfigReversalReasonController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('return-reasons', ConfigReturnReasonController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('social-media', ConfigSocialMediaController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('transfer-statuses', ConfigTransferStatusController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('order-payment-statuses', ConfigOrderPaymentStatusController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('management-reasons', ConfigManagementReasonController::class)->only(['index', 'store', 'update', 'destroy']);
@@ -1086,6 +1088,48 @@ Route::middleware(['auth'])->group(function () {
 
         Route::middleware('permission:'.Permission::DELETE_RETURNS->value)->group(function () {
             Route::delete('/returns/{returnOrder}', [\App\Http\Controllers\ReturnOrderController::class, 'destroy'])->whereNumber('returnOrder')->name('returns.destroy');
+        });
+    });
+
+    // ==========================================
+    // Coupons (Cupons de desconto — Consultor/Influencer/MS Indica)
+    // ==========================================
+    Route::middleware(['tenant.module:coupons', 'permission:'.Permission::VIEW_COUPONS->value])->group(function () {
+        Route::get('/coupons', [\App\Http\Controllers\CouponController::class, 'index'])->name('coupons.index');
+        Route::get('/coupons/dashboard', [\App\Http\Controllers\CouponController::class, 'dashboard'])->name('coupons.dashboard');
+
+        // AJAX lookups (banner warning + autocomplete modal)
+        Route::get('/coupons/lookup/existing', [\App\Http\Controllers\CouponController::class, 'lookupExisting'])->name('coupons.lookup.existing');
+        Route::get('/coupons/lookup/employees', [\App\Http\Controllers\CouponController::class, 'lookupEmployees'])->name('coupons.lookup.employees');
+        Route::get('/coupons/lookup/employee-details', [\App\Http\Controllers\CouponController::class, 'lookupEmployeeDetails'])->name('coupons.lookup.employee-details');
+        Route::get('/coupons/suggest-code', [\App\Http\Controllers\CouponController::class, 'suggestCode'])->name('coupons.suggest-code');
+
+        // Export (Excel + PDF individual) — antes de {coupon} para não conflitar com o wildcard
+        Route::middleware('permission:'.Permission::EXPORT_COUPONS->value)->group(function () {
+            Route::get('/coupons/export', [\App\Http\Controllers\CouponController::class, 'export'])->name('coupons.export');
+            Route::get('/coupons/{coupon}/pdf', [\App\Http\Controllers\CouponController::class, 'exportPdf'])->whereNumber('coupon')->name('coupons.pdf');
+        });
+
+        // Import (preview + persist)
+        Route::middleware('permission:'.Permission::IMPORT_COUPONS->value)->group(function () {
+            Route::post('/coupons/import/preview', [\App\Http\Controllers\CouponController::class, 'importPreview'])->name('coupons.import.preview');
+            Route::post('/coupons/import', [\App\Http\Controllers\CouponController::class, 'importStore'])->name('coupons.import.store');
+        });
+
+        Route::get('/coupons/{coupon}', [\App\Http\Controllers\CouponController::class, 'show'])->whereNumber('coupon')->name('coupons.show');
+
+        Route::middleware('permission:'.Permission::CREATE_COUPONS->value)->group(function () {
+            Route::post('/coupons', [\App\Http\Controllers\CouponController::class, 'store'])->name('coupons.store');
+        });
+
+        Route::middleware('permission:'.Permission::EDIT_COUPONS->value)->group(function () {
+            Route::put('/coupons/{coupon}', [\App\Http\Controllers\CouponController::class, 'update'])->whereNumber('coupon')->name('coupons.update');
+            // Transições (cancel/request/issue/activate) — permissão específica checada por target no controller/service
+            Route::post('/coupons/{coupon}/transition', [\App\Http\Controllers\CouponController::class, 'transition'])->whereNumber('coupon')->name('coupons.transition');
+        });
+
+        Route::middleware('permission:'.Permission::DELETE_COUPONS->value)->group(function () {
+            Route::delete('/coupons/{coupon}', [\App\Http\Controllers\CouponController::class, 'destroy'])->whereNumber('coupon')->name('coupons.destroy');
         });
     });
 

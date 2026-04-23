@@ -261,6 +261,15 @@ enum Role: string
                 Permission::IMPORT_DRE_BUDGETS->value,
                 Permission::MANAGE_DRE_PERIODS->value,
                 Permission::EXPORT_DRE->value,
+                // Cupons (todas)
+                Permission::VIEW_COUPONS->value,
+                Permission::CREATE_COUPONS->value,
+                Permission::EDIT_COUPONS->value,
+                Permission::DELETE_COUPONS->value,
+                Permission::MANAGE_COUPONS->value,
+                Permission::ISSUE_COUPON_CODE->value,
+                Permission::IMPORT_COUPONS->value,
+                Permission::EXPORT_COUPONS->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -472,6 +481,15 @@ enum Role: string
                 Permission::IMPORT_DRE_BUDGETS->value,
                 Permission::MANAGE_DRE_PERIODS->value,
                 Permission::EXPORT_DRE->value,
+                // Cupons (todas)
+                Permission::VIEW_COUPONS->value,
+                Permission::CREATE_COUPONS->value,
+                Permission::EDIT_COUPONS->value,
+                Permission::DELETE_COUPONS->value,
+                Permission::MANAGE_COUPONS->value,
+                Permission::ISSUE_COUPON_CODE->value,
+                Permission::IMPORT_COUPONS->value,
+                Permission::EXPORT_COUPONS->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -594,6 +612,15 @@ enum Role: string
                 // (não edita linhas gerenciais nem mappings).
                 Permission::VIEW_DRE->value,
                 Permission::VIEW_DRE_PENDING_ACCOUNTS->value,
+                // Cupons (view + create + edit + issue + export, sem delete e
+                // sem manage — fica com store scoping automático por
+                // ausência de MANAGE_COUPONS. Inclui ISSUE_COUPON_CODE pra
+                // equipe de e-commerce emitir o código na plataforma externa)
+                Permission::VIEW_COUPONS->value,
+                Permission::CREATE_COUPONS->value,
+                Permission::EDIT_COUPONS->value,
+                Permission::ISSUE_COUPON_CODE->value,
+                Permission::EXPORT_COUPONS->value,
             ],
             self::FINANCE => [
                 // Financeira — contas a pagar, orçamentos, imports de realizado DRE.
@@ -765,6 +792,10 @@ enum Role: string
                 // impede tampering de valor/datas/CC/AC).
                 Permission::VIEW_ORDER_PAYMENTS->value,
                 Permission::EDIT_ORDER_PAYMENTS->value,
+                // Cupons (view + create apenas — vendedor solicita cupom
+                // para a própria loja; edição/emissão com SUPPORT/ADMIN)
+                Permission::VIEW_COUPONS->value,
+                Permission::CREATE_COUPONS->value,
             ],
             self::DRIVER => [
                 // Perfil próprio

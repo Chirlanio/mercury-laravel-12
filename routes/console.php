@@ -97,6 +97,20 @@ Schedule::command('budgets:alert')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/budgets-alert.log'));
 
+// Coupons — marca cupons com valid_until vencido como expirados.
+// Roda antes do expediente para que a listagem do dia já reflita o estado.
+Schedule::command('coupons:expire-stale')
+    ->dailyAt('06:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/coupons-expire.log'));
+
+// Coupons — lembrete diário de cupons em requested há mais de 3 dias
+// sem emissão de código pela equipe e-commerce.
+Schedule::command('coupons:remind-pending')
+    ->dailyAt('09:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/coupons-remind.log'));
+
 // DRE rebuild — reconciliação defensiva semanal (domingo 03:00).
 // Prompt 8 do playbook: caso observer tenha falhado silenciosamente em
 // algum saving ao longo da semana, o rebuild traz o estado de volta ao

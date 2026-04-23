@@ -215,6 +215,16 @@ export const PERMISSIONS = {
     EXPORT_RETURNS: 'returns.export',
     MANAGE_RETURN_REASONS: 'returns.manage_reasons',
 
+    // Cupons
+    VIEW_COUPONS: 'coupons.view',
+    CREATE_COUPONS: 'coupons.create',
+    EDIT_COUPONS: 'coupons.edit',
+    DELETE_COUPONS: 'coupons.delete',
+    MANAGE_COUPONS: 'coupons.manage',
+    ISSUE_COUPON_CODE: 'coupons.issue_code',
+    IMPORT_COUPONS: 'coupons.import',
+    EXPORT_COUPONS: 'coupons.export',
+
     // Centros de Custo
     VIEW_COST_CENTERS: 'cost_centers.view',
     CREATE_COST_CENTERS: 'cost_centers.create',

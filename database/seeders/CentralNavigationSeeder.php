@@ -134,6 +134,7 @@ class CentralNavigationSeeder extends Seeder
             '/purchase-orders' => 'purchase_orders',
             '/reversals' => 'reversals',
             '/returns' => 'returns',
+            '/coupons' => 'coupons',
             '/cost-centers' => 'cost_centers',
             '/medical-certificates' => 'medical_certificates',
             '/absences' => 'absences',
@@ -176,6 +177,7 @@ class CentralNavigationSeeder extends Seeder
             ['route' => '/purchase-orders', 'page_name' => 'Ordens de Compra', 'icon' => 'fas fa-shopping-cart'],
             ['route' => '/reversals', 'page_name' => 'Estornos', 'icon' => 'fas fa-undo-alt'],
             ['route' => '/returns', 'page_name' => 'Devoluções', 'icon' => 'fas fa-box-open'],
+            ['route' => '/coupons', 'page_name' => 'Cupons', 'icon' => 'fas fa-ticket'],
             ['route' => '/cost-centers', 'page_name' => 'Centros de Custo', 'icon' => 'fas fa-sitemap'],
             ['route' => '/suppliers', 'page_name' => 'Fornecedores', 'icon' => 'fas fa-truck'],
             ['route' => '/medical-certificates', 'page_name' => 'Atestados Médicos', 'icon' => 'fas fa-file-medical'],
@@ -209,6 +211,7 @@ class CentralNavigationSeeder extends Seeder
             ['route' => '/config/stock-audit-vendors', 'page_name' => 'Empresas Auditoras', 'icon' => 'fas fa-cog'],
             ['route' => '/config/reversal-reasons', 'page_name' => 'Motivos de Estorno', 'icon' => 'fas fa-cog'],
             ['route' => '/config/return-reasons', 'page_name' => 'Motivos de Devolução', 'icon' => 'fas fa-cog'],
+            ['route' => '/config/social-media', 'page_name' => 'Redes Sociais', 'icon' => 'fas fa-cog'],
             ['route' => '/helpdesk/departamento-pessoal', 'page_name' => 'Solicitações DP', 'icon' => 'fa-solid fa-headset'],
             ['route' => '/logout', 'page_name' => 'Sair', 'icon' => 'fas fa-sign-out-alt', 'is_public' => true],
         ];
@@ -264,6 +267,7 @@ class CentralNavigationSeeder extends Seeder
             '/purchase-orders' => 'Financeiro',
             '/reversals' => 'Financeiro',
             '/returns' => 'E-commerce',
+            '/coupons' => 'E-commerce',
             '/suppliers' => 'Configurações',
             '/medical-certificates' => 'RH',
             '/absences' => 'RH',
@@ -297,6 +301,7 @@ class CentralNavigationSeeder extends Seeder
             '/config/stock-audit-vendors' => 'Configurações',
             '/config/reversal-reasons' => 'Configurações',
             '/config/return-reasons' => 'Configurações',
+            '/config/social-media' => 'Configurações',
             '/helpdesk/departamento-pessoal' => 'Departamento Pessoal',
             '/logout' => 'Sair',
         ];
@@ -308,7 +313,7 @@ class CentralNavigationSeeder extends Seeder
         // super_admin: everything | admin: everything except system management | support: view-only | user: dashboard only
         $viewOnlyRoutes = [
             '/dashboard', '/sales', '/products', '/stores', '/employees',
-            '/transfers', '/stock-adjustments', '/order-payments', '/purchase-orders', '/reversals', '/returns', '/suppliers',
+            '/transfers', '/stock-adjustments', '/order-payments', '/purchase-orders', '/reversals', '/returns', '/coupons', '/suppliers',
             '/checklists', '/medical-certificates', '/absences', '/overtime-records',
             '/user-sessions', '/work-shifts', '/work-schedules', '/activity-logs',
             '/store-goals', '/movements', '/vacations', '/stock-audits',

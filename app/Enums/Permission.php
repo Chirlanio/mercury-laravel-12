@@ -262,6 +262,16 @@ enum Permission: string
     case EXPORT_BUDGETS = 'budgets.export';
     case VIEW_BUDGET_CONSUMPTION = 'budgets.view_consumption';
 
+    // Cupons de desconto (Consultor / Influencer / MS Indica)
+    case VIEW_COUPONS = 'coupons.view';
+    case CREATE_COUPONS = 'coupons.create';
+    case EDIT_COUPONS = 'coupons.edit';
+    case DELETE_COUPONS = 'coupons.delete';
+    case MANAGE_COUPONS = 'coupons.manage';
+    case ISSUE_COUPON_CODE = 'coupons.issue_code';
+    case IMPORT_COUPONS = 'coupons.import';
+    case EXPORT_COUPONS = 'coupons.export';
+
     // DRE — Demonstrativo de Resultado do Exercício
     case VIEW_DRE = 'dre.view';
     case MANAGE_DRE_STRUCTURE = 'dre.manage_structure';
@@ -490,6 +500,16 @@ enum Permission: string
             self::MANAGE_BUDGETS => 'Gerenciar orçamentos de todos os escopos',
             self::EXPORT_BUDGETS => 'Exportar orçamento consolidado (com consumo realizado)',
             self::VIEW_BUDGET_CONSUMPTION => 'Visualizar dashboard de consumo previsto × realizado',
+
+            // Cupons
+            self::VIEW_COUPONS => 'Visualizar cupons',
+            self::CREATE_COUPONS => 'Criar solicitações de cupom',
+            self::EDIT_COUPONS => 'Editar cupons',
+            self::DELETE_COUPONS => 'Excluir cupons',
+            self::MANAGE_COUPONS => 'Gerenciar cupons (todas as lojas)',
+            self::ISSUE_COUPON_CODE => 'Emitir código do cupom (e-commerce)',
+            self::IMPORT_COUPONS => 'Importar cupons (planilha)',
+            self::EXPORT_COUPONS => 'Exportar cupons',
 
             self::VIEW_DRE => 'Visualizar DRE gerencial',
             self::MANAGE_DRE_STRUCTURE => 'Gerenciar estrutura da DRE (linhas gerenciais)',
@@ -720,6 +740,16 @@ enum Permission: string
             self::MANAGE_BUDGETS => 'Permite gerenciar orçamentos de todos os escopos (sem filtro de área)',
             self::EXPORT_BUDGETS => 'Permite exportar orçamento consolidado em Excel (com colunas de previsto × realizado lado a lado)',
             self::VIEW_BUDGET_CONSUMPTION => 'Permite acessar o dashboard de consumo previsto × realizado, com alertas de utilização',
+
+            // Cupons
+            self::VIEW_COUPONS => 'Permite visualizar cupons. Sem MANAGE_COUPONS, o usuário só vê cupons da sua loja',
+            self::CREATE_COUPONS => 'Permite criar solicitações de cupom. Sem MANAGE_COUPONS, só pode criar para a própria loja',
+            self::EDIT_COUPONS => 'Permite editar cupons enquanto estiverem em Draft ou Requested. Cupons emitidos/ativos só editáveis com MANAGE_COUPONS',
+            self::DELETE_COUPONS => 'Permite excluir cupons (soft delete). Bloqueado se já tiver código emitido',
+            self::MANAGE_COUPONS => 'Permite gerenciar cupons de todas as lojas (sem filtro de store scoping). Pode editar cupons em qualquer status',
+            self::ISSUE_COUPON_CODE => 'Permite emitir o código do cupom (preencher coupon_site) na plataforma de e-commerce e transicionar requested → issued',
+            self::IMPORT_COUPONS => 'Permite importar cupons via planilha (XLSX/CSV) — usado na migração de dados históricos v1',
+            self::EXPORT_COUPONS => 'Permite exportar cupons para Excel ou PDF (listagem com CPF mascarado)',
 
             self::VIEW_DRE => 'Permite visualizar a matriz gerencial da DRE (realizado × orçado × ano anterior), por período/loja/rede',
             self::MANAGE_DRE_STRUCTURE => 'Permite criar, editar, reordenar e remover linhas do plano gerencial da DRE (ex: EBITDA, Headcount, Lucro Líquido)',

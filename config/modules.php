@@ -281,6 +281,13 @@ return [
         'icon' => 'BanknotesIcon',
         'dependencies' => ['accounting_classes', 'management_classes', 'cost_centers'],
     ],
+    'coupons' => [
+        'name' => 'Cupons',
+        'description' => 'Cadastro e solicitação de cupons de desconto para Consultores, Influencers e MS Indica. Fluxo de emissão em duas etapas (solicitação → emissão do código pelo e-commerce).',
+        'routes' => ['coupons.*'],
+        'icon' => 'TicketIcon',
+        'dependencies' => ['employees', 'stores'],
+    ],
     'dre' => [
         'name' => 'DRE Gerencial',
         'description' => 'Demonstrativo do Resultado do Exercício — matriz executiva com realizado × orçado × ano anterior, mapeamento conta contábil → linha gerencial e fechamento de períodos.',

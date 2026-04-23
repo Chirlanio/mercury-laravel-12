@@ -93,6 +93,10 @@ class AppServiceProvider extends ServiceProvider
         $this->registerPurchaseOrderListeners();
         $this->registerReversalListeners();
         $this->registerReturnListeners();
+        // Coupons: usa auto-discovery do Laravel 12 (listener em
+        // App\Listeners\NotifyCouponStakeholders::handle com type-hint
+        // do event — registra-se sozinho). NÃO adicionar Event::listen
+        // aqui ou duplica notifications (bug ativo em Return/Reversal).
         $this->registerNavigationObservers();
     }
 
@@ -122,6 +126,7 @@ class AppServiceProvider extends ServiceProvider
         // Matriz de destinatários no listener (criador + aprovadores/processadores).
         Event::listen(ReturnOrderStatusChanged::class, NotifyReturnOrderStakeholders::class);
     }
+
 
     protected function registerNavigationObservers(): void
     {
