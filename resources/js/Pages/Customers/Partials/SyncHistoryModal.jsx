@@ -46,7 +46,11 @@ export default function SyncHistoryModal({ show, onClose, canSync = false }) {
         }
     };
 
-    // Busca inicial + auto-polling a cada 3s quando há sync em execução.
+    // Busca inicial + auto-polling INCONDICIONAL a cada 3s enquanto o
+    // modal está aberto. Antes tinha condicional `hasActive` no setInterval,
+    // mas a closure capturava o `logs` do mount (vazio) — ficava preso sem
+    // refetch. Polling incondicional é simples e custo é trivial
+    // (30 rows de query a cada 3s).
     useEffect(() => {
         if (!show) {
             if (pollRef.current) clearInterval(pollRef.current);
@@ -58,20 +62,15 @@ export default function SyncHistoryModal({ show, onClose, canSync = false }) {
 
         fetchLogs(controller.signal).finally(() => setLoading(false));
 
-        // Polling — roda sempre enquanto o modal está aberto. O custo é
-        // irrisório (query leve de 30 rows) e garante feedback imediato.
         pollRef.current = setInterval(() => {
-            const hasActive = logs.some((l) => l.status === 'running' || l.status === 'pending');
-            if (hasActive) {
-                fetchLogs();
-            }
+            fetchLogs();
         }, 3000);
 
         return () => {
             controller.abort();
             if (pollRef.current) clearInterval(pollRef.current);
         };
-    }, [show, logs.length]);
+    }, [show]);
 
     const handleCancel = (logId) => {
         setCancelling(logId);
@@ -185,18 +184,32 @@ export default function SyncHistoryModal({ show, onClose, canSync = false }) {
                                     />
                                 </div>
 
-                                {log.status === 'running' && log.total_records > 0 && (
+                                {(log.status === 'running' || log.status === 'pending') && (
                                     <div className="mt-3">
-                                        <div className="text-xs text-gray-600 mb-1">
-                                            Progresso: {log.processed_records} / {log.total_records}
+                                        <div className="text-xs text-gray-600 mb-1 flex justify-between">
+                                            <span>
+                                                {log.total_records > 0
+                                                    ? `Progresso: ${log.processed_records.toLocaleString('pt-BR')} / ${log.total_records.toLocaleString('pt-BR')}`
+                                                    : `Processados: ${log.processed_records.toLocaleString('pt-BR')} (calculando total…)`}
+                                            </span>
+                                            {log.total_records > 0 && (
+                                                <span className="font-medium">
+                                                    {Math.min(100, Math.round((log.processed_records / log.total_records) * 100))}%
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-blue-500 transition-all"
-                                                style={{
-                                                    width: `${Math.min(100, Math.round((log.processed_records / log.total_records) * 100))}%`,
-                                                }}
-                                            />
+                                            {log.total_records > 0 ? (
+                                                <div
+                                                    className="h-full bg-blue-500 transition-all duration-500"
+                                                    style={{
+                                                        width: `${Math.min(100, Math.round((log.processed_records / log.total_records) * 100))}%`,
+                                                    }}
+                                                />
+                                            ) : (
+                                                // Barra indeterminada (animada) quando total ainda não foi calculado
+                                                <div className="h-full bg-blue-400 animate-pulse w-1/3" />
+                                            )}
                                         </div>
                                     </div>
                                 )}
