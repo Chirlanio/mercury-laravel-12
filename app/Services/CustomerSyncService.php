@@ -28,6 +28,10 @@ class CustomerSyncService
     /**
      * Testa a conexão com CIGAM antes de iniciar um sync — evita
      * enfileirar jobs que vão falhar e logar log inútil.
+     *
+     * Timeout de 15s porque o CIGAM é um PostgreSQL remoto fora da rede
+     * local (infra CIGAM hospedada externamente); 3s-5s era agressivo
+     * demais e dava falso-negativo em horários de pico.
      */
     public function isAvailable(): bool
     {
@@ -38,14 +42,14 @@ class CustomerSyncService
             }
 
             $dsn = sprintf(
-                'pgsql:host=%s;port=%s;dbname=%s;connect_timeout=3',
+                'pgsql:host=%s;port=%s;dbname=%s;connect_timeout=15',
                 $config['host'],
                 $config['port'] ?? '5432',
                 $config['database'],
             );
 
             new \PDO($dsn, $config['username'] ?? '', $config['password'] ?? '', [
-                \PDO::ATTR_TIMEOUT => 3,
+                \PDO::ATTR_TIMEOUT => 15,
                 \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
             ]);
 

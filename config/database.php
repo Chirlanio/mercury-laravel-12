@@ -111,9 +111,11 @@ return [
             'search_path' => 'public',
             'sslmode' => 'prefer',
             'options' => [
-                \PDO::ATTR_TIMEOUT => 5,
+                // 15s — CIGAM é PostgreSQL remoto (infra externa). Timeouts
+                // menores (3s-5s) dão falso-negativo em horários de pico.
+                \PDO::ATTR_TIMEOUT => 15,
             ],
-            'connect_timeout' => 5,
+            'connect_timeout' => 15,
         ],
 
         'sqlsrv' => [
