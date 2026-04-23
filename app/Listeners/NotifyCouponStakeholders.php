@@ -11,10 +11,10 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 
 /**
- * Escuta CouponStatusChanged e notifica stakeholders via database
- * notification (sino do frontend).
+ * Escuta CouponStatusChanged e notifica stakeholders.
  *
- * Matriz de destinatários por transição (excluindo sempre o actor):
+ * Matriz de destinatários por transição (excluindo sempre o actor do
+ * fluxo padrão database+mail):
  *  - → requested: usuários com ISSUE_COUPON_CODE (equipe e-commerce)
  *    precisam saber que há pedido para emitir.
  *  - → issued: criador recebe (saber que seu código saiu + coupon_site).
@@ -22,6 +22,11 @@ use Illuminate\Support\Facades\Notification;
  *  - → cancelled: criador recebe (saber motivo).
  *  - → expired: criador recebe (informativo).
  *  - outros: silêncio (draft é interno, actor já sabe).
+ *
+ * Cópia mail-only adicional:
+ *  - → requested: criador também recebe e-mail de confirmação (mesmo
+ *    sendo o actor da ação), sem entrar no sino — confirma à loja/usuário
+ *    que a solicitação chegou no e-commerce.
  *
  * Falhas NÃO quebram o fluxo de transição (já estamos pós-commit).
  */
@@ -32,17 +37,17 @@ class NotifyCouponStakeholders
         try {
             $recipients = $this->resolveRecipients($event);
 
-            if ($recipients->isEmpty()) {
-                return;
+            if ($recipients->isNotEmpty()) {
+                Notification::send($recipients, new CouponStatusChangedNotification(
+                    coupon: $event->coupon,
+                    fromStatus: $event->fromStatus,
+                    toStatus: $event->toStatus,
+                    actor: $event->actor,
+                    note: $event->note,
+                ));
             }
 
-            Notification::send($recipients, new CouponStatusChangedNotification(
-                coupon: $event->coupon,
-                fromStatus: $event->fromStatus,
-                toStatus: $event->toStatus,
-                actor: $event->actor,
-                note: $event->note,
-            ));
+            $this->sendCreatorMailCopy($event, $recipients);
         } catch (\Throwable $e) {
             Log::warning('Failed to notify coupon stakeholders', [
                 'coupon_id' => $event->coupon->id,
@@ -51,6 +56,41 @@ class NotifyCouponStakeholders
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Manda mail-only ao criador em → requested se ele não estiver já
+     * incluído na lista padrão (evita duplicidade quando criador != actor
+     * e tem ISSUE_COUPON_CODE, p. ex. um admin do e-commerce que solicita).
+     */
+    protected function sendCreatorMailCopy(CouponStatusChanged $event, $recipients): void
+    {
+        if ($event->toStatus !== CouponStatus::REQUESTED) {
+            return;
+        }
+
+        $creatorId = $event->coupon->created_by_user_id;
+        if (! $creatorId) {
+            return;
+        }
+
+        if ($recipients->contains(fn (User $u) => $u->id === $creatorId)) {
+            return;
+        }
+
+        $creator = User::find($creatorId);
+        if (! $creator || empty($creator->email)) {
+            return;
+        }
+
+        Notification::send($creator, new CouponStatusChangedNotification(
+            coupon: $event->coupon,
+            fromStatus: $event->fromStatus,
+            toStatus: $event->toStatus,
+            actor: $event->actor,
+            note: $event->note,
+            mailOnly: true,
+        ));
     }
 
     /**
