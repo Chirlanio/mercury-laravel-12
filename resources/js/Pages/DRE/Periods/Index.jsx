@@ -166,7 +166,7 @@ export default function Index({ periods, lastActiveId, lastClosedUpTo }) {
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">Fechamentos DRE</h1>
                             <p className="text-sm text-gray-600 mt-1">
@@ -181,7 +181,7 @@ export default function Index({ periods, lastActiveId, lastClosedUpTo }) {
                                 </p>
                             )}
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                             {canImportActuals && (
                                 <Button
                                     variant="secondary"

@@ -71,7 +71,7 @@ export default function Matrix({
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="mb-6 flex justify-between items-center">
+                    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
                         <div>
                             <h1 className="text-2xl font-semibold text-gray-900">
                                 DRE Gerencial
@@ -81,7 +81,7 @@ export default function Matrix({
                             </p>
                         </div>
                         {canExport && (
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2">
                                 <a href={buildExportUrl('dre.matrix.export.xlsx', filters)} className="contents">
                                     <Button
                                         variant="outline"

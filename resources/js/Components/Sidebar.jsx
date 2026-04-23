@@ -344,7 +344,7 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
 
                 {/* Mobile sidebar */}
                 <div
-                    className={`lg:hidden fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${
+                    className={`lg:hidden flex flex-col fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${
                         isOpen ? "translate-x-0" : "-translate-x-full"
                     }`}
                 >
@@ -430,7 +430,7 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
 
             {/* Mobile Sidebar - sempre expandido */}
             <div
-                className={`lg:hidden fixed inset-y-0 left-0 z-50 w-[85vw] max-w-[16rem] bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${
+                className={`lg:hidden flex flex-col fixed inset-y-0 left-0 z-50 w-[85vw] max-w-[16rem] bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${
                     isOpen ? "translate-x-0" : "-translate-x-full"
                 }`}
             >

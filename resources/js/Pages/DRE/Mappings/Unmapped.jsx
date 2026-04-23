@@ -105,9 +105,9 @@ export default function MappingsUnmapped({
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="mb-6 flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                            <ExclamationTriangleIcon className="h-7 w-7 text-yellow-500" />
+                    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
+                        <div className="flex items-start gap-3 sm:items-center">
+                            <ExclamationTriangleIcon className="h-7 w-7 text-yellow-500 flex-shrink-0" />
                             <div>
                                 <h1 className="text-2xl font-semibold text-gray-900">
                                     Contas Não Mapeadas
@@ -119,7 +119,7 @@ export default function MappingsUnmapped({
                             </div>
                         </div>
 
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                             <Link href={route('dre.mappings.index')}>
                                 <Button variant="secondary" size="sm">
                                     Voltar ao mapeamento completo
