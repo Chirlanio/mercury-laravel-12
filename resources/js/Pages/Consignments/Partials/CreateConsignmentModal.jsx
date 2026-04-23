@@ -701,73 +701,141 @@ export default function CreateConsignmentModal({
 
                         {data.items.length === 0 ? (
                             <div className="text-center py-8 text-gray-500 text-sm border-2 border-dashed rounded-md">
-                                Nenhum item ainda. Clique em "Adicionar item" para incluir.
+                                Nenhum item ainda. Clique em "Adicionar item" ou "Buscar NF" para preencher automaticamente.
                             </div>
                         ) : (
                             <div className="space-y-3">
-                                {data.items.map((item, idx) => (
-                                    <div key={idx} className="border border-gray-200 rounded-md p-3 bg-gray-50 relative">
-                                        <button
-                                            type="button"
-                                            onClick={() => removeItem(idx)}
-                                            className="absolute top-2 right-2 text-gray-400 hover:text-red-600 p-1"
-                                            aria-label="Remover item"
-                                        >
-                                            <TrashIcon className="w-5 h-5" />
-                                        </button>
+                                {data.items.map((item, idx) => {
+                                    const fromNf = Boolean(item.movement_id);
+                                    const sizeDisplay = item.size_label
+                                        || (item.size_cigam_code ? item.size_cigam_code.replace(/^U/, '') : null);
+                                    const lineTotal = Number(item.quantity || 0) * Number(item.unit_value || 0);
 
-                                        <div className="pr-8">
-                                            <ProductLookupInline
-                                                value={item.product_id ? item : null}
-                                                onChange={(selection) => {
-                                                    if (selection) {
-                                                        updateItem(idx, {
-                                                            ...selection,
-                                                            unit_value: selection.unit_value ?? item.unit_value,
-                                                        });
-                                                    } else {
-                                                        updateItem(idx, {
-                                                            product_id: null,
-                                                            product_variant_id: null,
-                                                            reference: '',
-                                                            barcode: '',
-                                                            size_cigam_code: '',
-                                                        });
-                                                    }
-                                                }}
-                                                lookupUrl={route('consignments.lookup.products')}
-                                                label={`Item ${idx + 1}`}
-                                                error={errors[`items.${idx}.product_id`]}
-                                                required
-                                            />
+                                    if (fromNf) {
+                                        // Item da NF — read-only com referência + tamanho + qty + valor
+                                        return (
+                                            <div
+                                                key={idx}
+                                                className="border border-indigo-200 bg-indigo-50/40 rounded-md p-3 relative"
+                                            >
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeItem(idx)}
+                                                    className="absolute top-2 right-2 text-gray-400 hover:text-red-600 p-1"
+                                                    aria-label="Remover item"
+                                                    title="Remover da consignação"
+                                                >
+                                                    <TrashIcon className="w-5 h-5" />
+                                                </button>
 
-                                            <div className="mt-3 grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <InputLabel value="Quantidade *" />
-                                                    <TextInput
-                                                        type="number"
-                                                        min={1}
-                                                        value={item.quantity}
-                                                        onChange={(e) => updateItem(idx, { quantity: Math.max(1, Number(e.target.value)) })}
-                                                        className="mt-1 block w-full"
-                                                        inputMode="numeric"
-                                                    />
-                                                    <InputError message={errors[`items.${idx}.quantity`]} className="mt-1" />
+                                                <div className="pr-8 flex items-start gap-3 flex-wrap">
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-xs text-indigo-700 uppercase font-medium">
+                                                            Item {idx + 1} · da NF
+                                                        </div>
+                                                        <div className="mt-1 font-semibold text-gray-900 truncate">
+                                                            {item.reference || '—'}
+                                                            {sizeDisplay && (
+                                                                <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">
+                                                                    Tam. {sizeDisplay}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {item.description && (
+                                                            <div className="text-xs text-gray-600 truncate mt-0.5">
+                                                                {item.description}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex gap-4 text-sm shrink-0">
+                                                        <div className="text-center">
+                                                            <div className="text-[10px] text-gray-500 uppercase">Qtd</div>
+                                                            <div className="font-bold text-gray-900">{item.quantity}</div>
+                                                        </div>
+                                                        <div className="text-center">
+                                                            <div className="text-[10px] text-gray-500 uppercase">Unit.</div>
+                                                            <div className="font-bold text-gray-900">
+                                                                R$ {Number(item.unit_value || 0).toFixed(2).replace('.', ',')}
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-center">
+                                                            <div className="text-[10px] text-gray-500 uppercase">Total</div>
+                                                            <div className="font-bold text-indigo-700">
+                                                                R$ {lineTotal.toFixed(2).replace('.', ',')}
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <InputLabel value="Valor unitário *" />
-                                                    <TextInput
-                                                        type="text"
-                                                        value={maskMoney((item.unit_value ?? 0) * 100)}
-                                                        onChange={(e) => updateItem(idx, { unit_value: parseMoney(e.target.value) })}
-                                                        className="mt-1 block w-full"
-                                                        inputMode="decimal"
-                                                    />
+                                            </div>
+                                        );
+                                    }
+
+                                    // Item manual — editável
+                                    return (
+                                        <div key={idx} className="border border-gray-200 rounded-md p-3 bg-gray-50 relative">
+                                            <button
+                                                type="button"
+                                                onClick={() => removeItem(idx)}
+                                                className="absolute top-2 right-2 text-gray-400 hover:text-red-600 p-1"
+                                                aria-label="Remover item"
+                                            >
+                                                <TrashIcon className="w-5 h-5" />
+                                            </button>
+
+                                            <div className="pr-8">
+                                                <ProductLookupInline
+                                                    value={item.product_id ? item : null}
+                                                    onChange={(selection) => {
+                                                        if (selection) {
+                                                            updateItem(idx, {
+                                                                ...selection,
+                                                                unit_value: selection.unit_value ?? item.unit_value,
+                                                            });
+                                                        } else {
+                                                            updateItem(idx, {
+                                                                product_id: null,
+                                                                product_variant_id: null,
+                                                                reference: '',
+                                                                barcode: '',
+                                                                size_cigam_code: '',
+                                                            });
+                                                        }
+                                                    }}
+                                                    lookupUrl={route('consignments.lookup.products')}
+                                                    label={`Item ${idx + 1} · manual`}
+                                                    error={errors[`items.${idx}.product_id`]}
+                                                    required
+                                                />
+
+                                                <div className="mt-3 grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <InputLabel value="Quantidade *" />
+                                                        <TextInput
+                                                            type="number"
+                                                            min={1}
+                                                            value={item.quantity}
+                                                            onChange={(e) => updateItem(idx, { quantity: Math.max(1, Number(e.target.value)) })}
+                                                            className="mt-1 block w-full"
+                                                            inputMode="numeric"
+                                                        />
+                                                        <InputError message={errors[`items.${idx}.quantity`]} className="mt-1" />
+                                                    </div>
+                                                    <div>
+                                                        <InputLabel value="Valor unitário *" />
+                                                        <TextInput
+                                                            type="text"
+                                                            value={maskMoney((item.unit_value ?? 0) * 100)}
+                                                            onChange={(e) => updateItem(idx, { unit_value: parseMoney(e.target.value) })}
+                                                            className="mt-1 block w-full"
+                                                            inputMode="decimal"
+                                                        />
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

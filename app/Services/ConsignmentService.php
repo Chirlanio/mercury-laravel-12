@@ -210,6 +210,17 @@ class ConsignmentService
         $quantity = max(1, (int) $data['quantity']);
         $unitValue = round((float) $data['unit_value'], 2);
 
+        // Se o item veio da NF (movement_id presente), quantidade e valor
+        // devem vir do movement — não aceitar valores do payload.
+        // Evita que um usuário adultere os números da NF via DevTools.
+        if (! empty($data['movement_id'])) {
+            $movement = \App\Models\Movement::find($data['movement_id']);
+            if ($movement) {
+                $quantity = max(1, (int) $movement->quantity);
+                $unitValue = round((float) $movement->sale_price, 2);
+            }
+        }
+
         return ConsignmentItem::create([
             'consignment_id' => $consignment->id,
             'movement_id' => $data['movement_id'] ?? null,
