@@ -21,8 +21,9 @@ class CustomerVipTierConfigController extends Controller
         $configs = CustomerVipTierConfig::query()
             ->orderByDesc('year')
             ->orderBy('tier')
-            ->get()
-            ->map(fn (CustomerVipTierConfig $c) => [
+            ->paginate(50)
+            ->withQueryString()
+            ->through(fn (CustomerVipTierConfig $c) => [
                 'id' => $c->id,
                 'year' => (int) $c->year,
                 'tier' => $c->tier,

@@ -1,15 +1,16 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import {
-    AdjustmentsHorizontalIcon, ArrowLeftIcon, PlusIcon, TrashIcon, PencilSquareIcon,
+    AdjustmentsHorizontalIcon, ArrowLeftIcon, PlusIcon,
     InformationCircleIcon,
 } from '@heroicons/react/24/outline';
-import { useConfirm } from '@/Hooks/useConfirm';
 import { maskMoney, parseMoney } from '@/Hooks/useMasks';
 import Button from '@/Components/Button';
+import ActionButtons from '@/Components/ActionButtons';
+import DataTable from '@/Components/DataTable';
 import StandardModal from '@/Components/StandardModal';
 import StatusBadge from '@/Components/Shared/StatusBadge';
-import EmptyState from '@/Components/Shared/EmptyState';
+import DeleteConfirmModal from '@/Components/Shared/DeleteConfirmModal';
 import TextInput from '@/Components/TextInput';
 import InputLabel from '@/Components/InputLabel';
 
@@ -17,9 +18,12 @@ const fmtCurrency = (v) => new Intl.NumberFormat('pt-BR', {
     style: 'currency', currency: 'BRL',
 }).format(Number(v) || 0);
 
+const TIER_LABEL = { black: 'Black', gold: 'Gold' };
+
 export default function VipConfig({ configs, can }) {
-    const { confirm, ConfirmDialogComponent } = useConfirm();
     const [editing, setEditing] = useState(null); // null = closed, {} = new, { ...config } = edit
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [deleting, setDeleting] = useState(false);
     const isNew = editing && !editing.id;
 
     const { data, setData, post, patch, processing, reset, errors, transform } = useForm({
@@ -29,7 +33,6 @@ export default function VipConfig({ configs, can }) {
         notes: '',
     });
 
-    // Serializa o valor mascarado "15.000,00" → 15000 antes de enviar ao backend
     transform((payload) => ({
         ...payload,
         min_revenue: parseMoney(payload.min_revenue),
@@ -72,16 +75,58 @@ export default function VipConfig({ configs, can }) {
         }
     };
 
-    const handleDelete = async (c) => {
-        const ok = await confirm({
-            title: 'Remover threshold?',
-            message: `Threshold de ${c.tier.toUpperCase()} em ${c.year} (${fmtCurrency(c.min_revenue)}) será excluído.`,
-            confirmText: 'Sim, remover',
-            type: 'danger',
+    const handleDeleteConfirm = () => {
+        if (!deleteTarget) return;
+        setDeleting(true);
+        router.delete(route('customers.vip.config.destroy', deleteTarget.id), {
+            preserveScroll: true,
+            onFinish: () => {
+                setDeleting(false);
+                setDeleteTarget(null);
+            },
         });
-        if (!ok) return;
-        router.delete(route('customers.vip.config.destroy', c.id), { preserveScroll: true });
     };
+
+    const columns = [
+        {
+            key: 'year',
+            label: 'Ano',
+            className: 'font-medium text-gray-900',
+            render: (row) => row.year,
+        },
+        {
+            key: 'tier',
+            label: 'Tier',
+            render: (row) => (
+                <StatusBadge color={row.tier === 'black' ? 'dark' : 'warning'}>
+                    {TIER_LABEL[row.tier]}
+                </StatusBadge>
+            ),
+        },
+        {
+            key: 'min_revenue',
+            label: 'Faturamento mínimo',
+            className: 'text-right font-mono',
+            render: (row) => fmtCurrency(row.min_revenue),
+        },
+        {
+            key: 'notes',
+            label: 'Notas',
+            className: 'text-gray-600 max-w-md truncate',
+            render: (row) => row.notes || '—',
+        },
+        {
+            key: 'actions',
+            label: '',
+            className: 'text-right',
+            render: (row) => (
+                <ActionButtons
+                    onEdit={can.manage_config ? () => openEdit(row) : null}
+                    onDelete={can.manage_config ? () => setDeleteTarget(row) : null}
+                />
+            ),
+        },
+    ];
 
     return (
         <>
@@ -114,68 +159,19 @@ export default function VipConfig({ configs, can }) {
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ano</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tier</th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Faturamento mínimo</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notas</th>
-                                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {configs.length > 0 ? configs.map((c) => (
-                                        <tr key={c.id} className="hover:bg-gray-50">
-                                            <td className="px-4 py-3 text-sm text-gray-900 font-medium">{c.year}</td>
-                                            <td className="px-4 py-3">
-                                                <StatusBadge color={c.tier === 'black' ? 'dark' : 'warning'}>
-                                                    {c.tier === 'black' ? 'Black' : 'Gold'}
-                                                </StatusBadge>
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-mono text-sm text-gray-900">
-                                                {fmtCurrency(c.min_revenue)}
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-gray-600 max-w-md truncate" title={c.notes}>
-                                                {c.notes || '—'}
-                                            </td>
-                                            <td className="px-4 py-3 text-right">
-                                                {can.manage_config && (
-                                                    <div className="flex gap-1 justify-end">
-                                                        <button onClick={() => openEdit(c)} className="p-1 text-gray-600 hover:text-gray-900" title="Editar">
-                                                            <PencilSquareIcon className="w-5 h-5" />
-                                                        </button>
-                                                        <button onClick={() => handleDelete(c)} className="p-1 text-red-600 hover:text-red-800" title="Excluir">
-                                                            <TrashIcon className="w-5 h-5" />
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    )) : (
-                                        <tr>
-                                            <td colSpan={5} className="p-8">
-                                                <EmptyState
-                                                    title="Nenhum threshold configurado"
-                                                    description="Cadastre os valores mínimos por ano antes de rodar a classificação automática."
-                                                    icon={AdjustmentsHorizontalIcon}
-                                                />
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                    <DataTable
+                        data={configs}
+                        columns={columns}
+                        searchable={false}
+                        emptyMessage="Nenhum threshold configurado. Cadastre os valores mínimos por ano antes de rodar a classificação automática."
+                    />
                 </div>
             </div>
 
             <StandardModal
                 show={editing !== null}
                 onClose={() => setEditing(null)}
-                title={isNew ? 'Novo threshold' : `Editar threshold — ${editing?.year} ${editing?.tier?.toUpperCase()}`}
+                title={isNew ? 'Novo threshold' : `Editar threshold — ${editing?.year} ${TIER_LABEL[editing?.tier] ?? ''}`}
                 headerColor="bg-indigo-600"
                 headerIcon={<AdjustmentsHorizontalIcon className="w-6 h-6" />}
                 maxWidth="lg"
@@ -239,7 +235,6 @@ export default function VipConfig({ configs, can }) {
                             {errors.min_revenue && <p className="text-red-600 text-xs mt-1">{errors.min_revenue}</p>}
                         </div>
 
-                        {/* Nota explicativa do período + regra */}
                         <div className="rounded-md bg-indigo-50 border border-indigo-100 p-3 flex gap-2">
                             <InformationCircleIcon className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
                             <div className="text-xs text-indigo-900 space-y-1">
@@ -275,7 +270,20 @@ export default function VipConfig({ configs, can }) {
                 </StandardModal.Section>
             </StandardModal>
 
-            <ConfirmDialogComponent />
+            <DeleteConfirmModal
+                show={deleteTarget !== null}
+                onClose={() => !deleting && setDeleteTarget(null)}
+                onConfirm={handleDeleteConfirm}
+                itemType="threshold"
+                itemName={deleteTarget ? `${TIER_LABEL[deleteTarget.tier]} ${deleteTarget.year}` : ''}
+                details={deleteTarget ? [
+                    { label: 'Ano', value: String(deleteTarget.year) },
+                    { label: 'Tier', value: TIER_LABEL[deleteTarget.tier] },
+                    { label: 'Faturamento mínimo', value: fmtCurrency(deleteTarget.min_revenue) },
+                ] : []}
+                warningMessage="A sugestão automática do ano ficará sem régua para esse tier até você cadastrar um novo valor. Curadorias já registradas não são afetadas."
+                processing={deleting}
+            />
         </>
     );
 }
