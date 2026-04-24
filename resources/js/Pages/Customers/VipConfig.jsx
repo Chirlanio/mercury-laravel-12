@@ -240,13 +240,14 @@ export default function VipConfig({ configs, availableYears = [], can }) {
                                                 </div>
                                             </div>
                                             {can.manage_config && (
-                                                <button
-                                                    type="button"
+                                                <Button
+                                                    variant="outline"
+                                                    size="xs"
                                                     onClick={() => openYearForm(y.year)}
-                                                    className="text-xs text-indigo-600 hover:text-indigo-800 hover:underline shrink-0"
+                                                    className="shrink-0"
                                                 >
                                                     {complete ? 'Editar' : 'Completar'}
-                                                </button>
+                                                </Button>
                                             )}
                                         </div>
                                     </div>

@@ -13,6 +13,7 @@ import {
 import { useConfirm } from '@/Hooks/useConfirm';
 import useModalManager from '@/Hooks/useModalManager';
 import Button from '@/Components/Button';
+import ActionButtons from '@/Components/ActionButtons';
 import StandardModal from '@/Components/StandardModal';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import StatusBadge from '@/Components/Shared/StatusBadge';
@@ -295,50 +296,27 @@ export default function VipIndex({ tiers, year, availableYears, filters, statist
                                                 )}
                                             </td>
                                             <td className="px-3 py-3 text-right">
-                                                <div className="flex gap-1 justify-end">
+                                                <ActionButtons
+                                                    onEdit={can.curate ? () => openModal('curate', t) : null}
+                                                    onDelete={can.curate && t.final_tier ? () => handleRemove(t) : null}
+                                                >
                                                     {can.view_reports && (
-                                                        <button
-                                                            type="button"
+                                                        <ActionButtons.Custom
+                                                            variant="info"
+                                                            icon={ChartBarIcon}
+                                                            title="Relatório YoY (faturamento)"
                                                             onClick={() => openModal('report', t)}
-                                                            className="p-1 text-indigo-600 hover:text-indigo-800"
-                                                            title="Relatório YoY"
-                                                        >
-                                                            <ChartBarIcon className="w-5 h-5" />
-                                                        </button>
+                                                        />
                                                     )}
                                                     {can.manage_activities && (
-                                                        <button
-                                                            type="button"
+                                                        <ActionButtons.Custom
+                                                            variant="secondary"
+                                                            icon={GiftIcon}
+                                                            title="Atividades de marketing"
                                                             onClick={() => openModal('activities', t)}
-                                                            className="p-1 text-purple-600 hover:text-purple-800"
-                                                            title="Atividades"
-                                                        >
-                                                            <GiftIcon className="w-5 h-5" />
-                                                        </button>
+                                                        />
                                                     )}
-                                                    {can.curate && (
-                                                        <>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => openModal('curate', t)}
-                                                                className="p-1 text-gray-600 hover:text-gray-900"
-                                                                title="Curar"
-                                                            >
-                                                                <PencilSquareIcon className="w-5 h-5" />
-                                                            </button>
-                                                            {t.final_tier && (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleRemove(t)}
-                                                                    className="p-1 text-red-600 hover:text-red-800"
-                                                                    title="Remover da lista"
-                                                                >
-                                                                    <TrashIcon className="w-5 h-5" />
-                                                                </button>
-                                                            )}
-                                                        </>
-                                                    )}
-                                                </div>
+                                                </ActionButtons>
                                             </td>
                                         </tr>
                                     )) : (
