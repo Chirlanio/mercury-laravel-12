@@ -63,7 +63,7 @@ vendor/bin/pint        # Laravel Pint (PHP code style fixer)
 ### Backend Structure
 
 **Auth & RBAC (centralized, database-driven):**
-- 4 roles: SUPER_ADMIN > ADMIN > SUPPORT > USER — defined as enum in `app/Enums/Role.php` but **permissions are managed via central DB** (`central_roles` + `central_permissions` tables)
+- 9 roles: SUPER_ADMIN (10) > ADMIN (9) > FINANCE / ACCOUNTING / FISCAL / MARKETING (8) > SUPPORT (2) > USER / DRIVER (1) — defined as enum in `app/Enums/Role.php` but **permissions are managed via central DB** (`central_roles` + `central_permissions` tables). Hierarchy levels têm gaps intencionais (1, 2, 8, 9, 10) pra permitir adicionar roles intermediárias sem shift em cascata.
 - `CentralRoleResolver` (`app/Services/CentralRoleResolver.php`) resolves role→permissions from central DB with enum fallback, cached 5 min
 - `PermissionMiddleware` checks `$user->hasPermissionTo($permission)` which delegates to `CentralRoleResolver`
 - Routes protect endpoints with `middleware('permission:PERMISSION_NAME')` and `middleware('tenant.module:MODULE_SLUG')`
@@ -108,6 +108,16 @@ vendor/bin/pint        # Laravel Pint (PHP code style fixer)
 - Unicidade varia por tipo (via `CouponService::ensureUnique()`, não via DB constraint — MySQL não trata `NULL=NULL`): Consultor/MsIndica por `(cpf_hash, type, store_code)` permite cupons em lojas diferentes; Influencer por `(cpf_hash, type)`
 - Config module auxiliar `SocialMedia` com `link_type` (`url`|`username`) + `link_placeholder` — valida link do Influencer contextualmente (YouTube exige URL, Instagram aceita @user ou URL)
 - Análise completa em `docs/ANALISE_MODULO_COUPONS.md`
+
+**Customers VIP / Programa MS Life (curadoria anual Black/Gold da Marketing):**
+- Sub-módulo de Customers (mesmo `tenant.module:customers`), 6 permissions `customer_vips.*` + Role nova `MARKETING` (hierarchy 8). 3 tabelas tenant isoladas do sync CIGAM — nada toca `customers`, apenas FKs por `customer_id`.
+- **Regra N-1**: lista do ano N usa faturamento de N-1 (Lista 2026 ↔ vendas 2025). Encapsulado em `CustomerVipClassificationService::revenueYearFor($listYear)`.
+- **Escopo MS Life**: SÓ vendas em lojas da rede `MEIA SOLA` (`networks.nome`) contam — Arezzo/Schutz/MS Off/E-Commerce/Administrativo são excluídas. Resolvido via `msLifeStoreCodes()` com cache `array` por request, comparação `UPPER()` case-insensitive (seeder produção usa MAIÚSCULA, TestHelpers usa CamelCase).
+- **Fluxo híbrido**: auto sugere via `generateSuggestions(year)` (movements code=2 soma, code=6+E subtrai), Marketing cura manualmente via `curate()`. Curadoria com `curated_at != null` SEMPRE preservada — rodadas auto subsequentes só atualizam snapshots, nunca sobrescrevem `final_tier`. `cleanupObsoleteAutoTiers` deleta registros auto que não qualificam mais.
+- **Régua incompleta = pré-falha**: `runSuggestions` valida que Black E Gold estão cadastrados ANTES de processar. Sem ambos, retorna warning específico e nada é persistido.
+- **Loja preferida**: snapshot por cliente/ano com tie-break hierárquico revenue → tickets → items → menor store_code (estabilidade).
+- UI: cadastro do par Black+Gold em uma operação via endpoint `POST /customers/vip/config/year` (validação Black>=Gold). Campo Ano é `<select>` dinâmico populado pelo backend (`availableYears` = anos cadastrados ∪ ano corrente ∪ próximo). Layout `lg:flex-row` (não estoura iPad mini).
+- Detalhes em `C:\Users\MSDEV\.claude\projects\C--xampp-htdocs-mercury-laravel\memory\customers_vip_module.md`
 
 ### Frontend Structure
 
@@ -168,7 +178,7 @@ resources/js/
 
 | Componente | Quando usar | Nunca fazer |
 |---|---|---|
-| `StatisticsGrid` | Cards de estatísticas/KPIs no topo de qualquer pagina de listagem. Aceita `cards[]` com `label`, `value`, `format` (currency/number/percentage), `icon` (Heroicon), `color`, `sub`, `variation`, `onClick`, `active`. Suporta estado de `loading` com skeleton automático. | Criar cards de estatísticas inline com HTML/Tailwind avulso ou componentes específico por módulo (ex: `SaleStatisticsCards`, `XyzStats`). |
+| `StatisticsGrid` | Cards de estatísticas/KPIs no topo de qualquer pagina de listagem. Aceita `cards[]` com `label`, `value`, `format` (currency/number/percentage), `icon` (Heroicon), `color`, `sub`, `variation`, `onClick`, `active`. Suporta estado de `loading` com skeleton automático. **Layout responsivo**: cols 1-6 escalam progressivamente (cols=4 vira `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`); valor usa `text-lg sm:text-xl xl:text-2xl` + `tabular-nums` + `truncate` + `title=valor` (tooltip hover) — não estoura em iPad mini para valores monetários longos. | Criar cards de estatísticas inline com HTML/Tailwind avulso ou componentes específico por módulo (ex: `SaleStatisticsCards`, `XyzStats`). |
 | `StatusBadge` | Exibir status, tipo ou qualquer label categorizado com cor. Variantes: success, warning, danger, info, purple, indigo, teal, orange, gray. Aceita `icon` e `dot`. | Criar badges manuais com `<span className="bg-green-100 text-green-800...">`. |
 | `FormSection` | Agrupar campos de formulário com titulo e grid responsivo. Props: `title`, `cols` (1-4). | Criar `<div>` com titulo e grid manual para agrupar campos. |
 | `EmptyState` | Tela vazia quando nao ha dados. Props: `title`, `description`, `icon` (Heroicon), `action` (botão), `compact` (para uso dentro de tabelas). | Criar mensagens "Nenhum registro" com HTML avulso. |
@@ -197,7 +207,7 @@ resources/js/
 | `useTenant()` | Verificar módulos ativos do tenant. Método: `hasModule(slug)`. | Verificar módulos com logica manual ou condições hardcoded. |
 | `useModalManager(names[])` | Gerenciar multiplos modais numa pagina. Retorna `modals`, `selected`, `openModal()`, `closeModal()`, `switchModal()`. | Criar multiplos `useState` para controlar visibilidade de modais. |
 | `useConfirm()` | Confirmação com Promise. Retorna `confirm(config)` + `ConfirmDialogComponent`. | Usar `window.confirm()`. |
-| `useMasks` | Mascaras brasileiras: `maskMoney`, `maskCpf`, `maskCnpj`, `maskPhone`, `parseMoney`. | Criar funções de formatação avulsas ou usar libs externas de mascara. |
+| `useMasks` | Mascaras brasileiras: `maskMoney`, `maskCpf`, `maskCnpj`, `maskPhone`, `parseMoney`. **Importar como funções soltas** (`import { maskMoney, parseMoney } from '@/Hooks/useMasks'`), NUNCA como hook (`useMasks()` não existe e quebra build do Vite). | Criar funções de formatação avulsas ou usar libs externas de mascara. |
 
 #### Estrutura padrão de uma Pagina de Listagem
 
@@ -224,8 +234,13 @@ export default function Index({ items, filters, stats }) {
             <Head title="módulo" />
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* 1. Header com titulo + botoes de ação */}
-                    {/* 2. StatisticsGrid com cards de KPIs */}
+                    {/* 1. Header — vertical até lg pra não estourar em iPad mini (768).
+                           Padrão: <div className="flex flex-col gap-3 lg:flex-row lg:justify-between lg:items-center">
+                               <div className="min-w-0"> Título + subtítulo (ícones com shrink-0) </div>
+                               <div className="flex flex-wrap gap-2 lg:shrink-0"> Botões com flex-1 sm:flex-none whitespace-nowrap </div>
+                           </div>
+                           NÃO usar sm:flex-row no header — em 640-1023 estoura com 3+ botões. */}
+                    {/* 2. StatisticsGrid com cards de KPIs (responsivo automaticamente) */}
                     {/* 3. Filtros em bg-white shadow-sm rounded-lg p-4 mb-6 */}
                     {/* 4. DataTable com colunas, ActionButtons, StatusBadge */}
                 </div>
