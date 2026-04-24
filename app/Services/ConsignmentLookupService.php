@@ -542,6 +542,7 @@ class ConsignmentLookupService
             $missingInReturn[] = [
                 'consignment_item_id' => $out->id,
                 'reference' => $out->reference,
+                'size_label' => $out->size_label,
                 'size_cigam_code' => $out->size_cigam_code,
                 'description' => $out->description,
                 'outbound_quantity' => (int) $out->quantity,
@@ -594,6 +595,7 @@ class ConsignmentLookupService
             ->map(fn ($it) => [
                 'consignment_item_id' => $it->id,
                 'reference' => $it->reference,
+                'size_label' => $it->size_label,
                 'size_cigam_code' => $it->size_cigam_code,
                 'description' => $it->description,
                 'outbound_quantity' => (int) $it->quantity,
@@ -608,23 +610,35 @@ class ConsignmentLookupService
      * Verifica se houve venda (movement_code=2) para o CPF do cliente
      * na janela de N dias (default 7) após a data de retorno.
      *
-     * Usado para validar items marcados como "vendido" — se o cliente
-     * não comprou no CIGAM, sale_justification fica obrigatória.
+     * Quando $consignment é passada, produz também `per_item` — mapa
+     * keyed por consignment_item_id com `{matched:bool, movements:[]}`
+     * indicando se o produto específico (ref_size / barcode) apareceu
+     * entre as vendas do CPF. O alerta pertence aos produtos consignados,
+     * não a qualquer venda solta do cliente.
      *
-     * @return array{found: bool, movements: array<int, array<string, mixed>>}
+     * @return array{
+     *   found: bool,
+     *   movements: array<int, array<string, mixed>>,
+     *   per_item: array<int, array{matched: bool, movements: array<int, array<string, mixed>>}>
+     * }
      */
     public function verifyCustomerSale(
         ?string $cpfCustomer,
         string $referenceDate,
         int $windowDays = 7,
+        ?\App\Models\Consignment $consignment = null,
     ): array {
+        $emptyPerItem = $consignment
+            ? $consignment->items->mapWithKeys(fn ($it) => [$it->id => ['matched' => false, 'movements' => []]])->all()
+            : [];
+
         if (! $cpfCustomer) {
-            return ['found' => false, 'movements' => []];
+            return ['found' => false, 'movements' => [], 'per_item' => $emptyPerItem];
         }
 
         $cpfClean = preg_replace('/\D/', '', $cpfCustomer);
         if (strlen($cpfClean) !== 11) {
-            return ['found' => false, 'movements' => []];
+            return ['found' => false, 'movements' => [], 'per_item' => $emptyPerItem];
         }
 
         $start = (new \DateTime($referenceDate))->format('Y-m-d');
@@ -637,18 +651,57 @@ class ConsignmentLookupService
             ->orderBy('movement_date')
             ->get(['id', 'store_code', 'invoice_number', 'movement_date', 'ref_size', 'barcode', 'quantity', 'realized_value']);
 
+        $movementsDto = $movements->map(fn ($m) => [
+            'id' => $m->id,
+            'store_code' => $m->store_code,
+            'invoice_number' => $m->invoice_number,
+            'movement_date' => $m->movement_date?->format('Y-m-d'),
+            'ref_size' => $m->ref_size,
+            'barcode' => $m->barcode,
+            'quantity' => (int) $m->quantity,
+            'realized_value' => (float) $m->realized_value,
+        ])->values()->all();
+
+        $perItem = $emptyPerItem;
+
+        if ($consignment && $movements->isNotEmpty()) {
+            foreach ($consignment->items as $item) {
+                $itemBarcode = (string) $item->barcode;
+                $itemRef = (string) $item->reference;
+                $itemSize = (string) $item->size_cigam_code;
+
+                $matched = $movements->filter(function ($m) use ($itemBarcode, $itemRef, $itemSize) {
+                    if ($itemBarcode !== '' && (string) $m->barcode === $itemBarcode) {
+                        return true;
+                    }
+
+                    // Fallback: ref_size pode vir como "REF|SIZE" ou "REFSIZE" dependendo do sync.
+                    $refSize = (string) $m->ref_size;
+                    if ($itemRef !== '' && $itemSize !== '' && str_contains(strtoupper($refSize), strtoupper($itemRef)) && str_contains(strtoupper($refSize), strtoupper($itemSize))) {
+                        return true;
+                    }
+
+                    return false;
+                });
+
+                $perItem[$item->id] = [
+                    'matched' => $matched->isNotEmpty(),
+                    'movements' => $matched->map(fn ($m) => [
+                        'id' => $m->id,
+                        'store_code' => $m->store_code,
+                        'invoice_number' => $m->invoice_number,
+                        'movement_date' => $m->movement_date?->format('Y-m-d'),
+                        'quantity' => (int) $m->quantity,
+                        'realized_value' => (float) $m->realized_value,
+                    ])->values()->all(),
+                ];
+            }
+        }
+
         return [
             'found' => $movements->isNotEmpty(),
-            'movements' => $movements->map(fn ($m) => [
-                'id' => $m->id,
-                'store_code' => $m->store_code,
-                'invoice_number' => $m->invoice_number,
-                'movement_date' => $m->movement_date?->format('Y-m-d'),
-                'ref_size' => $m->ref_size,
-                'barcode' => $m->barcode,
-                'quantity' => (int) $m->quantity,
-                'realized_value' => (float) $m->realized_value,
-            ])->values()->all(),
+            'movements' => $movementsDto,
+            'per_item' => $perItem,
         ];
     }
 

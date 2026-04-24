@@ -11,6 +11,7 @@ use App\Models\Employee;
 use App\Models\Store;
 use App\Models\User;
 use App\Services\ConsignmentExportService;
+use App\Services\ConsignmentImportService;
 use App\Services\ConsignmentLookupService;
 use App\Services\ConsignmentReturnService;
 use App\Services\ConsignmentService;
@@ -42,6 +43,7 @@ class ConsignmentController extends Controller
         private ConsignmentTransitionService $transitions,
         private ConsignmentReturnService $returnService,
         private ConsignmentExportService $exportService,
+        private ConsignmentImportService $importService,
     ) {
     }
 
@@ -129,10 +131,13 @@ class ConsignmentController extends Controller
                 'register_return' => $user?->hasPermissionTo(Permission::REGISTER_CONSIGNMENT_RETURN->value) ?? false,
                 'override_lock' => $user?->hasPermissionTo(Permission::OVERRIDE_CONSIGNMENT_LOCK->value) ?? false,
                 'export' => $user?->hasPermissionTo(Permission::EXPORT_CONSIGNMENTS->value) ?? false,
+                'import' => $user?->hasPermissionTo(Permission::IMPORT_CONSIGNMENTS->value) ?? false,
                 'edit_return_period' => $this->canEditReturnPeriod($user),
                 'choose_return_store' => $this->canChooseReturnStore($user),
             ],
-            'user_store_code' => $user?->store_id,
+            'user_store_code' => $user?->store_id
+                ? Store::where('id', $user->store_id)->value('code')
+                : null,
         ]);
     }
 
@@ -332,6 +337,7 @@ class ConsignmentController extends Controller
             'items.*.consignment_item_id' => ['required', 'integer', 'exists:consignment_items,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.action' => ['nullable', 'string', 'in:returned,sold'],
+            'items.*.sale_justification' => ['nullable', 'string', 'max:2000'],
         ]);
 
         // Se user < SUPPORT, força a loja do próprio user
@@ -389,6 +395,7 @@ class ConsignmentController extends Controller
             $consignment->recipient_document_clean,
             $data['return_date'],
             7,
+            $consignment->load('items'),
         );
 
         return response()->json([
@@ -398,6 +405,7 @@ class ConsignmentController extends Controller
                 'window_days' => 7,
                 'found_in_cigam' => $saleCheck['found'],
                 'movements' => $saleCheck['movements'],
+                'per_item' => $saleCheck['per_item'],
             ],
         ]);
     }
@@ -423,7 +431,67 @@ class ConsignmentController extends Controller
             return $requested;
         }
 
-        return $user->store_id ?: $requested;
+        // USER/DRIVER: travado à loja do próprio usuário
+        $userStoreCode = $user->store_id
+            ? Store::where('id', $user->store_id)->value('code')
+            : null;
+
+        return $userStoreCode ?: $requested;
+    }
+
+    // ==================================================================
+    // Import (Fase 6 — migração v1 → v2 via planilha)
+    // ==================================================================
+
+    public function importPage(Request $request): Response
+    {
+        if (! $request->user()->hasPermissionTo(Permission::IMPORT_CONSIGNMENTS->value)) {
+            abort(403);
+        }
+
+        return Inertia::render('Consignments/Import');
+    }
+
+    public function importPreview(Request $request): JsonResponse
+    {
+        if (! $request->user()->hasPermissionTo(Permission::IMPORT_CONSIGNMENTS->value)) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
+        ]);
+
+        $result = $this->importService->preview($data['file']->getRealPath());
+
+        return response()->json($result);
+    }
+
+    public function importStore(Request $request): RedirectResponse
+    {
+        if (! $request->user()->hasPermissionTo(Permission::IMPORT_CONSIGNMENTS->value)) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
+        ]);
+
+        $result = $this->importService->import(
+            $data['file']->getRealPath(),
+            $request->user(),
+        );
+
+        $msg = sprintf(
+            'Importação concluída: %d criadas, %d atualizadas, %d ignoradas. %d itens criados, %d órfãos (produto não encontrado).',
+            $result['created'],
+            $result['updated'],
+            $result['skipped'],
+            $result['items_created'],
+            $result['orphan_items'],
+        );
+
+        return redirect()->back()->with('success', $msg)->with('import_result', $result);
     }
 
     // ==================================================================
@@ -515,7 +583,7 @@ class ConsignmentController extends Controller
                 'value' => (float) $r->value,
             ])->values();
 
-        // 4. Taxa de retorno por consultor(a) — só tipos que têm employee
+        // 4. Performance por consultor(a) — taxa de retorno + taxa de conversão em venda
         $byEmployee = $base()
             ->whereNotNull('employee_id')
             ->selectRaw('
@@ -523,6 +591,7 @@ class ConsignmentController extends Controller
                 COUNT(*) as total,
                 SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as completed_count,
                 COALESCE(SUM(returned_total_value), 0) as returned_value,
+                COALESCE(SUM(sold_total_value), 0) as sold_value,
                 COALESCE(SUM(outbound_total_value), 0) as outbound_value
             ', [ConsignmentStatus::COMPLETED->value])
             ->groupBy('employee_id')
@@ -536,7 +605,9 @@ class ConsignmentController extends Controller
         $byEmployeeData = $byEmployee->map(function ($r) use ($employeeNames) {
             $outbound = (float) $r->outbound_value;
             $returned = (float) $r->returned_value;
+            $sold = (float) $r->sold_value;
             $returnRate = $outbound > 0 ? round(($returned / $outbound) * 100, 1) : 0.0;
+            $conversionRate = $outbound > 0 ? round(($sold / $outbound) * 100, 1) : 0.0;
 
             return [
                 'employee_id' => $r->employee_id,
@@ -544,6 +615,10 @@ class ConsignmentController extends Controller
                 'total' => (int) $r->total,
                 'completed' => (int) $r->completed_count,
                 'return_rate' => $returnRate,
+                'conversion_rate' => $conversionRate,
+                'sold_value' => $sold,
+                'returned_value' => $returned,
+                'outbound_value' => $outbound,
             ];
         })->values();
 

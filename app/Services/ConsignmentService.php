@@ -7,6 +7,7 @@ use App\Enums\ConsignmentType;
 use App\Enums\Permission;
 use App\Models\Consignment;
 use App\Models\ConsignmentItem;
+use App\Models\Customer;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Store;
@@ -86,6 +87,14 @@ class ConsignmentService
         // Regra M9: bloqueio de inadimplência
         $this->ensureRecipientEligibility(
             $recipientDocClean,
+            $actor,
+            $data['override_lock_reason'] ?? null,
+        );
+
+        // Regra M20: limite configurável por cliente (peças / valor)
+        $this->ensureWithinCustomerLimits(
+            $data['customer_id'] ?? null,
+            $data['items'] ?? [],
             $actor,
             $data['override_lock_reason'] ?? null,
         );
@@ -283,6 +292,111 @@ class ConsignmentService
 
         throw ValidationException::withMessages([
             'recipient_document' => "Este destinatário possui {$overdueCount} consignação(ões) em atraso. Finalize ou cancele as pendentes antes de criar uma nova.",
+        ]);
+    }
+
+    /**
+     * Regra M20: bloqueia cadastro quando a soma de itens ou valor em
+     * consignações abertas do cliente (+ a nova) estouraria os tetos
+     * configurados em `customers.consignment_max_items` /
+     * `customers.consignment_max_value`. Tetos nulos = sem limite.
+     *
+     * Só se aplica quando a consignação tem FK `customer_id` conhecida —
+     * consignações com CPF avulso (sem cadastro) ficam livres do limite.
+     * Override via OVERRIDE_CONSIGNMENT_LOCK + justificativa.
+     *
+     * @param  array<int, array<string, mixed>>  $proposedItems
+     *
+     * @throws ValidationException
+     */
+    public function ensureWithinCustomerLimits(
+        ?int $customerId,
+        array $proposedItems,
+        User $actor,
+        ?string $overrideReason = null,
+    ): void {
+        if (! $customerId) {
+            return;
+        }
+
+        $customer = Customer::find($customerId);
+        if (! $customer) {
+            return;
+        }
+
+        $maxItems = $customer->consignment_max_items;
+        $maxValue = $customer->consignment_max_value ? (float) $customer->consignment_max_value : null;
+
+        if (! $maxItems && ! $maxValue) {
+            return;
+        }
+
+        // Soma do que o cliente já tem em aberto (pendente = saiu menos
+        // resolvido). M20 considera TODOS os estados não-terminais
+        // (pending/partially_returned/overdue) — diferente de M9 que só
+        // dispara em OVERDUE.
+        $openStates = [
+            ConsignmentStatus::PENDING->value,
+            ConsignmentStatus::PARTIALLY_RETURNED->value,
+            ConsignmentStatus::OVERDUE->value,
+        ];
+
+        $open = Consignment::query()
+            ->where('customer_id', $customerId)
+            ->whereNull('deleted_at')
+            ->whereIn('status', $openStates)
+            ->selectRaw('COALESCE(SUM(outbound_items_count - returned_items_count - sold_items_count - lost_items_count), 0) as pending_items')
+            ->selectRaw('COALESCE(SUM(outbound_total_value - returned_total_value - sold_total_value - lost_total_value), 0) as pending_value')
+            ->first();
+
+        $pendingItems = (int) ($open->pending_items ?? 0);
+        $pendingValue = (float) ($open->pending_value ?? 0);
+
+        $proposedItemsCount = 0;
+        $proposedItemsValue = 0.0;
+        foreach ($proposedItems as $row) {
+            $qty = max(0, (int) ($row['quantity'] ?? 0));
+            $unit = max(0.0, (float) ($row['unit_value'] ?? 0));
+            $proposedItemsCount += $qty;
+            $proposedItemsValue += round($qty * $unit, 2);
+        }
+
+        $totalItems = $pendingItems + $proposedItemsCount;
+        $totalValue = round($pendingValue + $proposedItemsValue, 2);
+
+        $violations = [];
+        if ($maxItems && $totalItems > $maxItems) {
+            $violations[] = sprintf(
+                'teto de %d peças (atual: %d em aberto + %d nesta = %d)',
+                $maxItems, $pendingItems, $proposedItemsCount, $totalItems,
+            );
+        }
+        if ($maxValue && $totalValue > $maxValue) {
+            $violations[] = sprintf(
+                'teto de R$ %s (atual: R$ %s em aberto + R$ %s nesta = R$ %s)',
+                number_format($maxValue, 2, ',', '.'),
+                number_format($pendingValue, 2, ',', '.'),
+                number_format($proposedItemsValue, 2, ',', '.'),
+                number_format($totalValue, 2, ',', '.'),
+            );
+        }
+
+        if (empty($violations)) {
+            return;
+        }
+
+        if ($overrideReason !== null && trim($overrideReason) !== '') {
+            if (! $actor->hasPermissionTo(Permission::OVERRIDE_CONSIGNMENT_LOCK->value)) {
+                throw ValidationException::withMessages([
+                    'override_lock_reason' => 'Você não tem permissão para ignorar o limite por cliente.',
+                ]);
+            }
+
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'customer_id' => 'Cliente excederia '.implode(' e ', $violations).'.',
         ]);
     }
 

@@ -4,6 +4,7 @@ namespace Tests\Feature\Consignments;
 
 use App\Enums\ConsignmentStatus;
 use App\Models\Consignment;
+use App\Models\ConsignmentReturn;
 use App\Models\Store;
 use App\Services\ConsignmentTransitionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -50,12 +51,23 @@ class ConsignmentTransitionTest extends TestCase
     public function test_pending_to_completed_sets_completed_at_and_user(): void
     {
         $c = Consignment::factory()->pending()->forStore($this->store)->create();
+        $this->seedReturn($c);
 
         $updated = $this->service->transition($c, ConsignmentStatus::COMPLETED, $this->adminUser);
 
         $this->assertEquals(ConsignmentStatus::COMPLETED, $updated->status);
         $this->assertNotNull($updated->completed_at);
         $this->assertEquals($this->adminUser->id, $updated->completed_by_user_id);
+    }
+
+    public function test_cannot_complete_without_return(): void
+    {
+        $c = Consignment::factory()->pending()->forStore($this->store)->create();
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('pelo menos um retorno');
+
+        $this->service->transition($c, ConsignmentStatus::COMPLETED, $this->adminUser);
     }
 
     public function test_pending_to_cancelled_requires_reason(): void
@@ -156,6 +168,7 @@ class ConsignmentTransitionTest extends TestCase
     public function test_overdue_to_completed_via_late_return(): void
     {
         $c = Consignment::factory()->overdue()->forStore($this->store)->create();
+        $this->seedReturn($c);
 
         $updated = $this->service->complete($c, $this->adminUser);
 
@@ -165,6 +178,7 @@ class ConsignmentTransitionTest extends TestCase
     public function test_deleted_consignment_cannot_transition(): void
     {
         $c = Consignment::factory()->pending()->forStore($this->store)->create();
+        $this->seedReturn($c);
         $c->update(['deleted_at' => now()]);
 
         $this->expectException(ValidationException::class);
@@ -180,6 +194,7 @@ class ConsignmentTransitionTest extends TestCase
     public function test_regular_user_cannot_complete(): void
     {
         $c = Consignment::factory()->pending()->forStore($this->store)->create();
+        $this->seedReturn($c);
 
         $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('finalizar');
@@ -201,9 +216,27 @@ class ConsignmentTransitionTest extends TestCase
     {
         // SUPPORT tem COMPLETE_CONSIGNMENT
         $c = Consignment::factory()->pending()->forStore($this->store)->create();
+        $this->seedReturn($c);
 
         $updated = $this->service->complete($c, $this->supportUser);
 
         $this->assertEquals(ConsignmentStatus::COMPLETED, $updated->status);
+    }
+
+    /**
+     * Helper — cria um ConsignmentReturn mínimo pra satisfazer a regra
+     * que exige ao menos um retorno registrado antes de finalizar.
+     */
+    protected function seedReturn(Consignment $c): ConsignmentReturn
+    {
+        return ConsignmentReturn::create([
+            'consignment_id' => $c->id,
+            'return_invoice_number' => '999',
+            'return_date' => now()->toDateString(),
+            'return_store_code' => $this->store->code,
+            'returned_quantity' => 1,
+            'returned_value' => 0,
+            'registered_by_user_id' => $this->adminUser->id,
+        ]);
     }
 }

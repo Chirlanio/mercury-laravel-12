@@ -289,6 +289,8 @@ class CustomerController extends Controller
             'zipcode' => $c->zipcode,
             'birth_date' => $c->birth_date?->format('Y-m-d'),
             'registered_at' => $c->registered_at?->format('Y-m-d'),
+            'consignment_max_items' => $c->consignment_max_items,
+            'consignment_max_value' => $c->consignment_max_value ? (float) $c->consignment_max_value : null,
             'consignments' => $c->consignments->map(fn ($cons) => [
                 'id' => $cons->id,
                 'type' => $cons->type?->value,
@@ -300,5 +302,29 @@ class CustomerController extends Controller
                 'outbound_total_value' => (float) $cons->outbound_total_value,
             ])->values(),
         ]);
+    }
+
+    /**
+     * Atualiza os tetos M20 (consignment_max_items / max_value) do cliente.
+     * Nullable = sem limite. Requer MANAGE_CONSIGNMENTS (é config operacional
+     * de consignações, não edição de dados cadastrais que vem do CIGAM).
+     */
+    public function updateConsignmentLimits(Customer $customer, Request $request): RedirectResponse
+    {
+        if (! $request->user()->hasPermissionTo(\App\Enums\Permission::MANAGE_CONSIGNMENTS->value)) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'consignment_max_items' => ['nullable', 'integer', 'min:1', 'max:1000'],
+            'consignment_max_value' => ['nullable', 'numeric', 'min:0.01', 'max:999999.99'],
+        ]);
+
+        $customer->update([
+            'consignment_max_items' => $data['consignment_max_items'] ?? null,
+            'consignment_max_value' => $data['consignment_max_value'] ?? null,
+        ]);
+
+        return redirect()->back()->with('success', 'Limites de consignação atualizados.');
     }
 }

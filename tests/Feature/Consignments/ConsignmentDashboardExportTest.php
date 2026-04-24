@@ -4,9 +4,11 @@ namespace Tests\Feature\Consignments;
 
 use App\Models\Consignment;
 use App\Models\ConsignmentItem;
+use App\Models\ConsignmentReturn;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Store;
+use App\Services\ConsignmentExportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 use Tests\Traits\TestHelpers;
@@ -159,6 +161,87 @@ class ConsignmentDashboardExportTest extends TestCase
         $this->actingAs($this->regularUser)
             ->get(route('consignments.export'))
             ->assertForbidden();
+    }
+
+    // ------------------------------------------------------------------
+    // Dias consignado — cálculo inclusivo (saída = dia 1)
+    // ------------------------------------------------------------------
+
+    public function test_days_on_consignment_counts_outbound_day_as_day_one(): void
+    {
+        $c = Consignment::factory()->pending()->forStore($this->store)->create([
+            'outbound_invoice_date' => now()->startOfDay(),
+        ]);
+
+        // Mesmo dia da saída → 1
+        $this->assertSame(1, ConsignmentExportService::calculateDaysOnConsignment($c->fresh()));
+    }
+
+    public function test_days_on_consignment_uses_last_return_date_when_available(): void
+    {
+        $c = Consignment::factory()->pending()->forStore($this->store)->create([
+            'outbound_invoice_date' => now()->subDays(10)->startOfDay(),
+        ]);
+
+        ConsignmentReturn::create([
+            'consignment_id' => $c->id,
+            'return_invoice_number' => '999',
+            'return_date' => now()->subDays(3)->toDateString(),
+            'return_store_code' => $this->store->code,
+            'returned_quantity' => 1,
+            'returned_value' => 0,
+            'registered_by_user_id' => $this->adminUser->id,
+        ]);
+
+        // Saída foi há 10 dias, retornou há 3 → dias = 10 - 3 + 1 = 8
+        $this->assertSame(8, ConsignmentExportService::calculateDaysOnConsignment($c->fresh(['returns'])));
+    }
+
+    public function test_days_on_consignment_uses_today_when_open(): void
+    {
+        $c = Consignment::factory()->pending()->forStore($this->store)->create([
+            'outbound_invoice_date' => now()->subDays(5)->startOfDay(),
+        ]);
+
+        // Sem retorno + status aberto → hoje. 5 + 1 = 6
+        $this->assertSame(6, ConsignmentExportService::calculateDaysOnConsignment($c->fresh()));
+    }
+
+    public function test_format_return_invoices_is_empty_when_no_returns(): void
+    {
+        $c = Consignment::factory()->pending()->forStore($this->store)->create();
+
+        $this->assertSame('', ConsignmentExportService::formatReturnInvoices($c->fresh()));
+    }
+
+    public function test_format_return_invoices_concatenates_multiple_sorted_by_date(): void
+    {
+        $c = Consignment::factory()->pending()->forStore($this->store)->create();
+
+        ConsignmentReturn::create([
+            'consignment_id' => $c->id,
+            'return_invoice_number' => '800',
+            'return_date' => '2026-04-10',
+            'return_store_code' => $this->store->code,
+            'returned_quantity' => 1,
+            'returned_value' => 0,
+            'registered_by_user_id' => $this->adminUser->id,
+        ]);
+
+        ConsignmentReturn::create([
+            'consignment_id' => $c->id,
+            'return_invoice_number' => '777',
+            'return_date' => '2026-04-05',
+            'return_store_code' => $this->store->code,
+            'returned_quantity' => 1,
+            'returned_value' => 0,
+            'registered_by_user_id' => $this->adminUser->id,
+        ]);
+
+        $formatted = ConsignmentExportService::formatReturnInvoices($c->fresh(['returns']));
+
+        // Ordenado por data ascendente
+        $this->assertSame('777 (05/04/2026) | 800 (10/04/2026)', $formatted);
     }
 
     // ------------------------------------------------------------------

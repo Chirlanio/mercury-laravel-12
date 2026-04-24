@@ -68,6 +68,15 @@ class ConsignmentTransitionService
             ]);
         }
 
+        // Finalização exige ao menos um retorno registrado.
+        // ConsignmentReturnService::register cria o Return dentro da mesma transação
+        // antes de chamar transition(), então essa regra não bloqueia o fluxo automático.
+        if ($target === ConsignmentStatus::COMPLETED && ! $consignment->returns()->exists()) {
+            throw ValidationException::withMessages([
+                'status' => 'Uma consignação só pode ser finalizada após o registro de pelo menos um retorno.',
+            ]);
+        }
+
         // Transições automáticas (sem actor) permitidas apenas para OVERDUE
         // (command consignments:mark-overdue roda diariamente sem usuário).
         $canRunWithoutActor = $target === ConsignmentStatus::OVERDUE;

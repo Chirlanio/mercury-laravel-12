@@ -26,6 +26,8 @@ export default function ConsignmentDetailModal({
     onClose,
     consignment,
     statusColors = {},
+    statusOptions = {},
+    stores = [],
 }) {
     const [tab, setTab] = useState('info');
 
@@ -40,6 +42,13 @@ export default function ConsignmentDetailModal({
     const formatCurrency = (v) => `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`;
     const formatDate = (d) => d ? new Date(d).toLocaleDateString('pt-BR') : '—';
     const formatDateTime = (d) => d ? new Date(d).toLocaleString('pt-BR') : '—';
+    const statusLabel = (key) => statusOptions[key] || key || '—';
+    const storeByCode = (code) => stores.find((s) => s.code === code);
+    const storeDisplay = (code) => {
+        if (!code) return '—';
+        const s = storeByCode(code);
+        return s ? `${s.code} — ${s.name}` : code;
+    };
 
     return (
         <StandardModal
@@ -197,7 +206,7 @@ export default function ConsignmentDetailModal({
                                                 NF {r.return_invoice_number || '(sem NF)'} — {formatDate(r.return_date)}
                                             </div>
                                             <div className="text-xs text-gray-500">
-                                                Loja {r.return_store_code} · Registrado por {r.registered_by?.name || '—'}
+                                                Loja {storeDisplay(r.return_store_code)} · Registrado por {r.registered_by?.name || '—'}
                                             </div>
                                         </div>
                                         <div className="text-right">
@@ -228,12 +237,12 @@ export default function ConsignmentDetailModal({
                                         <div className="font-medium text-gray-900">
                                             {h.from_status ? (
                                                 <span>
-                                                    <span className="text-gray-500">{h.from_status}</span>
+                                                    <span className="text-gray-500">{statusLabel(h.from_status)}</span>
                                                     <span className="mx-1">→</span>
-                                                    {h.to_status}
+                                                    {statusLabel(h.to_status)}
                                                 </span>
                                             ) : (
-                                                <span>Criado como <span className="font-mono">{h.to_status}</span></span>
+                                                <span>Criado como <span className="font-medium">{statusLabel(h.to_status)}</span></span>
                                             )}
                                         </div>
                                         {h.note && (

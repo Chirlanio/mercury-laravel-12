@@ -269,4 +269,55 @@ class CustomerControllerTest extends TestCase
             ->post(route('customers.sync.cancel', $log->id))
             ->assertForbidden();
     }
+
+    // ------------------------------------------------------------------
+    // M20 — atualização dos limites de consignação
+    // ------------------------------------------------------------------
+
+    public function test_update_consignment_limits_persists_values(): void
+    {
+        $customer = $this->makeCustomer();
+
+        $this->actingAs($this->adminUser)
+            ->patch(route('customers.consignment-limits.update', $customer->id), [
+                'consignment_max_items' => 5,
+                'consignment_max_value' => 1500.00,
+            ])
+            ->assertRedirect();
+
+        $customer->refresh();
+        $this->assertSame(5, $customer->consignment_max_items);
+        $this->assertEquals(1500.00, (float) $customer->consignment_max_value);
+    }
+
+    public function test_update_consignment_limits_clears_when_null(): void
+    {
+        $customer = $this->makeCustomer([
+            'consignment_max_items' => 3,
+            'consignment_max_value' => 500.00,
+        ]);
+
+        $this->actingAs($this->adminUser)
+            ->patch(route('customers.consignment-limits.update', $customer->id), [
+                'consignment_max_items' => null,
+                'consignment_max_value' => null,
+            ])
+            ->assertRedirect();
+
+        $customer->refresh();
+        $this->assertNull($customer->consignment_max_items);
+        $this->assertNull($customer->consignment_max_value);
+    }
+
+    public function test_update_consignment_limits_forbidden_for_regular_user(): void
+    {
+        $customer = $this->makeCustomer();
+
+        // regularUser não tem MANAGE_CONSIGNMENTS
+        $this->actingAs($this->regularUser)
+            ->patch(route('customers.consignment-limits.update', $customer->id), [
+                'consignment_max_items' => 5,
+            ])
+            ->assertForbidden();
+    }
 }

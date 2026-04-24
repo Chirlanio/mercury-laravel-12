@@ -307,6 +307,7 @@ enum Permission: string
     case COMPLETE_CONSIGNMENT = 'consignments.complete';
     case CANCEL_CONSIGNMENT = 'consignments.cancel';
     case EXPORT_CONSIGNMENTS = 'consignments.export';
+    case IMPORT_CONSIGNMENTS = 'consignments.import';
     case OVERRIDE_CONSIGNMENT_LOCK = 'consignments.override_lock';
 
     public function label(): string
@@ -567,6 +568,7 @@ enum Permission: string
             self::COMPLETE_CONSIGNMENT => 'Finalizar consignação',
             self::CANCEL_CONSIGNMENT => 'Cancelar consignação',
             self::EXPORT_CONSIGNMENTS => 'Exportar consignações (XLSX/PDF)',
+            self::IMPORT_CONSIGNMENTS => 'Importar consignações (planilha)',
             self::OVERRIDE_CONSIGNMENT_LOCK => 'Ignorar bloqueio de inadimplência e editar finalizadas',
         };
     }
@@ -829,6 +831,7 @@ enum Permission: string
             self::COMPLETE_CONSIGNMENT => 'Permite finalizar consignação (estado terminal). Itens pendentes precisam ser marcados como perdidos (shrinkage) com justificativa',
             self::CANCEL_CONSIGNMENT => 'Permite cancelar consignação (estado terminal). Exige motivo. Cancelamento não retorna itens ao estoque — é apenas registro',
             self::EXPORT_CONSIGNMENTS => 'Permite exportar consignações para Excel (2 abas: cabeçalhos + itens) ou PDF comprovante individual',
+            self::IMPORT_CONSIGNMENTS => 'Permite importar consignações via planilha (XLSX/CSV) — usado na migração de dados históricos v1',
             self::OVERRIDE_CONSIGNMENT_LOCK => 'Permite (a) criar consignação para destinatário com outra em atraso (override do bloqueio por inadimplência) e (b) editar consignações já finalizadas ou canceladas. Exige justificativa que fica no histórico.',
         };
     }

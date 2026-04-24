@@ -111,6 +111,7 @@ class ConsignmentReturnService
 
         // Consolida por (item_id, action) — permite mesmo item com partes returned+sold
         $consolidated = []; // [itemId => ['returned' => N, 'sold' => M]]
+        $itemJustifications = []; // [itemId => justificativa por-item]
         foreach ($items as $row) {
             $id = (int) ($row['consignment_item_id'] ?? 0);
             $qty = (int) ($row['quantity'] ?? 0);
@@ -131,6 +132,10 @@ class ConsignmentReturnService
                 $consolidated[$id] = ['returned' => 0, 'sold' => 0];
             }
             $consolidated[$id][$action] += $qty;
+
+            if ($action === 'sold' && ! empty($row['sale_justification'])) {
+                $itemJustifications[$id] = trim((string) $row['sale_justification']);
+            }
         }
 
         // Busca os items atuais (regra M1 — confronto com itens de saída)
@@ -162,44 +167,64 @@ class ConsignmentReturnService
 
         // Validação de venda no CIGAM: se algum item foi marcado como
         // 'sold', verifica movement_code=2 pelo CPF do cliente na janela
-        // de 7 dias após return_date. Se não achou, sale_justification
-        // vira obrigatória.
+        // de 7 dias. O match é POR PRODUTO CONSIGNADO (barcode/ref_size),
+        // não só pelo CPF — venda genérica do cliente não confirma venda
+        // do item consignado. Sem confirmação, justificativa por item
+        // (ou fallback global) é obrigatória.
         $soldItemsIds = array_keys(array_filter(
             $consolidated,
             fn ($q) => $q['sold'] > 0,
         ));
         $saleConfirmedInCigam = false;
         $unconfirmedSaleItems = [];
+        $globalJustification = isset($data['sale_justification']) ? trim((string) $data['sale_justification']) : '';
 
         if (! empty($soldItemsIds)) {
+            $consignment->setRelation('items', $consignmentItems->values());
             $verify = $this->lookup->verifyCustomerSale(
                 $consignment->recipient_document_clean,
                 $data['return_date'],
                 7,
+                $consignment,
             );
-            $saleConfirmedInCigam = $verify['found'];
+            $perItemMatches = $verify['per_item'];
 
-            if (! $saleConfirmedInCigam) {
-                if (empty($data['sale_justification']) || trim($data['sale_justification']) === '') {
+            $saleConfirmedInCigam = true; // só true se TODOS os soldItems tiverem match
+
+            foreach ($soldItemsIds as $id) {
+                $matched = (bool) ($perItemMatches[$id]['matched'] ?? false);
+                if ($matched) {
+                    continue;
+                }
+
+                $saleConfirmedInCigam = false;
+                $itemJustification = $itemJustifications[$id] ?? $globalJustification;
+
+                if ($itemJustification === '') {
+                    $item = $consignmentItems[$id];
                     throw ValidationException::withMessages([
-                        'sale_justification' => 'Venda de item(s) sem confirmação no CIGAM — justificativa é obrigatória.',
+                        'items' => sprintf(
+                            'Venda do produto %s (Tam. %s) sem confirmação no CIGAM — justificativa é obrigatória.',
+                            $item->reference,
+                            $item->size_label ?: $item->size_cigam_code ?: '—',
+                        ),
                     ]);
                 }
 
-                foreach ($soldItemsIds as $id) {
-                    $item = $consignmentItems[$id];
-                    $unconfirmedSaleItems[] = [
-                        'reference' => $item->reference,
-                        'size_label' => $item->size_cigam_code ? ltrim(preg_replace('/^U/i', '', $item->size_cigam_code)) : null,
-                        'quantity' => $consolidated[$id]['sold'],
-                    ];
-                }
+                $item = $consignmentItems[$id];
+                $unconfirmedSaleItems[] = [
+                    'consignment_item_id' => $item->id,
+                    'reference' => $item->reference,
+                    'size_label' => $item->size_label ?: $item->size_cigam_code,
+                    'quantity' => $consolidated[$id]['sold'],
+                    'justification' => $itemJustification,
+                ];
             }
         }
 
         return DB::transaction(function () use (
             $consignment, $data, $consolidated, $consignmentItems, $actor,
-            $saleConfirmedInCigam, $unconfirmedSaleItems,
+            $saleConfirmedInCigam, $unconfirmedSaleItems, $globalJustification,
         ) {
             // Cria o evento de retorno
             $return = ConsignmentReturn::create([
@@ -302,19 +327,29 @@ class ConsignmentReturnService
                 );
             }
 
-            // Venda não confirmada → grava justificativa no histórico e
-            // dispara notificação (email + database) pra gerência/loja.
+            // Venda não confirmada → grava justificativa (consolidada por
+            // item) no histórico e dispara notificação (email + database)
+            // pra gerência/loja. Cada item mantém sua própria justificativa.
             if (! empty($unconfirmedSaleItems)) {
+                $combinedJustification = collect($unconfirmedSaleItems)
+                    ->map(fn ($it) => sprintf(
+                        '[%s%s] %s',
+                        $it['reference'],
+                        $it['size_label'] ? ' Tam.'.$it['size_label'] : '',
+                        $it['justification'] ?? '—',
+                    ))
+                    ->implode(' | ');
+
                 \App\Models\ConsignmentStatusHistory::create([
                     'consignment_id' => $fresh->id,
                     'from_status' => $fresh->status->value,
                     'to_status' => $fresh->status->value,
                     'changed_by_user_id' => $actor->id,
-                    'note' => 'Venda alegada sem confirmação CIGAM — justificativa: '.$data['sale_justification'],
+                    'note' => 'Venda alegada sem confirmação CIGAM — '.$combinedJustification,
                     'context' => [
                         'sale_unconfirmed' => true,
                         'items' => $unconfirmedSaleItems,
-                        'justification' => $data['sale_justification'],
+                        'justification' => $globalJustification ?: null,
                     ],
                     'created_at' => now(),
                 ]);
@@ -322,7 +357,7 @@ class ConsignmentReturnService
                 $this->dispatchSaleUnconfirmedNotification(
                     $fresh,
                     $unconfirmedSaleItems,
-                    $data['sale_justification'],
+                    $combinedJustification,
                     $actor,
                 );
             }

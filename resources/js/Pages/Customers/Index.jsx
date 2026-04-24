@@ -245,7 +245,7 @@ export default function Index({
                                         className="min-h-[44px]"
                                     >
                                         <TrophyIcon className="w-4 h-4 sm:mr-2 text-amber-600" />
-                                        <span className="hidden sm:inline">Clientes VIP</span>
+                                        <span className="hidden sm:inline">MS Life</span>
                                     </Button>
                                 </Link>
                             )}

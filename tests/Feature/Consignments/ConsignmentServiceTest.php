@@ -5,6 +5,7 @@ namespace Tests\Feature\Consignments;
 use App\Enums\ConsignmentStatus;
 use App\Enums\ConsignmentType;
 use App\Models\Consignment;
+use App\Models\Customer;
 use App\Models\Employee;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -331,6 +332,175 @@ class ConsignmentServiceTest extends TestCase
         $consignment = $this->service->create($this->validPayload(), $this->adminUser);
 
         $this->assertNotNull($consignment);
+    }
+
+    // ------------------------------------------------------------------
+    // Regra M20 — limite configurável por cliente
+    // ------------------------------------------------------------------
+
+    protected function makeCustomer(array $limits = []): Customer
+    {
+        return Customer::create(array_merge([
+            'cigam_code' => 'CL-'.uniqid(),
+            'name' => 'Maria Cliente',
+            'cpf' => '12345678909',
+            'is_active' => true,
+        ], $limits));
+    }
+
+    public function test_create_blocks_when_customer_exceeds_max_items(): void
+    {
+        $customer = $this->makeCustomer(['consignment_max_items' => 3]);
+
+        // Já tem 2 peças em aberto
+        $existing = Consignment::factory()
+            ->pending()
+            ->forStore($this->store)
+            ->create(['customer_id' => $customer->id]);
+        $existing->update([
+            'outbound_items_count' => 2,
+            'returned_items_count' => 0,
+            'sold_items_count' => 0,
+            'lost_items_count' => 0,
+            'outbound_total_value' => 400.00,
+        ]);
+
+        // Nova tentaria adicionar +2 = 4 > 3 → bloqueia
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('teto de 3 peças');
+
+        $this->service->create(
+            $this->validPayload(['customer_id' => $customer->id]),
+            $this->adminUser,
+        );
+    }
+
+    public function test_create_blocks_when_customer_exceeds_max_value(): void
+    {
+        $customer = $this->makeCustomer(['consignment_max_value' => 500.00]);
+
+        $existing = Consignment::factory()
+            ->pending()
+            ->forStore($this->store)
+            ->create(['customer_id' => $customer->id]);
+        $existing->update([
+            'outbound_items_count' => 1,
+            'outbound_total_value' => 200.00,
+        ]);
+
+        // Nova propõe 2 peças x R$199.90 = R$399.80 → total R$599.80 > R$500
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('teto de R$ 500,00');
+
+        $this->service->create(
+            $this->validPayload(['customer_id' => $customer->id]),
+            $this->adminUser,
+        );
+    }
+
+    public function test_create_ok_when_customer_within_limits(): void
+    {
+        $customer = $this->makeCustomer(['consignment_max_items' => 10, 'consignment_max_value' => 5000.00]);
+
+        $existing = Consignment::factory()
+            ->pending()
+            ->forStore($this->store)
+            ->create(['customer_id' => $customer->id]);
+        $existing->update([
+            'outbound_items_count' => 2,
+            'outbound_total_value' => 300.00,
+        ]);
+
+        $consignment = $this->service->create(
+            $this->validPayload(['customer_id' => $customer->id]),
+            $this->adminUser,
+        );
+
+        $this->assertNotNull($consignment);
+    }
+
+    public function test_create_ignores_limit_when_customer_is_null(): void
+    {
+        // Consignação com CPF avulso (sem customer_id) — regra M20 não aplica
+        $consignment = $this->service->create(
+            $this->validPayload(),
+            $this->adminUser,
+        );
+
+        $this->assertNotNull($consignment);
+    }
+
+    public function test_create_ignores_limit_when_customer_has_null_caps(): void
+    {
+        // Cliente cadastrado mas sem tetos definidos — M20 não aplica
+        $customer = $this->makeCustomer();
+
+        $consignment = $this->service->create(
+            $this->validPayload(['customer_id' => $customer->id]),
+            $this->adminUser,
+        );
+
+        $this->assertNotNull($consignment);
+    }
+
+    public function test_create_allows_override_when_customer_exceeds_limit(): void
+    {
+        $customer = $this->makeCustomer(['consignment_max_items' => 1]);
+
+        $consignment = $this->service->create(
+            $this->validPayload([
+                'customer_id' => $customer->id,
+                'override_lock_reason' => 'Exceção aprovada pela gerência',
+            ]),
+            $this->adminUser,
+        );
+
+        $this->assertNotNull($consignment);
+    }
+
+    public function test_create_blocks_override_for_user_without_permission_on_limit(): void
+    {
+        $customer = $this->makeCustomer(['consignment_max_items' => 1]);
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('não tem permissão');
+
+        $this->service->create(
+            $this->validPayload([
+                'customer_id' => $customer->id,
+                'override_lock_reason' => 'Tentativa indevida',
+            ]),
+            $this->regularUser,
+        );
+    }
+
+    public function test_limit_considers_only_pending_not_resolved_items(): void
+    {
+        // Cliente tem 10 peças "saíram" mas 8 já voltaram/venderam — só 2 contam
+        $customer = $this->makeCustomer(['consignment_max_items' => 3]);
+
+        $existing = Consignment::factory()
+            ->pending()
+            ->forStore($this->store)
+            ->create(['customer_id' => $customer->id]);
+        $existing->update([
+            'outbound_items_count' => 10,
+            'returned_items_count' => 5,
+            'sold_items_count' => 3,
+            'lost_items_count' => 0,
+            'outbound_total_value' => 1000.00,
+            'returned_total_value' => 500.00,
+            'sold_total_value' => 300.00,
+        ]);
+
+        // Pendentes = 10 - 5 - 3 = 2. Nova com 2 peças → 4 > 3 bloqueia
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('teto de 3 peças');
+
+        $this->service->create(
+            $this->validPayload(['customer_id' => $customer->id]),
+            $this->adminUser,
+        );
     }
 
     // ------------------------------------------------------------------

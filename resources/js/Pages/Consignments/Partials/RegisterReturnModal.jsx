@@ -1,5 +1,5 @@
 import { useForm, router } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
     ArrowUturnLeftIcon,
     MagnifyingGlassIcon,
@@ -18,14 +18,16 @@ import InputError from '@/Components/InputError';
  * Registrar retorno de consignação.
  *
  * Fluxo:
- *  1. User preenche NF retorno (número + data + loja).
- *  2. Sistema busca a NF no CIGAM (movement_code=21) e compara com a
- *     NF de saída já salva. Divergências são exibidas com alertas
- *     visuais (qty, valor, produto a mais/a menos, não voltou).
- *  3. Para itens da saída que não voltaram (missing_in_return), user
- *     marca "Vendido" ou "Devolvido (fora da NF)". Se "Vendido", o
- *     sistema verifica movement_code=2 pro CPF do cliente nos 7 dias.
- *     Se NÃO achar, exige justificativa + dispara email para a loja.
+ *  1. Usuário preenche NF retorno (número + data + loja) e clica em
+ *     "Buscar NF e comparar".
+ *  2. Sistema busca a NF no CIGAM (movement_code=21) e compara com a NF
+ *     de saída. Divergências aparecem com alertas visuais.
+ *  3. Para os itens da saída que NÃO voltaram na NF (missing_in_return),
+ *     o usuário marca cada produto como "Vendido" ou "Devolvido (fora da
+ *     NF)". A quantidade é implícita (outbound_pending do item).
+ *  4. Se "Vendido", o sistema verifica movement_code=2 POR PRODUTO
+ *     (barcode/ref_size) pro CPF do cliente nos 7 dias. Sem confirmação
+ *     CIGAM, pede justificativa POR ITEM e dispara email pra loja.
  *
  * Obrigatórios: invoice_number, return_date, return_store_code.
  * Loja auto-travada à do user quando hierarquia < SUPPORT.
@@ -36,22 +38,23 @@ export default function RegisterReturnModal({
     consignmentSummary,
     userStoreCode = null,
     canChooseStore = false,
+    stores = [],
 }) {
     const [comparison, setComparison] = useState(null);
     const [saleCheck, setSaleCheck] = useState(null);
     const [lookupLoading, setLookupLoading] = useState(false);
     const [lookupError, setLookupError] = useState(null);
-    const [itemActions, setItemActions] = useState({});
+    const [itemActions, setItemActions] = useState({}); // itemId -> 'sold' | 'returned'
+    const [itemJustifications, setItemJustifications] = useState({});
+    const [expandedJustifications, setExpandedJustifications] = useState({});
 
     const { data, setData, processing, errors, reset, setError, clearErrors } = useForm({
         return_invoice_number: '',
         return_date: new Date().toISOString().slice(0, 10),
         return_store_code: '',
         notes: '',
-        sale_justification: '',
     });
 
-    // Ao abrir, pré-popula loja
     useEffect(() => {
         if (!show || !consignmentSummary?.id) return;
 
@@ -64,9 +67,10 @@ export default function RegisterReturnModal({
         setSaleCheck(null);
         setLookupError(null);
         setItemActions({});
+        setItemJustifications({});
+        setExpandedJustifications({});
     }, [show, consignmentSummary?.id]);
 
-    // Reset completo ao fechar
     useEffect(() => {
         if (!show) {
             reset();
@@ -74,6 +78,8 @@ export default function RegisterReturnModal({
             setSaleCheck(null);
             setLookupError(null);
             setItemActions({});
+            setItemJustifications({});
+        setExpandedJustifications({});
             clearErrors();
         }
     }, [show]);
@@ -109,13 +115,9 @@ export default function RegisterReturnModal({
             const json = await response.json();
             setComparison(json.comparison);
             setSaleCheck(json.customer_sale_check);
-
-            // Pré-marca default "sold" para itens que não voltaram
-            const defaults = {};
-            (json.comparison?.comparison?.missing_in_return || []).forEach((it) => {
-                defaults[it.consignment_item_id] = 'sold';
-            });
-            setItemActions(defaults);
+            // Nenhum produto pré-marcado como vendido — usuário clica
+            // na linha do produto que foi vendido para indicar.
+            setItemActions({});
         } catch (e) {
             setLookupError(e.message);
         } finally {
@@ -123,11 +125,54 @@ export default function RegisterReturnModal({
         }
     };
 
-    const soldItemsWithoutSaleConfirmed = (() => {
-        if (!comparison?.comparison?.missing_in_return?.length) return 0;
-        if (saleCheck?.found_in_cigam) return 0;
-        return Object.values(itemActions).filter((a) => a === 'sold').length;
-    })();
+    const perItemSaleMatch = saleCheck?.per_item || {};
+    const isItemSaleMatched = (itemId) => !!(perItemSaleMatch[itemId]?.matched);
+
+    const soldItemsNeedingJustification = useMemo(() => (
+        Object.entries(itemActions)
+            .filter(([itemId, action]) => action === 'sold' && !isItemSaleMatched(Number(itemId)))
+            .map(([itemId]) => Number(itemId))
+    ), [itemActions, perItemSaleMatch]);
+
+    // Unifica todos os produtos da comparação numa só lista para a UI.
+    // Cada entry tem a quantidade correta (qty da NF para items que vieram,
+    // outbound_pending para os que não vieram) e um flag `in_return_nf`.
+    const unifiedItems = useMemo(() => {
+        if (!comparison?.comparison) return [];
+        const cmp = comparison.comparison;
+        const list = [];
+
+        (cmp.matched || []).forEach((m) => list.push({
+            ...m,
+            in_return_nf: true,
+            returned_qty: m.return_quantity,
+            status_label: 'na NF de retorno',
+            status_color: 'green',
+        }));
+        (cmp.quantity_divergent || []).forEach((m) => list.push({
+            ...m,
+            in_return_nf: true,
+            returned_qty: m.return_quantity,
+            status_label: 'qtd divergente',
+            status_color: 'amber',
+        }));
+        (cmp.value_divergent || []).forEach((m) => list.push({
+            ...m,
+            in_return_nf: true,
+            returned_qty: m.return_quantity,
+            status_label: 'valor divergente',
+            status_color: 'amber',
+        }));
+        (cmp.missing_in_return || []).forEach((m) => list.push({
+            ...m,
+            in_return_nf: false,
+            returned_qty: 0,
+            status_label: 'não veio na NF',
+            status_color: 'orange',
+        }));
+
+        return list;
+    }, [comparison]);
 
     const submit = () => {
         if (!comparison?.found) {
@@ -135,31 +180,43 @@ export default function RegisterReturnModal({
             return;
         }
 
-        const cmp = comparison.comparison;
         const items = [];
 
-        cmp.matched.forEach((m) => items.push({
-            consignment_item_id: m.consignment_item_id,
-            quantity: m.return_quantity,
-            action: 'returned',
-        }));
-        cmp.quantity_divergent.forEach((m) => items.push({
-            consignment_item_id: m.consignment_item_id,
-            quantity: m.return_quantity,
-            action: 'returned',
-        }));
-        cmp.value_divergent.forEach((m) => items.push({
-            consignment_item_id: m.consignment_item_id,
-            quantity: m.return_quantity,
-            action: 'returned',
-        }));
-        (cmp.missing_in_return || []).forEach((m) => {
-            const action = itemActions[m.consignment_item_id];
-            if (!action) return;
+        unifiedItems.forEach((it) => {
+            const isSold = itemActions[it.consignment_item_id] === 'sold';
+
+            if (isSold) {
+                // Produto marcado como vendido — sobrescreve classificação
+                // da NF (se estava em matched/divergent). Qty = pendente total
+                // do item (outbound_pending), não a qty da NF.
+                const entry = {
+                    consignment_item_id: it.consignment_item_id,
+                    quantity: it.outbound_pending,
+                    action: 'sold',
+                };
+                if (!isItemSaleMatched(it.consignment_item_id)) {
+                    const j = (itemJustifications[it.consignment_item_id] || '').trim();
+                    if (j) entry.sale_justification = j;
+                }
+                items.push(entry);
+                return;
+            }
+
+            if (it.in_return_nf) {
+                // Item na NF retorno (não marcado como sold) → devolvido normal
+                items.push({
+                    consignment_item_id: it.consignment_item_id,
+                    quantity: it.returned_qty,
+                    action: 'returned',
+                });
+                return;
+            }
+
+            // Item não veio na NF e não foi marcado como sold → devolvido fora da NF
             items.push({
-                consignment_item_id: m.consignment_item_id,
-                quantity: m.outbound_pending,
-                action,
+                consignment_item_id: it.consignment_item_id,
+                quantity: it.outbound_pending,
+                action: 'returned',
             });
         });
 
@@ -168,9 +225,12 @@ export default function RegisterReturnModal({
             return;
         }
 
-        if (soldItemsWithoutSaleConfirmed > 0 && !data.sale_justification?.trim()) {
-            setError('sale_justification', 'Justificativa obrigatória — venda alegada sem confirmação no CIGAM.');
-            return;
+        for (const itemId of soldItemsNeedingJustification) {
+            const j = (itemJustifications[itemId] || '').trim();
+            if (!j) {
+                setError('items', 'Informe a justificativa de cada produto marcado como vendido sem confirmação no CIGAM.');
+                return;
+            }
         }
 
         router.post(
@@ -180,7 +240,6 @@ export default function RegisterReturnModal({
                 return_date: data.return_date,
                 return_store_code: data.return_store_code,
                 notes: data.notes || null,
-                sale_justification: data.sale_justification || null,
                 items,
             },
             {
@@ -224,7 +283,7 @@ export default function RegisterReturnModal({
                 {/* Identificadores da NF de retorno */}
                 <div className="bg-emerald-50 border border-emerald-200 rounded-md p-3">
                     <div className="text-sm font-medium text-emerald-900 mb-2">
-                        Identificação da NF de retorno (movement_code=21)
+                        Identificação da NF de retorno
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
@@ -252,16 +311,20 @@ export default function RegisterReturnModal({
                         </div>
                         <div>
                             <InputLabel value="Loja *" />
-                            <TextInput
-                                type="text"
+                            <select
                                 value={data.return_store_code}
-                                onChange={(e) => setData('return_store_code', e.target.value.toUpperCase())}
-                                className="mt-1 block w-full"
-                                maxLength={10}
-                                placeholder="Z421"
+                                onChange={(e) => setData('return_store_code', e.target.value)}
                                 disabled={!canChooseStore}
                                 title={canChooseStore ? '' : 'Loja do usuário — só supervisão pode alterar'}
-                            />
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-sm"
+                            >
+                                <option value="">Selecione a loja…</option>
+                                {stores.map((s) => (
+                                    <option key={s.id} value={s.code}>
+                                        {s.code} — {s.name}
+                                    </option>
+                                ))}
+                            </select>
                             {!canChooseStore && (
                                 <p className="mt-1 text-xs text-emerald-700">
                                     Loja travada à do seu usuário.
@@ -296,8 +359,8 @@ export default function RegisterReturnModal({
                                 <div className="text-sm text-amber-900">
                                     <div className="font-medium">NF de retorno não encontrada no CIGAM</div>
                                     <div className="text-xs mt-1">
-                                        Confira loja + número + data. Aguarde o próximo sync ou marque
-                                        manualmente os itens pendentes como vendidos/devolvidos abaixo.
+                                        Confira loja + número + data. Marque abaixo os produtos vendidos
+                                        ou devolvidos fora da NF.
                                     </div>
                                 </div>
                             </div>
@@ -313,105 +376,171 @@ export default function RegisterReturnModal({
                             </div>
                         )}
 
-                        {cmp?.matched?.length > 0 && (
-                            <IssueGroup title="Itens confirmados no retorno" color="green" icon={CheckCircleIcon} items={cmp.matched}
-                                render={(it) => <ItemRow refText={it.reference} size={it.size_label} quantity={it.return_quantity} value={it.return_unit_value} />}
-                            />
-                        )}
-                        {cmp?.quantity_divergent?.length > 0 && (
-                            <IssueGroup title="Quantidade diferente do esperado" color="amber" icon={ExclamationTriangleIcon} items={cmp.quantity_divergent}
-                                render={(it) => <ItemRow refText={it.reference} size={it.size_label} quantity={`${it.return_quantity} / ${it.outbound_pending}`} value={it.return_unit_value} note={it.reason} />}
-                            />
-                        )}
-                        {cmp?.value_divergent?.length > 0 && (
-                            <IssueGroup title="Valor unitário divergente" color="amber" icon={ExclamationTriangleIcon} items={cmp.value_divergent}
-                                render={(it) => <ItemRow refText={it.reference} size={it.size_label} quantity={it.return_quantity} value={`${Number(it.return_unit_value).toFixed(2)} / ${Number(it.outbound_unit_value).toFixed(2)}`} note={it.reason} />}
-                            />
-                        )}
                         {cmp?.extra_in_return?.length > 0 && (
-                            <IssueGroup title="Itens no retorno que NÃO constam na NF de saída" color="red" icon={XCircleIcon} items={cmp.extra_in_return}
+                            <IssueGroup title="Itens na NF que NÃO constam na saída" color="red" icon={XCircleIcon} items={cmp.extra_in_return}
                                 render={(it) => <ItemRow refText={it.reference || '—'} size={it.size_label} quantity={it.quantity} value={it.unit_value} note={it.reason} />}
                             />
                         )}
 
-                        {hasMissing && (
-                            <div className="bg-orange-50 border border-orange-200 rounded-md p-3">
+                        {unifiedItems.length > 0 && (
+                            <div className="bg-indigo-50 border border-indigo-200 rounded-md p-3">
                                 <div className="flex items-start gap-2 mb-2">
-                                    <InformationCircleIcon className="w-5 h-5 shrink-0 text-orange-600 mt-0.5" />
-                                    <div className="text-sm font-medium text-orange-900">
-                                        Itens que não voltaram — indique o destino:
+                                    <InformationCircleIcon className="w-5 h-5 shrink-0 text-indigo-600 mt-0.5" />
+                                    <div className="text-sm font-medium text-indigo-900">
+                                        Produtos da consignação — clique na linha do produto que foi vendido
                                     </div>
                                 </div>
 
-                                {saleCheck && !saleCheck.found_in_cigam && (
-                                    <div className="text-xs text-amber-800 bg-amber-100 border border-amber-200 rounded p-2 mb-2 flex items-start gap-1">
-                                        <ExclamationTriangleIcon className="w-4 h-4 shrink-0 mt-0.5" />
-                                        <div>
-                                            <strong>Atenção:</strong> não foi encontrada venda no CIGAM (movement_code=2)
-                                            para o CPF {saleCheck.cpf ?? '—'} nos próximos {saleCheck.window_days} dias após {data.return_date}.
-                                            Se marcar algum item como "Vendido", será necessário justificar e a
-                                            loja será notificada por e-mail.
-                                        </div>
-                                    </div>
-                                )}
-
-                                {saleCheck?.found_in_cigam && (
-                                    <div className="text-xs text-green-800 bg-green-100 border border-green-200 rounded p-2 mb-2 flex items-start gap-1">
-                                        <CheckCircleIcon className="w-4 h-4 shrink-0 mt-0.5" />
-                                        <div>
-                                            {saleCheck.movements.length} venda(s) localizada(s) no CIGAM para o CPF nos 7 dias seguintes.
-                                        </div>
-                                    </div>
-                                )}
+                                <div className="text-xs text-gray-700 bg-white border border-indigo-200 rounded p-2 mb-2">
+                                    A verificação no CIGAM é feita <strong>por produto</strong> (ref. + tamanho) para o
+                                    CPF {saleCheck?.cpf ?? '—'} na janela de {saleCheck?.window_days ?? 7} dias após {data.return_date}.
+                                    Produtos não clicados são considerados <strong>devolvidos</strong> (conforme a NF ou
+                                    fora dela).
+                                </div>
 
                                 <div className="space-y-2">
-                                    {cmp.missing_in_return.map((it) => (
-                                        <div
-                                            key={it.consignment_item_id}
-                                            className="bg-white border border-orange-200 rounded p-2 flex flex-wrap items-center justify-between gap-2"
-                                        >
-                                            <div className="text-sm">
-                                                <span className="font-medium">{it.reference}</span>
-                                                {it.size_cigam_code && (
-                                                    <span className="ml-1 text-xs text-gray-500">Tam. {it.size_cigam_code}</span>
-                                                )}
-                                                <span className="ml-2 text-xs text-gray-600">{it.outbound_pending} peça(s)</span>
-                                            </div>
-                                            <div className="flex gap-1 text-xs">
-                                                <ActionRadio
-                                                    checked={itemActions[it.consignment_item_id] === 'sold'}
-                                                    onChange={() => setItemActions((p) => ({ ...p, [it.consignment_item_id]: 'sold' }))}
-                                                    label="Vendido"
-                                                    color="blue"
-                                                />
-                                                <ActionRadio
-                                                    checked={itemActions[it.consignment_item_id] === 'returned'}
-                                                    onChange={() => setItemActions((p) => ({ ...p, [it.consignment_item_id]: 'returned' }))}
-                                                    label="Devolvido (fora da NF)"
-                                                    color="green"
-                                                />
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                                    {unifiedItems.map((it) => {
+                                        const isSold = itemActions[it.consignment_item_id] === 'sold';
+                                        const matched = isItemSaleMatched(it.consignment_item_id);
+                                        const needsJustification = isSold && !matched;
+                                        const movements = perItemSaleMatch[it.consignment_item_id]?.movements || [];
 
-                        {soldItemsWithoutSaleConfirmed > 0 && (
-                            <div className="bg-red-50 border border-red-300 rounded-md p-3">
-                                <InputLabel value="Justificativa obrigatória — venda alegada sem confirmação CIGAM *" className="!text-red-800" />
-                                <textarea
-                                    value={data.sale_justification}
-                                    onChange={(e) => setData('sale_justification', e.target.value)}
-                                    rows={3}
-                                    maxLength={2000}
-                                    className="mt-1 block w-full rounded-md border-red-300 shadow-sm focus:border-red-500 focus:ring-red-500"
-                                    placeholder="Explique por que o item foi marcado como vendido sem registro no CIGAM…"
-                                />
-                                <InputError message={errors.sale_justification} className="mt-1" />
-                                <p className="mt-1 text-xs text-red-700">
-                                    A loja será notificada por e-mail com esta justificativa.
-                                </p>
+                                        const toggleSold = () => setItemActions((p) => ({
+                                            ...p,
+                                            [it.consignment_item_id]: isSold ? 'returned' : 'sold',
+                                        }));
+
+                                        const statusClass = it.status_color === 'green'
+                                            ? 'bg-green-100 text-green-700'
+                                            : it.status_color === 'amber'
+                                                ? 'bg-amber-100 text-amber-800'
+                                                : 'bg-orange-100 text-orange-800';
+
+                                        return (
+                                            <div key={it.consignment_item_id}>
+                                                <button
+                                                    type="button"
+                                                    onClick={toggleSold}
+                                                    className={`w-full text-left border rounded p-2 transition-colors flex flex-wrap items-center justify-between gap-2 ${
+                                                        isSold
+                                                            ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-300'
+                                                            : 'bg-white border-indigo-200 hover:bg-indigo-100'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                        <span
+                                                            className={`inline-flex items-center justify-center w-5 h-5 rounded-full border ${
+                                                                isSold
+                                                                    ? 'bg-blue-600 border-blue-600 text-white'
+                                                                    : 'bg-white border-gray-300 text-transparent'
+                                                            }`}
+                                                            aria-hidden
+                                                        >
+                                                            <CheckCircleIcon className="w-4 h-4" />
+                                                        </span>
+                                                        <div className="text-sm">
+                                                            <span className="font-medium">{it.reference}</span>
+                                                            {(it.size_label || it.size_cigam_code) && (
+                                                                <span className="ml-1 text-xs text-gray-500">
+                                                                    Tam. {it.size_label || it.size_cigam_code}
+                                                                </span>
+                                                            )}
+                                                            <span className="ml-2 text-xs text-gray-600">
+                                                                {it.outbound_pending} peça(s)
+                                                            </span>
+                                                            <span className={`ml-2 text-[10px] uppercase font-medium px-1.5 py-0.5 rounded ${statusClass}`}>
+                                                                {it.status_label}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                                                        isSold
+                                                            ? 'bg-blue-600 text-white'
+                                                            : it.in_return_nf
+                                                                ? 'bg-green-100 text-green-700'
+                                                                : 'bg-gray-100 text-gray-600'
+                                                    }`}>
+                                                        {isSold
+                                                            ? 'Vendido'
+                                                            : it.in_return_nf
+                                                                ? 'Devolvido (NF)'
+                                                                : 'Devolvido fora da NF'}
+                                                    </span>
+                                                </button>
+
+                                                {isSold && matched && (
+                                                    <div className="mt-1 text-xs text-green-800 bg-green-50 border border-green-200 rounded p-2 flex items-start gap-1">
+                                                        <CheckCircleIcon className="w-4 h-4 shrink-0 mt-0.5" />
+                                                        <div>
+                                                            Venda deste produto localizada no CIGAM
+                                                            {movements[0]?.invoice_number
+                                                                ? ` — NF ${movements[0].invoice_number} em ${movements[0].movement_date}`
+                                                                : ''}.
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {needsJustification && (() => {
+                                                    const expanded = !!expandedJustifications[it.consignment_item_id];
+                                                    const hasText = !!(itemJustifications[it.consignment_item_id] || '').trim();
+                                                    const sizeDisplay = it.size_label || it.size_cigam_code;
+
+                                                    return (
+                                                        <div className="mt-1">
+                                                            {!expanded && !hasText ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setExpandedJustifications((p) => ({
+                                                                        ...p, [it.consignment_item_id]: true,
+                                                                    }))}
+                                                                    className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded px-2 py-1"
+                                                                >
+                                                                    <ExclamationTriangleIcon className="w-3.5 h-3.5" />
+                                                                    Venda não localizada no CIGAM — adicionar justificativa
+                                                                </button>
+                                                            ) : (
+                                                                <div className="bg-amber-50 border border-amber-300 rounded p-2">
+                                                                    <div className="flex items-start justify-between gap-2 mb-1">
+                                                                        <div className="flex items-start gap-1 text-xs text-amber-800">
+                                                                            <ExclamationTriangleIcon className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+                                                                            <span>
+                                                                                Venda não localizada no CIGAM — justificativa obrigatória.
+                                                                                A loja será notificada por e-mail.
+                                                                            </span>
+                                                                        </div>
+                                                                        {!hasText && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setExpandedJustifications((p) => ({
+                                                                                    ...p, [it.consignment_item_id]: false,
+                                                                                }))}
+                                                                                className="text-xs text-gray-500 hover:text-gray-700"
+                                                                            >
+                                                                                fechar
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                    <textarea
+                                                                        value={itemJustifications[it.consignment_item_id] || ''}
+                                                                        onChange={(e) => setItemJustifications((p) => ({
+                                                                            ...p,
+                                                                            [it.consignment_item_id]: e.target.value,
+                                                                        }))}
+                                                                        rows={2}
+                                                                        maxLength={2000}
+                                                                        autoFocus
+                                                                        className="mt-1 block w-full rounded-md border-amber-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm"
+                                                                        placeholder={`Explique por que ${it.reference}${sizeDisplay ? ' Tam. '+sizeDisplay : ''} foi marcado como vendido sem registro no CIGAM…`}
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         )}
 
@@ -495,18 +624,3 @@ function ItemRow({ refText, size, quantity, value, note }) {
     );
 }
 
-function ActionRadio({ checked, onChange, label, color }) {
-    const colors = {
-        blue: checked ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-700 border-blue-300 hover:bg-blue-50',
-        green: checked ? 'bg-green-600 text-white border-green-600' : 'bg-white text-green-700 border-green-300 hover:bg-green-50',
-    };
-    return (
-        <button
-            type="button"
-            onClick={onChange}
-            className={`px-3 py-1.5 rounded-md border font-medium transition-colors ${colors[color]}`}
-        >
-            {label}
-        </button>
-    );
-}

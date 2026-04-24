@@ -124,8 +124,8 @@ export default function Dashboard({
                                 )}
                             </p>
                         </div>
-                        <Link href={route('consignments.index')}>
-                            <Button variant="secondary" icon={ArrowLeftIcon}>
+                        <Link href={route('consignments.index')} className="shrink-0">
+                            <Button variant="secondary" icon={ArrowLeftIcon} className="min-h-[44px] w-full sm:w-auto">
                                 Voltar à listagem
                             </Button>
                         </Link>
@@ -223,13 +223,15 @@ export default function Dashboard({
                             )}
                         </div>
 
-                        {/* 4. Taxa de retorno por consultor */}
+                        {/* 4. Performance por consultor — retorno vs conversão em venda */}
                         <div className="bg-white rounded-lg shadow-sm p-4">
                             <h3 className="text-sm font-semibold text-gray-900 mb-3">
-                                Taxa de retorno por consultor(a)
+                                Performance por consultor(a) — retorno × conversão
                             </h3>
                             <p className="text-xs text-gray-500 mb-3">
-                                % do valor consignado que retornou (devolvido). Valores baixos podem indicar venda alta ou shrinkage.
+                                <span className="text-teal-600 font-medium">Taxa de retorno</span>: % do valor consignado que voltou fisicamente.
+                                {' '}<span className="text-blue-600 font-medium">Taxa de conversão</span>: % do valor consignado que virou venda.
+                                {' '}O restante ainda está pendente ou foi perdido.
                             </p>
                             {byEmployee.length === 0 ? (
                                 <div className="h-64 flex items-center justify-center text-sm text-gray-500">
@@ -246,10 +248,11 @@ export default function Dashboard({
                                             textAnchor="end"
                                             height={80}
                                         />
-                                        <YAxis tick={{ fontSize: 11 }} label={{ value: '% retorno', angle: -90, position: 'insideLeft', style: { fontSize: 11 } }} />
+                                        <YAxis tick={{ fontSize: 11 }} label={{ value: '%', angle: -90, position: 'insideLeft', style: { fontSize: 11 } }} />
                                         <Tooltip
-                                            formatter={(value, name, { payload }) => {
-                                                if (name === 'return_rate') return [`${value}%`, 'Taxa de retorno'];
+                                            formatter={(value, name) => {
+                                                if (name === 'return_rate') return [`${value}%`, 'Retorno'];
+                                                if (name === 'conversion_rate') return [`${value}%`, 'Conversão'];
                                                 return [value, name];
                                             }}
                                             labelFormatter={(label, payload) => {
@@ -257,7 +260,11 @@ export default function Dashboard({
                                                 return total ? `${label} (${total} consig.)` : label;
                                             }}
                                         />
+                                        <Legend wrapperStyle={{ fontSize: 11 }} formatter={(value) => (
+                                            value === 'return_rate' ? 'Retorno' : value === 'conversion_rate' ? 'Conversão' : value
+                                        )} />
                                         <Bar dataKey="return_rate" fill="#14b8a6" name="return_rate" />
+                                        <Bar dataKey="conversion_rate" fill="#3b82f6" name="conversion_rate" />
                                     </BarChart>
                                 </ResponsiveContainer>
                             )}

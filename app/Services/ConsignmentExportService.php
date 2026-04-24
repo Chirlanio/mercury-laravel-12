@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\ConsignmentStatus;
 use App\Models\Consignment;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Endroid\QrCode\Builder\Builder as QrBuilder;
@@ -35,7 +36,7 @@ class ConsignmentExportService
      */
     public function exportExcel(Builder $query): BinaryFileResponse
     {
-        $rows = $query->with(['store', 'employee', 'items'])->get();
+        $rows = $query->with(['store', 'employee', 'items', 'returns'])->get();
 
         $export = new class($rows) implements WithMultipleSheets {
             public function __construct(public $rows) {}
@@ -59,11 +60,12 @@ class ConsignmentExportService
                         public function headings(): array
                         {
                             return [
-                                'ID', 'UUID', 'Tipo', 'Status',
+                                'ID', 'Tipo', 'Status',
                                 'Loja', 'Consultor(a)',
                                 'Destinatário', 'Documento',
                                 'NF Saída', 'Data NF',
-                                'Prazo Retorno', 'Dias',
+                                'NF Retorno',
+                                'Prazo Retorno', 'Dias Consignado',
                                 'Itens', 'Valor Total',
                                 'Devolvidos', 'Valor Dev.',
                                 'Vendidos', 'Valor Vend.',
@@ -77,7 +79,6 @@ class ConsignmentExportService
                         {
                             return [
                                 $c->id,
-                                $c->uuid,
                                 $c->type?->label(),
                                 $c->status?->label(),
                                 $c->store?->code ? ($c->store->code.' — '.$c->store->name) : '',
@@ -86,8 +87,9 @@ class ConsignmentExportService
                                 $c->recipient_document ?? '',
                                 $c->outbound_invoice_number,
                                 $c->outbound_invoice_date?->format('d/m/Y'),
+                                \App\Services\ConsignmentExportService::formatReturnInvoices($c),
                                 $c->expected_return_date?->format('d/m/Y'),
-                                $c->return_period_days,
+                                \App\Services\ConsignmentExportService::calculateDaysOnConsignment($c),
                                 (int) $c->outbound_items_count,
                                 (float) $c->outbound_total_value,
                                 (int) $c->returned_items_count,
@@ -116,11 +118,13 @@ class ConsignmentExportService
                         {
                             // Flatten — 1 linha por item (filho) preservando vínculo com consignação
                             return $this->rows->flatMap(function ($c) {
+                                $returnInvoices = \App\Services\ConsignmentExportService::formatReturnInvoices($c);
+
                                 return $c->items->map(fn ($item) => (object) [
                                     'consignment_id' => $c->id,
-                                    'consignment_uuid' => $c->uuid,
                                     'recipient_name' => $c->recipient_name,
                                     'outbound_invoice_number' => $c->outbound_invoice_number,
+                                    'return_invoices' => $returnInvoices,
                                     'item' => $item,
                                 ]);
                             });
@@ -129,8 +133,8 @@ class ConsignmentExportService
                         public function headings(): array
                         {
                             return [
-                                'Consignação #', 'UUID',
-                                'Destinatário', 'NF Saída',
+                                'Consignação #',
+                                'Destinatário', 'NF Saída', 'NF Retorno',
                                 'Referência', 'EAN', 'Tamanho', 'Descrição',
                                 'Quantidade', 'Valor Unit.', 'Valor Total',
                                 'Devolvidos', 'Vendidos', 'Perdidos', 'Pendente',
@@ -144,9 +148,9 @@ class ConsignmentExportService
 
                             return [
                                 $row->consignment_id,
-                                $row->consignment_uuid,
                                 $row->recipient_name,
                                 $row->outbound_invoice_number,
+                                $row->return_invoices,
                                 $it->reference,
                                 $it->barcode ?? '',
                                 $it->size_label ?? $it->size_cigam_code ?? '',
@@ -169,6 +173,82 @@ class ConsignmentExportService
         $filename = 'consignacoes-'.now()->format('Y-m-d-His').'.xlsx';
 
         return ExcelFacade::download($export, $filename, Excel::XLSX);
+    }
+
+    /**
+     * Formata as NFs de retorno (pode haver múltiplas em retornos parciais)
+     * no padrão "numero (dd/mm/yyyy)", separadas por " | ". Vazio se não
+     * houver retorno registrado ainda. Usa a relação já carregada quando
+     * disponível pra evitar query extra.
+     */
+    public static function formatReturnInvoices(Consignment $c): string
+    {
+        $returns = $c->relationLoaded('returns')
+            ? $c->returns
+            : $c->returns()->get();
+
+        if ($returns->isEmpty()) {
+            return '';
+        }
+
+        return $returns
+            ->sortBy('return_date')
+            ->map(function ($r) {
+                $number = $r->return_invoice_number ?: '(sem nº)';
+                $date = $r->return_date ? \Carbon\Carbon::parse($r->return_date)->format('d/m/Y') : '—';
+
+                return $number.' ('.$date.')';
+            })
+            ->implode(' | ');
+    }
+
+    /**
+     * Quantos dias o produto esteve consignado. Conta o dia da saída como
+     * dia 1 fechado (independe de horário). Data de referência:
+     *  - último retorno (ConsignmentReturn::return_date), se existir;
+     *  - completed_at (se finalizada sem retornos);
+     *  - cancelled_at (se cancelada sem retornos);
+     *  - hoje (ainda em aberto).
+     *
+     * Usado tanto pelo export como por outras views que queiram exibir
+     * "dias consignado" sem recalcular a lógica.
+     */
+    public static function calculateDaysOnConsignment(Consignment $c): ?int
+    {
+        if (! $c->outbound_invoice_date) {
+            return null;
+        }
+
+        $outbound = $c->outbound_invoice_date->copy()->startOfDay();
+
+        $reference = null;
+        if ($c->relationLoaded('returns') && $c->returns->isNotEmpty()) {
+            $reference = $c->returns
+                ->pluck('return_date')
+                ->filter()
+                ->sortDesc()
+                ->first();
+        } elseif (! $c->relationLoaded('returns') && $c->returns()->exists()) {
+            $reference = $c->returns()->max('return_date');
+            $reference = $reference ? \Carbon\Carbon::parse($reference) : null;
+        }
+
+        if (! $reference) {
+            if ($c->status === ConsignmentStatus::COMPLETED && $c->completed_at) {
+                $reference = $c->completed_at;
+            } elseif ($c->status === ConsignmentStatus::CANCELLED && $c->cancelled_at) {
+                $reference = $c->cancelled_at;
+            } else {
+                $reference = now();
+            }
+        }
+
+        $referenceDay = $reference instanceof \Carbon\Carbon
+            ? $reference->copy()->startOfDay()
+            : \Carbon\Carbon::parse($reference)->startOfDay();
+
+        // diffInDays é absoluto (positivo). +1 para contar a saída como dia 1.
+        return (int) $outbound->diffInDays($referenceDay) + 1;
     }
 
     // ==================================================================

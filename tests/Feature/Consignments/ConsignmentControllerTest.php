@@ -6,6 +6,7 @@ use App\Enums\ConsignmentStatus;
 use App\Enums\ConsignmentType;
 use App\Models\Consignment;
 use App\Models\ConsignmentItem;
+use App\Models\ConsignmentReturn;
 use App\Models\Movement;
 use App\Models\MovementType;
 use App\Models\Product;
@@ -292,6 +293,15 @@ class ConsignmentControllerTest extends TestCase
     public function test_transition_completes_consignment(): void
     {
         $c = Consignment::factory()->pending()->forStore($this->store)->create();
+        ConsignmentReturn::create([
+            'consignment_id' => $c->id,
+            'return_invoice_number' => '99999',
+            'return_date' => now()->toDateString(),
+            'return_store_code' => $this->store->code,
+            'returned_quantity' => 1,
+            'returned_value' => 0,
+            'registered_by_user_id' => $this->adminUser->id,
+        ]);
 
         $this->actingAs($this->adminUser)
             ->post(route('consignments.transition', $c->id), [
@@ -302,6 +312,23 @@ class ConsignmentControllerTest extends TestCase
 
         $this->assertEquals(
             ConsignmentStatus::COMPLETED,
+            $c->fresh()->status,
+        );
+    }
+
+    public function test_transition_to_completed_blocked_without_return(): void
+    {
+        $c = Consignment::factory()->pending()->forStore($this->store)->create();
+
+        $this->actingAs($this->adminUser)
+            ->post(route('consignments.transition', $c->id), [
+                'to_status' => ConsignmentStatus::COMPLETED->value,
+                'note' => 'Tudo ok',
+            ])
+            ->assertSessionHasErrors(['status']);
+
+        $this->assertEquals(
+            ConsignmentStatus::PENDING,
             $c->fresh()->status,
         );
     }
