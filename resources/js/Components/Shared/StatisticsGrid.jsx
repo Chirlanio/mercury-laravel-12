@@ -92,13 +92,15 @@ function SkeletonCard() {
  * />
  */
 
+// Layout dos cards conforme número total. Em tablets (sm/md) preferimos
+// menos colunas pra evitar squeeze de valores longos (monetários).
 const GRID_CLASSES = {
     1: 'grid-cols-1',
-    2: 'grid-cols-1 md:grid-cols-2',
-    3: 'grid-cols-1 md:grid-cols-3',
-    4: 'grid-cols-1 md:grid-cols-4',
-    5: 'grid-cols-2 md:grid-cols-3 lg:grid-cols-5',
-    6: 'grid-cols-2 md:grid-cols-3 lg:grid-cols-6',
+    2: 'grid-cols-1 sm:grid-cols-2',
+    3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+    4: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4',
+    5: 'grid-cols-2 lg:grid-cols-5',
+    6: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6',
 };
 
 export default function StatisticsGrid({
@@ -128,31 +130,35 @@ export default function StatisticsGrid({
                 const IconComponent = card.icon;
                 const iconColor = ICON_COLORS[card.color] || ICON_COLORS.gray;
                 const Tag = card.onClick ? 'button' : 'div';
+                const formatted = formatValue(card.value, card.format);
 
                 return (
                     <Tag
                         key={index}
                         onClick={card.onClick}
-                        className={`bg-white shadow-sm rounded-lg p-4 text-left transition ${
+                        className={`bg-white shadow-sm rounded-lg p-4 text-left transition min-w-0 ${
                             card.onClick ? 'cursor-pointer hover:shadow-md' : ''
                         } ${card.active ? 'ring-2 ring-indigo-500 ring-offset-1' : ''}`}
                     >
-                        <div className="flex items-center justify-between">
-                            <div className="text-sm font-medium text-gray-500">
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="text-sm font-medium text-gray-500 truncate min-w-0">
                                 {card.label}
                             </div>
                             {IconComponent && (
                                 <IconComponent
-                                    className={`w-5 h-5 ${iconColor}`}
+                                    className={`w-5 h-5 shrink-0 ${iconColor}`}
                                 />
                             )}
                         </div>
-                        <div className="text-2xl font-bold text-gray-900 mt-1">
-                            {formatValue(card.value, card.format)}
+                        <div
+                            className="text-lg sm:text-xl xl:text-2xl font-bold text-gray-900 mt-1 tabular-nums truncate"
+                            title={typeof formatted === 'string' ? formatted : undefined}
+                        >
+                            {formatted}
                         </div>
-                        <div className="mt-1 flex items-center gap-2">
+                        <div className="mt-1 flex items-center gap-2 flex-wrap">
                             {card.sub && (
-                                <span className="text-xs text-gray-500">
+                                <span className="text-xs text-gray-500 truncate">
                                     {card.sub}
                                 </span>
                             )}
