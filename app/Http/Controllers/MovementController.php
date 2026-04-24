@@ -98,7 +98,7 @@ class MovementController extends Controller
     {
         ['query' => $query, 'filters' => $filters] = $this->buildFilteredQuery($request);
 
-        $movements = $query->paginate(50)->through(fn ($m) => [
+        $movements = $query->paginate(50)->withQueryString()->through(fn ($m) => [
             'id' => $m->id,
             'movement_date' => $m->movement_date->format('d/m/Y'),
             'movement_date_iso' => $m->movement_date->format('Y-m-d'),
