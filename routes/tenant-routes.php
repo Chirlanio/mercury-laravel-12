@@ -1156,6 +1156,47 @@ Route::middleware(['auth'])->group(function () {
         // Histórico de sincronizações (modal AJAX)
         Route::get('/customers/sync-history', [\App\Http\Controllers\CustomerController::class, 'syncHistory'])->name('customers.sync-history');
 
+        // ------------------------------------------
+        // Clientes VIP (Black/Gold — curadoria Marketing)
+        // Declaradas antes de /customers/{customer} pra evitar colisão
+        // com a route-model binding numérica do show.
+        // ------------------------------------------
+        Route::middleware('permission:'.Permission::VIEW_VIP_CUSTOMERS->value)->group(function () {
+            Route::get('/customers/vip', [\App\Http\Controllers\CustomerVipController::class, 'index'])->name('customers.vip.index');
+
+            // Config de thresholds
+            Route::middleware('permission:'.Permission::MANAGE_VIP_TIER_CONFIG->value)->group(function () {
+                Route::get('/customers/vip/config', [\App\Http\Controllers\CustomerVipTierConfigController::class, 'index'])->name('customers.vip.config.index');
+                Route::post('/customers/vip/config', [\App\Http\Controllers\CustomerVipTierConfigController::class, 'store'])->name('customers.vip.config.store');
+                Route::patch('/customers/vip/config/{config}', [\App\Http\Controllers\CustomerVipTierConfigController::class, 'update'])->whereNumber('config')->name('customers.vip.config.update');
+                Route::delete('/customers/vip/config/{config}', [\App\Http\Controllers\CustomerVipTierConfigController::class, 'destroy'])->whereNumber('config')->name('customers.vip.config.destroy');
+            });
+
+            // Disparar geração de sugestões
+            Route::middleware('permission:'.Permission::MANAGE_VIP_CUSTOMERS->value)->group(function () {
+                Route::post('/customers/vip/suggestions', [\App\Http\Controllers\CustomerVipController::class, 'runSuggestions'])->name('customers.vip.suggestions');
+            });
+
+            // Curadoria manual
+            Route::middleware('permission:'.Permission::CURATE_VIP_CUSTOMERS->value)->group(function () {
+                Route::patch('/customers/vip/{vip}', [\App\Http\Controllers\CustomerVipController::class, 'curate'])->whereNumber('vip')->name('customers.vip.curate');
+                Route::delete('/customers/vip/{vip}', [\App\Http\Controllers\CustomerVipController::class, 'destroy'])->whereNumber('vip')->name('customers.vip.destroy');
+            });
+
+            // Atividades (CRM-light) — permission própria
+            Route::middleware('permission:'.Permission::MANAGE_VIP_ACTIVITIES->value)->group(function () {
+                Route::get('/customers/{customer}/vip/activities', [\App\Http\Controllers\CustomerVipActivityController::class, 'index'])->whereNumber('customer')->name('customers.vip.activities.index');
+                Route::post('/customers/{customer}/vip/activities', [\App\Http\Controllers\CustomerVipActivityController::class, 'store'])->whereNumber('customer')->name('customers.vip.activities.store');
+                Route::patch('/customers/vip/activities/{activity}', [\App\Http\Controllers\CustomerVipActivityController::class, 'update'])->whereNumber('activity')->name('customers.vip.activities.update');
+                Route::delete('/customers/vip/activities/{activity}', [\App\Http\Controllers\CustomerVipActivityController::class, 'destroy'])->whereNumber('activity')->name('customers.vip.activities.destroy');
+            });
+
+            // Relatório YoY
+            Route::middleware('permission:'.Permission::VIEW_VIP_REPORTS->value)->group(function () {
+                Route::get('/customers/{customer}/vip/report/yoy', [\App\Http\Controllers\CustomerVipReportController::class, 'yoy'])->whereNumber('customer')->name('customers.vip.report.yoy');
+            });
+        });
+
         Route::get('/customers/{customer}', [\App\Http\Controllers\CustomerController::class, 'show'])->whereNumber('customer')->name('customers.show');
 
         // Sync manual — permissão SYNC_CUSTOMERS (admin+)
