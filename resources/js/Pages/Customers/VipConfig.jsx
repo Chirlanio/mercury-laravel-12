@@ -176,10 +176,11 @@ export default function VipConfig({ configs, availableYears = [], can }) {
 
             <div className="py-6 sm:py-12">
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
-                        <div>
+                    {/* Header — vertical até lg pra não estourar em iPad mini (768) */}
+                    <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:justify-between lg:items-center">
+                        <div className="min-w-0">
                             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
-                                <AdjustmentsHorizontalIcon className="h-7 w-7 text-indigo-600" />
+                                <AdjustmentsHorizontalIcon className="h-7 w-7 text-indigo-600 shrink-0" />
                                 Limites MS Life por ano
                             </h1>
                             <p className="mt-1 text-sm text-gray-600">
@@ -187,15 +188,20 @@ export default function VipConfig({ configs, availableYears = [], can }) {
                                 faturamento do ano <strong>anterior</strong> (Lista 2026 ↔ vendas de 2025).
                             </p>
                         </div>
-                        <div className="flex gap-2 shrink-0">
-                            <Link href={route('customers.vip.index')}>
-                                <Button variant="outline" icon={ArrowLeftIcon}>
-                                    <span className="hidden sm:inline">Voltar</span>
+                        <div className="flex flex-wrap gap-2 lg:shrink-0">
+                            <Link href={route('customers.vip.index')} className="flex-1 sm:flex-none">
+                                <Button variant="outline" icon={ArrowLeftIcon} className="w-full sm:w-auto whitespace-nowrap">
+                                    Voltar
                                 </Button>
                             </Link>
                             {can.manage_config && (
-                                <Button variant="primary" onClick={() => openYearForm()} icon={PlusIcon}>
-                                    <span className="hidden sm:inline">Cadastrar limites do ano</span>
+                                <Button
+                                    variant="primary"
+                                    onClick={() => openYearForm()}
+                                    icon={PlusIcon}
+                                    className="flex-1 sm:flex-none w-full sm:w-auto whitespace-nowrap"
+                                >
+                                    Cadastrar limites do ano
                                 </Button>
                             )}
                         </div>

@@ -146,11 +146,11 @@ export default function VipIndex({ tiers, year, availableYears, filters, statist
 
             <div className="py-6 sm:py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
-                        <div>
+                    {/* Header — vertical até lg pra não estourar em iPad mini (768) */}
+                    <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:justify-between lg:items-center">
+                        <div className="min-w-0">
                             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
-                                <TrophyIcon className="h-7 w-7 text-indigo-600" />
+                                <TrophyIcon className="h-7 w-7 text-indigo-600 shrink-0" />
                                 MS Life {year}
                             </h1>
                             <p className="mt-1 text-sm text-gray-600">
@@ -159,22 +159,27 @@ export default function VipIndex({ tiers, year, availableYears, filters, statist
                                 A lista de cada ano usa o faturamento do ano anterior.
                             </p>
                         </div>
-                        <div className="flex gap-2 shrink-0 flex-wrap">
-                            <Link href={route('customers.index')}>
-                                <Button variant="outline" icon={ArrowLeftIcon}>
-                                    <span className="hidden sm:inline">Voltar para Clientes</span>
+                        <div className="flex flex-wrap gap-2 lg:shrink-0">
+                            <Link href={route('customers.index')} className="flex-1 sm:flex-none">
+                                <Button variant="outline" icon={ArrowLeftIcon} className="w-full sm:w-auto whitespace-nowrap">
+                                    Voltar
                                 </Button>
                             </Link>
                             {can.manage_config && (
-                                <Link href={route('customers.vip.config.index')}>
-                                    <Button variant="secondary" icon={AdjustmentsHorizontalIcon}>
-                                        <span className="hidden sm:inline">Limites</span>
+                                <Link href={route('customers.vip.config.index')} className="flex-1 sm:flex-none">
+                                    <Button variant="secondary" icon={AdjustmentsHorizontalIcon} className="w-full sm:w-auto whitespace-nowrap">
+                                        Limites
                                     </Button>
                                 </Link>
                             )}
                             {can.manage && (
-                                <Button variant="primary" onClick={handleSuggestionsRun} icon={ArrowPathIcon}>
-                                    <span className="hidden sm:inline">Gerar sugestões {year}</span>
+                                <Button
+                                    variant="primary"
+                                    onClick={handleSuggestionsRun}
+                                    icon={ArrowPathIcon}
+                                    className="flex-1 sm:flex-none w-full sm:w-auto whitespace-nowrap"
+                                >
+                                    Gerar sugestões {year}
                                 </Button>
                             )}
                         </div>

@@ -11,6 +11,7 @@ import {
     ArrowUturnLeftIcon,
     NoSymbolIcon,
     DocumentArrowDownIcon,
+    ArrowUpTrayIcon,
     EyeIcon,
     CurrencyDollarIcon,
     ChartBarIcon,
@@ -68,6 +69,7 @@ export default function Index({
     const canRegisterReturn = can.register_return ?? false;
     const canOverrideLock = can.override_lock ?? false;
     const canExport = can.export ?? false;
+    const canImport = can.import ?? false;
 
     const { modals, selected, openModal, closeModal } = useModalManager([
         'create', 'detail', 'return',
@@ -322,9 +324,10 @@ export default function Index({
 
             <div className="py-6 sm:py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header — mobile stack, sm+ row */}
-                    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
-                        <div>
+                    {/* Header — vertical até lg (≥1024); título acima, botões abaixo
+                        em flex-wrap pra acomodar tablets (iPad mini = 768) sem estourar. */}
+                    <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:justify-between lg:items-center">
+                        <div className="min-w-0">
                             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Consignações</h1>
                             <p className="mt-1 text-sm text-gray-600">
                                 Remessa de produtos para Cliente, Influencer ou E-commerce com prazo de retorno
@@ -335,31 +338,39 @@ export default function Index({
                                 )}
                             </p>
                         </div>
-                        <div className="flex gap-2 shrink-0">
-                            <Link href={route('consignments.dashboard')}>
-                                <Button variant="secondary" title="Dashboard" aria-label="Dashboard" className="min-h-[44px]">
-                                    <ChartBarIcon className="w-4 h-4 sm:mr-2" />
-                                    <span className="hidden sm:inline">Dashboard</span>
+                        <div className="flex flex-wrap gap-2 lg:shrink-0">
+                            <Link href={route('consignments.dashboard')} className="flex-1 sm:flex-none min-w-[140px]">
+                                <Button variant="secondary" title="Dashboard" className="min-h-[44px] w-full sm:w-auto">
+                                    <ChartBarIcon className="w-4 h-4 mr-2" />
+                                    <span>Dashboard</span>
                                 </Button>
                             </Link>
                             {canExport && (
                                 <a
                                     href={route('consignments.export', filters)}
                                     title="Exportar XLSX"
-                                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-300 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50 min-h-[44px]"
+                                    className="flex-1 sm:flex-none min-w-[140px] inline-flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-700 bg-transparent border border-gray-300 rounded-lg transition-all duration-300 hover:bg-gray-50 hover:border-gray-400 hover:shadow-md hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 min-h-[44px]"
                                 >
-                                    <DocumentArrowDownIcon className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Exportar</span>
+                                    <DocumentArrowDownIcon className="w-4 h-4 mr-2" />
+                                    <span>Exportar</span>
                                 </a>
+                            )}
+                            {canImport && (
+                                <Link href={route('consignments.import')} className="flex-1 sm:flex-none min-w-[140px]">
+                                    <Button variant="outline" title="Importar planilha" className="min-h-[44px] w-full sm:w-auto">
+                                        <ArrowUpTrayIcon className="w-4 h-4 mr-2" />
+                                        <span>Importar</span>
+                                    </Button>
+                                </Link>
                             )}
                             {canCreate && (
                                 <Button
                                     variant="primary"
                                     onClick={() => openModal('create')}
-                                    className="min-h-[44px]"
+                                    className="min-h-[44px] flex-1 sm:flex-none min-w-[180px] whitespace-nowrap"
                                 >
-                                    <PlusIcon className="w-4 h-4 sm:mr-2" />
-                                    <span className="hidden sm:inline">Nova Consignação</span>
+                                    <PlusIcon className="w-4 h-4 mr-2" />
+                                    <span>Nova Consignação</span>
                                 </Button>
                             )}
                         </div>
@@ -368,10 +379,10 @@ export default function Index({
                     {/* Statistics */}
                     <StatisticsGrid cards={statsCards} cols={6} />
 
-                    {/* Filtros — mobile 1 col, md 5 cols */}
+                    {/* Filtros — mobile 1 col, sm 2 cols, lg 5 cols */}
                     <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                            <div className="md:col-span-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+                            <div className="sm:col-span-2 lg:col-span-2">
                                 <InputLabel htmlFor="search" value="Buscar" />
                                 <TextInput
                                     id="search"
@@ -460,6 +471,8 @@ export default function Index({
                 onClose={() => closeModal('detail')}
                 consignment={selected}
                 statusColors={statusColors}
+                statusOptions={statusOptions}
+                stores={selects.stores || []}
             />
 
             {canRegisterReturn && (
@@ -469,6 +482,7 @@ export default function Index({
                     consignmentSummary={selected}
                     userStoreCode={user_store_code}
                     canChooseStore={can.choose_return_store ?? false}
+                    stores={selects.stores || []}
                 />
             )}
 
