@@ -311,7 +311,7 @@ export default function CreateConsignmentModal({
             subtitle={stepTitles[step - 1]}
             headerColor="bg-indigo-600"
             headerIcon={<HeaderIcon className="h-5 w-5" />}
-            maxWidth="5xl"
+            maxWidth="7xl"
             footer={
                 <StandardModal.Footer>
                     <div className="flex-1" />

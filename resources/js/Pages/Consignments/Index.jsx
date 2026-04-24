@@ -49,6 +49,7 @@ export default function Index({
     consignments,
     filters = {},
     statistics = {},
+    user_store_code = null,
     typeOptions = {},
     statusOptions = {},
     statusColors = {},
@@ -466,6 +467,8 @@ export default function Index({
                     show={modals.return}
                     onClose={() => closeModal('return')}
                     consignmentSummary={selected}
+                    userStoreCode={user_store_code}
+                    canChooseStore={can.choose_return_store ?? false}
                 />
             )}
 

@@ -417,6 +417,242 @@ class ConsignmentLookupService
     }
 
     /**
+     * Lookup da NF de retorno + comparação com a NF de saída da
+     * consignação fornecida. Retorna diff detalhado para a UI mostrar
+     * divergências (mesma ref, mesma qtd, mesmo valor).
+     *
+     * Estrutura do diff:
+     *  - matched: item saída bateu 100% com item retorno
+     *  - missing_in_return: saída → não voltou (usuário decide: vendido/perdido)
+     *  - extra_in_return: retorno → não estava na saída (erro de processo!)
+     *  - quantity_divergent: voltou mas qtd != saída
+     *  - value_divergent: voltou mas valor != saída
+     *
+     * @return array{
+     *   found: bool,
+     *   return_invoice_number: string,
+     *   store_code: string,
+     *   movement_date: ?string,
+     *   total_value: float,
+     *   comparison: array{
+     *     matched: array<int, array<string, mixed>>,
+     *     missing_in_return: array<int, array<string, mixed>>,
+     *     extra_in_return: array<int, array<string, mixed>>,
+     *     quantity_divergent: array<int, array<string, mixed>>,
+     *     value_divergent: array<int, array<string, mixed>>,
+     *   }
+     * }
+     */
+    public function compareReturnWithOutbound(
+        \App\Models\Consignment $consignment,
+        string $storeCode,
+        string $invoiceNumber,
+        string $returnDate,
+    ): array {
+        $return = $this->findReturnInvoice($storeCode, $invoiceNumber, $returnDate);
+
+        if (! $return['found']) {
+            return [
+                'found' => false,
+                'return_invoice_number' => $invoiceNumber,
+                'store_code' => $storeCode,
+                'movement_date' => $returnDate,
+                'total_value' => 0.0,
+                'comparison' => [
+                    'matched' => [],
+                    'missing_in_return' => $this->missingItems($consignment),
+                    'extra_in_return' => [],
+                    'quantity_divergent' => [],
+                    'value_divergent' => [],
+                ],
+            ];
+        }
+
+        // Índice dos items da saída por product_variant_id (ou ref+size como fallback)
+        $outbound = $consignment->items()->get();
+        $outboundByKey = $outbound->keyBy(fn ($it) => $this->itemKey($it->product_variant_id, $it->reference, $it->size_cigam_code));
+
+        $matched = [];
+        $qtyDivergent = [];
+        $valueDivergent = [];
+        $extraInReturn = [];
+        $touchedKeys = [];
+
+        foreach ($return['items'] as $ret) {
+            $key = $this->itemKey($ret['product_variant_id'] ?? null, $ret['reference'] ?? null, $ret['size_cigam_code'] ?? null);
+            $touchedKeys[$key] = true;
+
+            /** @var \App\Models\ConsignmentItem|null $out */
+            $out = $outboundByKey->get($key);
+
+            if (! $out) {
+                $extraInReturn[] = array_merge($ret, ['reason' => 'Produto não consta na NF de saída']);
+                continue;
+            }
+
+            $pending = (int) $out->pending_quantity;
+            $retQty = (int) $ret['quantity'];
+            $sameQty = $retQty === $pending;
+            $sameValue = abs(((float) $ret['unit_value']) - ((float) $out->unit_value)) < 0.01;
+
+            $entry = [
+                'consignment_item_id' => $out->id,
+                'movement_id' => $ret['movement_id'],
+                'reference' => $out->reference,
+                'size_label' => $ret['size_label'] ?? null,
+                'size_cigam_code' => $out->size_cigam_code,
+                'description' => $out->description,
+                'outbound_quantity' => (int) $out->quantity,
+                'outbound_pending' => $pending,
+                'outbound_unit_value' => (float) $out->unit_value,
+                'return_quantity' => $retQty,
+                'return_unit_value' => (float) $ret['unit_value'],
+            ];
+
+            if (! $sameQty) {
+                $qtyDivergent[] = array_merge($entry, [
+                    'reason' => sprintf('Quantidade retornada (%d) diferente da pendente (%d)', $retQty, $pending),
+                ]);
+                continue;
+            }
+
+            if (! $sameValue) {
+                $valueDivergent[] = array_merge($entry, [
+                    'reason' => sprintf(
+                        'Valor unitário retornado (R$ %s) diferente do de saída (R$ %s)',
+                        number_format((float) $ret['unit_value'], 2, ',', '.'),
+                        number_format((float) $out->unit_value, 2, ',', '.'),
+                    ),
+                ]);
+                continue;
+            }
+
+            $matched[] = $entry;
+        }
+
+        // Itens da saída que não apareceram no retorno
+        $missingInReturn = [];
+        foreach ($outboundByKey as $key => $out) {
+            if (isset($touchedKeys[$key])) {
+                continue;
+            }
+            if ((int) $out->pending_quantity <= 0) {
+                continue;
+            }
+            $missingInReturn[] = [
+                'consignment_item_id' => $out->id,
+                'reference' => $out->reference,
+                'size_cigam_code' => $out->size_cigam_code,
+                'description' => $out->description,
+                'outbound_quantity' => (int) $out->quantity,
+                'outbound_pending' => (int) $out->pending_quantity,
+                'outbound_unit_value' => (float) $out->unit_value,
+                'reason' => 'Item da saída não retornou — usuário deve indicar se foi vendido ou perdido',
+            ];
+        }
+
+        return [
+            'found' => true,
+            'return_invoice_number' => $invoiceNumber,
+            'store_code' => $storeCode,
+            'movement_date' => $return['movement_date'],
+            'total_value' => (float) $return['total_value'],
+            'comparison' => [
+                'matched' => $matched,
+                'missing_in_return' => $missingInReturn,
+                'extra_in_return' => $extraInReturn,
+                'quantity_divergent' => $qtyDivergent,
+                'value_divergent' => $valueDivergent,
+            ],
+        ];
+    }
+
+    /**
+     * Chave de identidade para comparar itens saída x retorno. Prioriza
+     * product_variant_id (mais preciso) e cai em reference+size se faltar.
+     */
+    protected function itemKey(?int $variantId, ?string $reference, ?string $sizeCigam): string
+    {
+        if ($variantId) {
+            return 'v:'.$variantId;
+        }
+
+        return 'r:'.strtolower((string) $reference).'|'.strtolower((string) $sizeCigam);
+    }
+
+    /**
+     * Items da saída ainda pendentes (não voltaram, não venderam, não
+     * perderam). Usado quando a NF de retorno não foi encontrada.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function missingItems(\App\Models\Consignment $consignment): array
+    {
+        return $consignment->items()
+            ->get()
+            ->filter(fn ($it) => (int) $it->pending_quantity > 0)
+            ->map(fn ($it) => [
+                'consignment_item_id' => $it->id,
+                'reference' => $it->reference,
+                'size_cigam_code' => $it->size_cigam_code,
+                'description' => $it->description,
+                'outbound_quantity' => (int) $it->quantity,
+                'outbound_pending' => (int) $it->pending_quantity,
+                'outbound_unit_value' => (float) $it->unit_value,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Verifica se houve venda (movement_code=2) para o CPF do cliente
+     * na janela de N dias (default 7) após a data de retorno.
+     *
+     * Usado para validar items marcados como "vendido" — se o cliente
+     * não comprou no CIGAM, sale_justification fica obrigatória.
+     *
+     * @return array{found: bool, movements: array<int, array<string, mixed>>}
+     */
+    public function verifyCustomerSale(
+        ?string $cpfCustomer,
+        string $referenceDate,
+        int $windowDays = 7,
+    ): array {
+        if (! $cpfCustomer) {
+            return ['found' => false, 'movements' => []];
+        }
+
+        $cpfClean = preg_replace('/\D/', '', $cpfCustomer);
+        if (strlen($cpfClean) !== 11) {
+            return ['found' => false, 'movements' => []];
+        }
+
+        $start = (new \DateTime($referenceDate))->format('Y-m-d');
+        $end = (new \DateTime($referenceDate))->modify("+{$windowDays} days")->format('Y-m-d');
+
+        $movements = Movement::query()
+            ->where('movement_code', 2) // Venda
+            ->where('cpf_customer', $cpfClean)
+            ->whereBetween('movement_date', [$start, $end])
+            ->orderBy('movement_date')
+            ->get(['id', 'store_code', 'invoice_number', 'movement_date', 'ref_size', 'barcode', 'quantity', 'realized_value']);
+
+        return [
+            'found' => $movements->isNotEmpty(),
+            'movements' => $movements->map(fn ($m) => [
+                'id' => $m->id,
+                'store_code' => $m->store_code,
+                'invoice_number' => $m->invoice_number,
+                'movement_date' => $m->movement_date?->format('Y-m-d'),
+                'ref_size' => $m->ref_size,
+                'barcode' => $m->barcode,
+                'quantity' => (int) $m->quantity,
+                'realized_value' => (float) $m->realized_value,
+            ])->values()->all(),
+        ];
+    }
+
+    /**
      * @return array{0: ?string, 1: ?string}
      */
     protected function splitRefSize(?string $refSize): array

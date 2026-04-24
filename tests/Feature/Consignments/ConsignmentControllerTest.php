@@ -334,8 +334,9 @@ class ConsignmentControllerTest extends TestCase
             ->post(route('consignments.returns.store', $c->id), [
                 'return_invoice_number' => '88001',
                 'return_date' => '2026-04-23',
+                'return_store_code' => 'Z421',
                 'items' => [
-                    ['consignment_item_id' => $item->id, 'quantity' => 2],
+                    ['consignment_item_id' => $item->id, 'quantity' => 2, 'action' => 'returned'],
                 ],
             ])
             ->assertRedirect();
@@ -358,9 +359,11 @@ class ConsignmentControllerTest extends TestCase
 
         $this->actingAs($this->adminUser)
             ->post(route('consignments.returns.store', $c->id), [
+                'return_invoice_number' => '88002',
                 'return_date' => '2026-04-23',
+                'return_store_code' => 'Z421',
                 'items' => [
-                    ['consignment_item_id' => $otherItem->id, 'quantity' => 1],
+                    ['consignment_item_id' => $otherItem->id, 'quantity' => 1, 'action' => 'returned'],
                 ],
             ])
             ->assertSessionHasErrors();
@@ -395,8 +398,12 @@ class ConsignmentControllerTest extends TestCase
         // Registra um retorno
         app(\App\Services\ConsignmentReturnService::class)->register(
             $c->fresh(),
-            ['return_date' => '2026-04-23', 'return_store_code' => 'Z421'],
-            [['consignment_item_id' => $item->id, 'quantity' => 1]],
+            [
+                'return_invoice_number' => '99001',
+                'return_date' => '2026-04-23',
+                'return_store_code' => 'Z421',
+            ],
+            [['consignment_item_id' => $item->id, 'quantity' => 1, 'action' => 'returned']],
             $this->adminUser,
         );
 

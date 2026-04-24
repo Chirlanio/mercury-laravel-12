@@ -1198,6 +1198,7 @@ Route::middleware(['auth'])->group(function () {
 
         Route::middleware('permission:'.Permission::REGISTER_CONSIGNMENT_RETURN->value)->group(function () {
             Route::post('/consignments/{consignment}/returns', [\App\Http\Controllers\ConsignmentController::class, 'registerReturn'])->whereNumber('consignment')->name('consignments.returns.store');
+            Route::get('/consignments/{consignment}/lookup/return-compare', [\App\Http\Controllers\ConsignmentController::class, 'lookupReturnCompare'])->whereNumber('consignment')->name('consignments.lookup.return-compare');
         });
 
         Route::middleware('permission:'.Permission::DELETE_CONSIGNMENTS->value)->group(function () {

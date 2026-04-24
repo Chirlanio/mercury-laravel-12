@@ -130,8 +130,25 @@ class ConsignmentController extends Controller
                 'override_lock' => $user?->hasPermissionTo(Permission::OVERRIDE_CONSIGNMENT_LOCK->value) ?? false,
                 'export' => $user?->hasPermissionTo(Permission::EXPORT_CONSIGNMENTS->value) ?? false,
                 'edit_return_period' => $this->canEditReturnPeriod($user),
+                'choose_return_store' => $this->canChooseReturnStore($user),
             ],
+            'user_store_code' => $user?->store_id,
         ]);
+    }
+
+    /**
+     * True se o user pode escolher loja diferente ao lançar retorno.
+     * Hierarquia >= SUPPORT.
+     */
+    protected function canChooseReturnStore(?User $user): bool
+    {
+        if (! $user || ! $user->role) {
+            return false;
+        }
+
+        $role = $user->role instanceof Role ? $user->role : Role::tryFrom($user->role);
+
+        return $role?->hasPermission(Role::SUPPORT) ?? false;
     }
 
     /**
@@ -305,25 +322,34 @@ class ConsignmentController extends Controller
         $this->ensureCanView($request->user(), $consignment);
 
         $data = $request->validate([
-            'return_invoice_number' => ['nullable', 'string', 'max:20'],
+            'return_invoice_number' => ['required', 'string', 'max:20'],
             'return_date' => ['required', 'date'],
-            'return_store_code' => ['nullable', 'string', 'max:10'],
+            'return_store_code' => ['required', 'string', 'max:10'],
             'movement_id' => ['nullable', 'integer', 'exists:movements,id'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'sale_justification' => ['nullable', 'string', 'max:2000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.consignment_item_id' => ['required', 'integer', 'exists:consignment_items,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.action' => ['nullable', 'string', 'in:returned,sold'],
         ]);
+
+        // Se user < SUPPORT, força a loja do próprio user
+        $data['return_store_code'] = $this->resolveReturnStoreCode(
+            $request->user(),
+            $data['return_store_code'],
+        );
 
         try {
             $this->returnService->register(
                 $consignment,
                 [
-                    'return_invoice_number' => $data['return_invoice_number'] ?? null,
+                    'return_invoice_number' => $data['return_invoice_number'],
                     'return_date' => $data['return_date'],
-                    'return_store_code' => $data['return_store_code'] ?? null,
+                    'return_store_code' => $data['return_store_code'],
                     'movement_id' => $data['movement_id'] ?? null,
                     'notes' => $data['notes'] ?? null,
+                    'sale_justification' => $data['sale_justification'] ?? null,
                 ],
                 $data['items'],
                 $request->user(),
@@ -333,6 +359,71 @@ class ConsignmentController extends Controller
         }
 
         return redirect()->back()->with('success', 'Retorno registrado com sucesso.');
+    }
+
+    /**
+     * Endpoint AJAX — busca a NF de retorno no CIGAM (code=21) e
+     * retorna o diff contra a NF de saída da consignação.
+     * Usado pelo RegisterReturnModal ao preencher os 3 campos.
+     */
+    public function lookupReturnCompare(Consignment $consignment, Request $request): JsonResponse
+    {
+        $this->ensureCanView($request->user(), $consignment);
+
+        $data = $request->validate([
+            'return_invoice_number' => ['required', 'string', 'max:20'],
+            'return_date' => ['required', 'date'],
+            'return_store_code' => ['required', 'string', 'max:10'],
+        ]);
+
+        $storeCode = $this->resolveReturnStoreCode($request->user(), $data['return_store_code']);
+
+        $comparison = $this->lookup->compareReturnWithOutbound(
+            $consignment,
+            $storeCode,
+            $data['return_invoice_number'],
+            $data['return_date'],
+        );
+
+        $saleCheck = $this->lookup->verifyCustomerSale(
+            $consignment->recipient_document_clean,
+            $data['return_date'],
+            7,
+        );
+
+        return response()->json([
+            'comparison' => $comparison,
+            'customer_sale_check' => [
+                'cpf' => $consignment->recipient_document_clean,
+                'window_days' => 7,
+                'found_in_cigam' => $saleCheck['found'],
+                'movements' => $saleCheck['movements'],
+            ],
+        ]);
+    }
+
+    /**
+     * Resolve o store_code efetivo do retorno baseado na hierarquia
+     * do user. USER/DRIVER (hierarquia < SUPPORT) ficam travados na
+     * própria loja; SUPPORT+ pode escolher qualquer uma.
+     */
+    protected function resolveReturnStoreCode(?User $user, string $requested): string
+    {
+        if (! $user || ! $user->role) {
+            return $requested;
+        }
+
+        $role = $user->role instanceof Role ? $user->role : Role::tryFrom($user->role);
+        if (! $role) {
+            return $requested;
+        }
+
+        // SUPPORT (hierarquia 2) ou superior pode escolher
+        if ($role->hasPermission(Role::SUPPORT)) {
+            return $requested;
+        }
+
+        return $user->store_id ?: $requested;
     }
 
     // ==================================================================

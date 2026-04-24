@@ -34,29 +34,38 @@ class ConsignmentReturnService
     public function __construct(
         protected ConsignmentTransitionService $transitions,
         protected ConsignmentService $consignments,
+        protected ConsignmentLookupService $lookup,
     ) {
     }
 
     /**
-     * Registra um evento de retorno. Transação garante all-or-nothing.
+     * Registra um evento de retorno. Transação all-or-nothing.
      *
-     * Estrutura de cada linha em `items`:
-     *  - consignment_item_id: int (obrigatório — FK)
-     *  - quantity: int ≥ 1
+     * Cada item suporta 2 ações:
+     *  - 'returned' : produto voltou fisicamente — incrementa returned_quantity
+     *  - 'sold'     : produto foi vendido ao cliente — incrementa sold_quantity
+     *                 e valida no CIGAM se houve movement_code=2 pro CPF
+     *                 do cliente nos 7 dias após return_date. Se não
+     *                 achou, exige `sale_justification` e dispara email
+     *                 pra loja (ConsignmentSaleUnconfirmedNotification).
      *
-     * Validações (regra M1):
-     *  - cada item pertence à consignação (consignment_id casa)
-     *  - quantity ≤ pending_quantity do item
-     *  - soma agregada de cada item nunca excede a quantidade original
+     * NF de retorno (store_code + invoice_number + movement_date) é
+     * OBRIGATÓRIA e compõe a chave. Se houver itens 'sold' sem venda
+     * confirmada no CIGAM, `sale_justification` vira obrigatória.
      *
      * @param  array{
-     *   return_invoice_number?: ?string,
+     *   return_invoice_number: string,
      *   return_date: string,
-     *   return_store_code?: ?string,
+     *   return_store_code: string,
      *   movement_id?: ?int,
      *   notes?: ?string,
+     *   sale_justification?: ?string,
      * }  $data
-     * @param  array<int, array{consignment_item_id: int, quantity: int}>  $items
+     * @param  array<int, array{
+     *   consignment_item_id: int,
+     *   quantity: int,
+     *   action?: 'returned'|'sold',
+     * }>  $items
      *
      * @throws ValidationException
      */
@@ -86,23 +95,42 @@ class ConsignmentReturnService
 
         if (empty($items)) {
             throw ValidationException::withMessages([
-                'items' => 'Informe ao menos um item devolvido.',
+                'items' => 'Informe ao menos um item devolvido ou vendido.',
             ]);
         }
 
-        // Consolida quantidade por item (ignora duplicados no input)
-        $consolidated = [];
+        // NF de retorno é OBRIGATÓRIA (chave composta com loja + data)
+        $requiredKeys = ['return_invoice_number', 'return_date', 'return_store_code'];
+        foreach ($requiredKeys as $k) {
+            if (empty($data[$k])) {
+                throw ValidationException::withMessages([
+                    $k => 'Campo obrigatório — NF de retorno requer número, data e loja.',
+                ]);
+            }
+        }
+
+        // Consolida por (item_id, action) — permite mesmo item com partes returned+sold
+        $consolidated = []; // [itemId => ['returned' => N, 'sold' => M]]
         foreach ($items as $row) {
             $id = (int) ($row['consignment_item_id'] ?? 0);
             $qty = (int) ($row['quantity'] ?? 0);
+            $action = $row['action'] ?? 'returned';
 
             if ($id <= 0 || $qty <= 0) {
                 throw ValidationException::withMessages([
                     'items' => 'Item inválido: consignment_item_id e quantity > 0 são obrigatórios.',
                 ]);
             }
+            if (! in_array($action, ['returned', 'sold'], true)) {
+                throw ValidationException::withMessages([
+                    'items' => "Ação inválida '{$action}'. Aceito: returned, sold.",
+                ]);
+            }
 
-            $consolidated[$id] = ($consolidated[$id] ?? 0) + $qty;
+            if (! isset($consolidated[$id])) {
+                $consolidated[$id] = ['returned' => 0, 'sold' => 0];
+            }
+            $consolidated[$id][$action] += $qty;
         }
 
         // Busca os items atuais (regra M1 — confronto com itens de saída)
@@ -119,20 +147,59 @@ class ConsignmentReturnService
             ]);
         }
 
-        // Valida quantidade ≤ pendente por item
-        foreach ($consolidated as $itemId => $qty) {
+        // Valida soma (returned + sold) ≤ pendente por item
+        foreach ($consolidated as $itemId => $qtyMap) {
             $item = $consignmentItems[$itemId];
-            $pending = $item->pending_quantity;
+            $pending = (int) $item->pending_quantity;
+            $total = $qtyMap['returned'] + $qtyMap['sold'];
 
-            if ($qty > $pending) {
+            if ($total > $pending) {
                 throw ValidationException::withMessages([
-                    'items' => "Item {$item->reference}: quantidade informada ({$qty}) excede o pendente ({$pending}).",
+                    'items' => "Item {$item->reference}: soma (devolvido {$qtyMap['returned']} + vendido {$qtyMap['sold']}) = {$total} excede o pendente ({$pending}).",
                 ]);
             }
         }
 
+        // Validação de venda no CIGAM: se algum item foi marcado como
+        // 'sold', verifica movement_code=2 pelo CPF do cliente na janela
+        // de 7 dias após return_date. Se não achou, sale_justification
+        // vira obrigatória.
+        $soldItemsIds = array_keys(array_filter(
+            $consolidated,
+            fn ($q) => $q['sold'] > 0,
+        ));
+        $saleConfirmedInCigam = false;
+        $unconfirmedSaleItems = [];
+
+        if (! empty($soldItemsIds)) {
+            $verify = $this->lookup->verifyCustomerSale(
+                $consignment->recipient_document_clean,
+                $data['return_date'],
+                7,
+            );
+            $saleConfirmedInCigam = $verify['found'];
+
+            if (! $saleConfirmedInCigam) {
+                if (empty($data['sale_justification']) || trim($data['sale_justification']) === '') {
+                    throw ValidationException::withMessages([
+                        'sale_justification' => 'Venda de item(s) sem confirmação no CIGAM — justificativa é obrigatória.',
+                    ]);
+                }
+
+                foreach ($soldItemsIds as $id) {
+                    $item = $consignmentItems[$id];
+                    $unconfirmedSaleItems[] = [
+                        'reference' => $item->reference,
+                        'size_label' => $item->size_cigam_code ? ltrim(preg_replace('/^U/i', '', $item->size_cigam_code)) : null,
+                        'quantity' => $consolidated[$id]['sold'],
+                    ];
+                }
+            }
+        }
+
         return DB::transaction(function () use (
-            $consignment, $data, $consolidated, $consignmentItems, $actor
+            $consignment, $data, $consolidated, $consignmentItems, $actor,
+            $saleConfirmedInCigam, $unconfirmedSaleItems,
         ) {
             // Cria o evento de retorno
             $return = ConsignmentReturn::create([
@@ -146,30 +213,45 @@ class ConsignmentReturnService
                 'registered_by_user_id' => $actor->id,
             ]);
 
-            $totalQty = 0;
-            $totalValue = 0.0;
+            $totalReturnedQty = 0;
+            $totalReturnedValue = 0.0;
+            $totalSoldQty = 0;
 
-            foreach ($consolidated as $itemId => $qty) {
+            foreach ($consolidated as $itemId => $qtyMap) {
                 /** @var ConsignmentItem $item */
                 $item = $consignmentItems[$itemId];
-
                 $unitValue = (float) $item->unit_value;
-                $subtotal = round($qty * $unitValue, 2);
 
-                ConsignmentReturnItem::create([
-                    'consignment_return_id' => $return->id,
-                    'consignment_item_id' => $item->id,
-                    'quantity' => $qty,
-                    'unit_value' => $unitValue,
-                    'subtotal' => $subtotal,
-                ]);
+                // Parcela 'returned' — grava no pivô consignment_return_items
+                if ($qtyMap['returned'] > 0) {
+                    $qty = $qtyMap['returned'];
+                    $subtotal = round($qty * $unitValue, 2);
 
-                $item->returned_quantity = (int) $item->returned_quantity + $qty;
+                    ConsignmentReturnItem::create([
+                        'consignment_return_id' => $return->id,
+                        'consignment_item_id' => $item->id,
+                        'quantity' => $qty,
+                        'unit_value' => $unitValue,
+                        'subtotal' => $subtotal,
+                    ]);
+
+                    $item->returned_quantity = (int) $item->returned_quantity + $qty;
+                    $totalReturnedQty += $qty;
+                    $totalReturnedValue += $subtotal;
+                }
+
+                // Parcela 'sold' — incrementa sold_quantity no item.
+                // Não vai no pivô do retorno (sold não é retorno físico).
+                if ($qtyMap['sold'] > 0) {
+                    $item->sold_quantity = (int) $item->sold_quantity + $qtyMap['sold'];
+                    $totalSoldQty += $qtyMap['sold'];
+                }
+
                 $item->refreshDerivedStatus()->save();
-
-                $totalQty += $qty;
-                $totalValue += $subtotal;
             }
+
+            $totalQty = $totalReturnedQty; // pro update abaixo (mantém compat com UI)
+            $totalValue = $totalReturnedValue;
 
             $return->update([
                 'returned_quantity' => $totalQty,
@@ -214,11 +296,102 @@ class ConsignmentReturnService
                     [
                         'consignment_return_id' => $return->id,
                         'returned_quantity' => $totalQty,
+                        'sold_quantity' => $totalSoldQty,
+                        'sale_confirmed_cigam' => $saleConfirmedInCigam,
                     ],
+                );
+            }
+
+            // Venda não confirmada → grava justificativa no histórico e
+            // dispara notificação (email + database) pra gerência/loja.
+            if (! empty($unconfirmedSaleItems)) {
+                \App\Models\ConsignmentStatusHistory::create([
+                    'consignment_id' => $fresh->id,
+                    'from_status' => $fresh->status->value,
+                    'to_status' => $fresh->status->value,
+                    'changed_by_user_id' => $actor->id,
+                    'note' => 'Venda alegada sem confirmação CIGAM — justificativa: '.$data['sale_justification'],
+                    'context' => [
+                        'sale_unconfirmed' => true,
+                        'items' => $unconfirmedSaleItems,
+                        'justification' => $data['sale_justification'],
+                    ],
+                    'created_at' => now(),
+                ]);
+
+                $this->dispatchSaleUnconfirmedNotification(
+                    $fresh,
+                    $unconfirmedSaleItems,
+                    $data['sale_justification'],
+                    $actor,
                 );
             }
 
             return $return->fresh(['items', 'consignment']);
         });
+    }
+
+    /**
+     * Envia alerta de venda não confirmada para a loja + supervisão.
+     *
+     * Destinatários:
+     *  - Usuários com MANAGE_CONSIGNMENTS (supervisão ampla)
+     *  - Usuários da mesma loja da consignação (store_id)
+     *
+     * Silencioso em caso de falha — ação de UI deve continuar mesmo
+     * se o email/sino não disparar.
+     *
+     * @param  array<int, array<string, mixed>>  $items
+     */
+    protected function dispatchSaleUnconfirmedNotification(
+        Consignment $consignment,
+        array $items,
+        string $justification,
+        User $actor,
+    ): void {
+        try {
+            $store = $consignment->store;
+            $storeCode = $consignment->outbound_store_code;
+
+            $recipientIds = User::query()
+                ->where(function ($q) use ($storeCode) {
+                    $q->whereHas('employee', fn ($e) => $e->where('store_id', $storeCode))
+                        ->orWhereNotNull('id'); // fallback — filtramos abaixo
+                })
+                ->pluck('id')
+                ->all();
+
+            // Recupera como Collection pra filtrar por permissão em runtime
+            $candidates = User::query()->whereIn('id', $recipientIds)->get();
+
+            $recipients = $candidates->filter(
+                fn (User $u) => $u->hasPermissionTo(\App\Enums\Permission::MANAGE_CONSIGNMENTS->value)
+                    || $u->id === $consignment->created_by_user_id
+                    || (isset($u->store_id) && $u->store_id === $storeCode),
+            );
+
+            if ($recipients->isEmpty()) {
+                \Illuminate\Support\Facades\Log::warning('Consignment sale unconfirmed — no recipients', [
+                    'consignment_id' => $consignment->id,
+                ]);
+
+                return;
+            }
+
+            \Illuminate\Support\Facades\Notification::send(
+                $recipients,
+                new \App\Notifications\ConsignmentSaleUnconfirmedNotification(
+                    $consignment,
+                    $items,
+                    $justification,
+                    $actor->name,
+                ),
+            );
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed to dispatch sale-unconfirmed notification', [
+                'consignment_id' => $consignment->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

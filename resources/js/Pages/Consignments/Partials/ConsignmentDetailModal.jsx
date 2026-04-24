@@ -49,7 +49,7 @@ export default function ConsignmentDetailModal({
             subtitle={c.recipient_name}
             headerColor="bg-gray-700"
             headerIcon={<EyeIcon className="h-5 w-5" />}
-            maxWidth="4xl"
+            maxWidth="7xl"
             headerBadges={[
                 { text: c.type_label, className: 'bg-white/20 text-white' },
                 { text: c.status_label, className: 'bg-white/30 text-white font-semibold' },
@@ -163,7 +163,7 @@ export default function ConsignmentDetailModal({
                                         <td className="px-3 py-2">
                                             <div className="font-medium">{it.reference}</div>
                                             {it.description && (
-                                                <div className="text-xs text-gray-500 truncate max-w-xs">{it.description}</div>
+                                                <div className="text-xs text-gray-500 truncate max-w-xl">{it.description}</div>
                                             )}
                                         </td>
                                         <td className="px-3 py-2">{it.size_label || it.size_cigam_code || '—'}</td>
