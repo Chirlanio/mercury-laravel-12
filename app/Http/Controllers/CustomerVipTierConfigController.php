@@ -34,10 +34,48 @@ class CustomerVipTierConfigController extends Controller
 
         return Inertia::render('Customers/VipConfig', [
             'configs' => $configs,
+            'availableYears' => $this->resolveAvailableYears(),
             'can' => [
                 'manage_config' => $request->user()?->hasPermissionTo(Permission::MANAGE_VIP_TIER_CONFIG->value) ?? false,
             ],
         ]);
+    }
+
+    /**
+     * Anos disponíveis no select do modal de cadastro/edição.
+     * União de:
+     *   - anos com régua já cadastrada (customer_vip_tier_configs)
+     *   - anos com classificações persistidas (customer_vip_tiers)
+     *   - ano atual e próximo (para cadastrar régua nova)
+     *
+     * @return array<int,int> ordenado DESC, único
+     */
+    private function resolveAvailableYears(): array
+    {
+        $current = (int) now()->year;
+
+        $fromConfigs = CustomerVipTierConfig::query()
+            ->select('year')
+            ->distinct()
+            ->pluck('year')
+            ->all();
+
+        $fromTiers = \App\Models\CustomerVipTier::query()
+            ->select('year')
+            ->distinct()
+            ->pluck('year')
+            ->all();
+
+        $base = [$current, $current + 1];
+
+        $years = array_values(array_unique(array_map(
+            'intval',
+            array_merge($fromConfigs, $fromTiers, $base)
+        )));
+
+        rsort($years);
+
+        return $years;
     }
 
     public function store(Request $request): RedirectResponse

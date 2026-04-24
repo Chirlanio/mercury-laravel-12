@@ -20,7 +20,7 @@ const fmtCurrency = (v) => new Intl.NumberFormat('pt-BR', {
 
 const TIER_LABEL = { black: 'Black', gold: 'Gold' };
 
-export default function VipConfig({ configs, can }) {
+export default function VipConfig({ configs, availableYears = [], can }) {
     const [yearForm, setYearForm] = useState(null); // null = closed; { year? } = open
     const [editing, setEditing] = useState(null); // null = closed; { ...config } = edit existing
     const [deleteTarget, setDeleteTarget] = useState(null);
@@ -52,8 +52,11 @@ export default function VipConfig({ configs, can }) {
     }));
 
     const openYearForm = (year = null) => {
-        const targetYear = year ?? new Date().getFullYear();
-        // Se já existe um par para o ano, pré-preenche
+        // Default: primeiro ano disponível sem régua, ou ano atual
+        const incompleteYear = yearsStatus.find((y) => !y.black || !y.gold)?.year;
+        const fallback = availableYears[0] ?? new Date().getFullYear();
+        const targetYear = year ?? incompleteYear ?? fallback;
+
         const existing = yearsStatus.find((y) => y.year === targetYear);
         yearForm_.setData({
             year: targetYear,
@@ -62,6 +65,18 @@ export default function VipConfig({ configs, can }) {
             notes: existing?.black?.notes || existing?.gold?.notes || '',
         });
         setYearForm({ year: targetYear });
+    };
+
+    const handleYearChange = (newYear) => {
+        const y = Number(newYear);
+        const existing = yearsStatus.find((s) => s.year === y);
+        yearForm_.setData({
+            ...yearForm_.data,
+            year: y,
+            black_min_revenue: existing?.black ? maskMoney(Math.round(existing.black.min_revenue * 100)) : '',
+            gold_min_revenue: existing?.gold ? maskMoney(Math.round(existing.gold.min_revenue * 100)) : '',
+            notes: existing?.black?.notes || existing?.gold?.notes || '',
+        });
     };
 
     const handleYearSubmit = () => {
@@ -272,15 +287,26 @@ export default function VipConfig({ configs, can }) {
                     <div className="space-y-3">
                         <div>
                             <InputLabel value="Ano da Lista" />
-                            <TextInput
-                                type="number"
-                                min="2020"
-                                max="2100"
+                            <select
                                 value={yearForm_.data.year}
-                                onChange={(e) => yearForm_.setData('year', e.target.value)}
-                                className="mt-1 block w-32"
+                                onChange={(e) => handleYearChange(e.target.value)}
+                                className="mt-1 block w-48 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                 required
-                            />
+                            >
+                                {availableYears.map((y) => {
+                                    const status = yearsStatus.find((s) => s.year === y);
+                                    const tag = status?.black && status?.gold
+                                        ? '· editar'
+                                        : status?.black || status?.gold
+                                            ? '· completar'
+                                            : '· novo';
+                                    return (
+                                        <option key={y} value={y}>
+                                            Lista {y} {tag}
+                                        </option>
+                                    );
+                                })}
+                            </select>
                             <p className="mt-1 text-xs text-gray-500">
                                 Os limites serão aplicados sobre o faturamento de {Number(yearForm_.data.year) - 1}.
                             </p>
