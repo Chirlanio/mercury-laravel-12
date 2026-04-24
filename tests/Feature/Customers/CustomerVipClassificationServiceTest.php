@@ -7,6 +7,7 @@ use App\Models\CustomerVipTier;
 use App\Models\CustomerVipTierConfig;
 use App\Services\CustomerVipClassificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -26,6 +27,10 @@ class CustomerVipClassificationServiceTest extends TestCase
         $this->setUpTestData();
         $this->service = app(CustomerVipClassificationService::class);
 
+        // Cache em memória do array de lojas MS Life — limpa entre tests
+        // pra não vazar state do setUp anterior.
+        Cache::store('array')->forget('vip.ms_life_store_codes');
+
         // Minimal movements schema for SQLite — real tenant migrations não rodam
         // em in-memory SQLite padrão, então criamos as colunas que o service usa.
         if (! Schema::hasTable('movements')) {
@@ -36,11 +41,44 @@ class CustomerVipClassificationServiceTest extends TestCase
                 $table->integer('movement_code');
                 $table->char('entry_exit', 1);
                 $table->decimal('net_value', 12, 2)->default(0);
+                $table->decimal('quantity', 10, 3)->default(0);
                 $table->string('invoice_number', 30)->nullable();
                 $table->string('store_code', 10)->nullable();
                 $table->timestamps();
             });
         }
+
+        // Lojas da rede Meia Sola (network_id=3 via TestHelpers::createNetworks).
+        // Z441 = e-commerce (memorizado no CLAUDE.md como da rede Meia Sola na prática),
+        // Z800 = loja Meia Sola física hipotética pros tests.
+        // Z421/Z422 são Arezzo (network_id=1) — usados em tests de exclusão.
+        $this->createStoreIfMissing('Z441', 'MS E-COMMERCE', networkId: 3);
+        $this->createStoreIfMissing('Z800', 'MS LOJA FISICA', networkId: 3);
+        $this->createStoreIfMissing('Z801', 'MS LOJA SUL', networkId: 3);
+        $this->createStoreIfMissing('Z421', 'AREZZO RIOMAR', networkId: 1);
+    }
+
+    private function createStoreIfMissing(string $code, string $name, int $networkId): void
+    {
+        if (DB::table('stores')->where('code', $code)->exists()) {
+            return;
+        }
+        DB::table('stores')->insert([
+            'code' => $code,
+            'name' => $name,
+            'cnpj' => (string) random_int(10000000000000, 99999999999999),
+            'company_name' => $name,
+            'state_registration' => '000',
+            'address' => '—',
+            'network_id' => $networkId,
+            'manager_id' => 1,
+            'store_order' => 1,
+            'network_order' => 1,
+            'supervisor_id' => 1,
+            'status_id' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     private function makeCustomer(string $cpf, string $name = 'CLIENTE'): Customer
@@ -61,6 +99,7 @@ class CustomerVipClassificationServiceTest extends TestCase
             'movement_code' => 2,
             'entry_exit' => 'S',
             'net_value' => 1000.00,
+            'quantity' => 1,
             'invoice_number' => (string) random_int(1000, 99999),
             'store_code' => 'Z441',
             'created_at' => now(),
@@ -243,5 +282,101 @@ class CustomerVipClassificationServiceTest extends TestCase
 
         $this->assertSame(0, $summary['processed']);
         $this->assertSame(0, CustomerVipTier::count());
+    }
+
+    // --------------------------------------------------------------
+    // MS Life — filtro por rede Meia Sola
+    // --------------------------------------------------------------
+
+    public function test_ignores_sales_outside_meia_sola_network(): void
+    {
+        $customer = $this->makeCustomer('12312312312');
+        $this->setThresholds(10000, 5000);
+
+        // Vendas em lojas Meia Sola (Z800 = rede 3) — contam
+        $this->makeMovement(['cpf_customer' => '12312312312', 'store_code' => 'Z800', 'net_value' => 6000]);
+
+        // Vendas em Arezzo (Z421 = rede 1) — NÃO devem contar no MS Life
+        $this->makeMovement(['cpf_customer' => '12312312312', 'store_code' => 'Z421', 'net_value' => 50000]);
+
+        $this->service->generateSuggestions($this->year);
+
+        $tier = CustomerVipTier::where('customer_id', $customer->id)->first();
+        $this->assertEqualsWithDelta(6000.0, (float) $tier->total_revenue, 0.01);
+        $this->assertEquals('gold', $tier->suggested_tier, 'deveria ser Gold (apenas Meia Sola contou)');
+    }
+
+    public function test_returns_empty_when_no_meia_sola_stores_exist(): void
+    {
+        // Remove todas as stores Meia Sola — nada a classificar
+        DB::table('stores')->whereIn('code', ['Z441', 'Z800', 'Z801'])->delete();
+        Cache::store('array')->forget('vip.ms_life_store_codes');
+
+        $this->makeCustomer('55566677788');
+        $this->setThresholds(10000, 5000);
+        $this->makeMovement(['cpf_customer' => '55566677788', 'store_code' => 'Z421', 'net_value' => 50000]);
+
+        $summary = $this->service->generateSuggestions($this->year);
+
+        $this->assertSame(0, $summary['processed']);
+        $this->assertSame(0, CustomerVipTier::count());
+    }
+
+    // --------------------------------------------------------------
+    // Loja preferida (tie-breaking: revenue > tickets > items)
+    // --------------------------------------------------------------
+
+    public function test_preferred_store_is_the_one_with_highest_revenue(): void
+    {
+        $customer = $this->makeCustomer('20202020200');
+        $this->setThresholds(10000, 5000);
+
+        // Z800: R$ 2000 em 2 NFs
+        $this->makeMovement(['cpf_customer' => '20202020200', 'store_code' => 'Z800', 'net_value' => 1000, 'invoice_number' => 'A1']);
+        $this->makeMovement(['cpf_customer' => '20202020200', 'store_code' => 'Z800', 'net_value' => 1000, 'invoice_number' => 'A2']);
+
+        // Z801: R$ 5000 em 1 NF — maior faturamento
+        $this->makeMovement(['cpf_customer' => '20202020200', 'store_code' => 'Z801', 'net_value' => 5000, 'invoice_number' => 'B1']);
+
+        $this->service->generateSuggestions($this->year);
+
+        $tier = CustomerVipTier::where('customer_id', $customer->id)->first();
+        $this->assertEquals('Z801', $tier->preferred_store_code);
+    }
+
+    public function test_preferred_store_tie_breaks_by_tickets_when_revenue_equal(): void
+    {
+        $customer = $this->makeCustomer('30303030300');
+        $this->setThresholds(10000, 5000);
+
+        // Z800: R$ 3000 em 1 NF
+        $this->makeMovement(['cpf_customer' => '30303030300', 'store_code' => 'Z800', 'net_value' => 3000, 'invoice_number' => 'X1']);
+
+        // Z801: R$ 3000 em 3 NFs — mesmo revenue, mais tickets
+        $this->makeMovement(['cpf_customer' => '30303030300', 'store_code' => 'Z801', 'net_value' => 1000, 'invoice_number' => 'Y1']);
+        $this->makeMovement(['cpf_customer' => '30303030300', 'store_code' => 'Z801', 'net_value' => 1000, 'invoice_number' => 'Y2']);
+        $this->makeMovement(['cpf_customer' => '30303030300', 'store_code' => 'Z801', 'net_value' => 1000, 'invoice_number' => 'Y3']);
+
+        $this->service->generateSuggestions($this->year);
+
+        $tier = CustomerVipTier::where('customer_id', $customer->id)->first();
+        $this->assertEquals('Z801', $tier->preferred_store_code);
+    }
+
+    public function test_preferred_store_tie_breaks_by_items_when_revenue_and_tickets_equal(): void
+    {
+        $customer = $this->makeCustomer('40404040400');
+        $this->setThresholds(10000, 5000);
+
+        // Z800: R$ 2000 em 1 NF, 1 item
+        $this->makeMovement(['cpf_customer' => '40404040400', 'store_code' => 'Z800', 'net_value' => 2000, 'quantity' => 1, 'invoice_number' => 'I1']);
+
+        // Z801: R$ 2000 em 1 NF, 5 itens — mesmo revenue e NFs, mais itens
+        $this->makeMovement(['cpf_customer' => '40404040400', 'store_code' => 'Z801', 'net_value' => 2000, 'quantity' => 5, 'invoice_number' => 'J1']);
+
+        $this->service->generateSuggestions($this->year);
+
+        $tier = CustomerVipTier::where('customer_id', $customer->id)->first();
+        $this->assertEquals('Z801', $tier->preferred_store_code);
     }
 }

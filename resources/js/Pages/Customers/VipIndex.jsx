@@ -141,7 +141,7 @@ export default function VipIndex({ tiers, year, availableYears, filters, statist
 
     return (
         <>
-            <Head title="Clientes VIP" />
+            <Head title="MS Life" />
 
             <div className="py-6 sm:py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
@@ -150,11 +150,11 @@ export default function VipIndex({ tiers, year, availableYears, filters, statist
                         <div>
                             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
                                 <TrophyIcon className="h-7 w-7 text-indigo-600" />
-                                Clientes VIP {year}
+                                MS Life {year}
                             </h1>
                             <p className="mt-1 text-sm text-gray-600">
-                                Curadoria anual (Black/Gold) baseada no faturamento líquido — vendas menos devoluções.
-                                Dados isolados do sync CIGAM.
+                                Programa <strong>MS Life</strong> — curadoria anual (Black/Gold) baseada no faturamento
+                                líquido apenas nas lojas da rede <strong>Meia Sola</strong>. Dados isolados do sync CIGAM.
                             </p>
                         </div>
                         <div className="flex gap-2 shrink-0 flex-wrap">
@@ -166,7 +166,7 @@ export default function VipIndex({ tiers, year, availableYears, filters, statist
                             {can.manage_config && (
                                 <Link href={route('customers.vip.config.index')}>
                                     <Button variant="secondary" icon={AdjustmentsHorizontalIcon}>
-                                        <span className="hidden sm:inline">Thresholds</span>
+                                        <span className="hidden sm:inline">Limites</span>
                                     </Button>
                                 </Link>
                             )}
@@ -232,7 +232,8 @@ export default function VipIndex({ tiers, year, availableYears, filters, statist
                                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tier final</th>
                                         <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Faturamento</th>
                                         <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">NFs</th>
-                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Curadoria</th>
+                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Loja preferida</th>
+                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden xl:table-cell">Curadoria</th>
                                         <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
                                     </tr>
                                 </thead>
@@ -270,7 +271,19 @@ export default function VipIndex({ tiers, year, availableYears, filters, statist
                                             <td className="px-3 py-3 text-right text-sm text-gray-600 hidden lg:table-cell">
                                                 {t.total_orders}
                                             </td>
-                                            <td className="px-3 py-3 text-xs text-gray-500 hidden lg:table-cell">
+                                            <td className="px-3 py-3 text-sm hidden lg:table-cell">
+                                                {t.preferred_store ? (
+                                                    <div>
+                                                        <div className="font-medium text-gray-900">{t.preferred_store.code}</div>
+                                                        <div className="text-xs text-gray-500 truncate max-w-[180px]" title={t.preferred_store.name}>
+                                                            {t.preferred_store.name}
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400">—</span>
+                                                )}
+                                            </td>
+                                            <td className="px-3 py-3 text-xs text-gray-500 hidden xl:table-cell">
                                                 {t.curated_at ? (
                                                     <>
                                                         <div>{fmtDateTime(t.curated_at)}</div>
@@ -329,7 +342,7 @@ export default function VipIndex({ tiers, year, availableYears, filters, statist
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan={7} className="p-8">
+                                            <td colSpan={8} className="p-8">
                                                 <EmptyState
                                                     title="Nenhum VIP classificado para este ano"
                                                     description={can.manage
@@ -438,13 +451,22 @@ function CurateModal({ show, onClose, tier }) {
                 />
             }
         >
-            <StandardModal.Section title="Snapshot do ano">
+            <StandardModal.Section title="Snapshot do ano (MS Life)">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <StandardModal.Field label="Faturamento" value={fmtCurrency(tier.total_revenue)} />
+                    <StandardModal.Field label="Faturamento Meia Sola" value={fmtCurrency(tier.total_revenue)} />
                     <StandardModal.Field label="NFs" value={tier.total_orders} />
+                    <StandardModal.Field
+                        label="Loja preferida"
+                        value={tier.preferred_store
+                            ? `${tier.preferred_store.code} · ${tier.preferred_store.name}`
+                            : '—'}
+                    />
                     <StandardModal.Field label="Sugerido" value={tier.suggested_tier ? TIER_VARIANTS[tier.suggested_tier].label : '—'} />
-                    <StandardModal.Field label="Última sugestão" value={fmtDateTime(tier.suggested_at)} />
                 </div>
+                <p className="mt-3 text-xs text-gray-500">
+                    Considera apenas vendas nas lojas da rede Meia Sola. Loja preferida é a de maior
+                    faturamento; em empate, maior número de NFs; em empate, maior quantidade de itens.
+                </p>
             </StandardModal.Section>
 
             <StandardModal.Section title="Decisão de curadoria">

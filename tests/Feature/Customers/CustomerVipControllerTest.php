@@ -5,6 +5,7 @@ namespace Tests\Feature\Customers;
 use App\Models\Customer;
 use App\Models\CustomerVipTier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 use Tests\Traits\TestHelpers;
@@ -18,6 +19,7 @@ class CustomerVipControllerTest extends TestCase
         parent::setUp();
         $this->setUpTestData();
         app(\App\Services\CentralRoleResolver::class)->clearCache();
+        Cache::store('array')->forget('vip.ms_life_store_codes');
 
         if (! Schema::hasTable('movements')) {
             Schema::create('movements', function ($table) {
@@ -27,6 +29,7 @@ class CustomerVipControllerTest extends TestCase
                 $table->integer('movement_code');
                 $table->char('entry_exit', 1);
                 $table->decimal('net_value', 12, 2)->default(0);
+                $table->decimal('quantity', 10, 3)->default(0);
                 $table->string('invoice_number', 30)->nullable();
                 $table->string('store_code', 10)->nullable();
                 $table->timestamps();

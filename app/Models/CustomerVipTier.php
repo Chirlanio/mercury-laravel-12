@@ -29,6 +29,7 @@ class CustomerVipTier extends Model
         'final_tier',
         'total_revenue',
         'total_orders',
+        'preferred_store_code',
         'suggested_at',
         'curated_at',
         'curated_by_user_id',

@@ -283,6 +283,7 @@ enum Role: string
                 Permission::COMPLETE_CONSIGNMENT->value,
                 Permission::CANCEL_CONSIGNMENT->value,
                 Permission::EXPORT_CONSIGNMENTS->value,
+                Permission::IMPORT_CONSIGNMENTS->value,
                 Permission::OVERRIDE_CONSIGNMENT_LOCK->value,
                 // Clientes (todas)
                 Permission::VIEW_CUSTOMERS->value,
@@ -525,6 +526,7 @@ enum Role: string
                 Permission::COMPLETE_CONSIGNMENT->value,
                 Permission::CANCEL_CONSIGNMENT->value,
                 Permission::EXPORT_CONSIGNMENTS->value,
+                Permission::IMPORT_CONSIGNMENTS->value,
                 Permission::OVERRIDE_CONSIGNMENT_LOCK->value,
                 // Clientes (todas — admin pode disparar sync)
                 Permission::VIEW_CUSTOMERS->value,

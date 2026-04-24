@@ -6,34 +6,36 @@ use App\Models\Customer;
 use App\Models\CustomerVipTier;
 use App\Models\CustomerVipTierConfig;
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Serviço de classificação anual de clientes VIP (Black/Gold).
+ * Serviço de classificação anual de clientes VIP — programa MS Life.
+ *
+ * Regra do programa:
+ *  - Apenas vendas em lojas da rede MEIA SOLA contam (outras redes do grupo,
+ *    como AREZZO, SCHUTZ, MS OFF, são EXCLUÍDAS). O objetivo é promover a
+ *    marca Meia Sola especificamente.
+ *  - Faturamento líquido = SUM(movements.net_value) com:
+ *      movement_code = 2 → soma (venda)
+ *      movement_code = 6 AND entry_exit = 'E' → subtrai (devolução)
+ *    agrupado por cpf_customer + restrito a store_code em lojas Meia Sola.
+ *  - Loja de preferência: a de maior faturamento desse cliente; em empate,
+ *    maior número de NFs (tickets); em empate, maior quantidade de itens.
  *
  * Fluxo híbrido:
- *  1. generateSuggestions(year) — roda agregação sobre movements, aplica
- *     thresholds do ano (customer_vip_tier_configs) e upserta em
- *     customer_vip_tiers com source=auto. Respeita curadoria manual existente:
- *     se uma linha já tem curated_at preenchido, apenas atualiza os snapshots
- *     (total_revenue, total_orders) e NUNCA sobrescreve final_tier.
- *  2. curate(customer, year, tier, ...) — Marketing promove/rebaixa um cliente.
- *     Atualiza final_tier, preenche curated_at/curated_by_user_id, muda source
- *     para 'manual'.
- *  3. remove(customer, year) — tira o cliente da lista do ano (zera final_tier
- *     mas preserva o registro + snapshots para histórico).
- *
- * Regra de faturamento (alinhada com MovementController/CLAUDE.md):
- *   - movement_code = 2 → soma net_value (venda PDV/ecom)
- *   - movement_code = 6 AND entry_exit = 'E' → subtrai net_value (devolução)
- *   - Agrupado por cpf_customer, YEAR(movement_date) = $year
- *   - Exige CPF não nulo no cliente para vincular via customers.cpf
+ *  1. generateSuggestions(year) — roda agregação, aplica thresholds do ano,
+ *     upserta em customer_vip_tiers com source=auto. Curadorias manuais
+ *     (curated_at preenchido) são preservadas — só snapshots são refrescados.
+ *  2. curate(...) — Marketing define final_tier com source=manual.
+ *  3. remove(...) — zera final_tier preservando histórico.
  */
 class CustomerVipClassificationService
 {
+    /** Nome da rede cujas lojas fazem parte do programa MS Life. */
+    public const MS_LIFE_NETWORK_NAME = 'MEIA SOLA';
+
     /**
-     * Roda a classificação automática. Retorna um resumo do processamento.
-     *
      * @return array{
      *     year: int,
      *     processed: int,
@@ -46,7 +48,7 @@ class CustomerVipClassificationService
     public function generateSuggestions(int $year): array
     {
         $thresholds = $this->loadThresholds($year);
-        $revenueByCpf = $this->aggregateRevenueByCpf($year);
+        $storeCodes = $this->msLifeStoreCodes();
 
         $summary = [
             'year' => $year,
@@ -57,22 +59,27 @@ class CustomerVipClassificationService
             'preserved_curated' => 0,
         ];
 
+        if (empty($storeCodes)) {
+            return $summary; // rede Meia Sola não tem lojas cadastradas — nada a fazer
+        }
+
+        $revenueByCpf = $this->aggregateRevenueByCpf($year, $storeCodes);
         if ($revenueByCpf->isEmpty()) {
             return $summary;
         }
 
         $cpfs = $revenueByCpf->pluck('cpf')->all();
-
-        // Mapa cpf → customer (só registros com CPF preenchido batem)
         $customers = Customer::whereIn('cpf', $cpfs)->get()->keyBy('cpf');
 
-        DB::transaction(function () use ($year, $revenueByCpf, $customers, $thresholds, &$summary) {
+        // Loja preferida por CPF (entre as lojas Meia Sola)
+        $preferredStoreByCpf = $this->resolvePreferredStores($year, $storeCodes, $cpfs);
+
+        DB::transaction(function () use ($year, $revenueByCpf, $customers, $thresholds, $preferredStoreByCpf, &$summary) {
             $now = now();
 
             foreach ($revenueByCpf as $row) {
                 $customer = $customers->get($row->cpf);
                 if (! $customer) {
-                    // CPF em movements que não tem match em customers — ignora
                     continue;
                 }
 
@@ -81,6 +88,7 @@ class CustomerVipClassificationService
                 $revenue = (float) $row->revenue;
                 $orders = (int) $row->orders;
                 $suggested = $this->tierForRevenue($revenue, $thresholds);
+                $preferredStore = $preferredStoreByCpf[$row->cpf] ?? null;
 
                 if ($suggested === CustomerVipTier::TIER_BLACK) {
                     $summary['suggested_black']++;
@@ -95,10 +103,11 @@ class CustomerVipClassificationService
                     ->first();
 
                 if ($existing && $existing->curated_at !== null) {
-                    // Preserva curadoria — só atualiza snapshots + suggested_tier.
+                    // Preserva curadoria — atualiza snapshots + suggested_tier.
                     $existing->update([
                         'total_revenue' => $revenue,
                         'total_orders' => $orders,
+                        'preferred_store_code' => $preferredStore,
                         'suggested_tier' => $suggested,
                         'suggested_at' => $now,
                     ]);
@@ -114,6 +123,7 @@ class CustomerVipClassificationService
                         'final_tier' => $suggested,
                         'total_revenue' => $revenue,
                         'total_orders' => $orders,
+                        'preferred_store_code' => $preferredStore,
                         'suggested_at' => $now,
                         'source' => CustomerVipTier::SOURCE_AUTO,
                     ],
@@ -124,11 +134,6 @@ class CustomerVipClassificationService
         return $summary;
     }
 
-    /**
-     * Curadoria manual: Marketing promove, rebaixa, ou define tier de um cliente.
-     *
-     * @param  string|null  $tier  'black'|'gold'|null (null remove da lista)
-     */
     public function curate(Customer $customer, int $year, ?string $tier, ?string $notes, User $by): CustomerVipTier
     {
         if ($tier !== null && ! in_array($tier, [CustomerVipTier::TIER_BLACK, CustomerVipTier::TIER_GOLD], true)) {
@@ -148,9 +153,6 @@ class CustomerVipClassificationService
             if ($notes !== null) {
                 $record->notes = $notes;
             }
-            // Snapshots ficam intactos se já existirem; se for criação do zero
-            // (cliente que Marketing quer classificar sem passar pelo auto),
-            // zera por segurança — pode ser atualizado na próxima rodada.
             if (! $record->exists) {
                 $record->total_revenue = 0;
                 $record->total_orders = 0;
@@ -161,10 +163,6 @@ class CustomerVipClassificationService
         });
     }
 
-    /**
-     * Remove cliente da lista VIP do ano. Preserva histórico (registro + snapshots
-     * continuam) mas zera final_tier e marca como manualmente curado.
-     */
     public function remove(Customer $customer, int $year, User $by): ?CustomerVipTier
     {
         $record = CustomerVipTier::where('customer_id', $customer->id)
@@ -185,17 +183,30 @@ class CustomerVipClassificationService
         return $record->fresh();
     }
 
+    /**
+     * Retorna a lista de store_codes que pertencem à rede MEIA SOLA.
+     * Cacheado em memória por request — tabela stores raramente muda.
+     *
+     * @return array<int, string>
+     */
+    public function msLifeStoreCodes(): array
+    {
+        return Cache::store('array')->rememberForever('vip.ms_life_store_codes', function () {
+            // Comparação case-insensitive — o seeder de produção usa 'MEIA SOLA'
+            // (uppercase), mas TestHelpers usa 'Meia Sola' para consistência
+            // com a fixture de outros módulos. Ambos são válidos.
+            return DB::table('stores')
+                ->join('networks', 'stores.network_id', '=', 'networks.id')
+                ->whereRaw('UPPER(networks.nome) = ?', [self::MS_LIFE_NETWORK_NAME])
+                ->pluck('stores.code')
+                ->all();
+        });
+    }
+
     // ------------------------------------------------------------------
     // Internos
     // ------------------------------------------------------------------
 
-    /**
-     * Carrega thresholds configurados pro ano. Array com possíveis chaves
-     * 'black' e 'gold' (uma, ambas ou nenhuma). Se não houver nada configurado,
-     * a classificação roda mas nenhum cliente recebe tier sugerido.
-     *
-     * @return array<string,float>
-     */
     private function loadThresholds(int $year): array
     {
         return CustomerVipTierConfig::forYear($year)
@@ -220,14 +231,13 @@ class CustomerVipClassificationService
     }
 
     /**
-     * Agrega faturamento líquido e # de NFs por CPF para o ano.
+     * Agrega faturamento líquido + NFs por CPF no ano, restrito a lojas MS Life.
      *
+     * @param  array<int, string>  $storeCodes
      * @return \Illuminate\Support\Collection<int, object{cpf: string, revenue: float, orders: int}>
      */
-    private function aggregateRevenueByCpf(int $year): \Illuminate\Support\Collection
+    private function aggregateRevenueByCpf(int $year, array $storeCodes): \Illuminate\Support\Collection
     {
-        // MySQL/MariaDB: YEAR(movement_date). SQLite em testes: strftime.
-        // Evitamos função de ano em índice deixando o BETWEEN fazer range scan.
         $start = sprintf('%d-01-01', $year);
         $end = sprintf('%d-12-31', $year);
 
@@ -244,6 +254,7 @@ class CustomerVipClassificationService
             ])
             ->whereNotNull('cpf_customer')
             ->where('cpf_customer', '!=', '')
+            ->whereIn('store_code', $storeCodes)
             ->whereBetween('movement_date', [$start, $end])
             ->where(function ($q) {
                 $q->where('movement_code', 2)
@@ -257,5 +268,97 @@ class CustomerVipClassificationService
                 .'ELSE 0 END) > 0')
             ->orderByDesc('revenue')
             ->get();
+    }
+
+    /**
+     * Descobre a loja preferida de cada cliente entre as lojas Meia Sola.
+     *
+     * Critério (hierárquico, tie-breaking):
+     *   1. Maior faturamento líquido
+     *   2. Maior número de NFs (tickets)
+     *   3. Maior quantidade de itens (soma de quantity respeitando código)
+     *
+     * @param  array<int, string>  $storeCodes
+     * @param  array<int, string>  $cpfs
+     * @return array<string, string>  cpf → store_code
+     */
+    private function resolvePreferredStores(int $year, array $storeCodes, array $cpfs): array
+    {
+        if (empty($cpfs)) {
+            return [];
+        }
+
+        $start = sprintf('%d-01-01', $year);
+        $end = sprintf('%d-12-31', $year);
+
+        $rows = DB::table('movements')
+            ->select([
+                'cpf_customer as cpf',
+                'store_code',
+                DB::raw(
+                    'SUM(CASE '
+                    ."WHEN movement_code = 2 THEN net_value "
+                    ."WHEN movement_code = 6 AND entry_exit = 'E' THEN -net_value "
+                    .'ELSE 0 END) as revenue'
+                ),
+                DB::raw('COUNT(DISTINCT invoice_number) as tickets'),
+                DB::raw(
+                    'SUM(CASE '
+                    ."WHEN movement_code = 2 THEN quantity "
+                    ."WHEN movement_code = 6 AND entry_exit = 'E' THEN -quantity "
+                    .'ELSE 0 END) as items'
+                ),
+            ])
+            ->whereIn('cpf_customer', $cpfs)
+            ->whereIn('store_code', $storeCodes)
+            ->whereBetween('movement_date', [$start, $end])
+            ->where(function ($q) {
+                $q->where('movement_code', 2)
+                    ->orWhere(function ($qq) {
+                        $qq->where('movement_code', 6)->where('entry_exit', 'E');
+                    });
+            })
+            ->groupBy('cpf_customer', 'store_code')
+            ->get();
+
+        // Para cada CPF, escolhe a loja vencedora pelo tie-breaking.
+        $preferred = [];
+        foreach ($rows as $row) {
+            $cpf = $row->cpf;
+            $candidate = [
+                'store' => $row->store_code,
+                'revenue' => (float) $row->revenue,
+                'tickets' => (int) $row->tickets,
+                'items' => (float) $row->items,
+            ];
+
+            if (! isset($preferred[$cpf])) {
+                $preferred[$cpf] = $candidate;
+
+                continue;
+            }
+
+            $current = $preferred[$cpf];
+            if ($this->isBetterCandidate($candidate, $current)) {
+                $preferred[$cpf] = $candidate;
+            }
+        }
+
+        return array_map(fn ($p) => $p['store'], $preferred);
+    }
+
+    private function isBetterCandidate(array $a, array $b): bool
+    {
+        if ($a['revenue'] !== $b['revenue']) {
+            return $a['revenue'] > $b['revenue'];
+        }
+        if ($a['tickets'] !== $b['tickets']) {
+            return $a['tickets'] > $b['tickets'];
+        }
+        if ($a['items'] !== $b['items']) {
+            return $a['items'] > $b['items'];
+        }
+        // Empate técnico — menor store_code vence (estável entre rodadas)
+        return strcmp($a['store'], $b['store']) < 0;
     }
 }

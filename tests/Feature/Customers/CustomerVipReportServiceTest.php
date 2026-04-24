@@ -5,6 +5,7 @@ namespace Tests\Feature\Customers;
 use App\Models\Customer;
 use App\Services\CustomerVipReportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -22,6 +23,8 @@ class CustomerVipReportServiceTest extends TestCase
         $this->setUpTestData();
         $this->service = app(CustomerVipReportService::class);
 
+        Cache::store('array')->forget('vip.ms_life_store_codes');
+
         if (! Schema::hasTable('movements')) {
             Schema::create('movements', function ($table) {
                 $table->id();
@@ -30,10 +33,31 @@ class CustomerVipReportServiceTest extends TestCase
                 $table->integer('movement_code');
                 $table->char('entry_exit', 1);
                 $table->decimal('net_value', 12, 2)->default(0);
+                $table->decimal('quantity', 10, 3)->default(0);
                 $table->string('invoice_number', 30)->nullable();
                 $table->string('store_code', 10)->nullable();
                 $table->timestamps();
             });
+        }
+
+        // Loja Meia Sola pra permitir cálculo no service
+        if (! DB::table('stores')->where('code', 'Z800')->exists()) {
+            DB::table('stores')->insert([
+                'code' => 'Z800',
+                'name' => 'MS LOJA FISICA',
+                'cnpj' => '11111111111111',
+                'company_name' => 'MS LOJA',
+                'state_registration' => '0',
+                'address' => '—',
+                'network_id' => 3, // Meia Sola
+                'manager_id' => 1,
+                'store_order' => 1,
+                'network_order' => 1,
+                'supervisor_id' => 1,
+                'status_id' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
         }
     }
 
@@ -56,8 +80,9 @@ class CustomerVipReportServiceTest extends TestCase
             'movement_code' => 2,
             'entry_exit' => 'S',
             'net_value' => $value,
+            'quantity' => 1,
             'invoice_number' => $invoice ?: (string) random_int(1000, 99999),
-            'store_code' => 'Z441',
+            'store_code' => 'Z800', // loja Meia Sola
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -71,8 +96,9 @@ class CustomerVipReportServiceTest extends TestCase
             'movement_code' => 6,
             'entry_exit' => 'E',
             'net_value' => $value,
+            'quantity' => 1,
             'invoice_number' => (string) random_int(1000, 99999),
-            'store_code' => 'Z441',
+            'store_code' => 'Z800', // loja Meia Sola
             'created_at' => now(),
             'updated_at' => now(),
         ]);

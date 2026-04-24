@@ -33,6 +33,10 @@ class CustomerVipController extends Controller
         $finalTierFilter = $request->input('final_tier'); // null|black|gold|pending
         $search = $request->input('search');
 
+        $storeNames = \App\Models\Store::query()
+            ->pluck('name', 'code')
+            ->all();
+
         $query = CustomerVipTier::query()
             ->with(['customer:id,cigam_code,name,cpf,mobile,email,city,state', 'curatedBy:id,name'])
             ->forYear($year)
@@ -50,7 +54,7 @@ class CustomerVipController extends Controller
 
         $tiers = $query->paginate(25)
             ->withQueryString()
-            ->through(fn (CustomerVipTier $t) => $this->formatTier($t));
+            ->through(fn (CustomerVipTier $t) => $this->formatTier($t, $storeNames));
 
         $stats = $this->computeStats($year);
 
@@ -129,8 +133,10 @@ class CustomerVipController extends Controller
     // Internos
     // ------------------------------------------------------------------
 
-    private function formatTier(CustomerVipTier $tier): array
+    private function formatTier(CustomerVipTier $tier, array $storeNames = []): array
     {
+        $preferredCode = $tier->preferred_store_code;
+
         return [
             'id' => $tier->id,
             'year' => $tier->year,
@@ -138,6 +144,10 @@ class CustomerVipController extends Controller
             'final_tier' => $tier->final_tier,
             'total_revenue' => (float) $tier->total_revenue,
             'total_orders' => (int) $tier->total_orders,
+            'preferred_store' => $preferredCode ? [
+                'code' => $preferredCode,
+                'name' => $storeNames[$preferredCode] ?? $preferredCode,
+            ] : null,
             'source' => $tier->source,
             'suggested_at' => $tier->suggested_at?->toIso8601String(),
             'curated_at' => $tier->curated_at?->toIso8601String(),

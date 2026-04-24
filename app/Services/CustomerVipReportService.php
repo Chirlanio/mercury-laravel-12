@@ -8,17 +8,22 @@ use Illuminate\Support\Facades\DB;
 /**
  * Relatórios de faturamento dos clientes VIP (comparativo ano-a-ano).
  *
- * Regra de faturamento idêntica à do classificador:
+ * Programa MS Life: considera apenas vendas nas lojas da rede MEIA SOLA.
+ * Usa o mesmo filtro do classificador via CustomerVipClassificationService::msLifeStoreCodes().
+ *
+ * Regra de faturamento:
  *   movement_code = 2 soma, movement_code = 6 AND entry_exit = 'E' subtrai.
  *
  * A comparação é sempre "mesmo período" para manter YoY honesto:
  *   - mode='ytd' (default) — janeiro até hoje do ano atual VS janeiro até
- *     mesma data do ano anterior. Usado na listagem e no card executivo.
- *   - mode='full_year' — ano inteiro VS ano inteiro. Útil quando o usuário
- *     seleciona um ano fechado (ex: 2024 vs 2023 completo).
+ *     mesma data do ano anterior.
+ *   - mode='full_year' — ano inteiro VS ano inteiro.
  */
 class CustomerVipReportService
 {
+    public function __construct(private readonly CustomerVipClassificationService $classifier) {}
+
+
     /**
      * YoY mês a mês para um cliente.
      *
@@ -76,6 +81,15 @@ class CustomerVipReportService
      */
     private function computePeriod(string $cpf, string $start, string $end): array
     {
+        $storeCodes = $this->classifier->msLifeStoreCodes();
+        if (empty($storeCodes)) {
+            return [
+                'total' => 0.0,
+                'orders' => 0,
+                'monthly' => array_fill(1, 12, 0.0),
+            ];
+        }
+
         // SUBSTR(date, 6, 2) retorna 'MM' tanto em MySQL quanto em SQLite
         // (movement_date sempre gravada como Y-m-d). Evita DATE_FORMAT/MONTH
         // que não são portáveis.
@@ -92,6 +106,7 @@ class CustomerVipReportService
                 DB::raw('COUNT(DISTINCT invoice_number) as orders'),
             ])
             ->where('cpf_customer', $cpf)
+            ->whereIn('store_code', $storeCodes)
             ->whereBetween('movement_date', [$start, $end])
             ->where(function ($q) {
                 $q->where('movement_code', 2)
@@ -160,8 +175,14 @@ class CustomerVipReportService
 
     private function sumNetRevenue(string $cpf, string $start, string $end): float
     {
+        $storeCodes = $this->classifier->msLifeStoreCodes();
+        if (empty($storeCodes)) {
+            return 0.0;
+        }
+
         $value = DB::table('movements')
             ->where('cpf_customer', $cpf)
+            ->whereIn('store_code', $storeCodes)
             ->whereBetween('movement_date', [$start, $end])
             ->where(function ($q) {
                 $q->where('movement_code', 2)

@@ -130,7 +130,7 @@ export default function VipConfig({ configs, can }) {
 
     return (
         <>
-            <Head title="Thresholds VIP" />
+            <Head title="MS Life - Limites" />
 
             <div className="py-6 sm:py-12">
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -138,7 +138,7 @@ export default function VipConfig({ configs, can }) {
                         <div>
                             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
                                 <AdjustmentsHorizontalIcon className="h-7 w-7 text-indigo-600" />
-                                Thresholds VIP por ano
+                                Limites MS Life por ano
                             </h1>
                             <p className="mt-1 text-sm text-gray-600">
                                 Faturamento mínimo líquido para entrar em cada tier. Usado pela sugestão automática.
@@ -153,7 +153,7 @@ export default function VipConfig({ configs, can }) {
                             </Link>
                             {can.manage_config && (
                                 <Button variant="primary" onClick={openNew} icon={PlusIcon}>
-                                    <span className="hidden sm:inline">Novo threshold</span>
+                                    <span className="hidden sm:inline">Novo Limite</span>
                                 </Button>
                             )}
                         </div>
@@ -238,6 +238,11 @@ export default function VipConfig({ configs, can }) {
                         <div className="rounded-md bg-indigo-50 border border-indigo-100 p-3 flex gap-2">
                             <InformationCircleIcon className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
                             <div className="text-xs text-indigo-900 space-y-1">
+                                <p>
+                                    <strong>Programa MS Life:</strong> considera apenas vendas nas lojas da
+                                    rede <strong>Meia Sola</strong>. Outras redes do grupo (Arezzo, Schutz,
+                                    MS Off, etc.) são excluídas do cálculo.
+                                </p>
                                 <p>
                                     <strong>Período de apuração:</strong> 01/jan a 31/dez de {data.year} (ano civil).
                                 </p>
