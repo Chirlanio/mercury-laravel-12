@@ -1,5 +1,5 @@
 import { Head, router } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     UserGroupIcon,
     UsersIcon,
@@ -42,6 +42,30 @@ export default function Index({
     const { confirm, ConfirmDialogComponent } = useConfirm();
 
     const [syncing, setSyncing] = useState(false);
+    const [searchInput, setSearchInput] = useState(filters.search || '');
+    const [cityInput, setCityInput] = useState(filters.city || '');
+    const debounceRef = useRef(null);
+    const isFirstRender = useRef(true);
+
+    useEffect(() => {
+        if (isFirstRender.current) {
+            isFirstRender.current = false;
+            return;
+        }
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+            router.get(
+                route('customers.index'),
+                {
+                    ...filters,
+                    search: searchInput || undefined,
+                    city: cityInput || undefined,
+                },
+                { preserveState: true, preserveScroll: true, replace: true },
+            );
+        }, 400);
+        return () => debounceRef.current && clearTimeout(debounceRef.current);
+    }, [searchInput, cityInput]);
 
     const statsCards = useMemo(() => {
         const lastSync = statistics.last_sync
@@ -84,6 +108,8 @@ export default function Index({
     };
 
     const clearFilters = () => {
+        setSearchInput('');
+        setCityInput('');
         router.get(route('customers.index'), {}, {
             preserveState: false,
             preserveScroll: true,
@@ -244,8 +270,8 @@ export default function Index({
                                 <TextInput
                                     id="search"
                                     type="text"
-                                    value={filters.search || ''}
-                                    onChange={(e) => applyFilter('search', e.target.value)}
+                                    value={searchInput}
+                                    onChange={(e) => setSearchInput(e.target.value)}
                                     placeholder="Nome, CPF, e-mail, telefone…"
                                     className="mt-1 block w-full"
                                 />
@@ -268,8 +294,8 @@ export default function Index({
                                 <TextInput
                                     id="city"
                                     type="text"
-                                    value={filters.city || ''}
-                                    onChange={(e) => applyFilter('city', e.target.value)}
+                                    value={cityInput}
+                                    onChange={(e) => setCityInput(e.target.value)}
                                     placeholder="Ex: FORTALEZA"
                                     className="mt-1 block w-full"
                                 />
