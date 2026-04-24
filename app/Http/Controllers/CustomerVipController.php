@@ -90,13 +90,35 @@ class CustomerVipController extends Controller
     {
         $year = (int) $request->input('year', now()->year);
 
-        $summary = $this->classifier->generateSuggestions($year);
-
         $redirect = redirect()->route('customers.vip.index', ['year' => $year]);
 
+        // Pré-validação da régua: precisa ter Black E Gold cadastrados.
+        $tiersCadastrados = \App\Models\CustomerVipTierConfig::forYear($year)
+            ->pluck('tier')
+            ->all();
+        $faltantes = array_diff(['black', 'gold'], $tiersCadastrados);
+
+        if (! empty($faltantes)) {
+            $msg = empty($tiersCadastrados)
+                ? sprintf(
+                    'Cadastre os limites Black e Gold da Lista %d (apurada sobre faturamento %d) na página "Limites" antes de gerar sugestões.',
+                    $year, $year - 1,
+                )
+                : sprintf(
+                    'Régua incompleta para a Lista %d — falta cadastrar %s na página "Limites".',
+                    $year,
+                    implode(' e ', array_map('ucfirst', $faltantes)),
+                );
+
+            return $redirect->with('warning', $msg);
+        }
+
+        $summary = $this->classifier->generateSuggestions($year);
+
         if (! $summary['has_thresholds']) {
+            // Defensivo — checagem anterior já cobre, mas garante consistência
             return $redirect->with('warning', sprintf(
-                'Cadastre os thresholds de %d antes de gerar sugestões. Nenhum cliente foi classificado.',
+                'Não foi possível processar a Lista %d. Verifique a régua na página "Limites".',
                 $summary['year'],
             ));
         }

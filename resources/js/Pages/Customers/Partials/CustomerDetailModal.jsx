@@ -1,15 +1,54 @@
-import { UserIcon } from '@heroicons/react/24/outline';
+import { useState, useEffect } from 'react';
+import { router } from '@inertiajs/react';
+import { UserIcon, PencilIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import StandardModal from '@/Components/StandardModal';
 import StatusBadge from '@/Components/Shared/StatusBadge';
+import Button from '@/Components/Button';
+import TextInput from '@/Components/TextInput';
+import InputLabel from '@/Components/InputLabel';
+import { usePermissions } from '@/Hooks/usePermissions';
+import { maskMoney, parseMoney } from '@/Hooks/useMasks';
 
 /**
  * Modal de detalhes do cliente — read-only. Mostra dados pessoais,
- * contato, endereço + as últimas 20 consignações.
+ * contato, endereço, limites de consignação (M20) + as últimas 20
+ * consignações.
  */
 export default function CustomerDetailModal({ show, onClose, customer }) {
+    const { hasPermission } = usePermissions();
+    const canManageLimits = hasPermission('consignments.manage');
+
+    const [editingLimits, setEditingLimits] = useState(false);
+    const [maxItems, setMaxItems] = useState('');
+    const [maxValue, setMaxValue] = useState('');
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        if (customer) {
+            setMaxItems(customer.consignment_max_items ?? '');
+            setMaxValue(customer.consignment_max_value != null
+                ? maskMoney(customer.consignment_max_value.toFixed(2).replace('.', ','))
+                : '');
+            setEditingLimits(false);
+        }
+    }, [customer?.id]);
+
     if (!customer) return null;
 
     const c = customer;
+
+    const saveLimits = () => {
+        setSaving(true);
+        const payload = {
+            consignment_max_items: maxItems !== '' && Number(maxItems) > 0 ? Number(maxItems) : null,
+            consignment_max_value: maxValue !== '' ? parseMoney(maxValue) : null,
+        };
+        router.patch(route('customers.consignment-limits.update', c.id), payload, {
+            preserveScroll: true,
+            onFinish: () => setSaving(false),
+            onSuccess: () => setEditingLimits(false),
+        });
+    };
 
     const fullAddress = [
         c.address,
@@ -31,7 +70,7 @@ export default function CustomerDetailModal({ show, onClose, customer }) {
             subtitle={c.cigam_code ? `CIGAM #${c.cigam_code}` : null}
             headerColor="bg-indigo-600"
             headerIcon={<UserIcon className="h-5 w-5" />}
-            maxWidth="3xl"
+            maxWidth="5xl"
             headerBadges={[
                 { text: c.is_active ? 'Ativo' : 'Inativo', className: c.is_active ? 'bg-white/20 text-white' : 'bg-white/10 text-white/70' },
             ]}
@@ -62,6 +101,94 @@ export default function CustomerDetailModal({ show, onClose, customer }) {
                         {cityLine && <div className="mt-0.5">{cityLine}</div>}
                         {c.zipcode && <div className="mt-0.5 text-gray-500">CEP {c.zipcode}</div>}
                     </div>
+                </StandardModal.Section>
+
+                <StandardModal.Section title="Limites de consignação">
+                    {!editingLimits ? (
+                        <div className="text-sm text-gray-700">
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1">
+                                    {(c.consignment_max_items || c.consignment_max_value) ? (
+                                        <div className="space-y-1">
+                                            {c.consignment_max_items && (
+                                                <div>Máx. peças em aberto: <strong>{c.consignment_max_items}</strong></div>
+                                            )}
+                                            {c.consignment_max_value && (
+                                                <div>
+                                                    Máx. valor em aberto: <strong>R$ {Number(c.consignment_max_value).toFixed(2).replace('.', ',')}</strong>
+                                                </div>
+                                            )}
+                                            <div className="text-xs text-gray-500 mt-1">
+                                                Limites aplicados somando consignações em aberto ao tentar criar uma nova.
+                                                Override via permissão OVERRIDE_CONSIGNMENT_LOCK + justificativa.
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-gray-500 italic">
+                                            Sem limite configurado — cliente pode ter qualquer quantidade/valor em aberto.
+                                        </div>
+                                    )}
+                                </div>
+                                {canManageLimits && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingLimits(true)}
+                                        className="shrink-0 text-xs text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1"
+                                    >
+                                        <PencilIcon className="w-3.5 h-3.5" />
+                                        Editar
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <InputLabel value="Máx. peças em aberto" />
+                                    <TextInput
+                                        type="number"
+                                        min="1"
+                                        max="1000"
+                                        value={maxItems}
+                                        onChange={(e) => setMaxItems(e.target.value)}
+                                        placeholder="Deixe em branco = sem limite"
+                                        className="mt-1 block w-full"
+                                    />
+                                </div>
+                                <div>
+                                    <InputLabel value="Máx. valor em aberto (R$)" />
+                                    <TextInput
+                                        type="text"
+                                        value={maxValue}
+                                        onChange={(e) => setMaxValue(maskMoney(e.target.value))}
+                                        placeholder="Deixe em branco = sem limite"
+                                        className="mt-1 block w-full"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => setEditingLimits(false)}
+                                    disabled={saving}
+                                    icon={XMarkIcon}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    variant="primary"
+                                    size="sm"
+                                    onClick={saveLimits}
+                                    disabled={saving}
+                                    icon={CheckIcon}
+                                >
+                                    {saving ? 'Salvando…' : 'Salvar limites'}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </StandardModal.Section>
 
                 <StandardModal.Section title={`Consignações (${c.consignments?.length ?? 0})`}>

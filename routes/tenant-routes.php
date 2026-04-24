@@ -1168,6 +1168,7 @@ Route::middleware(['auth'])->group(function () {
             Route::middleware('permission:'.Permission::MANAGE_VIP_TIER_CONFIG->value)->group(function () {
                 Route::get('/customers/vip/config', [\App\Http\Controllers\CustomerVipTierConfigController::class, 'index'])->name('customers.vip.config.index');
                 Route::post('/customers/vip/config', [\App\Http\Controllers\CustomerVipTierConfigController::class, 'store'])->name('customers.vip.config.store');
+                Route::post('/customers/vip/config/year', [\App\Http\Controllers\CustomerVipTierConfigController::class, 'storeYear'])->name('customers.vip.config.store_year');
                 Route::patch('/customers/vip/config/{config}', [\App\Http\Controllers\CustomerVipTierConfigController::class, 'update'])->whereNumber('config')->name('customers.vip.config.update');
                 Route::delete('/customers/vip/config/{config}', [\App\Http\Controllers\CustomerVipTierConfigController::class, 'destroy'])->whereNumber('config')->name('customers.vip.config.destroy');
             });
@@ -1204,6 +1205,11 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/customers/sync', [\App\Http\Controllers\CustomerController::class, 'sync'])->name('customers.sync');
             Route::post('/customers/sync/{log}/cancel', [\App\Http\Controllers\CustomerController::class, 'cancelSync'])->whereNumber('log')->name('customers.sync.cancel');
         });
+
+        // M20 — limites de consignação por cliente (requer MANAGE_CONSIGNMENTS)
+        Route::middleware('permission:'.Permission::MANAGE_CONSIGNMENTS->value)->group(function () {
+            Route::patch('/customers/{customer}/consignment-limits', [\App\Http\Controllers\CustomerController::class, 'updateConsignmentLimits'])->whereNumber('customer')->name('customers.consignment-limits.update');
+        });
     });
 
     // ==========================================
@@ -1217,6 +1223,13 @@ Route::middleware(['auth'])->group(function () {
         Route::middleware('permission:'.Permission::EXPORT_CONSIGNMENTS->value)->group(function () {
             Route::get('/consignments/export', [\App\Http\Controllers\ConsignmentController::class, 'export'])->name('consignments.export');
             Route::get('/consignments/{consignment}/pdf', [\App\Http\Controllers\ConsignmentController::class, 'exportPdf'])->whereNumber('consignment')->name('consignments.pdf');
+        });
+
+        // Import (planilha v1 → v2 — Fase 6)
+        Route::middleware('permission:'.Permission::IMPORT_CONSIGNMENTS->value)->group(function () {
+            Route::get('/consignments/import', [\App\Http\Controllers\ConsignmentController::class, 'importPage'])->name('consignments.import');
+            Route::post('/consignments/import/preview', [\App\Http\Controllers\ConsignmentController::class, 'importPreview'])->name('consignments.import.preview');
+            Route::post('/consignments/import', [\App\Http\Controllers\ConsignmentController::class, 'importStore'])->name('consignments.import.store');
         });
 
         // AJAX lookups — produtos (M8) + NF saída/retorno CIGAM

@@ -201,6 +201,52 @@ class CustomerVipControllerTest extends TestCase
             ->assertSessionHas('success');
     }
 
+    public function test_run_suggestions_warns_when_only_one_tier_configured(): void
+    {
+        // Só Black cadastrado — falta Gold
+        \App\Models\CustomerVipTierConfig::create(['year' => 2025, 'tier' => 'black', 'min_revenue' => 10000]);
+
+        $this->actingAs($this->adminUser)
+            ->post(route('customers.vip.suggestions'), ['year' => 2025])
+            ->assertRedirect(route('customers.vip.index', ['year' => 2025]))
+            ->assertSessionHas('warning');
+
+        // Nada deve ter sido persistido (régua incompleta = pré-falha)
+        $this->assertSame(0, \App\Models\CustomerVipTier::count());
+    }
+
+    public function test_admin_can_store_year_pair(): void
+    {
+        $this->actingAs($this->adminUser)
+            ->post(route('customers.vip.config.store_year'), [
+                'year' => 2026,
+                'black_min_revenue' => 20000,
+                'gold_min_revenue' => 8000,
+                'notes' => 'Régua aprovada',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('customer_vip_tier_configs', [
+            'year' => 2026, 'tier' => 'black', 'min_revenue' => 20000,
+        ]);
+        $this->assertDatabaseHas('customer_vip_tier_configs', [
+            'year' => 2026, 'tier' => 'gold', 'min_revenue' => 8000,
+        ]);
+    }
+
+    public function test_store_year_rejects_gold_above_black(): void
+    {
+        $this->actingAs($this->adminUser)
+            ->post(route('customers.vip.config.store_year'), [
+                'year' => 2026,
+                'black_min_revenue' => 5000,
+                'gold_min_revenue' => 10000, // Gold > Black — inválido
+            ])
+            ->assertSessionHasErrors('gold_min_revenue');
+
+        $this->assertSame(0, \App\Models\CustomerVipTierConfig::count());
+    }
+
     public function test_support_user_cannot_run_suggestions(): void
     {
         $this->actingAs($this->supportUser)

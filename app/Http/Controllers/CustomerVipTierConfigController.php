@@ -57,6 +57,41 @@ class CustomerVipTierConfigController extends Controller
         return back()->with('success', 'Threshold salvo.');
     }
 
+    /**
+     * Cadastra o par Black + Gold de um ano em uma única operação.
+     * Endpoint preferido pelo modal "Cadastrar limites do ano" — evita o
+     * fluxo confuso de 2 cadastros separados pra um único ano.
+     *
+     * Validação garante que Black >= Gold (régua mais alta = tier superior).
+     */
+    public function storeYear(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'year' => ['required', 'integer', 'min:2020', 'max:2100'],
+            'black_min_revenue' => ['required', 'numeric', 'min:0'],
+            'gold_min_revenue' => ['required', 'numeric', 'min:0', 'lte:black_min_revenue'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ], [
+            'gold_min_revenue.lte' => 'O valor mínimo de Gold não pode ser maior que o de Black.',
+        ]);
+
+        CustomerVipTierConfig::updateOrCreate(
+            ['year' => $data['year'], 'tier' => 'black'],
+            ['min_revenue' => $data['black_min_revenue'], 'notes' => $data['notes'] ?? null],
+        );
+
+        CustomerVipTierConfig::updateOrCreate(
+            ['year' => $data['year'], 'tier' => 'gold'],
+            ['min_revenue' => $data['gold_min_revenue'], 'notes' => $data['notes'] ?? null],
+        );
+
+        return back()->with('success', sprintf(
+            'Limites da Lista %d cadastrados (apurados sobre faturamento %d).',
+            $data['year'],
+            $data['year'] - 1,
+        ));
+    }
+
     public function update(Request $request, CustomerVipTierConfig $config): RedirectResponse
     {
         $data = $request->validate([
