@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { router, useForm } from '@inertiajs/react';
 import {
     ArrowUpTrayIcon, DocumentArrowDownIcon, ExclamationTriangleIcon,
@@ -14,34 +14,69 @@ import StatusBadge from '@/Components/Shared/StatusBadge';
  */
 export default function VipImportModal({ show, onClose }) {
     const [summary, setSummary] = useState(null);
+    const fileInputRef = useRef(null);
+    const wasOpenRef = useRef(false);
 
     const form = useForm({
         file: null,
         replace_year: false,
     });
 
+    const resetAll = () => {
+        setSummary(null);
+        form.reset();
+        form.clearErrors();
+        // useForm.reset não limpa o native input file — força via ref
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    // Reset ao reabrir o modal (transição false → true).
+    // Garante que cada nova abertura começa limpa, mesmo que o componente
+    // continue montado entre fechamentos (StandardModal usa Transition).
+    useEffect(() => {
+        if (show && !wasOpenRef.current) {
+            wasOpenRef.current = true;
+            resetAll();
+        } else if (!show) {
+            wasOpenRef.current = false;
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [show]);
+
     const handleSubmit = () => {
         if (!form.data.file) {
             return;
         }
-        // useForm.post já serializa multipart quando há File em data
         form.post(route('customers.vip.import'), {
             preserveScroll: true,
             forceFormData: true,
             onSuccess: (page) => {
                 const flashed = page.props?.flash?.vip_import_summary;
+                // Sucesso limpo (sem erros nem warnings) → fecha automático
+                // e atualiza listagem. Marketing não precisa fechar manualmente.
+                if (flashed && flashed.errors.length === 0 && flashed.warnings.length === 0) {
+                    resetAll();
+                    onClose();
+                    router.reload({ preserveScroll: true });
+                    return;
+                }
                 if (flashed) {
                     setSummary(flashed);
                 }
+                // Limpa o input file mesmo quando exibe summary (evita reupload duplicado)
                 form.setData('file', null);
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                }
             },
         });
     };
 
     const handleClose = () => {
         if (form.processing) return;
-        setSummary(null);
-        form.reset();
+        resetAll();
         onClose();
     };
 
@@ -76,9 +111,9 @@ export default function VipImportModal({ show, onClose }) {
             }
         >
             {summary ? (
-                <ImportSummary summary={summary} onReset={() => { setSummary(null); form.reset(); }} />
+                <ImportSummary summary={summary} onReset={resetAll} />
             ) : (
-                <ImportForm form={form} onDownloadTemplate={downloadTemplate} />
+                <ImportForm form={form} fileInputRef={fileInputRef} onDownloadTemplate={downloadTemplate} />
             )}
         </StandardModal>
     );
@@ -87,7 +122,7 @@ export default function VipImportModal({ show, onClose }) {
 // ----------------------------------------------------------------------
 // Form
 // ----------------------------------------------------------------------
-function ImportForm({ form, onDownloadTemplate }) {
+function ImportForm({ form, fileInputRef, onDownloadTemplate }) {
     return (
         <>
             <StandardModal.Section title="Como funciona">
@@ -127,6 +162,7 @@ function ImportForm({ form, onDownloadTemplate }) {
 
             <StandardModal.Section title="Arquivo">
                 <input
+                    ref={fileInputRef}
                     type="file"
                     accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     onChange={(e) => form.setData('file', e.target.files[0] || null)}

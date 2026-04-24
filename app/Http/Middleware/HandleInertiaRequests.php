@@ -95,6 +95,10 @@ class HandleInertiaRequests extends Middleware
             'error' => fn () => $request->session()->get('error'),
             'warning' => fn () => $request->session()->get('warning'),
             'info' => fn () => $request->session()->get('info'),
+            // Payloads estruturados específicos de fluxos com summary detalhado.
+            // Adicione novas chaves aqui quando precisar expor uma estrutura
+            // que não cabe em string flash (success/warning).
+            'vip_import_summary' => fn () => $request->session()->get('vip_import_summary'),
         ];
     }
 }
