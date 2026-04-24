@@ -173,6 +173,33 @@ class CustomerVipController extends Controller
             ->deleteFileAfterSend(true);
     }
 
+    /**
+     * Recalcula snapshots (faturamento, NFs, loja preferida) de todos os
+     * tiers do ano informado, baseado em vendas Meia Sola DO ANO.
+     *
+     * Útil pra atualizar listas importadas via XLSX (que vinham com 0)
+     * ou refrescar acompanhamento do ano corrente.
+     */
+    public function refreshSnapshots(Request $request): RedirectResponse
+    {
+        $year = (int) $request->input('year', now()->year);
+
+        $summary = $this->classifier->refreshSnapshots($year);
+
+        $msg = sprintf(
+            'Faturamento da Lista %d atualizado: %d clientes recalculados',
+            $summary['year'],
+            $summary['updated'],
+        );
+        if ($summary['no_data'] > 0) {
+            $msg .= sprintf(' (%d sem CPF)', $summary['no_data']);
+        }
+
+        return redirect()
+            ->route('customers.vip.index', ['year' => $year])
+            ->with('success', $msg);
+    }
+
     public function runSuggestions(Request $request): RedirectResponse
     {
         $year = (int) $request->input('year', now()->year);

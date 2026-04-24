@@ -15,6 +15,7 @@ import useModalManager from '@/Hooks/useModalManager';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import StandardModal from '@/Components/StandardModal';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import EmptyState from '@/Components/Shared/EmptyState';
@@ -130,6 +131,17 @@ export default function VipIndex({ tiers, year, availableYears, filters, statist
         router.post(route('customers.vip.suggestions'), { year }, { preserveScroll: true });
     };
 
+    const handleRefreshSnapshots = async () => {
+        const ok = await confirm({
+            title: `Atualizar faturamento da Lista ${year}`,
+            message: `Recalcula faturamento, NFs e loja preferida de TODOS os clientes da Lista ${year} com base nas vendas Meia Sola de ${year}. Não muda tiers nem curadorias. Continuar?`,
+            confirmText: 'Atualizar',
+            type: 'info',
+        });
+        if (!ok) return;
+        router.post(route('customers.vip.refresh_snapshots'), { year }, { preserveScroll: true });
+    };
+
     const handleRemove = async (tier) => {
         const ok = await confirm({
             title: 'Remover cliente da lista VIP?',
@@ -147,54 +159,53 @@ export default function VipIndex({ tiers, year, availableYears, filters, statist
 
             <div className="py-6 sm:py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header — vertical até lg pra não estourar em iPad mini (768) */}
-                    <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:justify-between lg:items-center">
-                        <div className="min-w-0">
-                            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
-                                <TrophyIcon className="h-7 w-7 text-indigo-600 shrink-0" />
-                                MS Life {year}
-                            </h1>
-                            <p className="mt-1 text-sm text-gray-600">
+                    <PageHeader
+                        title={`MS Life ${year}`}
+                        icon={TrophyIcon}
+                        subtitle={
+                            <>
                                 Programa <strong>MS Life</strong> — curadoria Black/Gold baseada no faturamento
                                 de <strong>{year - 1}</strong> apenas nas lojas da rede <strong>Meia Sola</strong>.
                                 A lista de cada ano usa o faturamento do ano anterior.
-                            </p>
-                        </div>
-                        <div className="flex flex-wrap gap-2 lg:shrink-0">
-                            <Link href={route('customers.index')} className="flex-1 sm:flex-none">
-                                <Button variant="outline" icon={ArrowLeftIcon} className="w-full sm:w-auto whitespace-nowrap">
-                                    Voltar
-                                </Button>
-                            </Link>
-                            {can.manage_config && (
-                                <Link href={route('customers.vip.config.index')} className="flex-1 sm:flex-none">
-                                    <Button variant="secondary" icon={AdjustmentsHorizontalIcon} className="w-full sm:w-auto whitespace-nowrap">
-                                        Limites
-                                    </Button>
-                                </Link>
-                            )}
-                            {can.import && (
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => openModal('import')}
-                                    icon={ArrowUpTrayIcon}
-                                    className="flex-1 sm:flex-none w-full sm:w-auto whitespace-nowrap"
-                                >
-                                    Importar lista
-                                </Button>
-                            )}
-                            {can.manage && (
-                                <Button
-                                    variant="primary"
-                                    onClick={handleSuggestionsRun}
-                                    icon={ArrowPathIcon}
-                                    className="flex-1 sm:flex-none w-full sm:w-auto whitespace-nowrap"
-                                >
-                                    Gerar sugestões {year}
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                            </>
+                        }
+                        actions={[
+                            {
+                                label: 'Voltar',
+                                icon: ArrowLeftIcon,
+                                variant: 'outline',
+                                href: route('customers.index'),
+                            },
+                            {
+                                label: 'Limites',
+                                icon: AdjustmentsHorizontalIcon,
+                                variant: 'secondary',
+                                href: route('customers.vip.config.index'),
+                                visible: can.manage_config,
+                            },
+                            {
+                                label: 'Importar lista',
+                                icon: ArrowUpTrayIcon,
+                                variant: 'secondary',
+                                onClick: () => openModal('import'),
+                                visible: can.import,
+                            },
+                            {
+                                label: 'Atualizar faturamento',
+                                icon: ArrowPathIcon,
+                                variant: 'secondary',
+                                onClick: handleRefreshSnapshots,
+                                visible: can.manage,
+                            },
+                            {
+                                label: `Gerar sugestões ${year}`,
+                                icon: ArrowPathIcon,
+                                variant: 'primary',
+                                onClick: handleSuggestionsRun,
+                                visible: can.manage,
+                            },
+                        ]}
+                    />
 
                     <StatisticsGrid cards={statsCards} cols={4} />
 
@@ -248,7 +259,7 @@ export default function VipIndex({ tiers, year, availableYears, filters, statist
                                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
                                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Sugerido</th>
                                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tier final</th>
-                                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Faturamento {year - 1}</th>
+                                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Faturamento {year}</th>
                                         <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">NFs</th>
                                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Loja preferida</th>
                                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden xl:table-cell">Curadoria</th>
@@ -451,10 +462,10 @@ function CurateModal({ show, onClose, tier }) {
                 />
             }
         >
-            <StandardModal.Section title={`Snapshot — Lista ${tier.year} (faturamento ${tier.revenue_year ?? tier.year - 1})`}>
+            <StandardModal.Section title={`Snapshot — Lista ${tier.year}`}>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <StandardModal.Field
-                        label={`Faturamento ${tier.revenue_year ?? tier.year - 1}`}
+                        label={`Faturamento ${tier.revenue_year ?? tier.year}`}
                         value={fmtCurrency(tier.total_revenue)}
                     />
                     <StandardModal.Field label="NFs" value={tier.total_orders} />
@@ -467,7 +478,8 @@ function CurateModal({ show, onClose, tier }) {
                     <StandardModal.Field label="Sugerido" value={tier.suggested_tier ? TIER_VARIANTS[tier.suggested_tier].label : '—'} />
                 </div>
                 <p className="mt-3 text-xs text-gray-500">
-                    A lista de {tier.year} é construída com o faturamento de {tier.revenue_year ?? tier.year - 1},
+                    A Lista {tier.year} é decidida pelo faturamento de {tier.year - 1} (régua MS Life).
+                    O snapshot acima reflete o faturamento de <strong>{tier.revenue_year ?? tier.year}</strong>,
                     apenas em lojas da rede Meia Sola. Loja preferida é a de maior faturamento; em empate,
                     maior número de NFs; em empate, maior quantidade de itens.
                 </p>

@@ -98,10 +98,15 @@ class CustomerVipClassificationServiceTest extends TestCase
         ]);
     }
 
+    /**
+     * Insere movements no ano de APURAÇÃO ($revenueYear, decide o tier) E
+     * espelha no ano da LISTA ($year, vai pro snapshot persistido). Quando o
+     * test passa `movement_date` explícito, NÃO espelha — usado em cenários
+     * que filtram por ano específico (ex: test_decision_uses_revenue_year).
+     */
     private function makeMovement(array $overrides): void
     {
-        // Por padrão movements caem no ano de apuração ($this->year - 1)
-        DB::table('movements')->insert(array_merge([
+        $defaults = [
             'movement_date' => sprintf('%d-03-15', $this->revenueYear),
             'movement_code' => 2,
             'entry_exit' => 'S',
@@ -111,7 +116,16 @@ class CustomerVipClassificationServiceTest extends TestCase
             'store_code' => 'Z441',
             'created_at' => now(),
             'updated_at' => now(),
-        ], $overrides));
+        ];
+
+        DB::table('movements')->insert(array_merge($defaults, $overrides));
+
+        // Espelha em $year (snapshot) só se o test não definiu data explícita
+        if (! isset($overrides['movement_date'])) {
+            $mirror = array_merge($defaults, $overrides);
+            $mirror['movement_date'] = sprintf('%d-03-15', $this->year);
+            DB::table('movements')->insert($mirror);
+        }
     }
 
     private function setThresholds(float $black = 10000, float $gold = 5000): void
@@ -167,31 +181,33 @@ class CustomerVipClassificationServiceTest extends TestCase
         $this->assertEquals('gold', $tier->suggested_tier);
     }
 
-    public function test_revenue_only_counts_the_revenue_year(): void
+    public function test_decision_uses_revenue_year_snapshot_uses_list_year(): void
     {
-        // Lista = 2026, apuração = 2025. Movements de outros anos são ignorados.
+        // Lista = 2026, apuração = 2025.
+        // Decisão de tier olha 2025; snapshot persistido reflete 2026.
         $customer = $this->makeCustomer('33333333333');
         $this->setThresholds(10000, 5000);
 
-        // Apuração (2025) — único que conta
+        // 2025 (apuração) → 6000, bate Gold
         $this->makeMovement(['cpf_customer' => '33333333333', 'movement_date' => $this->revenueYear.'-05-01', 'net_value' => 6000]);
-        // Ano da lista (2026) — não conta
-        $this->makeMovement(['cpf_customer' => '33333333333', 'movement_date' => $this->year.'-05-01', 'net_value' => 100000]);
-        // Ano anterior à apuração (2024) — não conta
+        // 2026 (ano da lista) → 4500, snapshot persistido
+        $this->makeMovement(['cpf_customer' => '33333333333', 'movement_date' => $this->year.'-05-01', 'net_value' => 4500]);
+        // 2024 (fora) — não afeta
         $this->makeMovement(['cpf_customer' => '33333333333', 'movement_date' => ($this->revenueYear - 1).'-05-01', 'net_value' => 100000]);
 
         $this->service->generateSuggestions($this->year);
 
         $tier = CustomerVipTier::where('customer_id', $customer->id)->first();
-        $this->assertEqualsWithDelta(6000.0, (float) $tier->total_revenue, 0.01);
-        $this->assertEquals($this->revenueYear, $tier->revenue_year);
-        $this->assertEquals($this->year, $tier->year);
+        $this->assertEquals('gold', $tier->suggested_tier, 'Tier decidido por 2025 (6000 → Gold)');
+        $this->assertEqualsWithDelta(4500.0, (float) $tier->total_revenue, 0.01, 'Snapshot reflete vendas de 2026');
+        $this->assertEquals($this->year, $tier->revenue_year, 'revenue_year armazena ano da lista');
     }
 
-    public function test_persists_revenue_year_in_record(): void
+    public function test_persists_year_and_revenue_year_in_record(): void
     {
         $customer = $this->makeCustomer('44400440044');
         $this->setThresholds(10000, 5000);
+        // makeMovement default cria em ambos: $revenueYear (decisão) + $year (snapshot)
         $this->makeMovement(['cpf_customer' => '44400440044', 'net_value' => 8000]);
 
         $summary = $this->service->generateSuggestions($this->year);
@@ -200,7 +216,66 @@ class CustomerVipClassificationServiceTest extends TestCase
         $this->assertEquals($this->revenueYear, $summary['revenue_year']);
 
         $tier = CustomerVipTier::where('customer_id', $customer->id)->first();
-        $this->assertEquals($this->revenueYear, $tier->revenue_year);
+        $this->assertEquals($this->year, $tier->revenue_year, 'revenue_year = ano da lista (snapshot)');
+    }
+
+    // -------------------------------------------------------------
+    // refreshSnapshots — recalcula snapshots de uma lista existente
+    // -------------------------------------------------------------
+
+    public function test_refresh_snapshots_recomputes_from_list_year(): void
+    {
+        $customer = $this->makeCustomer('55500550055');
+
+        // Cria tier 2026 manualmente sem snapshot (cenário: importou lista via XLSX)
+        CustomerVipTier::create([
+            'customer_id' => $customer->id,
+            'year' => $this->year,
+            'final_tier' => 'black',
+            'source' => 'manual',
+            'curated_at' => now(),
+            'total_revenue' => 0,
+            'total_orders' => 0,
+        ]);
+
+        // Vendas Meia Sola em 2026 — devem aparecer no snapshot
+        $this->makeMovement(['cpf_customer' => '55500550055', 'movement_date' => $this->year.'-04-10', 'net_value' => 7500, 'invoice_number' => 'A1']);
+        $this->makeMovement(['cpf_customer' => '55500550055', 'movement_date' => $this->year.'-08-20', 'net_value' => 2500, 'invoice_number' => 'A2']);
+
+        $summary = $this->service->refreshSnapshots($this->year);
+
+        $this->assertSame(1, $summary['updated']);
+        $this->assertEquals($this->year, $summary['year']);
+
+        $tier = CustomerVipTier::where('customer_id', $customer->id)->first();
+        $this->assertEqualsWithDelta(10000.0, (float) $tier->total_revenue, 0.01);
+        $this->assertEquals(2, $tier->total_orders);
+        $this->assertEquals('black', $tier->final_tier, 'final_tier preservado');
+        $this->assertNotNull($tier->curated_at, 'curadoria preservada');
+        $this->assertEquals($this->year, $tier->revenue_year);
+    }
+
+    public function test_refresh_snapshots_zera_quando_cliente_nao_comprou_no_ano(): void
+    {
+        $customer = $this->makeCustomer('66600660066');
+        CustomerVipTier::create([
+            'customer_id' => $customer->id,
+            'year' => $this->year,
+            'final_tier' => 'gold',
+            'source' => 'manual',
+            'curated_at' => now(),
+            'total_revenue' => 5000, // valor antigo de outra rodada
+            'total_orders' => 3,
+        ]);
+        // Sem movements em 2026
+
+        $summary = $this->service->refreshSnapshots($this->year);
+
+        $this->assertSame(1, $summary['updated']);
+        $tier = CustomerVipTier::where('customer_id', $customer->id)->first();
+        $this->assertEqualsWithDelta(0.0, (float) $tier->total_revenue, 0.01);
+        $this->assertEquals(0, $tier->total_orders);
+        $this->assertNull($tier->preferred_store_code);
     }
 
     // --------------------------------------------------------------

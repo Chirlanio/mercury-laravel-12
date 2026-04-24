@@ -1173,9 +1173,10 @@ Route::middleware(['auth'])->group(function () {
                 Route::delete('/customers/vip/config/{config}', [\App\Http\Controllers\CustomerVipTierConfigController::class, 'destroy'])->whereNumber('config')->name('customers.vip.config.destroy');
             });
 
-            // Disparar geração de sugestões
+            // Disparar geração de sugestões + refresh manual de snapshots
             Route::middleware('permission:'.Permission::MANAGE_VIP_CUSTOMERS->value)->group(function () {
                 Route::post('/customers/vip/suggestions', [\App\Http\Controllers\CustomerVipController::class, 'runSuggestions'])->name('customers.vip.suggestions');
+                Route::post('/customers/vip/refresh-snapshots', [\App\Http\Controllers\CustomerVipController::class, 'refreshSnapshots'])->name('customers.vip.refresh_snapshots');
             });
 
             // Importar lista VIP

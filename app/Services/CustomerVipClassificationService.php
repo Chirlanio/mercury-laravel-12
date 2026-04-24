@@ -105,13 +105,19 @@ class CustomerVipClassificationService
 
         $cpfs = $revenueByCpf->pluck('cpf')->all();
         $customers = Customer::whereIn('cpf', $cpfs)->get()->keyBy('cpf');
-        $preferredStoreByCpf = $this->resolvePreferredStores($revenueYear, $storeCodes, $cpfs);
+
+        // Snapshot do ANO DA LISTA (N) — pra UI mostrar faturamento atual.
+        // Decisão de tier usa N-1 (acima); persistência usa N. Retorna mapa
+        // cpf → {revenue, orders} (sem HAVING > 0, pra incluir clientes
+        // que qualificaram em N-1 mas têm zero em N).
+        $currentByCpf = $this->revenueMapByCpf($listYear, $storeCodes, $cpfs);
+        $preferredStoreByCpf = $this->resolvePreferredStores($listYear, $storeCodes, $cpfs);
 
         $qualifiedCustomerIds = [];
 
         DB::transaction(function () use (
-            $listYear, $revenueYear, $revenueByCpf, $customers, $thresholds,
-            $preferredStoreByCpf, &$summary, &$qualifiedCustomerIds
+            $listYear, $revenueYear, $revenueByCpf, $currentByCpf, $customers,
+            $thresholds, $preferredStoreByCpf, &$summary, &$qualifiedCustomerIds
         ) {
             $now = now();
 
@@ -123,9 +129,11 @@ class CustomerVipClassificationService
 
                 $summary['processed']++;
 
-                $revenue = (float) $row->revenue;
-                $orders = (int) $row->orders;
-                $suggested = $this->tierForRevenue($revenue, $thresholds);
+                $decisionRevenue = (float) $row->revenue;       // N-1, decide o tier
+                $current = $currentByCpf[$row->cpf] ?? null;     // N, vai pro snapshot
+                $snapshotRevenue = $current ? (float) $current->revenue : 0.0;
+                $snapshotOrders = $current ? (int) $current->orders : 0;
+                $suggested = $this->tierForRevenue($decisionRevenue, $thresholds);
                 $preferredStore = $preferredStoreByCpf[$row->cpf] ?? null;
 
                 if ($suggested === null) {
@@ -137,10 +145,10 @@ class CustomerVipClassificationService
 
                     if ($existing && $existing->curated_at !== null) {
                         $existing->update([
-                            'total_revenue' => $revenue,
-                            'total_orders' => $orders,
+                            'total_revenue' => $snapshotRevenue,
+                            'total_orders' => $snapshotOrders,
                             'preferred_store_code' => $preferredStore,
-                            'revenue_year' => $revenueYear,
+                            'revenue_year' => $listYear,
                             'suggested_tier' => null,
                             'suggested_at' => $now,
                         ]);
@@ -165,10 +173,10 @@ class CustomerVipClassificationService
 
                 if ($existing && $existing->curated_at !== null) {
                     $existing->update([
-                        'total_revenue' => $revenue,
-                        'total_orders' => $orders,
+                        'total_revenue' => $snapshotRevenue,
+                        'total_orders' => $snapshotOrders,
                         'preferred_store_code' => $preferredStore,
-                        'revenue_year' => $revenueYear,
+                        'revenue_year' => $listYear,
                         'suggested_tier' => $suggested,
                         'suggested_at' => $now,
                     ]);
@@ -182,10 +190,10 @@ class CustomerVipClassificationService
                     [
                         'suggested_tier' => $suggested,
                         'final_tier' => $suggested,
-                        'total_revenue' => $revenue,
-                        'total_orders' => $orders,
+                        'total_revenue' => $snapshotRevenue,
+                        'total_orders' => $snapshotOrders,
                         'preferred_store_code' => $preferredStore,
-                        'revenue_year' => $revenueYear,
+                        'revenue_year' => $listYear,
                         'suggested_at' => $now,
                         'source' => CustomerVipTier::SOURCE_AUTO,
                     ],
@@ -196,6 +204,109 @@ class CustomerVipClassificationService
         $summary['removed_obsolete'] = $this->cleanupObsoleteAutoTiers($listYear, $qualifiedCustomerIds);
 
         return $summary;
+    }
+
+    /**
+     * Recalcula snapshots (total_revenue, total_orders, preferred_store_code,
+     * revenue_year=year) de TODOS os tiers do ano informado, baseado nas vendas
+     * Meia Sola DO PRÓPRIO ANO (não N-1). Útil para:
+     *   - Atualizar listas importadas via XLSX (vinham com 0)
+     *   - Atualizar acompanhamento parcial do ano corrente sem mexer na régua
+     *   - Repopular após mudanças retroativas em movements
+     *
+     * NÃO toca em final_tier nem em curated_at — só os snapshots. Curadoria
+     * sempre preservada.
+     *
+     * @return array{updated: int, no_data: int, year: int}
+     */
+    public function refreshSnapshots(int $year): array
+    {
+        $summary = ['updated' => 0, 'no_data' => 0, 'year' => $year];
+        $storeCodes = $this->msLifeStoreCodes();
+
+        $tiers = CustomerVipTier::with('customer:id,cpf')
+            ->where('year', $year)
+            ->get();
+
+        if ($tiers->isEmpty() || empty($storeCodes)) {
+            return $summary;
+        }
+
+        $cpfs = $tiers->map(fn ($t) => $t->customer?->cpf)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $revenueByCpf = $this->revenueMapByCpf($year, $storeCodes, $cpfs);
+        $preferredByCpf = $this->resolvePreferredStores($year, $storeCodes, $cpfs);
+
+        DB::transaction(function () use ($tiers, $year, $revenueByCpf, $preferredByCpf, &$summary) {
+            foreach ($tiers as $tier) {
+                $cpf = $tier->customer?->cpf;
+                if (! $cpf) {
+                    $summary['no_data']++;
+
+                    continue;
+                }
+
+                $rev = $revenueByCpf[$cpf] ?? null;
+
+                $tier->update([
+                    'total_revenue' => $rev ? (float) $rev->revenue : 0,
+                    'total_orders' => $rev ? (int) $rev->orders : 0,
+                    'preferred_store_code' => $preferredByCpf[$cpf] ?? null,
+                    'revenue_year' => $year,
+                ]);
+                $summary['updated']++;
+            }
+        });
+
+        return $summary;
+    }
+
+    /**
+     * Variante de aggregateRevenueByCpf sem HAVING > 0 e filtrando por lista
+     * específica de CPFs. Usado pelo refreshSnapshots — precisamos dos zeros
+     * pra reportar quem não comprou nada no ano.
+     *
+     * @param  array<int,string>  $storeCodes
+     * @param  array<int,string>  $cpfs
+     * @return array<string, object{cpf:string, revenue:float, orders:int}>
+     */
+    private function revenueMapByCpf(int $year, array $storeCodes, array $cpfs): array
+    {
+        if (empty($cpfs)) {
+            return [];
+        }
+
+        $start = sprintf('%d-01-01', $year);
+        $end = sprintf('%d-12-31', $year);
+
+        return DB::table('movements')
+            ->select([
+                'cpf_customer as cpf',
+                DB::raw(
+                    'SUM(CASE '
+                    ."WHEN movement_code = 2 THEN net_value "
+                    ."WHEN movement_code = 6 AND entry_exit = 'E' THEN -net_value "
+                    .'ELSE 0 END) as revenue'
+                ),
+                DB::raw('COUNT(DISTINCT invoice_number) as orders'),
+            ])
+            ->whereIn('cpf_customer', $cpfs)
+            ->whereIn('store_code', $storeCodes)
+            ->whereBetween('movement_date', [$start, $end])
+            ->where(function ($q) {
+                $q->where('movement_code', 2)
+                    ->orWhere(function ($qq) {
+                        $qq->where('movement_code', 6)->where('entry_exit', 'E');
+                    });
+            })
+            ->groupBy('cpf_customer')
+            ->get()
+            ->keyBy('cpf')
+            ->all();
     }
 
     /**
