@@ -2,8 +2,10 @@ import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import {
     AdjustmentsHorizontalIcon, ArrowLeftIcon, PlusIcon, TrashIcon, PencilSquareIcon,
+    InformationCircleIcon,
 } from '@heroicons/react/24/outline';
 import { useConfirm } from '@/Hooks/useConfirm';
+import { maskMoney, parseMoney } from '@/Hooks/useMasks';
 import Button from '@/Components/Button';
 import StandardModal from '@/Components/StandardModal';
 import StatusBadge from '@/Components/Shared/StatusBadge';
@@ -20,16 +22,31 @@ export default function VipConfig({ configs, can }) {
     const [editing, setEditing] = useState(null); // null = closed, {} = new, { ...config } = edit
     const isNew = editing && !editing.id;
 
-    const { data, setData, post, patch, processing, reset, errors } = useForm({
+    const { data, setData, post, patch, processing, reset, errors, transform } = useForm({
         year: new Date().getFullYear(),
         tier: 'black',
         min_revenue: '',
         notes: '',
     });
 
+    // Serializa o valor mascarado "15.000,00" → 15000 antes de enviar ao backend
+    transform((payload) => ({
+        ...payload,
+        min_revenue: parseMoney(payload.min_revenue),
+    }));
+
+    const handleRevenueChange = (e) => {
+        setData('min_revenue', maskMoney(e.target.value));
+    };
+
     const openNew = () => {
         reset();
-        setData({ year: new Date().getFullYear(), tier: 'black', min_revenue: '', notes: '' });
+        setData({
+            year: new Date().getFullYear(),
+            tier: 'black',
+            min_revenue: '',
+            notes: '',
+        });
         setEditing({});
     };
 
@@ -37,7 +54,7 @@ export default function VipConfig({ configs, can }) {
         setData({
             year: c.year,
             tier: c.tier,
-            min_revenue: String(c.min_revenue),
+            min_revenue: maskMoney(Math.round(c.min_revenue * 100)),
             notes: c.notes || '',
         });
         setEditing(c);
@@ -204,19 +221,44 @@ export default function VipConfig({ configs, can }) {
                             </div>
                         )}
                         <div>
-                            <InputLabel value="Faturamento mínimo (R$)" />
-                            <TextInput
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={data.min_revenue}
-                                onChange={(e) => setData('min_revenue', e.target.value)}
-                                placeholder="Ex: 15000.00"
-                                className="mt-1 block w-full"
-                                required
-                            />
+                            <InputLabel value="Faturamento mínimo" />
+                            <div className="relative mt-1">
+                                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-gray-500 pointer-events-none">
+                                    R$
+                                </span>
+                                <TextInput
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={data.min_revenue}
+                                    onChange={handleRevenueChange}
+                                    placeholder="15.000,00"
+                                    className="block w-full pl-10 text-right font-mono"
+                                    required
+                                />
+                            </div>
                             {errors.min_revenue && <p className="text-red-600 text-xs mt-1">{errors.min_revenue}</p>}
                         </div>
+
+                        {/* Nota explicativa do período + regra */}
+                        <div className="rounded-md bg-indigo-50 border border-indigo-100 p-3 flex gap-2">
+                            <InformationCircleIcon className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+                            <div className="text-xs text-indigo-900 space-y-1">
+                                <p>
+                                    <strong>Período de apuração:</strong> 01/jan a 31/dez de {data.year} (ano civil).
+                                </p>
+                                <p>
+                                    <strong>Cálculo do faturamento líquido:</strong> soma das vendas
+                                    (movimentos código <strong>2</strong>) menos as devoluções
+                                    (movimentos código <strong>6</strong> com entrada/saída <strong>E</strong>),
+                                    agrupado pelo CPF do cliente.
+                                </p>
+                                <p className="text-indigo-700">
+                                    Clientes cujo total bater este valor serão sugeridos automaticamente para o tier.
+                                    Curadoria manual do Marketing sempre prevalece.
+                                </p>
+                            </div>
+                        </div>
+
                         <div>
                             <InputLabel value="Notas (opcional)" />
                             <textarea
