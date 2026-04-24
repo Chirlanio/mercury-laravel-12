@@ -76,9 +76,14 @@ class CustomerVipReportService
      */
     private function computePeriod(string $cpf, string $start, string $end): array
     {
+        // SUBSTR(date, 6, 2) retorna 'MM' tanto em MySQL quanto em SQLite
+        // (movement_date sempre gravada como Y-m-d). Evita DATE_FORMAT/MONTH
+        // que não são portáveis.
+        $monthExpr = "SUBSTR(movement_date, 6, 2)";
+
         $rows = DB::table('movements')
             ->select([
-                DB::raw('MONTH(movement_date) as month'),
+                DB::raw("{$monthExpr} as month"),
                 DB::raw(
                     'SUM(CASE WHEN movement_code = 2 THEN net_value '
                     ."WHEN movement_code = 6 AND entry_exit = 'E' THEN -net_value "
@@ -94,7 +99,7 @@ class CustomerVipReportService
                         $qq->where('movement_code', 6)->where('entry_exit', 'E');
                     });
             })
-            ->groupBy(DB::raw('MONTH(movement_date)'))
+            ->groupBy(DB::raw($monthExpr))
             ->get();
 
         $monthly = array_fill(1, 12, 0.0);

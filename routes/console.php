@@ -179,3 +179,12 @@ Schedule::command('customers:sync')
     ->dailyAt('04:00')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/customers-sync.log'));
+
+// Customers VIP — atualiza sugestões automáticas do ano corrente. Curadorias
+// manuais ficam sempre preservadas (service só toca final_tier quando não
+// tem curated_at). Weekly porque o ranking muda pouco de dia para dia;
+// Marketing pode rodar sob demanda no botão da UI quando precisar.
+Schedule::command('customers:vip-suggest')
+    ->weeklyOn(1, '05:30') // Segunda-feira 05:30
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/customers-vip-suggest.log'));

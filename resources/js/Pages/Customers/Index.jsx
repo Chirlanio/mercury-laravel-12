@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     UserGroupIcon,
@@ -9,6 +9,7 @@ import {
     XMarkIcon,
     MapPinIcon,
     ClockIcon,
+    TrophyIcon,
 } from '@heroicons/react/24/outline';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
@@ -37,6 +38,7 @@ export default function Index({
     const { hasPermission } = usePermissions();
     const canSync = can.sync ?? hasPermission(PERMISSIONS.SYNC_CUSTOMERS);
     const canExport = can.export ?? hasPermission(PERMISSIONS.EXPORT_CUSTOMERS);
+    const canViewVip = can.view_vip ?? hasPermission(PERMISSIONS.VIEW_VIP_CUSTOMERS);
 
     const { modals, selected, openModal, closeModal } = useModalManager(['detail', 'history']);
     const { confirm, ConfirmDialogComponent } = useConfirm();
@@ -235,6 +237,18 @@ export default function Index({
                             </p>
                         </div>
                         <div className="flex gap-2 shrink-0">
+                            {canViewVip && (
+                                <Link href={route('customers.vip.index')}>
+                                    <Button
+                                        variant="secondary"
+                                        title="Lista anual de clientes VIP (Black/Gold)"
+                                        className="min-h-[44px]"
+                                    >
+                                        <TrophyIcon className="w-4 h-4 sm:mr-2 text-amber-600" />
+                                        <span className="hidden sm:inline">Clientes VIP</span>
+                                    </Button>
+                                </Link>
+                            )}
                             <Button
                                 variant="secondary"
                                 onClick={() => openModal('history')}

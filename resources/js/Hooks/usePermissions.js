@@ -270,6 +270,19 @@ export const PERMISSIONS = {
     IMPORT_DRE_BUDGETS: 'dre.import_budgets',
     MANAGE_DRE_PERIODS: 'dre.manage_periods',
     EXPORT_DRE: 'dre.export',
+
+    // Clientes (sincronizados do CIGAM)
+    VIEW_CUSTOMERS: 'customers.view',
+    EXPORT_CUSTOMERS: 'customers.export',
+    SYNC_CUSTOMERS: 'customers.sync',
+
+    // Clientes VIP (Black/Gold — curadoria Marketing)
+    VIEW_VIP_CUSTOMERS: 'customer_vips.view',
+    MANAGE_VIP_CUSTOMERS: 'customer_vips.manage',
+    CURATE_VIP_CUSTOMERS: 'customer_vips.curate',
+    VIEW_VIP_REPORTS: 'customer_vips.view_reports',
+    MANAGE_VIP_ACTIVITIES: 'customer_vips.manage_activities',
+    MANAGE_VIP_TIER_CONFIG: 'customer_vips.manage_config',
 };
 
 export const ROLES = {

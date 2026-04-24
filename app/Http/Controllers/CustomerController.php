@@ -70,6 +70,7 @@ class CustomerController extends Controller
             'can' => [
                 'export' => $request->user()?->hasPermissionTo(Permission::EXPORT_CUSTOMERS->value) ?? false,
                 'sync' => $request->user()?->hasPermissionTo(Permission::SYNC_CUSTOMERS->value) ?? false,
+                'view_vip' => $request->user()?->hasPermissionTo(Permission::VIEW_VIP_CUSTOMERS->value) ?? false,
             ],
         ]);
     }
