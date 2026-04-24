@@ -128,4 +128,26 @@ class Customer extends Model
     {
         return $this->hasMany(Consignment::class);
     }
+
+    public function vipTiers(): HasMany
+    {
+        return $this->hasMany(CustomerVipTier::class);
+    }
+
+    public function vipActivities(): HasMany
+    {
+        return $this->hasMany(CustomerVipActivity::class);
+    }
+
+    /**
+     * Classificação VIP vigente no ano informado (ou ano atual).
+     * Retorna a linha independentemente de ter curadoria ou não —
+     * consumidores usam `final_tier` pra saber se está ativo.
+     */
+    public function currentVipTier(?int $year = null): ?CustomerVipTier
+    {
+        $year ??= (int) date('Y');
+
+        return $this->vipTiers()->where('year', $year)->first();
+    }
 }

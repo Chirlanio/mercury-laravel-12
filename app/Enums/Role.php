@@ -9,6 +9,7 @@ enum Role: string
     case FINANCE = 'finance';
     case ACCOUNTING = 'accounting';
     case FISCAL = 'fiscal';
+    case MARKETING = 'marketing';
     case SUPPORT = 'support';
     case USER = 'user';
     case DRIVER = 'drivers';
@@ -21,6 +22,7 @@ enum Role: string
             self::FINANCE => 'Financeira',
             self::ACCOUNTING => 'Contabilidade',
             self::FISCAL => 'Fiscal',
+            self::MARKETING => 'Marketing',
             self::SUPPORT => 'Suporte',
             self::USER => 'Usuário',
             self::DRIVER => 'Motorista',
@@ -38,6 +40,7 @@ enum Role: string
             self::FINANCE->value => 8,
             self::ACCOUNTING->value => 8,
             self::FISCAL->value => 8,
+            self::MARKETING->value => 8,
             self::ADMIN->value => 9,
             self::SUPER_ADMIN->value => 10,
         ];
@@ -285,6 +288,13 @@ enum Role: string
                 Permission::VIEW_CUSTOMERS->value,
                 Permission::EXPORT_CUSTOMERS->value,
                 Permission::SYNC_CUSTOMERS->value,
+                // Clientes VIP (todas)
+                Permission::VIEW_VIP_CUSTOMERS->value,
+                Permission::MANAGE_VIP_CUSTOMERS->value,
+                Permission::CURATE_VIP_CUSTOMERS->value,
+                Permission::VIEW_VIP_REPORTS->value,
+                Permission::MANAGE_VIP_ACTIVITIES->value,
+                Permission::MANAGE_VIP_TIER_CONFIG->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -520,6 +530,13 @@ enum Role: string
                 Permission::VIEW_CUSTOMERS->value,
                 Permission::EXPORT_CUSTOMERS->value,
                 Permission::SYNC_CUSTOMERS->value,
+                // Clientes VIP (todas — admin cobre Marketing)
+                Permission::VIEW_VIP_CUSTOMERS->value,
+                Permission::MANAGE_VIP_CUSTOMERS->value,
+                Permission::CURATE_VIP_CUSTOMERS->value,
+                Permission::VIEW_VIP_REPORTS->value,
+                Permission::MANAGE_VIP_ACTIVITIES->value,
+                Permission::MANAGE_VIP_TIER_CONFIG->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -806,6 +823,30 @@ enum Role: string
                 // DRE: matriz + export (leitura executiva)
                 Permission::VIEW_DRE->value,
                 Permission::EXPORT_DRE->value,
+            ],
+            self::MARKETING => [
+                // Marketing — curadoria de VIPs e atividades de relacionamento.
+                // Precisa ver clientes (para detalhes/contato) e movements (contexto
+                // de faturamento), mas não sincroniza, não exporta base completa,
+                // não toca em qualquer outro módulo. Cupons ficam fora do escopo
+                // (fluxo Consultor/Influencer é operado por vendas/e-commerce).
+                Permission::VIEW_OWN_PROFILE->value,
+                Permission::EDIT_OWN_PROFILE->value,
+                Permission::ACCESS_DASHBOARD->value,
+
+                // Clientes (view apenas — sem export de base / sem sync)
+                Permission::VIEW_CUSTOMERS->value,
+
+                // Clientes VIP (full lifecycle — fluxo principal da role)
+                Permission::VIEW_VIP_CUSTOMERS->value,
+                Permission::MANAGE_VIP_CUSTOMERS->value,
+                Permission::CURATE_VIP_CUSTOMERS->value,
+                Permission::VIEW_VIP_REPORTS->value,
+                Permission::MANAGE_VIP_ACTIVITIES->value,
+                Permission::MANAGE_VIP_TIER_CONFIG->value,
+
+                // Movimentações (view — contexto pra entender o faturamento do VIP)
+                Permission::VIEW_MOVEMENTS->value,
             ],
             self::USER => [
                 // Apenas próprio perfil

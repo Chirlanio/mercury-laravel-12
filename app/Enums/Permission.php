@@ -287,6 +287,16 @@ enum Permission: string
     case EXPORT_CUSTOMERS = 'customers.export';
     case SYNC_CUSTOMERS = 'customers.sync';
 
+    // Clientes VIP (Black / Gold — curadoria anual de Marketing)
+    // Dados ficam em tabelas separadas (customer_vip_tiers, customer_vip_activities,
+    // customer_vip_tier_configs) — nunca tocados pelo CustomerSyncService.
+    case VIEW_VIP_CUSTOMERS = 'customer_vips.view';
+    case MANAGE_VIP_CUSTOMERS = 'customer_vips.manage';
+    case CURATE_VIP_CUSTOMERS = 'customer_vips.curate';
+    case VIEW_VIP_REPORTS = 'customer_vips.view_reports';
+    case MANAGE_VIP_ACTIVITIES = 'customer_vips.manage_activities';
+    case MANAGE_VIP_TIER_CONFIG = 'customer_vips.manage_config';
+
     // Consignações (Cliente / Influencer / E-commerce)
     case VIEW_CONSIGNMENTS = 'consignments.view';
     case CREATE_CONSIGNMENTS = 'consignments.create';
@@ -540,6 +550,13 @@ enum Permission: string
             self::VIEW_CUSTOMERS => 'Visualizar clientes',
             self::EXPORT_CUSTOMERS => 'Exportar clientes',
             self::SYNC_CUSTOMERS => 'Disparar sincronização manual com CIGAM',
+
+            self::VIEW_VIP_CUSTOMERS => 'Visualizar clientes VIP',
+            self::MANAGE_VIP_CUSTOMERS => 'Gerar sugestões de VIPs (rodar classificação)',
+            self::CURATE_VIP_CUSTOMERS => 'Curar lista VIP (promover/rebaixar/remover)',
+            self::VIEW_VIP_REPORTS => 'Visualizar relatórios VIP (YoY de faturamento)',
+            self::MANAGE_VIP_ACTIVITIES => 'Registrar atividades de marketing (brindes, eventos, contatos)',
+            self::MANAGE_VIP_TIER_CONFIG => 'Configurar thresholds de tier VIP por ano',
 
             self::VIEW_CONSIGNMENTS => 'Visualizar consignações',
             self::CREATE_CONSIGNMENTS => 'Criar consignações',
@@ -795,6 +812,13 @@ enum Permission: string
             self::VIEW_CUSTOMERS => 'Permite visualizar clientes sincronizados do CIGAM. Módulo majoritariamente read-only — edição acontece no ERP',
             self::EXPORT_CUSTOMERS => 'Permite exportar base de clientes em Excel/CSV (mascara CPF)',
             self::SYNC_CUSTOMERS => 'Permite disparar sync manual com CIGAM fora do schedule padrão (dailyAt 04:00)',
+
+            self::VIEW_VIP_CUSTOMERS => 'Permite visualizar listagem anual de VIPs (Black/Gold), incluindo histórico de anos anteriores',
+            self::MANAGE_VIP_CUSTOMERS => 'Permite disparar a geração automática de sugestões de VIPs com base no faturamento anual (movements code=2 soma, code=6+E subtrai)',
+            self::CURATE_VIP_CUSTOMERS => 'Permite promover/rebaixar/remover clientes da lista VIP após a sugestão automática. Exclusivo da equipe de Marketing',
+            self::VIEW_VIP_REPORTS => 'Permite acessar o relatório YoY de faturamento do cliente VIP (ano atual vs ano anterior, mesmo período)',
+            self::MANAGE_VIP_ACTIVITIES => 'Permite registrar atividades de relacionamento com o VIP (envio de brinde, convite para evento, contato, nota)',
+            self::MANAGE_VIP_TIER_CONFIG => 'Permite cadastrar/editar os thresholds mínimos de faturamento por tier e ano (base para a sugestão automática)',
 
             self::VIEW_CONSIGNMENTS => 'Permite visualizar consignações. Sem MANAGE_CONSIGNMENTS, o usuário só vê consignações da sua loja',
             self::CREATE_CONSIGNMENTS => 'Permite criar novas consignações. Sem MANAGE_CONSIGNMENTS, só para a própria loja',
