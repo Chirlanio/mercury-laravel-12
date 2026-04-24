@@ -92,16 +92,34 @@ class CustomerVipController extends Controller
 
         $summary = $this->classifier->generateSuggestions($year);
 
-        return redirect()
-            ->route('customers.vip.index', ['year' => $year])
-            ->with('success', sprintf(
-                'Classificação %d concluída: %d clientes processados, %d Black, %d Gold (%d preservaram curadoria).',
+        $redirect = redirect()->route('customers.vip.index', ['year' => $year]);
+
+        if (! $summary['has_thresholds']) {
+            return $redirect->with('warning', sprintf(
+                'Cadastre os thresholds de %d antes de gerar sugestões. Nenhum cliente foi classificado.',
                 $summary['year'],
-                $summary['processed'],
-                $summary['suggested_black'],
-                $summary['suggested_gold'],
-                $summary['preserved_curated'],
             ));
+        }
+
+        $msg = sprintf(
+            'Classificação %d: %d Black + %d Gold (de %d clientes com compras Meia Sola).',
+            $summary['year'],
+            $summary['suggested_black'],
+            $summary['suggested_gold'],
+            $summary['processed'],
+        );
+
+        if ($summary['below_threshold'] > 0) {
+            $msg .= sprintf(' %d ficaram abaixo do threshold.', $summary['below_threshold']);
+        }
+        if ($summary['preserved_curated'] > 0) {
+            $msg .= sprintf(' %d curadorias preservadas.', $summary['preserved_curated']);
+        }
+        if ($summary['removed_obsolete'] > 0) {
+            $msg .= sprintf(' %d registros auto obsoletos removidos.', $summary['removed_obsolete']);
+        }
+
+        return $redirect->with('success', $msg);
     }
 
     public function curate(Request $request, CustomerVipTier $vip): RedirectResponse

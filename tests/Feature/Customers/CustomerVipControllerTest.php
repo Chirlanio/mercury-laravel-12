@@ -183,6 +183,18 @@ class CustomerVipControllerTest extends TestCase
 
     public function test_admin_can_run_suggestions(): void
     {
+        // Sem thresholds configurados — deve retornar warning (não success)
+        $this->actingAs($this->adminUser)
+            ->post(route('customers.vip.suggestions'), ['year' => 2025])
+            ->assertRedirect(route('customers.vip.index', ['year' => 2025]))
+            ->assertSessionHas('warning');
+    }
+
+    public function test_run_suggestions_returns_success_when_thresholds_exist(): void
+    {
+        \App\Models\CustomerVipTierConfig::create(['year' => 2025, 'tier' => 'black', 'min_revenue' => 10000]);
+        \App\Models\CustomerVipTierConfig::create(['year' => 2025, 'tier' => 'gold', 'min_revenue' => 5000]);
+
         $this->actingAs($this->adminUser)
             ->post(route('customers.vip.suggestions'), ['year' => 2025])
             ->assertRedirect(route('customers.vip.index', ['year' => 2025]))

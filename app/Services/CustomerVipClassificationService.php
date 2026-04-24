@@ -36,13 +36,25 @@ class CustomerVipClassificationService
     public const MS_LIFE_NETWORK_NAME = 'MEIA SOLA';
 
     /**
+     * Regras aplicadas:
+     *  - Só gera/atualiza registro quando o cliente BATE threshold (Black/Gold).
+     *    Clientes abaixo do threshold não poluem a listagem — nenhum record é
+     *    criado para eles. Contados no summary em below_threshold pra feedback.
+     *  - Curadorias manuais (curated_at != null) são SEMPRE preservadas, mesmo
+     *    que nesta rodada o cliente não qualifique mais. Snapshots atualizados
+     *    quando ele ainda aparece na agregação; ficam estáveis se sumiu.
+     *  - Registros auto-gerados em rodadas anteriores que não qualificam mais
+     *    são REMOVIDOS (cleanup) — só sobra quem bate threshold agora.
+     *
      * @return array{
      *     year: int,
      *     processed: int,
      *     suggested_black: int,
      *     suggested_gold: int,
      *     below_threshold: int,
-     *     preserved_curated: int
+     *     preserved_curated: int,
+     *     removed_obsolete: int,
+     *     has_thresholds: bool
      * }
      */
     public function generateSuggestions(int $year): array
@@ -57,30 +69,42 @@ class CustomerVipClassificationService
             'suggested_gold' => 0,
             'below_threshold' => 0,
             'preserved_curated' => 0,
+            'removed_obsolete' => 0,
+            'has_thresholds' => ! empty($thresholds),
         ];
 
-        if (empty($storeCodes)) {
-            return $summary; // rede Meia Sola não tem lojas cadastradas — nada a fazer
+        // Sem thresholds ou sem lojas Meia Sola, nada qualifica — limpa os
+        // registros auto de rodadas anteriores e retorna.
+        if (empty($thresholds) || empty($storeCodes)) {
+            $summary['removed_obsolete'] = $this->cleanupObsoleteAutoTiers($year, []);
+
+            return $summary;
         }
 
         $revenueByCpf = $this->aggregateRevenueByCpf($year, $storeCodes);
+
         if ($revenueByCpf->isEmpty()) {
+            $summary['removed_obsolete'] = $this->cleanupObsoleteAutoTiers($year, []);
+
             return $summary;
         }
 
         $cpfs = $revenueByCpf->pluck('cpf')->all();
         $customers = Customer::whereIn('cpf', $cpfs)->get()->keyBy('cpf');
-
-        // Loja preferida por CPF (entre as lojas Meia Sola)
         $preferredStoreByCpf = $this->resolvePreferredStores($year, $storeCodes, $cpfs);
 
-        DB::transaction(function () use ($year, $revenueByCpf, $customers, $thresholds, $preferredStoreByCpf, &$summary) {
+        $qualifiedCustomerIds = [];
+
+        DB::transaction(function () use (
+            $year, $revenueByCpf, $customers, $thresholds, $preferredStoreByCpf,
+            &$summary, &$qualifiedCustomerIds
+        ) {
             $now = now();
 
             foreach ($revenueByCpf as $row) {
                 $customer = $customers->get($row->cpf);
                 if (! $customer) {
-                    continue;
+                    continue; // CPF em movements sem match em customers — ignora
                 }
 
                 $summary['processed']++;
@@ -90,20 +114,46 @@ class CustomerVipClassificationService
                 $suggested = $this->tierForRevenue($revenue, $thresholds);
                 $preferredStore = $preferredStoreByCpf[$row->cpf] ?? null;
 
+                if ($suggested === null) {
+                    // Cliente abaixo do threshold. Se havia curadoria manual
+                    // prévia, preserva + atualiza snapshots. Senão, pula.
+                    $summary['below_threshold']++;
+
+                    $existing = CustomerVipTier::where('customer_id', $customer->id)
+                        ->where('year', $year)
+                        ->first();
+
+                    if ($existing && $existing->curated_at !== null) {
+                        $existing->update([
+                            'total_revenue' => $revenue,
+                            'total_orders' => $orders,
+                            'preferred_store_code' => $preferredStore,
+                            'suggested_tier' => null,
+                            'suggested_at' => $now,
+                        ]);
+                        $summary['preserved_curated']++;
+                        $qualifiedCustomerIds[] = $customer->id; // protege no cleanup
+                    }
+                    // Sem curadoria: nenhum registro é criado. Cleanup removerá
+                    // qualquer auto-gerado obsoleto dessa rodada anterior.
+
+                    continue;
+                }
+
+                // Bateu threshold — conta + persiste
                 if ($suggested === CustomerVipTier::TIER_BLACK) {
                     $summary['suggested_black']++;
-                } elseif ($suggested === CustomerVipTier::TIER_GOLD) {
-                    $summary['suggested_gold']++;
                 } else {
-                    $summary['below_threshold']++;
+                    $summary['suggested_gold']++;
                 }
+
+                $qualifiedCustomerIds[] = $customer->id;
 
                 $existing = CustomerVipTier::where('customer_id', $customer->id)
                     ->where('year', $year)
                     ->first();
 
                 if ($existing && $existing->curated_at !== null) {
-                    // Preserva curadoria — atualiza snapshots + suggested_tier.
                     $existing->update([
                         'total_revenue' => $revenue,
                         'total_orders' => $orders,
@@ -131,7 +181,29 @@ class CustomerVipClassificationService
             }
         });
 
+        $summary['removed_obsolete'] = $this->cleanupObsoleteAutoTiers($year, $qualifiedCustomerIds);
+
         return $summary;
+    }
+
+    /**
+     * Remove registros auto (sem curadoria) do ano cujos customer_id não estão
+     * no conjunto qualificado desta rodada. Curadorias (curated_at != null)
+     * são preservadas incondicionalmente.
+     *
+     * @param  array<int,int>  $qualifiedCustomerIds
+     */
+    private function cleanupObsoleteAutoTiers(int $year, array $qualifiedCustomerIds): int
+    {
+        $query = CustomerVipTier::query()
+            ->where('year', $year)
+            ->whereNull('curated_at');
+
+        if (! empty($qualifiedCustomerIds)) {
+            $query->whereNotIn('customer_id', $qualifiedCustomerIds);
+        }
+
+        return $query->delete();
     }
 
     public function curate(Customer $customer, int $year, ?string $tier, ?string $notes, User $by): CustomerVipTier

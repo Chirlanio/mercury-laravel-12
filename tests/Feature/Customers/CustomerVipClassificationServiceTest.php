@@ -193,7 +193,7 @@ class CustomerVipClassificationServiceTest extends TestCase
         $this->assertEquals('black', $tier->final_tier);
     }
 
-    public function test_no_tier_suggested_when_below_gold_threshold(): void
+    public function test_no_record_created_when_below_gold_threshold(): void
     {
         $customer = $this->makeCustomer('55555555555');
         $this->setThresholds(10000, 5000);
@@ -203,9 +203,25 @@ class CustomerVipClassificationServiceTest extends TestCase
         $summary = $this->service->generateSuggestions($this->year);
 
         $this->assertSame(1, $summary['below_threshold']);
-        $tier = CustomerVipTier::where('customer_id', $customer->id)->first();
-        $this->assertNull($tier->suggested_tier);
-        $this->assertNull($tier->final_tier);
+        $this->assertSame(0, $summary['suggested_black']);
+        $this->assertSame(0, $summary['suggested_gold']);
+        $this->assertNull(
+            CustomerVipTier::where('customer_id', $customer->id)->first(),
+            'Cliente abaixo do threshold não deve gerar registro VIP'
+        );
+    }
+
+    public function test_returns_has_thresholds_false_when_year_unconfigured(): void
+    {
+        $this->makeCustomer('66600011111');
+        // SEM setThresholds — ano sem config
+        $this->makeMovement(['cpf_customer' => '66600011111', 'net_value' => 50000]);
+
+        $summary = $this->service->generateSuggestions($this->year);
+
+        $this->assertFalse($summary['has_thresholds']);
+        $this->assertSame(0, $summary['processed']);
+        $this->assertSame(0, CustomerVipTier::count());
     }
 
     public function test_preserves_manual_curation(): void
@@ -368,15 +384,93 @@ class CustomerVipClassificationServiceTest extends TestCase
         $customer = $this->makeCustomer('40404040400');
         $this->setThresholds(10000, 5000);
 
-        // Z800: R$ 2000 em 1 NF, 1 item
-        $this->makeMovement(['cpf_customer' => '40404040400', 'store_code' => 'Z800', 'net_value' => 2000, 'quantity' => 1, 'invoice_number' => 'I1']);
+        // Z800: R$ 3000 em 1 NF, 1 item
+        $this->makeMovement(['cpf_customer' => '40404040400', 'store_code' => 'Z800', 'net_value' => 3000, 'quantity' => 1, 'invoice_number' => 'I1']);
 
-        // Z801: R$ 2000 em 1 NF, 5 itens — mesmo revenue e NFs, mais itens
-        $this->makeMovement(['cpf_customer' => '40404040400', 'store_code' => 'Z801', 'net_value' => 2000, 'quantity' => 5, 'invoice_number' => 'J1']);
+        // Z801: R$ 3000 em 1 NF, 5 itens — mesmo revenue e NFs, mais itens
+        // Total combinado = 6000, bate Gold (5000)
+        $this->makeMovement(['cpf_customer' => '40404040400', 'store_code' => 'Z801', 'net_value' => 3000, 'quantity' => 5, 'invoice_number' => 'J1']);
 
         $this->service->generateSuggestions($this->year);
 
         $tier = CustomerVipTier::where('customer_id', $customer->id)->first();
+        $this->assertNotNull($tier, 'Cliente deve qualificar como Gold (R$ 6000)');
         $this->assertEquals('Z801', $tier->preferred_store_code);
+    }
+
+    // --------------------------------------------------------------
+    // Cleanup de registros auto obsoletos
+    // --------------------------------------------------------------
+
+    public function test_cleans_up_auto_records_that_no_longer_qualify(): void
+    {
+        $customer = $this->makeCustomer('70700700700');
+        $this->setThresholds(10000, 5000);
+
+        // 1ª rodada: cliente compra Meia Sola e qualifica como Gold
+        $this->makeMovement(['cpf_customer' => '70700700700', 'store_code' => 'Z800', 'net_value' => 6000]);
+        $this->service->generateSuggestions($this->year);
+
+        $this->assertNotNull(
+            CustomerVipTier::where('customer_id', $customer->id)->first(),
+            'Após 1ª rodada deve existir registro Gold'
+        );
+
+        // 2ª rodada: as compras Meia Sola somem (foram cancel), cliente passa
+        // a comprar só na Arezzo. Deve perder a sugestão.
+        DB::table('movements')->where('cpf_customer', '70700700700')->delete();
+        $this->makeMovement(['cpf_customer' => '70700700700', 'store_code' => 'Z421', 'net_value' => 50000]);
+
+        $summary = $this->service->generateSuggestions($this->year);
+
+        $this->assertSame(1, $summary['removed_obsolete']);
+        $this->assertNull(
+            CustomerVipTier::where('customer_id', $customer->id)->first(),
+            'Registro auto deve ser removido — cliente não qualifica mais'
+        );
+    }
+
+    public function test_cleanup_preserves_curated_records_even_when_dropped(): void
+    {
+        $customer = $this->makeCustomer('80800800800');
+        $this->setThresholds(10000, 5000);
+
+        // 1ª rodada qualifica + Marketing cura como Black (decisão estratégica)
+        $this->makeMovement(['cpf_customer' => '80800800800', 'store_code' => 'Z800', 'net_value' => 6000]);
+        $this->service->generateSuggestions($this->year);
+        $this->service->curate($customer, $this->year, 'black', 'Cliente histórico', $this->adminUser);
+
+        // 2ª rodada: cliente para de comprar Meia Sola
+        DB::table('movements')->where('cpf_customer', '80800800800')->delete();
+
+        $summary = $this->service->generateSuggestions($this->year);
+
+        $this->assertSame(0, $summary['removed_obsolete'], 'Curadoria nunca é deletada');
+
+        $tier = CustomerVipTier::where('customer_id', $customer->id)->first();
+        $this->assertNotNull($tier);
+        $this->assertEquals('black', $tier->final_tier, 'final_tier curado preservado');
+        $this->assertNotNull($tier->curated_at);
+    }
+
+    public function test_cleanup_runs_when_thresholds_missing(): void
+    {
+        $customer = $this->makeCustomer('90900900900');
+        $this->setThresholds(10000, 5000);
+
+        // 1ª rodada: cliente qualifica
+        $this->makeMovement(['cpf_customer' => '90900900900', 'store_code' => 'Z800', 'net_value' => 12000]);
+        $this->service->generateSuggestions($this->year);
+
+        $this->assertNotNull(CustomerVipTier::where('customer_id', $customer->id)->first());
+
+        // 2ª rodada: thresholds removidos (Marketing zerou a régua para revisar)
+        \App\Models\CustomerVipTierConfig::truncate();
+
+        $summary = $this->service->generateSuggestions($this->year);
+
+        $this->assertFalse($summary['has_thresholds']);
+        $this->assertSame(1, $summary['removed_obsolete']);
+        $this->assertNull(CustomerVipTier::where('customer_id', $customer->id)->first());
     }
 }

@@ -40,7 +40,7 @@ class CustomersVipSuggestCommand extends Command
         $this->info("Classificando VIPs — ano {$year}");
         $this->newLine();
 
-        $totals = ['processed' => 0, 'black' => 0, 'gold' => 0, 'preserved' => 0];
+        $totals = ['processed' => 0, 'black' => 0, 'gold' => 0, 'preserved' => 0, 'removed' => 0];
 
         foreach ($tenants as $tenant) {
             $this->line("Tenant: {$tenant->id}");
@@ -52,18 +52,25 @@ class CustomersVipSuggestCommand extends Command
 
                         return;
                     }
+                    if (! $result['has_thresholds']) {
+                        $this->warn('  Sem thresholds configurados pra esse ano. Nenhum cliente classificado.');
+
+                        return;
+                    }
                     $this->line(sprintf(
-                        '  %d clientes processados: %d Black, %d Gold, %d abaixo do threshold, %d preservaram curadoria.',
-                        $result['processed'],
+                        '  %d Black + %d Gold (de %d com compras Meia Sola). %d below · %d curadorias preservadas · %d auto obsoletos removidos.',
                         $result['suggested_black'],
                         $result['suggested_gold'],
+                        $result['processed'],
                         $result['below_threshold'],
                         $result['preserved_curated'],
+                        $result['removed_obsolete'],
                     ));
                     $totals['processed'] += $result['processed'];
                     $totals['black'] += $result['suggested_black'];
                     $totals['gold'] += $result['suggested_gold'];
                     $totals['preserved'] += $result['preserved_curated'];
+                    $totals['removed'] += $result['removed_obsolete'];
                 });
             } catch (\Throwable $e) {
                 $this->error("  Falha: {$e->getMessage()}");
@@ -72,8 +79,8 @@ class CustomersVipSuggestCommand extends Command
 
         $this->newLine();
         $this->info(sprintf(
-            'Totalização: %d processados · %d Black · %d Gold · %d curadorias preservadas.',
-            $totals['processed'], $totals['black'], $totals['gold'], $totals['preserved'],
+            'Totalização: %d Black · %d Gold (de %d processados) · %d curadorias preservadas · %d auto obsoletos removidos.',
+            $totals['black'], $totals['gold'], $totals['processed'], $totals['preserved'], $totals['removed'],
         ));
 
         return self::SUCCESS;
