@@ -163,7 +163,7 @@ export default function VipConfig({ configs, can }) {
                         data={configs}
                         columns={columns}
                         searchable={false}
-                        emptyMessage="Nenhum threshold configurado. Cadastre os valores mínimos por ano antes de rodar a classificação automática."
+                        emptyMessage="Nenhum limite configurado. Cadastre os valores mínimos por ano antes de rodar a classificação automática."
                     />
                 </div>
             </div>
@@ -171,10 +171,10 @@ export default function VipConfig({ configs, can }) {
             <StandardModal
                 show={editing !== null}
                 onClose={() => setEditing(null)}
-                title={isNew ? 'Novo threshold' : `Editar threshold — ${editing?.year} ${TIER_LABEL[editing?.tier] ?? ''}`}
+                title={isNew ? 'Novo limite' : `Editar limite — ${editing?.year} ${TIER_LABEL[editing?.tier] ?? ''}`}
                 headerColor="bg-indigo-600"
                 headerIcon={<AdjustmentsHorizontalIcon className="w-6 h-6" />}
-                maxWidth="lg"
+                maxWidth="2xl"
                 onSubmit={handleSubmit}
                 footer={
                     <StandardModal.Footer
@@ -244,7 +244,10 @@ export default function VipConfig({ configs, can }) {
                                     MS Off, etc.) são excluídas do cálculo.
                                 </p>
                                 <p>
-                                    <strong>Período de apuração:</strong> 01/jan a 31/dez de {data.year} (ano civil).
+                                    <strong>Período de apuração:</strong> 01/jan a 31/dez
+                                    de <strong>{Number(data.year) - 1}</strong> (ano anterior à lista).
+                                    O limite cadastrado para {data.year} será aplicado sobre o faturamento
+                                    de {Number(data.year) - 1}.
                                 </p>
                                 <p>
                                     <strong>Cálculo do faturamento líquido:</strong> soma das vendas

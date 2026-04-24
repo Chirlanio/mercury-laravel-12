@@ -58,7 +58,9 @@ class CustomersVipSuggestCommand extends Command
                         return;
                     }
                     $this->line(sprintf(
-                        '  %d Black + %d Gold (de %d com compras Meia Sola). %d below · %d curadorias preservadas · %d auto obsoletos removidos.',
+                        '  Lista %d (faturamento %d): %d Black + %d Gold de %d. %d below · %d curadorias preservadas · %d auto obsoletos removidos.',
+                        $result['year'],
+                        $result['revenue_year'],
                         $result['suggested_black'],
                         $result['suggested_gold'],
                         $result['processed'],

@@ -102,8 +102,9 @@ class CustomerVipController extends Controller
         }
 
         $msg = sprintf(
-            'Classificação %d: %d Black + %d Gold (de %d clientes com compras Meia Sola).',
+            'Lista %d (faturamento %d): %d Black + %d Gold de %d clientes com compras Meia Sola.',
             $summary['year'],
+            $summary['revenue_year'],
             $summary['suggested_black'],
             $summary['suggested_gold'],
             $summary['processed'],
@@ -154,10 +155,13 @@ class CustomerVipController extends Controller
     private function formatTier(CustomerVipTier $tier, array $storeNames = []): array
     {
         $preferredCode = $tier->preferred_store_code;
+        // Fallback para registros gerados antes da migration de revenue_year
+        $revenueYear = $tier->revenue_year ?? ($tier->year - 1);
 
         return [
             'id' => $tier->id,
             'year' => $tier->year,
+            'revenue_year' => $revenueYear,
             'suggested_tier' => $tier->suggested_tier,
             'final_tier' => $tier->final_tier,
             'total_revenue' => (float) $tier->total_revenue,

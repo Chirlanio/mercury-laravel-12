@@ -19,7 +19,13 @@ class CustomerVipClassificationServiceTest extends TestCase
 
     private CustomerVipClassificationService $service;
 
-    private int $year = 2025;
+    /**
+     * Ano da LISTA VIP. A apuração usa $year - 1 (regra MS Life).
+     * Movements são gerados com data em $year - 1 nos helpers.
+     */
+    private int $year = 2026;
+
+    private int $revenueYear = 2025;
 
     protected function setUp(): void
     {
@@ -94,8 +100,9 @@ class CustomerVipClassificationServiceTest extends TestCase
 
     private function makeMovement(array $overrides): void
     {
+        // Por padrão movements caem no ano de apuração ($this->year - 1)
         DB::table('movements')->insert(array_merge([
-            'movement_date' => sprintf('%d-03-15', $this->year),
+            'movement_date' => sprintf('%d-03-15', $this->revenueYear),
             'movement_code' => 2,
             'entry_exit' => 'S',
             'net_value' => 1000.00,
@@ -160,19 +167,40 @@ class CustomerVipClassificationServiceTest extends TestCase
         $this->assertEquals('gold', $tier->suggested_tier);
     }
 
-    public function test_revenue_ignores_other_years(): void
+    public function test_revenue_only_counts_the_revenue_year(): void
     {
+        // Lista = 2026, apuração = 2025. Movements de outros anos são ignorados.
         $customer = $this->makeCustomer('33333333333');
         $this->setThresholds(10000, 5000);
 
-        $this->makeMovement(['cpf_customer' => '33333333333', 'movement_date' => $this->year.'-05-01', 'net_value' => 6000]);
-        $this->makeMovement(['cpf_customer' => '33333333333', 'movement_date' => ($this->year - 1).'-05-01', 'net_value' => 100000]);
-        $this->makeMovement(['cpf_customer' => '33333333333', 'movement_date' => ($this->year + 1).'-05-01', 'net_value' => 100000]);
+        // Apuração (2025) — único que conta
+        $this->makeMovement(['cpf_customer' => '33333333333', 'movement_date' => $this->revenueYear.'-05-01', 'net_value' => 6000]);
+        // Ano da lista (2026) — não conta
+        $this->makeMovement(['cpf_customer' => '33333333333', 'movement_date' => $this->year.'-05-01', 'net_value' => 100000]);
+        // Ano anterior à apuração (2024) — não conta
+        $this->makeMovement(['cpf_customer' => '33333333333', 'movement_date' => ($this->revenueYear - 1).'-05-01', 'net_value' => 100000]);
 
         $this->service->generateSuggestions($this->year);
 
         $tier = CustomerVipTier::where('customer_id', $customer->id)->first();
         $this->assertEqualsWithDelta(6000.0, (float) $tier->total_revenue, 0.01);
+        $this->assertEquals($this->revenueYear, $tier->revenue_year);
+        $this->assertEquals($this->year, $tier->year);
+    }
+
+    public function test_persists_revenue_year_in_record(): void
+    {
+        $customer = $this->makeCustomer('44400440044');
+        $this->setThresholds(10000, 5000);
+        $this->makeMovement(['cpf_customer' => '44400440044', 'net_value' => 8000]);
+
+        $summary = $this->service->generateSuggestions($this->year);
+
+        $this->assertEquals($this->year, $summary['year']);
+        $this->assertEquals($this->revenueYear, $summary['revenue_year']);
+
+        $tier = CustomerVipTier::where('customer_id', $customer->id)->first();
+        $this->assertEquals($this->revenueYear, $tier->revenue_year);
     }
 
     // --------------------------------------------------------------

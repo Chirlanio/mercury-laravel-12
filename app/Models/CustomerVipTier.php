@@ -30,6 +30,7 @@ class CustomerVipTier extends Model
         'total_revenue',
         'total_orders',
         'preferred_store_code',
+        'revenue_year',
         'suggested_at',
         'curated_at',
         'curated_by_user_id',
@@ -39,6 +40,7 @@ class CustomerVipTier extends Model
 
     protected $casts = [
         'year' => 'integer',
+        'revenue_year' => 'integer',
         'total_revenue' => 'decimal:2',
         'total_orders' => 'integer',
         'suggested_at' => 'datetime',

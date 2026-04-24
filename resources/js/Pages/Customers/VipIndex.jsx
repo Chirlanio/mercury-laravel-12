@@ -153,8 +153,9 @@ export default function VipIndex({ tiers, year, availableYears, filters, statist
                                 MS Life {year}
                             </h1>
                             <p className="mt-1 text-sm text-gray-600">
-                                Programa <strong>MS Life</strong> — curadoria anual (Black/Gold) baseada no faturamento
-                                líquido apenas nas lojas da rede <strong>Meia Sola</strong>. Dados isolados do sync CIGAM.
+                                Programa <strong>MS Life</strong> — curadoria Black/Gold baseada no faturamento
+                                de <strong>{year - 1}</strong> apenas nas lojas da rede <strong>Meia Sola</strong>.
+                                A lista de cada ano usa o faturamento do ano anterior.
                             </p>
                         </div>
                         <div className="flex gap-2 shrink-0 flex-wrap">
@@ -230,7 +231,7 @@ export default function VipIndex({ tiers, year, availableYears, filters, statist
                                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
                                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Sugerido</th>
                                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tier final</th>
-                                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Faturamento</th>
+                                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Faturamento {year - 1}</th>
                                         <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">NFs</th>
                                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Loja preferida</th>
                                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden xl:table-cell">Curadoria</th>
@@ -451,9 +452,12 @@ function CurateModal({ show, onClose, tier }) {
                 />
             }
         >
-            <StandardModal.Section title="Snapshot do ano (MS Life)">
+            <StandardModal.Section title={`Snapshot — Lista ${tier.year} (faturamento ${tier.revenue_year ?? tier.year - 1})`}>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <StandardModal.Field label="Faturamento Meia Sola" value={fmtCurrency(tier.total_revenue)} />
+                    <StandardModal.Field
+                        label={`Faturamento ${tier.revenue_year ?? tier.year - 1}`}
+                        value={fmtCurrency(tier.total_revenue)}
+                    />
                     <StandardModal.Field label="NFs" value={tier.total_orders} />
                     <StandardModal.Field
                         label="Loja preferida"
@@ -464,8 +468,9 @@ function CurateModal({ show, onClose, tier }) {
                     <StandardModal.Field label="Sugerido" value={tier.suggested_tier ? TIER_VARIANTS[tier.suggested_tier].label : '—'} />
                 </div>
                 <p className="mt-3 text-xs text-gray-500">
-                    Considera apenas vendas nas lojas da rede Meia Sola. Loja preferida é a de maior
-                    faturamento; em empate, maior número de NFs; em empate, maior quantidade de itens.
+                    A lista de {tier.year} é construída com o faturamento de {tier.revenue_year ?? tier.year - 1},
+                    apenas em lojas da rede Meia Sola. Loja preferida é a de maior faturamento; em empate,
+                    maior número de NFs; em empate, maior quantidade de itens.
                 </p>
             </StandardModal.Section>
 

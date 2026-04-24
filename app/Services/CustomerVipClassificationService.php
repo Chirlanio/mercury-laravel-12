@@ -13,6 +13,10 @@ use Illuminate\Support\Facades\DB;
  * Serviço de classificação anual de clientes VIP — programa MS Life.
  *
  * Regra do programa:
+ *  - A LISTA DO ANO N é montada com base no faturamento do ANO N-1.
+ *    Ex.: lista de 2026 considera compras de 2025; lista de 2025 considera
+ *    compras de 2024. O parâmetro $year do service refere-se sempre ao ano
+ *    da lista; a apuração interna usa year-1.
  *  - Apenas vendas em lojas da rede MEIA SOLA contam (outras redes do grupo,
  *    como AREZZO, SCHUTZ, MS OFF, são EXCLUÍDAS). O objetivo é promover a
  *    marca Meia Sola especificamente.
@@ -24,9 +28,9 @@ use Illuminate\Support\Facades\DB;
  *    maior número de NFs (tickets); em empate, maior quantidade de itens.
  *
  * Fluxo híbrido:
- *  1. generateSuggestions(year) — roda agregação, aplica thresholds do ano,
- *     upserta em customer_vip_tiers com source=auto. Curadorias manuais
- *     (curated_at preenchido) são preservadas — só snapshots são refrescados.
+ *  1. generateSuggestions(listYear) — roda agregação do ano N-1, aplica
+ *     thresholds do ano N, upserta em customer_vip_tiers (year=N,
+ *     revenue_year=N-1) com source=auto. Curadorias manuais preservadas.
  *  2. curate(...) — Marketing define final_tier com source=manual.
  *  3. remove(...) — zera final_tier preservando histórico.
  */
@@ -34,6 +38,14 @@ class CustomerVipClassificationService
 {
     /** Nome da rede cujas lojas fazem parte do programa MS Life. */
     public const MS_LIFE_NETWORK_NAME = 'MEIA SOLA';
+
+    /**
+     * Retorna o ano de apuração para uma dada lista. Sempre listYear - 1.
+     */
+    public static function revenueYearFor(int $listYear): int
+    {
+        return $listYear - 1;
+    }
 
     /**
      * Regras aplicadas:
@@ -46,8 +58,10 @@ class CustomerVipClassificationService
      *  - Registros auto-gerados em rodadas anteriores que não qualificam mais
      *    são REMOVIDOS (cleanup) — só sobra quem bate threshold agora.
      *
+     * @param  int  $listYear  ano da LISTA VIP (apuração interna usa $listYear - 1).
      * @return array{
      *     year: int,
+     *     revenue_year: int,
      *     processed: int,
      *     suggested_black: int,
      *     suggested_gold: int,
@@ -57,13 +71,15 @@ class CustomerVipClassificationService
      *     has_thresholds: bool
      * }
      */
-    public function generateSuggestions(int $year): array
+    public function generateSuggestions(int $listYear): array
     {
-        $thresholds = $this->loadThresholds($year);
+        $revenueYear = self::revenueYearFor($listYear);
+        $thresholds = $this->loadThresholds($listYear);
         $storeCodes = $this->msLifeStoreCodes();
 
         $summary = [
-            'year' => $year,
+            'year' => $listYear,
+            'revenue_year' => $revenueYear,
             'processed' => 0,
             'suggested_black' => 0,
             'suggested_gold' => 0,
@@ -73,38 +89,36 @@ class CustomerVipClassificationService
             'has_thresholds' => ! empty($thresholds),
         ];
 
-        // Sem thresholds ou sem lojas Meia Sola, nada qualifica — limpa os
-        // registros auto de rodadas anteriores e retorna.
         if (empty($thresholds) || empty($storeCodes)) {
-            $summary['removed_obsolete'] = $this->cleanupObsoleteAutoTiers($year, []);
+            $summary['removed_obsolete'] = $this->cleanupObsoleteAutoTiers($listYear, []);
 
             return $summary;
         }
 
-        $revenueByCpf = $this->aggregateRevenueByCpf($year, $storeCodes);
+        $revenueByCpf = $this->aggregateRevenueByCpf($revenueYear, $storeCodes);
 
         if ($revenueByCpf->isEmpty()) {
-            $summary['removed_obsolete'] = $this->cleanupObsoleteAutoTiers($year, []);
+            $summary['removed_obsolete'] = $this->cleanupObsoleteAutoTiers($listYear, []);
 
             return $summary;
         }
 
         $cpfs = $revenueByCpf->pluck('cpf')->all();
         $customers = Customer::whereIn('cpf', $cpfs)->get()->keyBy('cpf');
-        $preferredStoreByCpf = $this->resolvePreferredStores($year, $storeCodes, $cpfs);
+        $preferredStoreByCpf = $this->resolvePreferredStores($revenueYear, $storeCodes, $cpfs);
 
         $qualifiedCustomerIds = [];
 
         DB::transaction(function () use (
-            $year, $revenueByCpf, $customers, $thresholds, $preferredStoreByCpf,
-            &$summary, &$qualifiedCustomerIds
+            $listYear, $revenueYear, $revenueByCpf, $customers, $thresholds,
+            $preferredStoreByCpf, &$summary, &$qualifiedCustomerIds
         ) {
             $now = now();
 
             foreach ($revenueByCpf as $row) {
                 $customer = $customers->get($row->cpf);
                 if (! $customer) {
-                    continue; // CPF em movements sem match em customers — ignora
+                    continue;
                 }
 
                 $summary['processed']++;
@@ -115,12 +129,10 @@ class CustomerVipClassificationService
                 $preferredStore = $preferredStoreByCpf[$row->cpf] ?? null;
 
                 if ($suggested === null) {
-                    // Cliente abaixo do threshold. Se havia curadoria manual
-                    // prévia, preserva + atualiza snapshots. Senão, pula.
                     $summary['below_threshold']++;
 
                     $existing = CustomerVipTier::where('customer_id', $customer->id)
-                        ->where('year', $year)
+                        ->where('year', $listYear)
                         ->first();
 
                     if ($existing && $existing->curated_at !== null) {
@@ -128,19 +140,17 @@ class CustomerVipClassificationService
                             'total_revenue' => $revenue,
                             'total_orders' => $orders,
                             'preferred_store_code' => $preferredStore,
+                            'revenue_year' => $revenueYear,
                             'suggested_tier' => null,
                             'suggested_at' => $now,
                         ]);
                         $summary['preserved_curated']++;
-                        $qualifiedCustomerIds[] = $customer->id; // protege no cleanup
+                        $qualifiedCustomerIds[] = $customer->id;
                     }
-                    // Sem curadoria: nenhum registro é criado. Cleanup removerá
-                    // qualquer auto-gerado obsoleto dessa rodada anterior.
 
                     continue;
                 }
 
-                // Bateu threshold — conta + persiste
                 if ($suggested === CustomerVipTier::TIER_BLACK) {
                     $summary['suggested_black']++;
                 } else {
@@ -150,7 +160,7 @@ class CustomerVipClassificationService
                 $qualifiedCustomerIds[] = $customer->id;
 
                 $existing = CustomerVipTier::where('customer_id', $customer->id)
-                    ->where('year', $year)
+                    ->where('year', $listYear)
                     ->first();
 
                 if ($existing && $existing->curated_at !== null) {
@@ -158,6 +168,7 @@ class CustomerVipClassificationService
                         'total_revenue' => $revenue,
                         'total_orders' => $orders,
                         'preferred_store_code' => $preferredStore,
+                        'revenue_year' => $revenueYear,
                         'suggested_tier' => $suggested,
                         'suggested_at' => $now,
                     ]);
@@ -167,13 +178,14 @@ class CustomerVipClassificationService
                 }
 
                 CustomerVipTier::updateOrCreate(
-                    ['customer_id' => $customer->id, 'year' => $year],
+                    ['customer_id' => $customer->id, 'year' => $listYear],
                     [
                         'suggested_tier' => $suggested,
                         'final_tier' => $suggested,
                         'total_revenue' => $revenue,
                         'total_orders' => $orders,
                         'preferred_store_code' => $preferredStore,
+                        'revenue_year' => $revenueYear,
                         'suggested_at' => $now,
                         'source' => CustomerVipTier::SOURCE_AUTO,
                     ],
@@ -181,7 +193,7 @@ class CustomerVipClassificationService
             }
         });
 
-        $summary['removed_obsolete'] = $this->cleanupObsoleteAutoTiers($year, $qualifiedCustomerIds);
+        $summary['removed_obsolete'] = $this->cleanupObsoleteAutoTiers($listYear, $qualifiedCustomerIds);
 
         return $summary;
     }

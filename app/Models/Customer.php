@@ -40,6 +40,8 @@ class Customer extends Model
         'birth_date',
         'registered_at',
         'is_active',
+        'consignment_max_items',
+        'consignment_max_value',
         'synced_at',
     ];
 
@@ -48,6 +50,8 @@ class Customer extends Model
         'birth_date' => 'date',
         'registered_at' => 'date',
         'synced_at' => 'datetime',
+        'consignment_max_items' => 'integer',
+        'consignment_max_value' => 'decimal:2',
     ];
 
     // ------------------------------------------------------------------
