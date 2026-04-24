@@ -296,6 +296,7 @@ enum Permission: string
     case VIEW_VIP_REPORTS = 'customer_vips.view_reports';
     case MANAGE_VIP_ACTIVITIES = 'customer_vips.manage_activities';
     case MANAGE_VIP_TIER_CONFIG = 'customer_vips.manage_config';
+    case IMPORT_VIP_CUSTOMERS = 'customer_vips.import';
 
     // Consignações (Cliente / Influencer / E-commerce)
     case VIEW_CONSIGNMENTS = 'consignments.view';
@@ -558,6 +559,7 @@ enum Permission: string
             self::VIEW_VIP_REPORTS => 'Visualizar relatórios VIP (YoY de faturamento)',
             self::MANAGE_VIP_ACTIVITIES => 'Registrar atividades de marketing (brindes, eventos, contatos)',
             self::MANAGE_VIP_TIER_CONFIG => 'Configurar thresholds de tier VIP por ano',
+            self::IMPORT_VIP_CUSTOMERS => 'Importar lista de clientes VIP via XLSX',
 
             self::VIEW_CONSIGNMENTS => 'Visualizar consignações',
             self::CREATE_CONSIGNMENTS => 'Criar consignações',
@@ -821,6 +823,7 @@ enum Permission: string
             self::VIEW_VIP_REPORTS => 'Permite acessar o relatório YoY de faturamento do cliente VIP (ano atual vs ano anterior, mesmo período)',
             self::MANAGE_VIP_ACTIVITIES => 'Permite registrar atividades de relacionamento com o VIP (envio de brinde, convite para evento, contato, nota)',
             self::MANAGE_VIP_TIER_CONFIG => 'Permite cadastrar/editar os thresholds mínimos de faturamento por tier e ano (base para a sugestão automática)',
+            self::IMPORT_VIP_CUSTOMERS => 'Permite importar listas de clientes VIP via XLSX (cpf + ano + status). Aplica como curadoria manual em lote, com opção de substituir a lista do ano',
 
             self::VIEW_CONSIGNMENTS => 'Permite visualizar consignações. Sem MANAGE_CONSIGNMENTS, o usuário só vê consignações da sua loja',
             self::CREATE_CONSIGNMENTS => 'Permite criar novas consignações. Sem MANAGE_CONSIGNMENTS, só para a própria loja',

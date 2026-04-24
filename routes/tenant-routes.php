@@ -1178,6 +1178,12 @@ Route::middleware(['auth'])->group(function () {
                 Route::post('/customers/vip/suggestions', [\App\Http\Controllers\CustomerVipController::class, 'runSuggestions'])->name('customers.vip.suggestions');
             });
 
+            // Importar lista VIP
+            Route::middleware('permission:'.Permission::IMPORT_VIP_CUSTOMERS->value)->group(function () {
+                Route::get('/customers/vip/import/template', [\App\Http\Controllers\CustomerVipController::class, 'template'])->name('customers.vip.import.template');
+                Route::post('/customers/vip/import', [\App\Http\Controllers\CustomerVipController::class, 'import'])->name('customers.vip.import');
+            });
+
             // Curadoria manual
             Route::middleware('permission:'.Permission::CURATE_VIP_CUSTOMERS->value)->group(function () {
                 Route::patch('/customers/vip/{vip}', [\App\Http\Controllers\CustomerVipController::class, 'curate'])->whereNumber('vip')->name('customers.vip.curate');

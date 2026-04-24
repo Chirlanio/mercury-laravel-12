@@ -6,10 +6,13 @@ use App\Enums\Permission;
 use App\Models\Customer;
 use App\Models\CustomerVipTier;
 use App\Services\CustomerVipClassificationService;
+use App\Services\CustomerVipImportService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
  * Listagem e curadoria de clientes VIP por ano.
@@ -25,7 +28,10 @@ use Inertia\Response;
  */
 class CustomerVipController extends Controller
 {
-    public function __construct(private readonly CustomerVipClassificationService $classifier) {}
+    public function __construct(
+        private readonly CustomerVipClassificationService $classifier,
+        private readonly CustomerVipImportService $importer,
+    ) {}
 
     public function index(Request $request): Response
     {
@@ -82,8 +88,89 @@ class CustomerVipController extends Controller
                 'view_reports' => $request->user()?->hasPermissionTo(Permission::VIEW_VIP_REPORTS->value) ?? false,
                 'manage_activities' => $request->user()?->hasPermissionTo(Permission::MANAGE_VIP_ACTIVITIES->value) ?? false,
                 'manage_config' => $request->user()?->hasPermissionTo(Permission::MANAGE_VIP_TIER_CONFIG->value) ?? false,
+                'import' => $request->user()?->hasPermissionTo(Permission::IMPORT_VIP_CUSTOMERS->value) ?? false,
             ],
         ]);
+    }
+
+    /**
+     * Importa lista de clientes VIP via XLSX.
+     *
+     * @param  bool  $request->boolean('replace_year')  Se true, deleta registros do ano que não estão no arquivo.
+     */
+    public function import(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,xls', 'max:5120'],
+            'replace_year' => ['nullable', 'boolean'],
+        ]);
+
+        $summary = $this->importer->import(
+            $request->file('file'),
+            $request->user(),
+            $request->boolean('replace_year'),
+        );
+
+        $msg = sprintf(
+            'Importação: %d criadas, %d atualizadas',
+            $summary['imported'],
+            $summary['updated'],
+        );
+        if ($summary['total_removed'] > 0) {
+            $msg .= sprintf(', %d removidas (anos %s)',
+                $summary['total_removed'],
+                implode(', ', $summary['replaced_years']),
+            );
+        }
+        if (! empty($summary['errors'])) {
+            $msg .= sprintf(' · %d linhas com erro', count($summary['errors']));
+        }
+
+        return back()
+            ->with(empty($summary['errors']) ? 'success' : 'warning', $msg)
+            ->with('vip_import_summary', $summary);
+    }
+
+    /**
+     * Baixa um XLSX modelo com cabeçalho + 3 linhas de exemplo.
+     */
+    public function template(): BinaryFileResponse
+    {
+        $tmp = tempnam(sys_get_temp_dir(), 'vip_template_');
+        $tmpXlsx = $tmp.'.xlsx';
+        @unlink($tmp);
+
+        $rows = [
+            ['cpf', 'ano', 'status'],
+            ['12345678909', now()->year, 'Black'],
+            ['98765432100', now()->year, 'Gold'],
+            ['11122233344', now()->year - 1, 'Black'],
+        ];
+
+        \Maatwebsite\Excel\Facades\Excel::store(
+            new class($rows) implements \Maatwebsite\Excel\Concerns\FromArray {
+                public function __construct(private array $rows) {}
+
+                public function array(): array
+                {
+                    return $this->rows;
+                }
+            },
+            basename($tmpXlsx),
+            'local',
+            \Maatwebsite\Excel\Excel::XLSX,
+        );
+
+        $stored = storage_path('app/private/'.basename($tmpXlsx));
+        if (! file_exists($stored)) {
+            $stored = storage_path('app/'.basename($tmpXlsx));
+        }
+
+        return response()
+            ->download($stored, 'modelo_lista_vip.xlsx', [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ])
+            ->deleteFileAfterSend(true);
     }
 
     public function runSuggestions(Request $request): RedirectResponse

@@ -4,7 +4,7 @@ import {
     SparklesIcon, TrophyIcon, UsersIcon, CurrencyDollarIcon,
     ArrowPathIcon, ArrowTopRightOnSquareIcon, ChartBarIcon,
     GiftIcon, CalendarDaysIcon, PencilSquareIcon, TrashIcon,
-    ArrowLeftIcon, AdjustmentsHorizontalIcon, PlusIcon,
+    ArrowLeftIcon, AdjustmentsHorizontalIcon, PlusIcon, ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline';
 import {
     ResponsiveContainer, LineChart, Line, CartesianGrid,
@@ -20,6 +20,7 @@ import StatusBadge from '@/Components/Shared/StatusBadge';
 import EmptyState from '@/Components/Shared/EmptyState';
 import TextInput from '@/Components/TextInput';
 import InputLabel from '@/Components/InputLabel';
+import VipImportModal from './Partials/VipImportModal';
 
 const MONTHS_PT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
@@ -56,7 +57,7 @@ const fmtDateTime = (iso) => iso ? new Date(iso).toLocaleString('pt-BR', {
 
 export default function VipIndex({ tiers, year, availableYears, filters, statistics, can }) {
     const { confirm, ConfirmDialogComponent } = useConfirm();
-    const { modals, selected, openModal, closeModal } = useModalManager(['curate', 'report', 'activities']);
+    const { modals, selected, openModal, closeModal } = useModalManager(['curate', 'report', 'activities', 'import']);
 
     const [searchInput, setSearchInput] = useState(filters.search || '');
 
@@ -171,6 +172,16 @@ export default function VipIndex({ tiers, year, availableYears, filters, statist
                                         Limites
                                     </Button>
                                 </Link>
+                            )}
+                            {can.import && (
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => openModal('import')}
+                                    icon={ArrowUpTrayIcon}
+                                    className="flex-1 sm:flex-none w-full sm:w-auto whitespace-nowrap"
+                                >
+                                    Importar lista
+                                </Button>
                             )}
                             {can.manage && (
                                 <Button
@@ -381,6 +392,11 @@ export default function VipIndex({ tiers, year, availableYears, filters, statist
                 show={modals.activities}
                 onClose={() => closeModal('activities')}
                 tier={selected}
+            />
+
+            <VipImportModal
+                show={modals.import}
+                onClose={() => closeModal('import')}
             />
 
             <ConfirmDialogComponent />

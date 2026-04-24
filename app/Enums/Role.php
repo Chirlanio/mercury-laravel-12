@@ -296,6 +296,7 @@ enum Role: string
                 Permission::VIEW_VIP_REPORTS->value,
                 Permission::MANAGE_VIP_ACTIVITIES->value,
                 Permission::MANAGE_VIP_TIER_CONFIG->value,
+                Permission::IMPORT_VIP_CUSTOMERS->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -539,6 +540,7 @@ enum Role: string
                 Permission::VIEW_VIP_REPORTS->value,
                 Permission::MANAGE_VIP_ACTIVITIES->value,
                 Permission::MANAGE_VIP_TIER_CONFIG->value,
+                Permission::IMPORT_VIP_CUSTOMERS->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
