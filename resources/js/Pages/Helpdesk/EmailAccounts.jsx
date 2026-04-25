@@ -8,13 +8,12 @@ import {
     CheckCircleIcon,
     XCircleIcon,
     EnvelopeIcon,
-    ArrowLeftIcon,
 } from '@heroicons/react/24/outline';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Button from '@/Components/Button';
 import DataTable from '@/Components/DataTable';
 import ActionButtons from '@/Components/ActionButtons';
 import StandardModal from '@/Components/StandardModal';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import EmptyState from '@/Components/Shared/EmptyState';
 import DeleteConfirmModal from '@/Components/Shared/DeleteConfirmModal';
@@ -219,32 +218,20 @@ export default function EmailAccounts({ accounts = [], departments = [], default
     ];
 
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="Contas de E-mail — Helpdesk" />
 
             <div className="py-12">
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="flex items-center justify-between mb-6">
-                        <div className="flex items-center gap-3">
-                            <a
-                                href={route('helpdesk.index')}
-                                className="text-gray-400 hover:text-gray-600"
-                                title="Voltar para o helpdesk"
-                            >
-                                <ArrowLeftIcon className="w-5 h-5" />
-                            </a>
-                            <div>
-                                <h1 className="text-xl font-semibold text-gray-900">Contas de E-mail</h1>
-                                <p className="text-sm text-gray-500">
-                                    Caixas IMAP que o Mercury monitora a cada minuto para converter e-mails em chamados.
-                                </p>
-                            </div>
-                        </div>
-                        <Button variant="primary" icon={PlusIcon} onClick={openCreate}>
-                            Nova conta
-                        </Button>
-                    </div>
+                <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+                    <PageHeader
+                        title="Contas de E-mail"
+                        icon={EnvelopeIcon}
+                        subtitle="Caixas IMAP que o Mercury monitora a cada minuto para converter e-mails em chamados."
+                        actions={[
+                            { type: 'back', href: route('helpdesk.index') },
+                            { type: 'create', label: 'Nova conta', onClick: openCreate },
+                        ]}
+                    />
 
                     {/* Hostinger hint card */}
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-sm text-blue-900">
@@ -464,6 +451,6 @@ export default function EmailAccounts({ accounts = [], departments = [], default
                 }
                 warningMessage="Os chamados já criados a partir desta conta serão preservados — apenas a configuração de sincronização será removida."
             />
-        </AuthenticatedLayout>
+        </>
     );
 }

@@ -2,8 +2,6 @@ import { Head, router } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import {
     TruckIcon,
-    PlusIcon,
-    FunnelIcon,
     XMarkIcon,
     MapPinIcon,
     PhoneIcon,
@@ -17,6 +15,7 @@ import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import DataTable from '@/Components/DataTable';
 import StandardModal from '@/Components/StandardModal';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import DeleteConfirmModal from '@/Components/Shared/DeleteConfirmModal';
@@ -352,24 +351,22 @@ export default function Index({ deliveries, filters, statusOptions, statusCounts
             <Head title="Entregas" />
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="flex items-center justify-between mb-6">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Entregas</h1>
-                            <p className="mt-1 text-sm text-gray-500">Gestão de entregas e solicitações</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <Button variant="outline" size="sm" icon={FunnelIcon} onClick={() => setShowFilters(!showFilters)}>
-                                Filtros
-                            </Button>
-                            {canCreate && (
-                                <Button variant="primary" size="sm" icon={PlusIcon} onClick={() => { resetForm(); openModal('create'); }}>
-                                    <span className="sm:hidden">Nova</span>
-                                    <span className="hidden sm:inline">Nova Entrega</span>
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Entregas"
+                        subtitle="Gestão de entregas e solicitações"
+                        actions={[
+                            {
+                                type: 'filter',
+                                onClick: () => setShowFilters(!showFilters),
+                            },
+                            {
+                                type: 'create',
+                                label: 'Nova Entrega',
+                                onClick: () => { resetForm(); openModal('create'); },
+                                visible: canCreate,
+                            },
+                        ]}
+                    />
 
                     <StatisticsGrid cards={statisticsCards} loading={statsLoading} />
 

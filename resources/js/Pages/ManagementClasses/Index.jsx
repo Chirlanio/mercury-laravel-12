@@ -10,7 +10,6 @@ import {
     NoSymbolIcon,
     DocumentIcon,
     FolderIcon,
-    DocumentArrowDownIcon,
     DocumentArrowUpIcon,
     ExclamationTriangleIcon,
     ListBulletIcon,
@@ -24,6 +23,7 @@ import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import DataTable from '@/Components/DataTable';
 import StandardModal from '@/Components/StandardModal';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import TextInput from '@/Components/TextInput';
@@ -321,52 +321,37 @@ export default function Index({ managementClasses, filters = {}, statistics = {}
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="mb-6 flex justify-between items-center">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900">Plano de Contas Gerencial</h1>
-                            <p className="mt-1 text-sm text-gray-600">
-                                Visão interna operacional, complementar ao plano contábil.
-                            </p>
-                        </div>
-                        <div className="flex gap-2">
-                            {canExport && (
-                                <Button
-                                    variant="secondary"
-                                    icon={DocumentArrowDownIcon}
-                                    onClick={() => window.location.href = route('management-classes.export', filters)}
-                                >
-                                    Exportar
-                                </Button>
-                            )}
-                            {canImport && (
-                                <Button
-                                    variant="secondary"
-                                    icon={DocumentArrowUpIcon}
-                                    onClick={() => {
-                                        setImportFile(null);
-                                        setImportPreview(null);
-                                        setImportError(null);
-                                        openModal('import');
-                                    }}
-                                >
-                                    Importar
-                                </Button>
-                            )}
-                            {canCreate && (
-                                <Button
-                                    variant="primary"
-                                    icon={PlusIcon}
-                                    onClick={() => {
-                                        setCreateForm(emptyForm);
-                                        setCreateErrors({});
-                                        openModal('create');
-                                    }}
-                                >
-                                    Nova Conta
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Plano de Contas Gerencial"
+                        subtitle="Visão interna operacional, complementar ao plano contábil."
+                        actions={[
+                            {
+                                type: 'download',
+                                download: route('management-classes.export', filters),
+                                visible: canExport,
+                            },
+                            {
+                                type: 'import',
+                                onClick: () => {
+                                    setImportFile(null);
+                                    setImportPreview(null);
+                                    setImportError(null);
+                                    openModal('import');
+                                },
+                                visible: canImport,
+                            },
+                            {
+                                type: 'create',
+                                label: 'Nova Conta',
+                                onClick: () => {
+                                    setCreateForm(emptyForm);
+                                    setCreateErrors({});
+                                    openModal('create');
+                                },
+                                visible: canCreate,
+                            },
+                        ]}
+                    />
 
                     <StatisticsGrid cards={statisticsCards} cols={5} />
 

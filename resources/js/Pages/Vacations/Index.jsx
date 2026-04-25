@@ -1,6 +1,6 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import {
-    PlusIcon, XMarkIcon, ArrowRightIcon,
+    XMarkIcon, ArrowRightIcon,
     CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, ClockIcon,
     ArrowPathIcon, PaperAirplaneIcon, PlayIcon, FlagIcon, CalendarDaysIcon,
 } from '@heroicons/react/24/outline';
@@ -10,6 +10,7 @@ import useModalManager from '@/Hooks/useModalManager';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import DataTable from '@/Components/DataTable';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import StandardModal from '@/Components/StandardModal';
@@ -180,24 +181,18 @@ export default function Index({
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="mb-6">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <h1 className="text-3xl font-bold text-gray-900">
-                                    Gestão de Férias
-                                </h1>
-                                <p className="mt-1 text-sm text-gray-600">
-                                    Solicitação, aprovação e controle de férias
-                                </p>
-                            </div>
-                            {canCreate && (
-                                <Button variant="primary" onClick={() => openModal('create')} icon={PlusIcon}>
-                                    Nova Solicitação
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Gestão de Férias"
+                        subtitle="Solicitação, aprovação e controle de férias"
+                        actions={[
+                            {
+                                type: 'create',
+                                label: 'Nova Solicitação',
+                                onClick: () => openModal('create'),
+                                visible: canCreate,
+                            },
+                        ]}
+                    />
 
                     {/* Estatísticas */}
                     <StatisticsGrid cols={4} cards={

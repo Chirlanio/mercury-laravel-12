@@ -6,9 +6,9 @@ import {
     UserGroupIcon,
     BuildingStorefrontIcon,
     BookOpenIcon,
-    ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
+import PageHeader from '@/Components/Shared/PageHeader';
 import Button from '@/Components/Button';
 
 const REPORT_TYPES = [
@@ -60,14 +60,16 @@ export default function Reports() {
             <Head title="Relatórios de Treinamento" />
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between mb-6">
-                        <h1 className="text-2xl font-bold text-gray-900">Relatórios de Treinamento</h1>
-                        <a href={route('training-reports.export', { type: activeType })}>
-                            <Button variant="success" size="sm" icon={ArrowDownTrayIcon}>
-                                Exportar Excel
-                            </Button>
-                        </a>
-                    </div>
+                    <PageHeader
+                        title="Relatórios de Treinamento"
+                        actions={[
+                            {
+                                type: 'download',
+                                label: 'Exportar Excel',
+                                download: route('training-reports.export', { type: activeType }),
+                            },
+                        ]}
+                    />
 
                     {/* Tabs */}
                     <div className="flex items-center gap-2 mb-6">

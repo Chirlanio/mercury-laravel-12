@@ -195,7 +195,7 @@ export default function Index({
                                 <Link href={route('order-payments.dashboard')}>
                                     <Button
                                         variant="outline"
-                                        size="sm"
+                                        size="lg"
                                         icon={ChartBarIcon}
                                         iconOnly
                                         title="Dashboard"
@@ -203,7 +203,7 @@ export default function Index({
                                 </Link>
                                 <Button
                                     variant="outline"
-                                    size="sm"
+                                    size="lg"
                                     onClick={() => {
                                         window.location.href = route('order-payments.export', {
                                             search: search || undefined,
@@ -1335,10 +1335,10 @@ function Filters({ search, setSearch, statusFilter, setStatusFilter, storeFilter
 function ViewToggle({ viewMode, setViewMode }) {
     return (
         <div className="flex bg-gray-100 rounded-md p-0.5">
-            <button onClick={() => setViewMode('kanban')} className={`p-1.5 rounded ${viewMode === 'kanban' ? 'bg-white shadow-sm' : ''}`}>
+            <button onClick={() => setViewMode('kanban')} className={`p-2.5 rounded-md ${viewMode === 'kanban' ? 'bg-white shadow-sm' : ''}`}>
                 <Squares2X2Icon className="h-5 w-5 text-gray-600" />
             </button>
-            <button onClick={() => setViewMode('table')} className={`p-1.5 rounded ${viewMode === 'table' ? 'bg-white shadow-sm' : ''}`}>
+            <button onClick={() => setViewMode('table')} className={`p-2.5 rounded-md ${viewMode === 'table' ? 'bg-white shadow-sm' : ''}`}>
                 <TableCellsIcon className="h-5 w-5 text-gray-600" />
             </button>
         </div>

@@ -4,6 +4,7 @@ import axios from "axios";
 import { usePermissions } from "@/Hooks/usePermissions";
 import useModalManager from "@/Hooks/useModalManager";
 import Button from "@/Components/Button";
+import PageHeader from "@/Components/Shared/PageHeader";
 import StatusBadge from "@/Components/Shared/StatusBadge";
 import StatisticsGrid from "@/Components/Shared/StatisticsGrid";
 import ProductFilterBar from "@/Components/ProductFilterBar";
@@ -15,7 +16,7 @@ import ProductPriceImportModal from "@/Components/ProductPriceImportModal";
 import PrintLabelsModal from "@/Components/PrintLabelsModal";
 import {
     LockClosedIcon, CubeIcon, CheckCircleIcon, ArrowPathIcon,
-    TagIcon, ArrowDownTrayIcon, ClockIcon, PlusIcon,
+    TagIcon, ArrowDownTrayIcon,
 } from "@heroicons/react/24/outline";
 
 export default function Index({ products, filters, stats, cigamAvailable, activeSyncLog }) {
@@ -107,40 +108,36 @@ export default function Index({ products, filters, stats, cigamAvailable, active
 
             <div className="py-4 px-3 sm:py-6 sm:px-6 lg:px-8">
                 {/* Header */}
-                <div className="mb-4 sm:mb-6">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Produtos</h1>
-                            <p className="mt-0.5 text-xs text-gray-500 sm:text-sm">Catálogo de produtos sincronizado do CIGAM</p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Button variant="outline" size="sm" onClick={() => openModal('printLabels')} icon={TagIcon}>
-                                Etiquetas
-                            </Button>
-                            {canEditProducts() && (
-                                <Button variant="outline" size="sm" onClick={() => openModal('priceImport')} icon={ArrowDownTrayIcon}>
-                                    Importar Preços
-                                </Button>
-                            )}
-                            {canSyncProducts() && (
-                                <>
-                                    <Button variant="outline" size="sm" onClick={() => openModal('syncLogs')} icon={ClockIcon}>
-                                        Histórico
-                                    </Button>
-                                    <Button
-                                        variant="primary"
-                                        size="sm"
-                                        onClick={() => openModal('sync')}
-                                        disabled={!cigamAvailable}
-                                        icon={ArrowPathIcon}
-                                    >
-                                        Sincronizar
-                                    </Button>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                <PageHeader
+                    title="Produtos"
+                    subtitle="Catálogo de produtos sincronizado do CIGAM"
+                    actions={[
+                        {
+                            label: 'Etiquetas',
+                            icon: TagIcon,
+                            variant: 'outline',
+                            onClick: () => openModal('printLabels'),
+                        },
+                        {
+                            label: 'Importar Preços',
+                            icon: ArrowDownTrayIcon,
+                            variant: 'outline',
+                            onClick: () => openModal('priceImport'),
+                            visible: canEditProducts(),
+                        },
+                        {
+                            type: 'history',
+                            onClick: () => openModal('syncLogs'),
+                            visible: canSyncProducts(),
+                        },
+                        {
+                            type: 'sync',
+                            onClick: () => openModal('sync'),
+                            disabled: !cigamAvailable,
+                            visible: canSyncProducts(),
+                        },
+                    ]}
+                />
 
                 {/* Estatísticas */}
                 <StatisticsGrid cards={statisticsCards} cols={4} />

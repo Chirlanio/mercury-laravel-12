@@ -8,6 +8,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Button from '@/Components/Button';
 import StandardModal from '@/Components/StandardModal';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import InputLabel from '@/Components/InputLabel';
 import InputError from '@/Components/InputError';
@@ -55,23 +56,16 @@ export default function IntakeTemplates({
         <>
             <Head title="Templates de Intake" />
             <div className="py-6 sm:py-12">
-                <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
-                        <div>
-                            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
-                                <DocumentTextIcon className="w-6 h-6 sm:w-7 sm:h-7 text-indigo-600 shrink-0" />
-                                <span>Templates de Intake</span>
-                            </h1>
-                            <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                                Formulários estruturados para tipos específicos de chamado.
-                            </p>
-                        </div>
-                        <Button variant="primary" icon={PlusIcon} size="sm" onClick={startNew}
-                            className="w-full sm:w-auto">
-                            Novo template
-                        </Button>
-                    </div>
+                <div className="max-w-full mx-auto px-3 sm:px-6 lg:px-8">
+                    <PageHeader
+                        title="Templates de Intake"
+                        icon={DocumentTextIcon}
+                        subtitle="Formulários estruturados para tipos específicos de chamado."
+                        actions={[
+                            { type: 'back', href: route('helpdesk.index') },
+                            { type: 'create', label: 'Novo template', onClick: startNew },
+                        ]}
+                    />
 
                     {/* List */}
                     <div className="bg-white shadow-sm rounded-lg overflow-hidden">

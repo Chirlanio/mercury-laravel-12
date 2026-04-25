@@ -5,6 +5,7 @@ import useModalManager from "@/Hooks/useModalManager";
 import DataTable from "@/Components/DataTable";
 import Button from "@/Components/Button";
 import ActionButtons from "@/Components/ActionButtons";
+import PageHeader from "@/Components/Shared/PageHeader";
 import StatusBadge from "@/Components/Shared/StatusBadge";
 import StatisticsGrid from "@/Components/Shared/StatisticsGrid";
 import DeleteConfirmModal from "@/Components/Shared/DeleteConfirmModal";
@@ -13,7 +14,7 @@ import WorkScheduleEditModal from "@/Components/WorkScheduleEditModal";
 import WorkScheduleViewModal from "@/Components/WorkScheduleViewModal";
 import WorkScheduleAssignModal from "@/Components/WorkScheduleAssignModal";
 import {
-    PlusIcon, XMarkIcon, UserPlusIcon, DocumentDuplicateIcon,
+    XMarkIcon, UserPlusIcon, DocumentDuplicateIcon,
     CalendarDaysIcon, CheckCircleIcon, XCircleIcon, UsersIcon,
 } from "@heroicons/react/24/outline";
 
@@ -122,17 +123,17 @@ export default function Index({ schedules, stats, filters }) {
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="mb-6">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <h1 className="text-3xl font-bold text-gray-900">Escalas de Trabalho</h1>
-                                <p className="mt-1 text-sm text-gray-600">Gerencie templates de escalas e atribua funcionários</p>
-                            </div>
-                            <Button variant="primary" onClick={() => openModal('create')} icon={PlusIcon}>
-                                Nova Escala
-                            </Button>
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Escalas de Trabalho"
+                        subtitle="Gerencie templates de escalas e atribua funcionários"
+                        actions={[
+                            {
+                                type: 'create',
+                                label: 'Nova Escala',
+                                onClick: () => openModal('create'),
+                            },
+                        ]}
+                    />
 
                     <StatisticsGrid cards={statisticsCards} cols={4} />
 

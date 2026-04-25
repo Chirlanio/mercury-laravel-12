@@ -1,14 +1,11 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     UserGroupIcon,
     UsersIcon,
     CheckCircleIcon,
     CloudArrowDownIcon,
-    ArrowPathIcon,
     XMarkIcon,
-    MapPinIcon,
-    ClockIcon,
     TrophyIcon,
 } from '@heroicons/react/24/outline';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
@@ -19,6 +16,7 @@ import ActionButtons from '@/Components/ActionButtons';
 import DataTable from '@/Components/DataTable';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
+import PageHeader from '@/Components/Shared/PageHeader';
 import TextInput from '@/Components/TextInput';
 import InputLabel from '@/Components/InputLabel';
 import CustomerDetailModal from './Partials/CustomerDetailModal';
@@ -224,55 +222,16 @@ export default function Index({
 
             <div className="py-6 sm:py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
-                        <div>
-                            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
-                                <UserGroupIcon className="h-7 w-7 text-indigo-600" />
-                                Clientes
-                            </h1>
-                            <p className="mt-1 text-sm text-gray-600">
-                                Base sincronizada do CIGAM — atualização diária às 04:00.
-                                Escrita acontece no ERP.
-                            </p>
-                        </div>
-                        <div className="flex gap-2 shrink-0">
-                            {canViewVip && (
-                                <Link href={route('customers.vip.index')}>
-                                    <Button
-                                        variant="secondary"
-                                        title="Lista anual de clientes VIP (Black/Gold)"
-                                        className="min-h-[44px]"
-                                    >
-                                        <TrophyIcon className="w-4 h-4 sm:mr-2 text-amber-600" />
-                                        <span className="hidden sm:inline">MS Life</span>
-                                    </Button>
-                                </Link>
-                            )}
-                            <Button
-                                variant="secondary"
-                                onClick={() => openModal('history')}
-                                title="Histórico de sincronizações"
-                                className="min-h-[44px]"
-                            >
-                                <ClockIcon className="w-4 h-4 sm:mr-2" />
-                                <span className="hidden sm:inline">Histórico</span>
-                            </Button>
-                            {canSync && (
-                                <Button
-                                    variant="primary"
-                                    onClick={handleSync}
-                                    disabled={syncing}
-                                    className="min-h-[44px]"
-                                >
-                                    <ArrowPathIcon className={`w-4 h-4 sm:mr-2 ${syncing ? 'animate-spin' : ''}`} />
-                                    <span className="hidden sm:inline">
-                                        {syncing ? 'Sincronizando…' : 'Sincronizar'}
-                                    </span>
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Clientes"
+                        subtitle="Base sincronizada do CIGAM — atualização diária às 04:00. Escrita acontece no ERP."
+                        icon={UserGroupIcon}
+                        actions={[
+                            { label: 'MS Life', icon: TrophyIcon, variant: 'secondary', href: route('customers.vip.index'), title: 'Lista anual de clientes VIP (Black/Gold)', visible: canViewVip },
+                            { type: 'history', onClick: () => openModal('history'), title: 'Histórico de sincronizações' },
+                            { type: 'sync', label: syncing ? 'Sincronizando…' : 'Sincronizar', onClick: handleSync, loading: syncing, visible: canSync },
+                        ]}
+                    />
 
                     <StatisticsGrid cards={statsCards} cols={3} />
 

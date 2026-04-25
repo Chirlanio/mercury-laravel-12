@@ -2,7 +2,6 @@ import { Head, router } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 import {
     BriefcaseIcon,
-    PlusIcon,
     ArrowPathIcon,
     ClockIcon,
     CheckCircleIcon,
@@ -16,6 +15,7 @@ import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import DataTable from '@/Components/DataTable';
 import StandardModal from '@/Components/StandardModal';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import { TrashIcon } from '@heroicons/react/24/outline';
@@ -321,33 +321,23 @@ export default function Index({
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="mb-6 flex justify-between items-center">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900">Abertura de Vagas</h1>
-                            <p className="mt-1 text-sm text-gray-600">
-                                Substituição, aumento de quadro e volante — ciclo completo até o pré-cadastro do contratado
-                                {isStoreScoped && scopedStoreCode && (
-                                    <span className="ml-2 text-xs font-medium text-indigo-600">
-                                        (escopo: loja {scopedStoreCode})
-                                    </span>
-                                )}
-                            </p>
-                        </div>
-                        {canCreate && (
-                            <Button
-                                variant="primary"
-                                onClick={() => {
+                    <PageHeader
+                        title="Abertura de Vagas"
+                        subtitle="Substituição, aumento de quadro e volante — ciclo completo até o pré-cadastro do contratado"
+                        scopeBadge={isStoreScoped && scopedStoreCode ? `escopo: loja ${scopedStoreCode}` : null}
+                        actions={[
+                            {
+                                type: 'create',
+                                label: 'Nova Vaga',
+                                onClick: () => {
                                     setCreateForm(emptyCreate);
                                     setCreateErrors({});
                                     openModal('create');
-                                }}
-                                icon={PlusIcon}
-                            >
-                                Nova Vaga
-                            </Button>
-                        )}
-                    </div>
+                                },
+                                visible: canCreate,
+                            },
+                        ]}
+                    />
 
                     <StatisticsGrid cards={statisticsCards} />
 

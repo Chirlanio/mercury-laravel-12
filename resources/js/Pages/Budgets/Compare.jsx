@@ -8,9 +8,8 @@ import {
     MinusCircleIcon,
     PencilSquareIcon,
 } from '@heroicons/react/24/outline';
-import Button from '@/Components/Button';
 import EmptyState from '@/Components/Shared/EmptyState';
-import StatusBadge from '@/Components/Shared/StatusBadge';
+import PageHeader from '@/Components/Shared/PageHeader';
 
 const BRL = (v) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(v || 0));
@@ -63,20 +62,17 @@ export default function Compare({ diff, error }) {
 
             <div className="py-8">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="mb-6 flex justify-between items-start">
-                        <div>
-                            <Link href={route('budgets.index')}
-                                className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-2">
-                                <ArrowLeftIcon className="w-4 h-4" /> Voltar para orçamentos
-                            </Link>
-                            <h1 className="text-3xl font-bold text-gray-900">
-                                Comparativo: {v1.scope_label} {v1.year}
-                            </h1>
-                            <p className="mt-1 text-sm text-gray-600">
+                    <PageHeader
+                        title={`Comparativo: ${v1.scope_label} ${v1.year}`}
+                        subtitle={(
+                            <>
                                 <strong>v{v1.version_label}</strong> ({v1.created_at}) × <strong>v{v2.version_label}</strong> ({v2.created_at})
-                            </p>
-                        </div>
-                    </div>
+                            </>
+                        )}
+                        actions={[
+                            { type: 'back', href: route('budgets.index') },
+                        ]}
+                    />
 
                     {/* Resumo de totais */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

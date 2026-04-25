@@ -22,6 +22,7 @@ import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import DataTable from '@/Components/DataTable';
 import StandardModal from '@/Components/StandardModal';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import TextInput from '@/Components/TextInput';
@@ -236,35 +237,27 @@ export default function Index({ budgets, filters = {}, statistics = {}, enums = 
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="mb-6 flex justify-between items-center">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900">Orçamentos</h1>
-                            <p className="mt-1 text-sm text-gray-600">
-                                Orçamento anual por escopo com versionamento e consumo previsto × realizado.
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            {canManage && (
-                                <Link
-                                    href={route('budgets.trash')}
-                                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-                                    title="Lixeira de orçamentos"
-                                >
-                                    <TrashIcon className="w-4 h-4" />
-                                    Lixeira
-                                </Link>
-                            )}
-                            {canUpload && (
-                                <Button
-                                    variant="primary"
-                                    icon={CloudArrowUpIcon}
-                                    onClick={() => openModal('upload')}
-                                >
-                                    Novo Upload
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Orçamentos"
+                        subtitle="Orçamento anual por escopo com versionamento e consumo previsto × realizado."
+                        actions={[
+                            {
+                                label: 'Lixeira',
+                                icon: TrashIcon,
+                                variant: 'outline',
+                                href: route('budgets.trash'),
+                                visible: canManage,
+                                title: 'Lixeira de orçamentos',
+                            },
+                            {
+                                label: 'Novo Upload',
+                                icon: CloudArrowUpIcon,
+                                variant: 'primary',
+                                onClick: () => openModal('upload'),
+                                visible: canUpload,
+                            },
+                        ]}
+                    />
 
                     <StatisticsGrid cards={statisticsCards} cols={5} />
 

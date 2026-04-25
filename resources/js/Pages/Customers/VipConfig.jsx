@@ -1,7 +1,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import {
-    AdjustmentsHorizontalIcon, ArrowLeftIcon, PlusIcon,
+    AdjustmentsHorizontalIcon,
     InformationCircleIcon, CheckCircleIcon, ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { maskMoney, parseMoney } from '@/Hooks/useMasks';
@@ -9,6 +9,7 @@ import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import DataTable from '@/Components/DataTable';
 import StandardModal from '@/Components/StandardModal';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import DeleteConfirmModal from '@/Components/Shared/DeleteConfirmModal';
 import TextInput from '@/Components/TextInput';
@@ -176,36 +177,25 @@ export default function VipConfig({ configs, availableYears = [], can }) {
 
             <div className="py-6 sm:py-12">
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header — vertical até lg pra não estourar em iPad mini (768) */}
-                    <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:justify-between lg:items-center">
-                        <div className="min-w-0">
-                            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
-                                <AdjustmentsHorizontalIcon className="h-7 w-7 text-indigo-600 shrink-0" />
-                                Limites MS Life por ano
-                            </h1>
-                            <p className="mt-1 text-sm text-gray-600">
+                    <PageHeader
+                        title="Limites MS Life por ano"
+                        icon={AdjustmentsHorizontalIcon}
+                        subtitle={
+                            <>
                                 Faturamento mínimo líquido para entrar em cada tier. Cada Lista usa o
                                 faturamento do ano <strong>anterior</strong> (Lista 2026 ↔ vendas de 2025).
-                            </p>
-                        </div>
-                        <div className="flex flex-wrap gap-2 lg:shrink-0">
-                            <Link href={route('customers.vip.index')} className="flex-1 sm:flex-none">
-                                <Button variant="outline" icon={ArrowLeftIcon} className="w-full sm:w-auto whitespace-nowrap">
-                                    Voltar
-                                </Button>
-                            </Link>
-                            {can.manage_config && (
-                                <Button
-                                    variant="primary"
-                                    onClick={() => openYearForm()}
-                                    icon={PlusIcon}
-                                    className="flex-1 sm:flex-none w-full sm:w-auto whitespace-nowrap"
-                                >
-                                    Cadastrar limites do ano
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                            </>
+                        }
+                        actions={[
+                            { type: 'back', href: route('customers.vip.index') },
+                            {
+                                type: 'create',
+                                label: 'Cadastrar limites do ano',
+                                onClick: () => openYearForm(),
+                                visible: can.manage_config,
+                            },
+                        ]}
+                    />
 
                     {/* Status por ano — atalho visual */}
                     {yearsStatus.length > 0 && (

@@ -2,11 +2,9 @@ import { Head, router } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import {
     ClipboardDocumentCheckIcon,
-    PlusIcon,
     ExclamationTriangleIcon,
     ClockIcon,
     CheckCircleIcon,
-    FunnelIcon,
     XMarkIcon,
     ShieldCheckIcon,
     ArrowTrendingUpIcon,
@@ -19,6 +17,7 @@ import DataTable from '@/Components/DataTable';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import LoadingSpinner from '@/Components/Shared/LoadingSpinner';
+import PageHeader from '@/Components/Shared/PageHeader';
 import EvaluationDetailModal from '@/Components/ExperienceTracker/EvaluationDetailModal';
 import EvaluationFormModal from '@/Components/ExperienceTracker/EvaluationFormModal';
 
@@ -145,24 +144,26 @@ export default function Index({ evaluations, filters, milestoneOptions, stores, 
             <Head title="Avaliação de Experiência" />
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between mb-6">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Avaliação de Experiência</h1>
-                            <p className="mt-1 text-sm text-gray-500">Acompanhamento do período de experiência (45/90 dias)</p>
-                        </div>
-                        {activeTab === 'evaluations' && (
-                            <div className="flex items-center gap-3">
-                                <Button variant="outline" size="sm" icon={FunnelIcon} onClick={() => setShowFilters(!showFilters)}>
-                                    Filtros
-                                </Button>
-                                {canManage && (
-                                    <Button variant="primary" size="sm" icon={PlusIcon} onClick={() => openModal('create')}>
-                                        Nova Avaliação
-                                    </Button>
-                                )}
-                            </div>
-                        )}
-                    </div>
+                    <PageHeader
+                        title="Avaliação de Experiência"
+                        subtitle="Acompanhamento do período de experiência (45/90 dias)"
+                        titleSize="md"
+                        actions={activeTab === 'evaluations' ? [
+                            {
+                                type: 'filter',
+                                size: 'sm',
+                                onClick: () => setShowFilters(!showFilters),
+                            },
+                            {
+                                type: 'create',
+                                label: 'Nova Avaliação',
+                                size: 'sm',
+                                onClick: () => openModal('create'),
+                                visible: canManage,
+                            },
+                        ] : []}
+                    />
+
 
                     <StatisticsGrid cards={statisticsCards} />
 

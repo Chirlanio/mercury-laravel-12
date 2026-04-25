@@ -8,7 +8,6 @@ import {
     XCircleIcon,
     FolderIcon,
     Bars3BottomLeftIcon,
-    DocumentArrowDownIcon,
     DocumentArrowUpIcon,
     ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
@@ -18,6 +17,7 @@ import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import DataTable from '@/Components/DataTable';
 import StandardModal from '@/Components/StandardModal';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import TextInput from '@/Components/TextInput';
@@ -287,52 +287,36 @@ export default function Index({ costCenters, filters = {}, statistics = {}, sele
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="mb-6 flex justify-between items-center">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900">Centros de Custo</h1>
-                            <p className="mt-1 text-sm text-gray-600">
-                                Cadastro de centros de custo — base para orçamentos e DRE.
-                            </p>
-                        </div>
-                        <div className="flex gap-2">
-                            {canExport && (
-                                <Button
-                                    variant="secondary"
-                                    icon={DocumentArrowDownIcon}
-                                    onClick={() => window.location.href = route('cost-centers.export', filters)}
-                                >
-                                    Exportar
-                                </Button>
-                            )}
-                            {canImport && (
-                                <Button
-                                    variant="secondary"
-                                    icon={DocumentArrowUpIcon}
-                                    onClick={() => {
-                                        setImportFile(null);
-                                        setImportPreview(null);
-                                        setImportError(null);
-                                        openModal('import');
-                                    }}
-                                >
-                                    Importar
-                                </Button>
-                            )}
-                            {canCreate && (
-                                <Button
-                                    variant="primary"
-                                    icon={PlusIcon}
-                                    onClick={() => {
-                                        setCreateForm(emptyForm);
-                                        setCreateErrors({});
-                                        openModal('create');
-                                    }}
-                                >
-                                    Novo
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Centros de Custo"
+                        subtitle="Cadastro de centros de custo — base para orçamentos e DRE."
+                        actions={[
+                            {
+                                type: 'download',
+                                download: route('cost-centers.export', filters),
+                                visible: canExport,
+                            },
+                            {
+                                type: 'import',
+                                onClick: () => {
+                                    setImportFile(null);
+                                    setImportPreview(null);
+                                    setImportError(null);
+                                    openModal('import');
+                                },
+                                visible: canImport,
+                            },
+                            {
+                                type: 'create',
+                                onClick: () => {
+                                    setCreateForm(emptyForm);
+                                    setCreateErrors({});
+                                    openModal('create');
+                                },
+                                visible: canCreate,
+                            },
+                        ]}
+                    />
 
                     <StatisticsGrid cards={statisticsCards} cols={5} />
 

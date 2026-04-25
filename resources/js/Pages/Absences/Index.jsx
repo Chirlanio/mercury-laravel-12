@@ -6,6 +6,7 @@ import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import DeleteConfirmModal from '@/Components/Shared/DeleteConfirmModal';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StandardModal from '@/Components/StandardModal';
 import FormSection from '@/Components/Shared/FormSection';
 import InputLabel from '@/Components/InputLabel';
@@ -68,18 +69,20 @@ export default function Index({ absences, employees = [], filters = {}, typeOpti
             <Head title="Controle de Faltas" />
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="mb-6 flex justify-between items-center">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900">Controle de Faltas</h1>
-                            <p className="mt-1 text-sm text-gray-600">Registre e acompanhe faltas dos funcionários</p>
-                        </div>
-                        {canCreate && (
-                            <Button variant="primary" onClick={() => openModal('create')} icon={PlusIcon}>
-                                Registrar Falta
-                            </Button>
-                        )}
-                    </div>
+                    <PageHeader
+                        title="Controle de Faltas"
+                        subtitle="Registre e acompanhe faltas dos funcionários"
+                        actions={[
+                            {
+                                label: 'Registrar Falta',
+                                icon: PlusIcon,
+                                variant: 'primary',
+                                onClick: () => openModal('create'),
+                                visible: canCreate,
+                            },
+                        ]}
+                    />
+
 
                     {/* Filtros */}
                     <div className="bg-white shadow-sm rounded-lg p-4 mb-6">

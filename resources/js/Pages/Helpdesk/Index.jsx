@@ -133,6 +133,7 @@ import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import DataTable from '@/Components/DataTable';
 import StandardModal from '@/Components/StandardModal';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import TextInput from '@/Components/TextInput';
@@ -511,12 +512,10 @@ export default function Index({
     const canSeeAdminMenu = hasRoleLevel(ROLES.SUPPORT);
     const canManageHdDepartments = hasPermission(PERMISSIONS.MANAGE_HD_DEPARTMENTS);
     const canManageHdPermissions = hasPermission(PERMISSIONS.MANAGE_HD_PERMISSIONS);
-    const [showAdminMenu, setShowAdminMenu] = useState(false);
 
     const [stats, setStats] = useState(null);
     const [statsLoading, setStatsLoading] = useState(true);
     const [showFilters, setShowFilters] = useState(false);
-    const [showExportMenu, setShowExportMenu] = useState(false);
     const [selectedIds, setSelectedIds] = useState([]);
     const [bulkProcessing, setBulkProcessing] = useState(false);
     const [localFilters, setLocalFilters] = useState({
@@ -956,129 +955,72 @@ export default function Index({
             <Head title="Helpdesk" />
             <div className="py-6 sm:py-12">
                 <div className="max-w-full mx-auto px-3 sm:px-6 lg:px-8">
-                    {/* Header — stacks on mobile, inline on sm+ */}
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
-                        <div>
-                            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Helpdesk</h1>
-                            <div className="flex items-center gap-2">
-                                <p className="text-xs sm:text-sm text-gray-500">Gerenciamento de chamados</p>
+                    <PageHeader
+                        title="Helpdesk"
+                        subtitle={
+                            <>
+                                Gerenciamento de chamados
                                 {realtimeConnected && (
                                     <span
-                                        className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-green-700 bg-green-100 px-1.5 py-0.5 rounded"
+                                        className="ml-2 inline-flex items-center gap-1 text-[10px] sm:text-xs text-green-700 bg-green-100 px-1.5 py-0.5 rounded align-middle"
                                         title="Atualização em tempo real ativa"
                                     >
                                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                                         ao vivo
                                     </span>
                                 )}
-                            </div>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {activeTab === 'tickets' && (
-                                <div className="relative inline-block">
-                                    <Button variant="outline" icon={ArrowDownTrayIcon} onClick={() => setShowExportMenu(v => !v)}>
-                                        Exportar
-                                    </Button>
-                                    {showExportMenu && (
-                                        <div className="absolute right-0 mt-1 w-40 bg-white shadow-lg rounded-md border z-10">
-                                            {['csv', 'xlsx', 'pdf'].map(fmt => (
-                                                <a key={fmt}
-                                                    href={`${route('helpdesk.export.' + fmt)}?${new URLSearchParams(Object.fromEntries(Object.entries(localFilters).filter(([, v]) => v))).toString()}`}
-                                                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                                    onClick={() => setShowExportMenu(false)}>
-                                                    {fmt.toUpperCase()}
-                                                </a>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                            {canSeeAdminMenu && (canManageHdDepartments || canManageHdPermissions) && (
-                                <div className="relative inline-block">
-                                    <Button
-                                        variant="outline"
-                                        icon={Cog6ToothIcon}
-                                        onClick={() => setShowAdminMenu(v => !v)}
-                                    >
-                                        <span className="hidden sm:inline">Administração</span>
-                                        <span className="sm:hidden">Admin</span>
-                                    </Button>
-                                    {showAdminMenu && (
-                                        <>
-                                            {/* Click-outside catcher */}
-                                            <div
-                                                className="fixed inset-0 z-10"
-                                                onClick={() => setShowAdminMenu(false)}
-                                            />
-                                            <div className="absolute right-0 mt-1 w-56 bg-white shadow-lg rounded-md border z-20 py-1">
-                                                {canManageHdDepartments && (
-                                                    <a
-                                                        href={route('helpdesk.department-settings.index')}
-                                                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                                        onClick={() => setShowAdminMenu(false)}
-                                                    >
-                                                        <Cog6ToothIcon className="w-4 h-4 text-indigo-500" />
-                                                        Configurações
-                                                    </a>
-                                                )}
-                                                {canManageHdDepartments && (
-                                                    <a
-                                                        href={route('helpdesk.intake-templates.index')}
-                                                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                                        onClick={() => setShowAdminMenu(false)}
-                                                    >
-                                                        <DocumentTextIcon className="w-4 h-4 text-indigo-500" />
-                                                        Templates de Intake
-                                                    </a>
-                                                )}
-                                                {canManageHdDepartments && (
-                                                    <a
-                                                        href={route('helpdesk.email-accounts.index')}
-                                                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                                        onClick={() => setShowAdminMenu(false)}
-                                                    >
-                                                        <EnvelopeIcon className="w-4 h-4 text-indigo-500" />
-                                                        Contas de E-mail
-                                                    </a>
-                                                )}
-                                                {canManageHdDepartments && (
-                                                    <a
-                                                        href={route('helpdesk.articles.index')}
-                                                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                                        onClick={() => setShowAdminMenu(false)}
-                                                    >
-                                                        <BookOpenIcon className="w-4 h-4 text-indigo-500" />
-                                                        Base de Conhecimento
-                                                    </a>
-                                                )}
-                                                {canManageHdPermissions && (
-                                                    <>
-                                                        {canManageHdDepartments && (
-                                                            <div className="border-t border-gray-100 my-1" />
-                                                        )}
-                                                        <a
-                                                            href={route('helpdesk.permissions.index')}
-                                                            className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                                            onClick={() => setShowAdminMenu(false)}
-                                                        >
-                                                            <ShieldCheckIcon className="w-4 h-4 text-indigo-500" />
-                                                            Permissões
-                                                        </a>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            )}
-                            {canCreate && (
-                                <Button variant="primary" icon={PlusIcon} onClick={() => openModal('create')}>
-                                    <span className="hidden sm:inline">Novo Chamado</span>
-                                    <span className="sm:hidden">Novo</span>
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                            </>
+                        }
+                        actions={[
+                            {
+                                type: 'download',
+                                visible: activeTab === 'tickets',
+                                items: ['csv', 'xlsx', 'pdf'].map((fmt) => ({
+                                    label: fmt.toUpperCase(),
+                                    download: `${route('helpdesk.export.' + fmt)}?${new URLSearchParams(Object.fromEntries(Object.entries(localFilters).filter(([, v]) => v))).toString()}`,
+                                })),
+                            },
+                            {
+                                type: 'settings',
+                                label: 'Administração',
+                                visible: canSeeAdminMenu && (canManageHdDepartments || canManageHdPermissions),
+                                items: [
+                                    canManageHdDepartments && {
+                                        label: 'Configurações',
+                                        icon: Cog6ToothIcon,
+                                        href: route('helpdesk.department-settings.index'),
+                                    },
+                                    canManageHdDepartments && {
+                                        label: 'Templates de Intake',
+                                        icon: DocumentTextIcon,
+                                        href: route('helpdesk.intake-templates.index'),
+                                    },
+                                    canManageHdDepartments && {
+                                        label: 'Contas de E-mail',
+                                        icon: EnvelopeIcon,
+                                        href: route('helpdesk.email-accounts.index'),
+                                    },
+                                    canManageHdDepartments && {
+                                        label: 'Base de Conhecimento',
+                                        icon: BookOpenIcon,
+                                        href: route('helpdesk.articles.index'),
+                                    },
+                                    canManageHdDepartments && canManageHdPermissions && { divider: true },
+                                    canManageHdPermissions && {
+                                        label: 'Permissões',
+                                        icon: ShieldCheckIcon,
+                                        href: route('helpdesk.permissions.index'),
+                                    },
+                                ].filter(Boolean),
+                            },
+                            {
+                                type: 'create',
+                                label: 'Novo Chamado',
+                                onClick: () => openModal('create'),
+                                visible: canCreate,
+                            },
+                        ]}
+                    />
 
                     {/* Tabs — horizontal scroll on very small widths.
                         overflow-y must be explicit or the -mb-px below leaks into a

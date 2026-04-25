@@ -3,6 +3,7 @@ import { useState } from "react";
 import { usePermissions, PERMISSIONS } from "@/Hooks/usePermissions";
 import useModalManager from "@/Hooks/useModalManager";
 import Button from "@/Components/Button";
+import PageHeader from "@/Components/Shared/PageHeader";
 import SaleStatisticsCards from "@/Components/SaleStatisticsCards";
 import SaleCreateModal from "@/Components/SaleCreateModal";
 import SaleEditModal from "@/Components/SaleEditModal";
@@ -11,12 +12,7 @@ import SalesHierarchyTable from "@/Components/SalesHierarchyTable";
 import EmployeeDailySalesModal from "@/Components/EmployeeDailySalesModal";
 import DeleteConfirmModal from "@/Components/Shared/DeleteConfirmModal";
 import { formatDate } from '@/Utils/dateHelpers';
-import {
-    PlusIcon,
-    XMarkIcon,
-    ArrowPathIcon,
-    TrashIcon,
-} from "@heroicons/react/24/outline";
+import { XMarkIcon } from "@heroicons/react/24/outline";
 
 export default function Index({ salesByStore, grandTotals, stores, filters, lastMovementDate }) {
     const { hasPermission } = usePermissions();
@@ -119,53 +115,36 @@ export default function Index({ salesByStore, grandTotals, stores, filters, last
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="mb-6">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <h1 className="text-3xl font-bold text-gray-900">Vendas</h1>
-                                <p className="mt-1 text-sm text-gray-600">
-                                    Gerencie registros de vendas por loja e funcionário
-                                    {lastMovementDate && (
-                                        <span className="ml-2 text-xs text-gray-400">
-                                            (Movimentações até {lastMovementDate})
-                                        </span>
-                                    )}
-                                </p>
-                            </div>
-                            <div className="flex gap-2">
-                                {hasPermission(PERMISSIONS.CREATE_SALES) && (
-                                    <Button
-                                        variant="info"
-                                        onClick={handleRefreshFromMovements}
-                                        disabled={isRefreshing}
-                                        loading={isRefreshing}
-                                        icon={ArrowPathIcon}
-                                    >
-                                        {isRefreshing ? 'Atualizando...' : 'Atualizar Vendas'}
-                                    </Button>
-                                )}
-                                {hasPermission(PERMISSIONS.DELETE_SALES) && (
-                                    <Button
-                                        variant="danger"
-                                        onClick={() => openModal('bulkDelete')}
-                                        icon={TrashIcon}
-                                    >
-                                        Excluir Período
-                                    </Button>
-                                )}
-                                {hasPermission(PERMISSIONS.CREATE_SALES) && (
-                                    <Button
-                                        variant="primary"
-                                        onClick={() => openModal('create')}
-                                        icon={PlusIcon}
-                                    >
-                                        Nova Venda
-                                    </Button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Vendas"
+                        subtitle="Gerencie registros de vendas por loja e funcionário"
+                        scopeBadge={lastMovementDate ? `Movimentações até ${lastMovementDate}` : null}
+                        scopeBadgeColor="text-gray-400"
+                        actions={[
+                            {
+                                type: 'refresh',
+                                label: isRefreshing ? 'Atualizando...' : 'Atualizar Vendas',
+                                onClick: handleRefreshFromMovements,
+                                loading: isRefreshing,
+                                disabled: isRefreshing,
+                                visible: hasPermission(PERMISSIONS.CREATE_SALES),
+                                title: 'Recalcula vendas a partir das movimentações CIGAM do período',
+                            },
+                            {
+                                type: 'delete',
+                                label: 'Excluir Período',
+                                onClick: () => openModal('bulkDelete'),
+                                visible: hasPermission(PERMISSIONS.DELETE_SALES),
+                                title: 'Excluir todas as vendas do período filtrado',
+                            },
+                            {
+                                type: 'create',
+                                label: 'Nova Venda',
+                                onClick: () => openModal('create'),
+                                visible: hasPermission(PERMISSIONS.CREATE_SALES),
+                            },
+                        ]}
+                    />
 
                     {/* Estatísticas */}
                     <SaleStatisticsCards

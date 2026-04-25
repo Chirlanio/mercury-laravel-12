@@ -4,6 +4,7 @@ import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import DeleteConfirmModal from '@/Components/Shared/DeleteConfirmModal';
 import StatisticsCards from '@/Components/StoreGoals/StatisticsCards';
@@ -14,8 +15,8 @@ import ImportModal from '@/Components/StoreGoals/ImportModal';
 import ConsultantRankingModal from '@/Components/StoreGoals/ConsultantRankingModal';
 import ConfirmSalesModal from '@/Components/StoreGoals/ConfirmSalesModal';
 import {
-    ChartBarIcon, DocumentArrowDownIcon, ArrowUpTrayIcon,
-    PlusIcon, XMarkIcon, CheckCircleIcon,
+    BuildingStorefrontIcon, UsersIcon,
+    XMarkIcon, CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import { CheckCircleIcon as CheckCircleSolid } from '@heroicons/react/24/solid';
 
@@ -72,47 +73,44 @@ export default function Index({ goals, stores, filters }) {
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="mb-6">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <h1 className="text-3xl font-bold text-gray-900">Metas de Loja</h1>
-                                <p className="mt-1 text-sm text-gray-600">
-                                    Gerencie as metas de vendas por loja e período
-                                </p>
-                            </div>
-                            <div className="flex gap-2 flex-wrap">
-                                <Button variant="outline" size="sm" onClick={() => openModal('ranking')} icon={ChartBarIcon}>
-                                    Ranking
-                                </Button>
-                                <div className="relative group">
-                                    <Button variant="outline" size="sm" icon={DocumentArrowDownIcon}>
-                                        Exportar
-                                    </Button>
-                                    <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                                        <a href={`/store-goals/export/stores?month=${currentMonth}&year=${currentYear}`}
-                                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                            Por Loja (CSV)
-                                        </a>
-                                        <a href={`/store-goals/export/consultants?month=${currentMonth}&year=${currentYear}`}
-                                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                            Por Consultor (CSV)
-                                        </a>
-                                    </div>
-                                </div>
-                                {hasPermission(PERMISSIONS.CREATE_STORE_GOALS) && (
-                                    <>
-                                        <Button variant="secondary" size="sm" onClick={() => openModal('import')} icon={ArrowUpTrayIcon}>
-                                            Importar
-                                        </Button>
-                                        <Button variant="primary" size="sm" onClick={() => openModal('create')} icon={PlusIcon}>
-                                            Nova Meta
-                                        </Button>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Metas de Loja"
+                        subtitle="Gerencie as metas de vendas por loja e período"
+                        actions={[
+                            {
+                                type: 'reports',
+                                label: 'Ranking',
+                                onClick: () => openModal('ranking'),
+                                title: 'Ranking de consultores no período',
+                            },
+                            {
+                                type: 'download',
+                                items: [
+                                    {
+                                        label: 'Por Loja (CSV)',
+                                        icon: BuildingStorefrontIcon,
+                                        download: `/store-goals/export/stores?month=${currentMonth}&year=${currentYear}`,
+                                    },
+                                    {
+                                        label: 'Por Consultor (CSV)',
+                                        icon: UsersIcon,
+                                        download: `/store-goals/export/consultants?month=${currentMonth}&year=${currentYear}`,
+                                    },
+                                ],
+                            },
+                            {
+                                type: 'import',
+                                onClick: () => openModal('import'),
+                                visible: hasPermission(PERMISSIONS.CREATE_STORE_GOALS),
+                            },
+                            {
+                                type: 'create',
+                                label: 'Nova Meta',
+                                onClick: () => openModal('create'),
+                                visible: hasPermission(PERMISSIONS.CREATE_STORE_GOALS),
+                            },
+                        ]}
+                    />
 
                     {/* Estatísticas */}
                     <StatisticsCards month={currentMonth} year={currentYear} storeId={filters.store_id} />

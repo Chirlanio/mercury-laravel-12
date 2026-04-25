@@ -1,7 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import {
-    PlusIcon,
     XMarkIcon,
     ArchiveBoxIcon,
     ClockIcon,
@@ -10,18 +9,17 @@ import {
     ArrowPathIcon,
     ArrowUturnLeftIcon,
     NoSymbolIcon,
-    DocumentArrowDownIcon,
-    ArrowUpTrayIcon,
     EyeIcon,
     CurrencyDollarIcon,
-    ChartBarIcon,
 } from '@heroicons/react/24/outline';
+
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
 import { useConfirm } from '@/Hooks/useConfirm';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import DataTable from '@/Components/DataTable';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import TextInput from '@/Components/TextInput';
@@ -324,57 +322,35 @@ export default function Index({
 
             <div className="py-6 sm:py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header — vertical até lg (≥1024); título acima, botões abaixo
-                        em flex-wrap pra acomodar tablets (iPad mini = 768) sem estourar. */}
-                    <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:justify-between lg:items-center">
-                        <div className="min-w-0">
-                            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Consignações</h1>
-                            <p className="mt-1 text-sm text-gray-600">
-                                Remessa de produtos para Cliente, Influencer ou E-commerce com prazo de retorno
-                                {isStoreScoped && (
-                                    <span className="ml-2 text-xs font-medium text-indigo-600">
-                                        (escopo: sua loja)
-                                    </span>
-                                )}
-                            </p>
-                        </div>
-                        <div className="flex flex-wrap gap-2 lg:shrink-0">
-                            <Link href={route('consignments.dashboard')} className="flex-1 sm:flex-none min-w-[140px]">
-                                <Button variant="secondary" title="Dashboard" className="min-h-[44px] w-full sm:w-auto">
-                                    <ChartBarIcon className="w-4 h-4 mr-2" />
-                                    <span>Dashboard</span>
-                                </Button>
-                            </Link>
-                            {canExport && (
-                                <a
-                                    href={route('consignments.export', filters)}
-                                    title="Exportar XLSX"
-                                    className="flex-1 sm:flex-none min-w-[140px] inline-flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-700 bg-transparent border border-gray-300 rounded-lg transition-all duration-300 hover:bg-gray-50 hover:border-gray-400 hover:shadow-md hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 min-h-[44px]"
-                                >
-                                    <DocumentArrowDownIcon className="w-4 h-4 mr-2" />
-                                    <span>Exportar</span>
-                                </a>
-                            )}
-                            {canImport && (
-                                <Link href={route('consignments.import')} className="flex-1 sm:flex-none min-w-[140px]">
-                                    <Button variant="outline" title="Importar planilha" className="min-h-[44px] w-full sm:w-auto">
-                                        <ArrowUpTrayIcon className="w-4 h-4 mr-2" />
-                                        <span>Importar</span>
-                                    </Button>
-                                </Link>
-                            )}
-                            {canCreate && (
-                                <Button
-                                    variant="primary"
-                                    onClick={() => openModal('create')}
-                                    className="min-h-[44px] flex-1 sm:flex-none min-w-[180px] whitespace-nowrap"
-                                >
-                                    <PlusIcon className="w-4 h-4 mr-2" />
-                                    <span>Nova Consignação</span>
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Consignações"
+                        subtitle="Remessa de produtos para Cliente, Influencer ou E-commerce com prazo de retorno"
+                        scopeBadge={isStoreScoped ? 'escopo: sua loja' : null}
+                        actions={[
+                            {
+                                type: 'dashboard',
+                                href: route('consignments.dashboard'),
+                            },
+                            {
+                                type: 'download',
+                                download: route('consignments.export', filters),
+                                visible: canExport,
+                                title: 'Exportar XLSX',
+                            },
+                            {
+                                type: 'import',
+                                href: route('consignments.import'),
+                                visible: canImport,
+                                title: 'Importar planilha',
+                            },
+                            {
+                                type: 'create',
+                                label: 'Nova Consignação',
+                                onClick: () => openModal('create'),
+                                visible: canCreate,
+                            },
+                        ]}
+                    />
 
                     {/* Statistics */}
                     <StatisticsGrid cards={statsCards} cols={6} />

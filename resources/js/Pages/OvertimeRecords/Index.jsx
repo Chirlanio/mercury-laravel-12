@@ -4,6 +4,7 @@ import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import DeleteConfirmModal from '@/Components/Shared/DeleteConfirmModal';
 import StandardModal from '@/Components/StandardModal';
@@ -71,17 +72,19 @@ export default function Index({ records, employees = [], filters = {}, typeOptio
             <Head title="Controle de Horas Extras" />
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="mb-6 flex justify-between items-center">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900">Controle de Horas Extras</h1>
-                            <p className="mt-1 text-sm text-gray-600">Registre e aprove horas extras dos funcionários</p>
-                        </div>
-                        {canCreate && (
-                            <Button variant="primary" onClick={() => openModal('create')} icon={PlusIcon}>
-                                Registrar HE
-                            </Button>
-                        )}
-                    </div>
+                    <PageHeader
+                        title="Controle de Horas Extras"
+                        subtitle="Registre e aprove horas extras dos funcionários"
+                        actions={[
+                            {
+                                label: 'Registrar HE',
+                                icon: PlusIcon,
+                                variant: 'primary',
+                                onClick: () => openModal('create'),
+                                visible: canCreate,
+                            },
+                        ]}
+                    />
 
                     {/* Filtros */}
                     <div className="bg-white shadow-sm rounded-lg p-4 mb-6">

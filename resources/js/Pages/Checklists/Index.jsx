@@ -10,9 +10,9 @@ import ChecklistEditModal from '@/Components/Modals/ChecklistEditModal';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import DeleteConfirmModal from '@/Components/Shared/DeleteConfirmModal';
+import PageHeader from '@/Components/Shared/PageHeader';
 import Button from '@/Components/Button';
 import {
-    PlusIcon,
     MagnifyingGlassIcon,
     ClipboardDocumentCheckIcon,
     FunnelIcon,
@@ -183,26 +183,20 @@ export default function Index({ checklists, stats, stores = [], filters = {} }) 
             
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                        <div>
-                            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                                <ClipboardDocumentCheckIcon className="h-8 w-8 text-indigo-600" />
-                                Checklists de Qualidade
-                            </h2>
-                            <p className="mt-1 text-sm text-gray-500">
-                                Gestão e acompanhamento de auditorias de qualidade nas lojas.
-                            </p>
-                        </div>
-                        {hasPermission(PERMISSIONS.CREATE_CHECKLISTS) && (
-                            <Button 
-                                onClick={() => openModal('create')}
-                                icon={PlusIcon}
-                            >
-                                Novo Checklist
-                            </Button>
-                        )}
-                    </div>
+                    <PageHeader
+                        title="Checklists de Qualidade"
+                        subtitle="Gestão e acompanhamento de auditorias de qualidade nas lojas."
+                        icon={ClipboardDocumentCheckIcon}
+                        actions={[
+                            {
+                                type: 'create',
+                                label: 'Novo Checklist',
+                                onClick: () => openModal('create'),
+                                visible: hasPermission(PERMISSIONS.CREATE_CHECKLISTS),
+                            },
+                        ]}
+                    />
+
 
                     {/* Statistics */}
                     <StatisticsGrid cards={statsCards} />

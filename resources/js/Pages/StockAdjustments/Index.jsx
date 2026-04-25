@@ -6,6 +6,7 @@ import useModalManager from '@/Hooks/useModalManager';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import StandardModal from '@/Components/StandardModal';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import DeleteConfirmModal from '@/Components/Shared/DeleteConfirmModal';
@@ -214,41 +215,27 @@ export default function Index({
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="mb-6 flex justify-between items-center">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900">
-                                Ajustes de Estoque
-                            </h1>
-                            <p className="mt-1 text-sm text-gray-600">
-                                Solicite inclusão ou remoção de saldo e acompanhe o ciclo
-                                de aprovação.
-                            </p>
-                        </div>
-                        <div className="flex gap-2">
-                            <a
-                                href={route('stock-adjustments.export', {
+                    <PageHeader
+                        title="Ajustes de Estoque"
+                        subtitle="Solicite inclusão ou remoção de saldo e acompanhe o ciclo de aprovação."
+                        actions={[
+                            {
+                                type: 'download',
+                                download: route('stock-adjustments.export', {
                                     status: statusFilter || undefined,
                                     store_id: storeFilter || undefined,
                                     reason_id: reasonFilter || undefined,
                                     direction: directionFilter || undefined,
-                                })}
-                            >
-                                <Button variant="outline" icon={ArrowDownTrayIcon}>
-                                    Exportar
-                                </Button>
-                            </a>
-                            {hasPermission(PERMISSIONS.CREATE_ADJUSTMENTS) && (
-                                <Button
-                                    variant="primary"
-                                    onClick={() => openModal('create')}
-                                    icon={PlusIcon}
-                                >
-                                    Novo Ajuste
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                                }),
+                            },
+                            {
+                                type: 'create',
+                                label: 'Novo Ajuste',
+                                onClick: () => openModal('create'),
+                                visible: hasPermission(PERMISSIONS.CREATE_ADJUSTMENTS),
+                            },
+                        ]}
+                    />
 
                     {/* Estatísticas */}
                     <div className="mb-6">

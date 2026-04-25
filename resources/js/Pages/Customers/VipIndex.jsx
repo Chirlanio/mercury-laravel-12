@@ -5,6 +5,7 @@ import {
     ArrowPathIcon, ArrowTopRightOnSquareIcon, ChartBarIcon,
     GiftIcon, CalendarDaysIcon, PencilSquareIcon, TrashIcon,
     ArrowLeftIcon, AdjustmentsHorizontalIcon, PlusIcon, ArrowUpTrayIcon,
+    BoltIcon,
 } from '@heroicons/react/24/outline';
 import {
     ResponsiveContainer, LineChart, Line, CartesianGrid,
@@ -14,6 +15,7 @@ import { useConfirm } from '@/Hooks/useConfirm';
 import useModalManager from '@/Hooks/useModalManager';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
+import DataTable from '@/Components/DataTable';
 import StandardModal from '@/Components/StandardModal';
 import PageHeader from '@/Components/Shared/PageHeader';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
@@ -153,6 +155,117 @@ export default function VipIndex({ tiers, year, availableYears, filters, statist
         router.delete(route('customers.vip.destroy', tier.id), { preserveScroll: true });
     };
 
+    const columns = [
+        {
+            label: 'Cliente',
+            className: 'px-3 py-3',
+            nowrap: false,
+            render: (t) => (
+                <>
+                    <div className="font-medium text-gray-900">{t.customer.name}</div>
+                    <div className="text-xs text-gray-500">
+                        {t.customer.formatted_cpf || '—'}
+                        {t.customer.city && ` · ${t.customer.city}${t.customer.state ? `/${t.customer.state}` : ''}`}
+                    </div>
+                </>
+            ),
+        },
+        {
+            label: 'Sugerido',
+            headerTitle: 'Tier sugerido pela classificação automática',
+            className: 'px-3 py-3 hidden md:table-cell',
+            render: (t) => t.suggested_tier ? (
+                <StatusBadge color={TIER_VARIANTS[t.suggested_tier].color} size="sm">
+                    {TIER_VARIANTS[t.suggested_tier].label}
+                </StatusBadge>
+            ) : (
+                <span className="text-xs text-gray-400">—</span>
+            ),
+        },
+        {
+            label: 'Tier',
+            headerTitle: 'Tier final após curadoria',
+            className: 'px-3 py-3',
+            render: (t) => t.final_tier ? (
+                <StatusBadge color={TIER_VARIANTS[t.final_tier].color}>
+                    {TIER_VARIANTS[t.final_tier].label}
+                </StatusBadge>
+            ) : (
+                <StatusBadge color="gray" size="sm">Sem tier</StatusBadge>
+            ),
+        },
+        {
+            label: `Fat. ${year}`,
+            headerTitle: `Faturamento ${year} (rede Meia Sola)`,
+            align: 'right',
+            className: 'px-3 py-3 font-mono',
+            render: (t) => fmtCurrency(t.total_revenue),
+        },
+        {
+            label: 'NFs',
+            headerTitle: 'Quantidade de notas fiscais',
+            align: 'right',
+            className: 'px-3 py-3 text-gray-600 hidden lg:table-cell',
+            render: (t) => t.total_orders,
+        },
+        {
+            label: 'Loja pref.',
+            headerTitle: 'Loja de preferência (maior faturamento)',
+            className: 'px-3 py-3 hidden lg:table-cell',
+            render: (t) => t.preferred_store ? (
+                <div>
+                    <div className="font-medium text-gray-900">{t.preferred_store.code}</div>
+                    <div className="text-xs text-gray-500 truncate max-w-[180px]" title={t.preferred_store.name}>
+                        {t.preferred_store.name}
+                    </div>
+                </div>
+            ) : (
+                <span className="text-xs text-gray-400">—</span>
+            ),
+        },
+        {
+            label: 'Curado',
+            headerTitle: 'Data e responsável pela curadoria',
+            className: 'px-3 py-3 text-xs text-gray-500 hidden xl:table-cell',
+            render: (t) => t.curated_at ? (
+                <>
+                    <div>{fmtDateTime(t.curated_at)}</div>
+                    {t.curated_by && <div className="text-gray-400">por {t.curated_by}</div>}
+                </>
+            ) : (
+                <span className="text-amber-600">Pendente</span>
+            ),
+        },
+        {
+            label: 'Ações',
+            align: 'right',
+            className: 'px-3 py-3',
+            render: (t) => (
+                <ActionButtons
+                    onEdit={can.curate ? () => openModal('curate', t) : null}
+                    onDelete={can.curate && t.final_tier ? () => handleRemove(t) : null}
+                >
+                    {can.view_reports && (
+                        <ActionButtons.Custom
+                            variant="info"
+                            icon={ChartBarIcon}
+                            title="Relatório YoY (faturamento)"
+                            onClick={() => openModal('report', t)}
+                        />
+                    )}
+                    {can.manage_activities && (
+                        <ActionButtons.Custom
+                            variant="secondary"
+                            icon={GiftIcon}
+                            title="Atividades de marketing"
+                            onClick={() => openModal('activities', t)}
+                        />
+                    )}
+                </ActionButtons>
+            ),
+        },
+    ];
+
     return (
         <>
             <Head title="MS Life" />
@@ -170,37 +283,30 @@ export default function VipIndex({ tiers, year, availableYears, filters, statist
                             </>
                         }
                         actions={[
+                            { type: 'back', href: route('customers.index') },
                             {
-                                label: 'Voltar',
-                                icon: ArrowLeftIcon,
-                                variant: 'outline',
-                                href: route('customers.index'),
-                            },
-                            {
+                                type: 'settings',
                                 label: 'Limites',
                                 icon: AdjustmentsHorizontalIcon,
-                                variant: 'secondary',
                                 href: route('customers.vip.config.index'),
                                 visible: can.manage_config,
                             },
                             {
+                                type: 'import',
                                 label: 'Importar lista',
-                                icon: ArrowUpTrayIcon,
-                                variant: 'secondary',
                                 onClick: () => openModal('import'),
                                 visible: can.import,
                             },
                             {
+                                type: 'refresh',
                                 label: 'Atualizar faturamento',
-                                icon: ArrowPathIcon,
-                                variant: 'secondary',
                                 onClick: handleRefreshSnapshots,
                                 visible: can.manage,
                             },
                             {
+                                type: 'create',
                                 label: `Gerar sugestões ${year}`,
-                                icon: ArrowPathIcon,
-                                variant: 'primary',
+                                icon: BoltIcon,
                                 onClick: handleSuggestionsRun,
                                 visible: can.manage,
                             },
@@ -250,141 +356,21 @@ export default function VipIndex({ tiers, year, availableYears, filters, statist
                         </div>
                     </div>
 
-                    {/* Tabela */}
-                    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Cliente</th>
-                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap hidden md:table-cell" title="Tier sugerido pela classificação automática">Sugerido</th>
-                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap" title="Tier final após curadoria">Tier</th>
-                                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap" title={`Faturamento ${year} (rede Meia Sola)`}>Fat. {year}</th>
-                                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap hidden lg:table-cell" title="Quantidade de notas fiscais">NFs</th>
-                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap hidden lg:table-cell" title="Loja de preferência (maior faturamento)">Loja pref.</th>
-                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap hidden xl:table-cell" title="Data e responsável pela curadoria">Curado</th>
-                                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {tiers.data?.length > 0 ? tiers.data.map((t) => (
-                                        <tr key={t.id} className="hover:bg-gray-50">
-                                            <td className="px-3 py-3">
-                                                <div className="font-medium text-gray-900">{t.customer.name}</div>
-                                                <div className="text-xs text-gray-500">
-                                                    {t.customer.formatted_cpf || '—'}
-                                                    {t.customer.city && ` · ${t.customer.city}${t.customer.state ? `/${t.customer.state}` : ''}`}
-                                                </div>
-                                            </td>
-                                            <td className="px-3 py-3 hidden md:table-cell">
-                                                {t.suggested_tier ? (
-                                                    <StatusBadge color={TIER_VARIANTS[t.suggested_tier].color} size="sm">
-                                                        {TIER_VARIANTS[t.suggested_tier].label}
-                                                    </StatusBadge>
-                                                ) : (
-                                                    <span className="text-xs text-gray-400">—</span>
-                                                )}
-                                            </td>
-                                            <td className="px-3 py-3">
-                                                {t.final_tier ? (
-                                                    <StatusBadge color={TIER_VARIANTS[t.final_tier].color}>
-                                                        {TIER_VARIANTS[t.final_tier].label}
-                                                    </StatusBadge>
-                                                ) : (
-                                                    <StatusBadge color="gray" size="sm">Sem tier</StatusBadge>
-                                                )}
-                                            </td>
-                                            <td className="px-3 py-3 text-right font-mono text-sm">
-                                                {fmtCurrency(t.total_revenue)}
-                                            </td>
-                                            <td className="px-3 py-3 text-right text-sm text-gray-600 hidden lg:table-cell">
-                                                {t.total_orders}
-                                            </td>
-                                            <td className="px-3 py-3 text-sm hidden lg:table-cell">
-                                                {t.preferred_store ? (
-                                                    <div>
-                                                        <div className="font-medium text-gray-900">{t.preferred_store.code}</div>
-                                                        <div className="text-xs text-gray-500 truncate max-w-[180px]" title={t.preferred_store.name}>
-                                                            {t.preferred_store.name}
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-xs text-gray-400">—</span>
-                                                )}
-                                            </td>
-                                            <td className="px-3 py-3 text-xs text-gray-500 hidden xl:table-cell">
-                                                {t.curated_at ? (
-                                                    <>
-                                                        <div>{fmtDateTime(t.curated_at)}</div>
-                                                        {t.curated_by && <div className="text-gray-400">por {t.curated_by}</div>}
-                                                    </>
-                                                ) : (
-                                                    <span className="text-amber-600">Pendente</span>
-                                                )}
-                                            </td>
-                                            <td className="px-3 py-3 text-right">
-                                                <ActionButtons
-                                                    onEdit={can.curate ? () => openModal('curate', t) : null}
-                                                    onDelete={can.curate && t.final_tier ? () => handleRemove(t) : null}
-                                                >
-                                                    {can.view_reports && (
-                                                        <ActionButtons.Custom
-                                                            variant="info"
-                                                            icon={ChartBarIcon}
-                                                            title="Relatório YoY (faturamento)"
-                                                            onClick={() => openModal('report', t)}
-                                                        />
-                                                    )}
-                                                    {can.manage_activities && (
-                                                        <ActionButtons.Custom
-                                                            variant="secondary"
-                                                            icon={GiftIcon}
-                                                            title="Atividades de marketing"
-                                                            onClick={() => openModal('activities', t)}
-                                                        />
-                                                    )}
-                                                </ActionButtons>
-                                            </td>
-                                        </tr>
-                                    )) : (
-                                        <tr>
-                                            <td colSpan={8} className="p-8">
-                                                <EmptyState
-                                                    title="Nenhum VIP classificado para este ano"
-                                                    description={can.manage
-                                                        ? 'Configure os thresholds e gere as sugestões para começar.'
-                                                        : 'Aguarde a geração das sugestões pelo time de Marketing.'
-                                                    }
-                                                    icon={TrophyIcon}
-                                                />
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Paginação */}
-                        {tiers.last_page > 1 && (
-                            <div className="px-4 py-3 bg-gray-50 border-t flex items-center justify-between">
-                                <p className="text-sm text-gray-500">
-                                    Mostrando {tiers.from}-{tiers.to} de {new Intl.NumberFormat('pt-BR').format(tiers.total)}
-                                </p>
-                                <div className="flex gap-1">
-                                    {tiers.links.filter((l) => l.url).map((link, i) => (
-                                        <button
-                                            key={i}
-                                            onClick={() => router.get(link.url, {}, { preserveState: true, preserveScroll: true })}
-                                            className={`px-3 py-1 text-sm rounded ${
-                                                link.active ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100 border'
-                                            }`}
-                                            dangerouslySetInnerHTML={{ __html: link.label }}
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                    <DataTable
+                        data={tiers}
+                        columns={columns}
+                        searchable={false}
+                        emptyMessage={
+                            <EmptyState
+                                title="Nenhum VIP classificado para este ano"
+                                description={can.manage
+                                    ? 'Configure os thresholds e gere as sugestões para começar.'
+                                    : 'Aguarde a geração das sugestões pelo time de Marketing.'
+                                }
+                                icon={TrophyIcon}
+                            />
+                        }
+                    />
                 </div>
             </div>
 

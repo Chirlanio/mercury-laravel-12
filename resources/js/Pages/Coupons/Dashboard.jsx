@@ -1,5 +1,5 @@
-import { Head, Link } from '@inertiajs/react';
-import { ArrowLeftIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { Head } from '@inertiajs/react';
+import { ChartBarIcon } from '@heroicons/react/24/outline';
 import {
     ResponsiveContainer,
     LineChart, Line,
@@ -10,7 +10,7 @@ import {
     Tooltip,
     Legend,
 } from 'recharts';
-import Button from '@/Components/Button';
+import PageHeader from '@/Components/Shared/PageHeader';
 
 const STATUS_COLORS = {
     draft: '#9ca3af',
@@ -40,27 +40,15 @@ export default function Dashboard({ analytics = {}, isStoreScoped, scopedStoreCo
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
                     {/* Header */}
-                    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-                                <ChartBarIcon className="h-7 w-7 text-indigo-600" />
-                                Dashboard de Cupons
-                            </h1>
-                            <p className="mt-1 text-sm text-gray-600">
-                                Visão analítica de emissões, top lojas e influencers
-                                {isStoreScoped && scopedStoreCode && (
-                                    <span className="ml-2 text-xs font-medium text-indigo-600">
-                                        (escopo: loja {scopedStoreCode})
-                                    </span>
-                                )}
-                            </p>
-                        </div>
-                        <Link href={route('coupons.index')}>
-                            <Button variant="secondary" icon={ArrowLeftIcon}>
-                                Voltar para listagem
-                            </Button>
-                        </Link>
-                    </div>
+                    <PageHeader
+                        title="Dashboard de Cupons"
+                        subtitle="Visão analítica de emissões, top lojas e influencers"
+                        icon={ChartBarIcon}
+                        scopeBadge={isStoreScoped && scopedStoreCode ? `escopo: loja ${scopedStoreCode}` : null}
+                        actions={[
+                            { type: 'back', label: 'Voltar para listagem', href: route('coupons.index') },
+                        ]}
+                    />
 
                     {/* Grid 2x2 de gráficos — mobile: 1 col; lg+: 2 cols */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

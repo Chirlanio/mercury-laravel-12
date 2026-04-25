@@ -177,12 +177,17 @@ export default function DataTable({
                             {columns.map((column, index) => (
                                 <th
                                     key={index}
-                                    className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                                    className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                                        column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : 'text-left'
+                                    } ${
                                         column.sortable ? 'cursor-pointer hover:bg-gray-100 select-none' : ''
-                                    }`}
+                                    } ${column.className || ''}`}
                                     onClick={() => column.sortable && handleSort(column.field ?? column.key)}
+                                    title={column.headerTitle}
                                 >
-                                    <div className="flex items-center space-x-1">
+                                    <div className={`flex items-center space-x-1 ${
+                                        column.align === 'right' ? 'justify-end' : column.align === 'center' ? 'justify-center' : ''
+                                    }`}>
                                         <span>{column.label}</span>
                                         {column.sortable && getSortIcon(column.field ?? column.key)}
                                     </div>
@@ -212,7 +217,9 @@ export default function DataTable({
                                     {columns.map((column, colIndex) => (
                                         <td
                                             key={colIndex}
-                                            className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                                            className={`px-6 py-4 text-sm text-gray-900 ${
+                                                column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''
+                                            } ${column.nowrap === false ? '' : 'whitespace-nowrap'} ${column.className || ''}`}
                                         >
                                             {column.render
                                                 ? column.render(row, rowIndex)
@@ -228,7 +235,10 @@ export default function DataTable({
                             <tr>
                                 <td
                                     colSpan={columns.length + (selectable ? 1 : 0)}
-                                    className="px-6 py-12 text-center text-gray-500"
+                                    className={typeof emptyMessage === 'string'
+                                        ? 'px-6 py-12 text-center text-gray-500'
+                                        : 'p-0'
+                                    }
                                 >
                                     {emptyMessage}
                                 </td>

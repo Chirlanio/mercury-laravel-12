@@ -1,6 +1,6 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import {
-    ArrowsRightLeftIcon, PlusIcon, XMarkIcon, ExclamationTriangleIcon,
+    ArrowsRightLeftIcon, XMarkIcon, ExclamationTriangleIcon,
     TruckIcon, CheckCircleIcon, XCircleIcon,
 } from '@heroicons/react/24/outline';
 import { CheckCircleIcon as CheckCircleSolid } from '@heroicons/react/24/solid';
@@ -11,6 +11,7 @@ import { useConfirm } from '@/Hooks/useConfirm';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import DataTable from '@/Components/DataTable';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import DeleteConfirmModal from '@/Components/Shared/DeleteConfirmModal';
 import StandardModal from '@/Components/StandardModal';
@@ -138,20 +139,18 @@ export default function Index({ transfers, stores = [], filters = {}, statusOpti
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="mb-6">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <h1 className="text-3xl font-bold text-gray-900">Transferências</h1>
-                                <p className="mt-1 text-sm text-gray-600">Gerencie transferências entre lojas</p>
-                            </div>
-                            {canCreate && (
-                                <Button variant="primary" onClick={() => openModal('create')} icon={PlusIcon}>
-                                    Nova Transferência
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Transferências"
+                        subtitle="Gerencie transferências entre lojas"
+                        actions={[
+                            {
+                                type: 'create',
+                                label: 'Nova Transferência',
+                                onClick: () => openModal('create'),
+                                visible: canCreate,
+                            },
+                        ]}
+                    />
 
                     {/* Estatísticas */}
                     <StatisticsCards filters={{ store_id: filters.store_id, status: filters.status, transfer_type: filters.transfer_type }} />

@@ -1,6 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { PlusIcon, ArrowPathIcon, CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
+import PageHeader from '@/Components/Shared/PageHeader';
 
 const statusIcons = {
     success: <CheckCircleIcon className="h-5 w-5 text-green-500" />,
@@ -23,14 +24,10 @@ export default function Index({ integrations, providers, drivers }) {
 
             <div className="py-6">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center mb-6">
-                        <div>
-                            <h1 className="text-2xl font-semibold text-gray-900">Integrações</h1>
-                            <p className="mt-1 text-sm text-gray-500">
-                                Gerencie conexões com sistemas externos.
-                            </p>
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Integrações"
+                        subtitle="Gerencie conexões com sistemas externos."
+                    />
 
                     {integrations.length === 0 ? (
                         <div className="bg-white rounded-lg shadow p-12 text-center">

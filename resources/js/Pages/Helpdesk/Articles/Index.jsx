@@ -10,6 +10,7 @@ import {
     HandThumbDownIcon,
 } from '@heroicons/react/24/outline';
 import Button from '@/Components/Button';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import InputLabel from '@/Components/InputLabel';
 import TextInput from '@/Components/TextInput';
@@ -47,26 +48,18 @@ export default function Index({ articles, filters = {}, departments = [] }) {
 
     return (
         <>
-            <Head title="Knowledge Base" />
+            <Head title="Base de Conhecimento" />
             <div className="py-6 sm:py-12">
-                <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
-                        <div>
-                            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
-                                <BookOpenIcon className="w-6 h-6 sm:w-7 sm:h-7 text-indigo-600 shrink-0" />
-                                <span>Base de Conhecimento</span>
-                            </h1>
-                            <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                                Artigos de ajuda para reduzir abertura de chamados repetitivos.
-                            </p>
-                        </div>
-                        <Link href={route('helpdesk.articles.create')}>
-                            <Button variant="primary" icon={PlusIcon} size="sm" className="w-full sm:w-auto">
-                                Novo artigo
-                            </Button>
-                        </Link>
-                    </div>
+                <div className="max-w-full mx-auto px-3 sm:px-6 lg:px-8">
+                    <PageHeader
+                        title="Base de Conhecimento"
+                        icon={BookOpenIcon}
+                        subtitle="Artigos de ajuda para reduzir abertura de chamados repetitivos."
+                        actions={[
+                            { type: 'back', href: route('helpdesk.index') },
+                            { type: 'create', label: 'Novo artigo', href: route('helpdesk.articles.create') },
+                        ]}
+                    />
 
                     {/* Filters */}
                     <div className="bg-white shadow-sm rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">

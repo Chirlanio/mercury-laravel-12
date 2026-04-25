@@ -1,13 +1,14 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState, useRef, useEffect } from 'react';
 import {
-    ArrowLeftIcon, ArrowUpTrayIcon, CheckCircleIcon, XCircleIcon,
+    ArrowUpTrayIcon, CheckCircleIcon, XCircleIcon,
     DocumentArrowUpIcon, ExclamationTriangleIcon, TagIcon, ScaleIcon,
     ClockIcon,
 } from '@heroicons/react/24/outline';
 import Button from '@/Components/Button';
 import EmptyState from '@/Components/Shared/EmptyState';
 import LoadingSpinner from '@/Components/Shared/LoadingSpinner';
+import PageHeader from '@/Components/Shared/PageHeader';
 
 export default function Import() {
     const { importStats } = usePage().props;
@@ -158,25 +159,25 @@ export default function Import() {
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
                     {/* Header */}
-                    <div className="mb-6">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <h1 className="text-3xl font-bold text-gray-900">Importar Ordens de Compra</h1>
-                                <p className="mt-1 text-sm text-gray-600">Upload de planilha XLSX ou CSV no formato Mercury v1</p>
-                            </div>
-                            <div className="flex gap-2">
-                                <Link href={route('purchase-orders.brand-aliases.index')}>
-                                    <Button variant="outline" size="sm" icon={TagIcon}>Aliases de Marca</Button>
-                                </Link>
-                                <Link href={route('purchase-orders.size-mappings.index')}>
-                                    <Button variant="outline" size="sm" icon={ScaleIcon}>Mapeamento de Tamanhos</Button>
-                                </Link>
-                                <Link href={route('purchase-orders.index')}>
-                                    <Button variant="outline" size="sm" icon={ArrowLeftIcon}>Voltar</Button>
-                                </Link>
-                            </div>
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Importar Ordens de Compra"
+                        subtitle="Upload de planilha XLSX ou CSV no formato Mercury v1"
+                        actions={[
+                            {
+                                label: 'Aliases de Marca',
+                                icon: TagIcon,
+                                variant: 'outline',
+                                href: route('purchase-orders.brand-aliases.index'),
+                            },
+                            {
+                                label: 'Mapeamento de Tamanhos',
+                                icon: ScaleIcon,
+                                variant: 'outline',
+                                href: route('purchase-orders.size-mappings.index'),
+                            },
+                            { type: 'back', href: route('purchase-orders.index') },
+                        ]}
+                    />
 
                     {/* Resultado da importação anterior */}
                     {importStats && (

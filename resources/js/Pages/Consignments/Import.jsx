@@ -1,7 +1,6 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState, useRef, useEffect } from 'react';
 import {
-    ArrowLeftIcon,
     ArrowUpTrayIcon,
     CheckCircleIcon,
     XCircleIcon,
@@ -13,6 +12,7 @@ import {
 import Button from '@/Components/Button';
 import EmptyState from '@/Components/Shared/EmptyState';
 import LoadingSpinner from '@/Components/Shared/LoadingSpinner';
+import PageHeader from '@/Components/Shared/PageHeader';
 
 /**
  * Import de consignações — migração v1 → v2 via planilha XLSX/CSV.
@@ -147,19 +147,13 @@ export default function Import() {
 
             <div className="py-6 sm:py-12">
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Importar Consignações</h1>
-                            <p className="mt-1 text-sm text-gray-600">
-                                Migração de dados históricos da v1 via planilha XLSX/CSV.
-                            </p>
-                        </div>
-                        <Link href={route('consignments.index')} className="shrink-0">
-                            <Button variant="outline" icon={ArrowLeftIcon} className="min-h-[44px] w-full sm:w-auto">
-                                Voltar
-                            </Button>
-                        </Link>
-                    </div>
+                    <PageHeader
+                        title="Importar Consignações"
+                        subtitle="Migração de dados históricos da v1 via planilha XLSX/CSV."
+                        actions={[
+                            { type: 'back', href: route('consignments.index') },
+                        ]}
+                    />
 
                     {importResult && (
                         <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">

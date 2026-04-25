@@ -25,6 +25,7 @@ import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import DataTable from '@/Components/DataTable';
 import StandardModal from '@/Components/StandardModal';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import TextInput from '@/Components/TextInput';
@@ -565,51 +566,17 @@ export default function Index({
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header — mobile: stack vertical; sm+: linha única */}
-                    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900">Cupons</h1>
-                            <p className="mt-1 text-sm text-gray-600">
-                                Solicitação e emissão de cupons de desconto para Consultores, Influencers e MS Indica
-                                {isStoreScoped && scopedStoreCode && (
-                                    <span className="ml-2 text-xs font-medium text-indigo-600">
-                                        (escopo: loja {scopedStoreCode})
-                                    </span>
-                                )}
-                            </p>
-                        </div>
-                        <div className="flex gap-2 shrink-0">
-                            <Link href={route('coupons.dashboard')}>
-                                <Button variant="secondary" title="Dashboard" aria-label="Dashboard">
-                                    <ChartBarIcon className="w-4 h-4 xl:mr-2" />
-                                    <span className="hidden xl:inline">Dashboard</span>
-                                </Button>
-                            </Link>
-                            {canImport && (
-                                <Button variant="secondary" onClick={openImport} title="Importar" aria-label="Importar">
-                                    <DocumentArrowUpIcon className="w-4 h-4 xl:mr-2" />
-                                    <span className="hidden xl:inline">Importar</span>
-                                </Button>
-                            )}
-                            {canExport && (
-                                <a
-                                    href={route('coupons.export', filters)}
-                                    title="Exportar"
-                                    aria-label="Exportar"
-                                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-300 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50"
-                                >
-                                    <DocumentArrowDownIcon className="h-4 w-4" />
-                                    <span className="hidden xl:inline">Exportar</span>
-                                </a>
-                            )}
-                            {canCreate && (
-                                <Button variant="primary" onClick={openCreate} title="Novo Cupom" aria-label="Novo Cupom">
-                                    <PlusIcon className="w-4 h-4 xl:mr-2" />
-                                    <span className="hidden xl:inline">Novo Cupom</span>
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Cupons"
+                        subtitle="Solicitação e emissão de cupons de desconto para Consultores, Influencers e MS Indica"
+                        scopeBadge={isStoreScoped && scopedStoreCode ? `escopo: loja ${scopedStoreCode}` : null}
+                        actions={[
+                            { type: 'dashboard', href: route('coupons.dashboard') },
+                            { type: 'import', onClick: openImport, visible: canImport },
+                            { type: 'download', download: route('coupons.export', filters), visible: canExport },
+                            { type: 'create', label: 'Novo Cupom', onClick: openCreate, visible: canCreate },
+                        ]}
+                    />
 
                     {/* Statistics — mobile: 2 cols; md: 3 cols; lg+: 6 cols (grid responsivo interno) */}
                     <StatisticsGrid cards={statsCards} cols={6} />

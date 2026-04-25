@@ -2,12 +2,10 @@ import { Head, router, Link } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 import {
     ArrowUturnLeftIcon,
-    PlusIcon,
     ArrowPathIcon,
     ClockIcon,
     CheckCircleIcon,
     ExclamationTriangleIcon,
-    ChartBarIcon,
     TrashIcon,
     CurrencyDollarIcon,
     DocumentArrowDownIcon,
@@ -19,6 +17,7 @@ import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import DataTable from '@/Components/DataTable';
 import StandardModal from '@/Components/StandardModal';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import InvoiceLookupSection from './components/InvoiceLookupSection';
@@ -457,44 +456,29 @@ export default function Index({
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="mb-6 flex justify-between items-center">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900">
-                                Estornos
-                            </h1>
-                            <p className="mt-1 text-sm text-gray-600">
-                                Solicitações de estorno de vendas com workflow de aprovação
-                                {isStoreScoped && scopedStoreCode && (
-                                    <span className="ml-2 text-xs font-medium text-indigo-600">
-                                        (escopo: loja {scopedStoreCode})
-                                    </span>
-                                )}
-                            </p>
-                        </div>
-                        <div className="flex gap-2">
-                            <Link href={route('reversals.dashboard')}>
-                                <Button variant="secondary" icon={ChartBarIcon}>
-                                    Dashboard
-                                </Button>
-                            </Link>
-                            {canCreate && (
-                                <Button
-                                    variant="primary"
-                                    onClick={() => {
-                                        setCreateForm(emptyCreate);
-                                        setCreateErrors({});
-                                        setCreateLookup(null);
-                                        setCreateFiles([]);
-                                        openModal('create');
-                                    }}
-                                    icon={PlusIcon}
-                                >
-                                    Novo Estorno
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Estornos"
+                        subtitle="Solicitações de estorno de vendas com workflow de aprovação"
+                        scopeBadge={isStoreScoped && scopedStoreCode ? `escopo: loja ${scopedStoreCode}` : null}
+                        actions={[
+                            {
+                                type: 'dashboard',
+                                href: route('reversals.dashboard'),
+                            },
+                            {
+                                type: 'create',
+                                label: 'Novo Estorno',
+                                onClick: () => {
+                                    setCreateForm(emptyCreate);
+                                    setCreateErrors({});
+                                    setCreateLookup(null);
+                                    setCreateFiles([]);
+                                    openModal('create');
+                                },
+                                visible: canCreate,
+                            },
+                        ]}
+                    />
 
                     <StatisticsGrid cards={statisticsCards} />
 

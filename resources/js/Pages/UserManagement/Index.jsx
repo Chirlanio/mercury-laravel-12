@@ -11,10 +11,10 @@ import DataTable from '@/Components/DataTable';
 import UserAvatar from '@/Components/UserAvatar';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import {
-    PlusIcon,
     XMarkIcon,
     UsersIcon,
     ShieldCheckIcon,
@@ -201,28 +201,18 @@ export default function Index({ auth, users = { data: [], links: [] }, roles = {
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="mb-6">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <h1 className="text-3xl font-bold text-gray-900">Usuários</h1>
-                                <p className="mt-1 text-sm text-gray-600">
-                                    Gerencie os usuários e seus níveis de acesso
-                                </p>
-                            </div>
-                            <div className="flex gap-3">
-                                {hasPermission(PERMISSIONS.CREATE_USERS) && (
-                                    <Button
-                                        onClick={() => openModal('create')}
-                                        variant="primary"
-                                        icon={PlusIcon}
-                                    >
-                                        Novo Usuário
-                                    </Button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Usuários"
+                        subtitle="Gerencie os usuários e seus níveis de acesso"
+                        actions={[
+                            {
+                                type: 'create',
+                                label: 'Novo Usuário',
+                                onClick: () => openModal('create'),
+                                visible: hasPermission(PERMISSIONS.CREATE_USERS),
+                            },
+                        ]}
+                    />
 
                     {/* Estatísticas */}
                     <StatisticsGrid cards={statisticsCards} />

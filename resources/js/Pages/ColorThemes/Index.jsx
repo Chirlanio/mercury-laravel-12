@@ -1,6 +1,7 @@
 import DataTable from '@/Components/DataTable';
 import Button from '@/Components/Button';
 import Modal from '@/Components/Modal';
+import PageHeader from '@/Components/Shared/PageHeader';
 import ColorThemeFormModal from '@/Components/ColorThemeFormModal';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import { Head, router } from '@inertiajs/react';
@@ -164,34 +165,19 @@ export default function Index({ auth, colorThemes = { data: [], links: [] }, col
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="mb-6">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <h1 className="text-3xl font-bold text-gray-900">
-                                    Temas de Cores
-                                </h1>
-                                <p className="mt-1 text-sm text-gray-600">
-                                    Gerencie as cores disponiveis para os niveis de acesso
-                                </p>
-                            </div>
-                            <div className="flex gap-3">
-                                {hasPermission(PERMISSIONS.CREATE_USERS) && (
-                                    <Button
-                                        onClick={() => setShowCreateModal(true)}
-                                        variant="primary"
-                                        icon={({ className }) => (
-                                            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                            </svg>
-                                        )}
-                                    >
-                                        Nova Cor
-                                    </Button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Temas de Cores"
+                        subtitle="Gerencie as cores disponiveis para os niveis de acesso"
+                        actions={[
+                            {
+                                type: 'create',
+                                label: 'Nova Cor',
+                                onClick: () => setShowCreateModal(true),
+                                visible: hasPermission(PERMISSIONS.CREATE_USERS),
+                            },
+                        ]}
+                    />
+
 
                     {/* Cards de Estatisticas */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">

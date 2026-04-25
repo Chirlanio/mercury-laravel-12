@@ -4,7 +4,6 @@ import {
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import {
-    ArrowLeftIcon,
     ArrowUturnLeftIcon,
     ChartBarIcon,
     ClockIcon,
@@ -14,6 +13,7 @@ import {
     TagIcon,
 } from '@heroicons/react/24/outline';
 import Button from '@/Components/Button';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import EmptyState from '@/Components/Shared/EmptyState';
 
@@ -113,26 +113,14 @@ export default function Dashboard({
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="mb-6 flex justify-between items-center">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900">
-                                Dashboard de Estornos
-                            </h1>
-                            <p className="mt-1 text-sm text-gray-600">
-                                Visão analítica das solicitações de estorno
-                                {isStoreScoped && scopedStoreCode && (
-                                    <span className="ml-2 text-xs font-medium text-indigo-600">
-                                        (escopo: loja {scopedStoreCode})
-                                    </span>
-                                )}
-                            </p>
-                        </div>
-                        <Link href={route('reversals.index')}>
-                            <Button variant="secondary" icon={ArrowLeftIcon}>
-                                Voltar para Estornos
-                            </Button>
-                        </Link>
-                    </div>
+                    <PageHeader
+                        title="Dashboard de Estornos"
+                        subtitle="Visão analítica das solicitações de estorno"
+                        scopeBadge={isStoreScoped && scopedStoreCode ? `escopo: loja ${scopedStoreCode}` : null}
+                        actions={[
+                            { type: 'back', label: 'Voltar para Estornos', href: route('reversals.index') },
+                        ]}
+                    />
 
                     <StatisticsGrid cards={cards} />
 

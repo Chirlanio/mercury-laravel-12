@@ -11,12 +11,11 @@ import DataTable from "@/Components/DataTable";
 import EmployeeAvatar from "@/Components/EmployeeAvatar";
 import Button from "@/Components/Button";
 import ActionButtons from "@/Components/ActionButtons";
+import PageHeader from "@/Components/Shared/PageHeader";
 import StatusBadge from "@/Components/Shared/StatusBadge";
 import StatisticsGrid from "@/Components/Shared/StatisticsGrid";
 import {
     CalendarDaysIcon,
-    DocumentArrowDownIcon,
-    PlusIcon,
     XMarkIcon,
     UsersIcon,
     CheckCircleIcon,
@@ -196,50 +195,33 @@ export default function Index({ employees, stats, positions, stores, statuses, e
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                                <UsersIcon className="h-8 w-8 text-indigo-600" />
-                                Gestão de Funcionários
-                            </h1>
-                            <p className="mt-1 text-sm text-gray-500">
-                                Cadastro, visualização e acompanhamento do ciclo de vida dos colaboradores.
-                            </p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {hasPermission(PERMISSIONS.VIEW_USERS) && (
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => openModal('exportEvents')}
-                                    icon={CalendarDaysIcon}
-                                >
-                                    Eventos
-                                </Button>
-                            )}
-                            {hasPermission(PERMISSIONS.VIEW_USERS) && (
-                                <Button
-                                    variant="success"
-                                    onClick={() => {
-                                        const currentUrl = new URL(window.location);
-                                        window.location.href = `/employees/export${currentUrl.search}`;
-                                    }}
-                                    icon={DocumentArrowDownIcon}
-                                >
-                                    Exportar
-                                </Button>
-                            )}
-                            {hasPermission(PERMISSIONS.CREATE_USERS) && (
-                                <Button
-                                    variant="primary"
-                                    onClick={() => openModal('create')}
-                                    icon={PlusIcon}
-                                >
-                                    Novo Funcionário
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Gestão de Funcionários"
+                        icon={UsersIcon}
+                        subtitle="Cadastro, visualização e acompanhamento do ciclo de vida dos colaboradores."
+                        actions={[
+                            {
+                                label: 'Eventos',
+                                icon: CalendarDaysIcon,
+                                variant: 'info-soft',
+                                onClick: () => openModal('exportEvents'),
+                                visible: hasPermission(PERMISSIONS.VIEW_USERS),
+                                title: 'Exportar histórico de eventos (admissões, férias, licenças, demissões)',
+                            },
+                            {
+                                type: 'download',
+                                download: `/employees/export${typeof window !== 'undefined' ? window.location.search : ''}`,
+                                visible: hasPermission(PERMISSIONS.VIEW_USERS),
+                                title: 'Exportar funcionários (filtros aplicados)',
+                            },
+                            {
+                                type: 'create',
+                                label: 'Novo Funcionário',
+                                onClick: () => openModal('create'),
+                                visible: hasPermission(PERMISSIONS.CREATE_USERS),
+                            },
+                        ]}
+                    />
 
                     {/* Statistics */}
                     <StatisticsGrid cards={statsCards} />

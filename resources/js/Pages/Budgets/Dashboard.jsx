@@ -1,4 +1,4 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import axios from 'axios';
 import {
@@ -7,8 +7,6 @@ import {
     ExclamationTriangleIcon,
     FireIcon,
     ChartBarIcon,
-    ArrowLeftIcon,
-    ArrowDownTrayIcon,
     CalendarIcon,
     TagIcon,
     PencilSquareIcon,
@@ -30,6 +28,7 @@ import {
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import EmptyState from '@/Components/Shared/EmptyState';
+import PageHeader from '@/Components/Shared/PageHeader';
 
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -124,19 +123,10 @@ export default function Dashboard({ budget, consumption }) {
 
             <div className="py-8">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="mb-6 flex justify-between items-start">
-                        <div>
-                            <Link
-                                href={route('budgets.index')}
-                                className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-2"
-                            >
-                                <ArrowLeftIcon className="w-4 h-4" />
-                                Voltar para orçamentos
-                            </Link>
-                            <h1 className="text-3xl font-bold text-gray-900">
-                                Dashboard de Consumo
-                            </h1>
-                            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-700">
+                    <PageHeader
+                        title="Dashboard de Consumo"
+                        subtitle={(
+                            <span className="inline-flex flex-wrap items-center gap-2 align-middle">
                                 <StatusBadge variant="indigo" icon={TagIcon}>
                                     {budget?.scope_label}
                                 </StatusBadge>
@@ -151,16 +141,13 @@ export default function Dashboard({ budget, consumption }) {
                                 ) : (
                                     <StatusBadge variant="gray">Inativo</StatusBadge>
                                 )}
-                            </div>
-                        </div>
-                        <a
-                            href={route('budgets.export', budget.id)}
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
-                        >
-                            <ArrowDownTrayIcon className="h-4 w-4" />
-                            Exportar xlsx
-                        </a>
-                    </div>
+                            </span>
+                        )}
+                        actions={[
+                            { type: 'back', href: route('budgets.index') },
+                            { type: 'download', label: 'Exportar xlsx', download: route('budgets.export', budget.id) },
+                        ]}
+                    />
 
                     <StatisticsGrid cards={statisticsCards} cols={6} />
 

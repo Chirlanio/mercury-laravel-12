@@ -2,8 +2,6 @@ import { Head, router } from '@inertiajs/react';
 import { useState, useEffect, useRef } from 'react';
 import {
     MapIcon,
-    PlusIcon,
-    FunnelIcon,
     XMarkIcon,
     PlayIcon,
     PrinterIcon,
@@ -24,6 +22,7 @@ import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import DataTable from '@/Components/DataTable';
 import StandardModal from '@/Components/StandardModal';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import TextInput from '@/Components/TextInput';
 import InputLabel from '@/Components/InputLabel';
@@ -326,25 +325,29 @@ export default function Index({ routes, filters, statusOptions, drivers, availab
             <Head title="Rotas de Entrega" />
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between mb-6">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Rotas de Entrega</h1>
-                            <p className="mt-1 text-sm text-gray-500">Gestão de rotas e motoristas</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <Button variant="outline" size="sm" icon={FunnelIcon} onClick={() => setShowFilters(!showFilters)}>Filtros</Button>
-                            {canManage && (
-                                <Button variant="primary" size="sm" icon={PlusIcon} onClick={() => {
+                    <PageHeader
+                        title="Rotas de Entrega"
+                        subtitle="Gestão de rotas e motoristas"
+                        actions={[
+                            {
+                                type: 'filter',
+                                onClick: () => setShowFilters(!showFilters),
+                            },
+                            {
+                                type: 'create',
+                                label: 'Nova Rota',
+                                onClick: () => {
                                     setCreateData({ driver_id: '', date_route: '', notes: '', delivery_ids: [] });
                                     setSelectedNeighborhoods([]);
                                     setNeighborhoodSearch('');
                                     setOptimizedData(null);
                                     setErrors({});
                                     openModal('create');
-                                }}>Nova Rota</Button>
-                            )}
-                        </div>
-                    </div>
+                                },
+                                visible: canManage,
+                            },
+                        ]}
+                    />
 
                     <StatisticsGrid cards={statisticsCards} loading={statsLoading} />
 

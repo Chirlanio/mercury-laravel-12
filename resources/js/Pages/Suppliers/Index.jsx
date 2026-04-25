@@ -5,6 +5,7 @@ import useModalManager from '@/Hooks/useModalManager';
 import { maskCpfCnpj, maskPhone, maskCep } from '@/Hooks/useMasks';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import DeleteConfirmModal from '@/Components/Shared/DeleteConfirmModal';
 import StandardModal from '@/Components/StandardModal';
@@ -67,20 +68,18 @@ export default function Index({ suppliers, filters = {} }) {
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="mb-6">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <h1 className="text-3xl font-bold text-gray-900">Fornecedores</h1>
-                                <p className="mt-1 text-sm text-gray-600">Gerencie e visualize informações dos fornecedores</p>
-                            </div>
-                            {canCreate && (
-                                <Button variant="primary" onClick={() => openModal('create')} icon={PlusIcon}>
-                                    Novo Fornecedor
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Fornecedores"
+                        subtitle="Gerencie e visualize informações dos fornecedores"
+                        actions={[
+                            {
+                                type: 'create',
+                                label: 'Novo Fornecedor',
+                                onClick: () => openModal('create'),
+                                visible: canCreate,
+                            },
+                        ]}
+                    />
 
                     {/* Filtros */}
                     <div className="bg-white shadow-sm rounded-lg p-4 mb-6">

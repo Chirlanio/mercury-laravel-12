@@ -1,11 +1,12 @@
 import { Head, router } from '@inertiajs/react';
-import { ArrowsUpDownIcon, PlusIcon, XMarkIcon, ChartBarIcon, ClockIcon, CheckCircleIcon, XCircleIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { ArrowsUpDownIcon, XMarkIcon, ChartBarIcon, ClockIcon, CheckCircleIcon, XCircleIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import { useConfirm } from '@/Hooks/useConfirm';
 import useModalManager from '@/Hooks/useModalManager';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import DataTable from '@/Components/DataTable';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import CreateMovementModal from './CreateMovementModal';
@@ -145,28 +146,18 @@ export default function Index({ movements, filters = {}, statusOptions = {}, sta
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="mb-6">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <h1 className="text-3xl font-bold text-gray-900">
-                                    Movimentação de Pessoal
-                                </h1>
-                                <p className="mt-1 text-sm text-gray-600">
-                                    Desligamento, promoção, transferência e reativação de funcionários
-                                </p>
-                            </div>
-                            {canCreate && (
-                                <Button
-                                    variant="primary"
-                                    onClick={() => openModal('create')}
-                                    icon={PlusIcon}
-                                >
-                                    Nova Movimentação
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Movimentação de Pessoal"
+                        subtitle="Desligamento, promoção, transferência e reativação de funcionários"
+                        actions={[
+                            {
+                                type: 'create',
+                                label: 'Nova Movimentação',
+                                onClick: () => openModal('create'),
+                                visible: canCreate,
+                            },
+                        ]}
+                    />
 
                     {/* Statistics Cards */}
                     <StatisticsGrid

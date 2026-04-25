@@ -1,6 +1,5 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import {
-    ArrowLeftIcon,
     ChartBarIcon,
     ArchiveBoxIcon,
     ClockIcon,
@@ -19,8 +18,8 @@ import {
     Tooltip,
     Legend,
 } from 'recharts';
-import Button from '@/Components/Button';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
+import PageHeader from '@/Components/Shared/PageHeader';
 
 const TYPE_COLORS = {
     cliente: '#3b82f6',
@@ -109,27 +108,15 @@ export default function Dashboard({
             <div className="py-6 sm:py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
                     {/* Header */}
-                    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
-                        <div>
-                            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">
-                                <ChartBarIcon className="h-7 w-7 text-indigo-600" />
-                                Dashboard de Consignações
-                            </h1>
-                            <p className="mt-1 text-sm text-gray-600">
-                                Visão analítica de remessas, taxa de retorno e performance por consultor
-                                {isStoreScoped && (
-                                    <span className="ml-2 text-xs font-medium text-indigo-600">
-                                        (escopo: sua loja)
-                                    </span>
-                                )}
-                            </p>
-                        </div>
-                        <Link href={route('consignments.index')} className="shrink-0">
-                            <Button variant="secondary" icon={ArrowLeftIcon} className="min-h-[44px] w-full sm:w-auto">
-                                Voltar à listagem
-                            </Button>
-                        </Link>
-                    </div>
+                    <PageHeader
+                        title="Dashboard de Consignações"
+                        subtitle="Visão analítica de remessas, taxa de retorno e performance por consultor"
+                        icon={ChartBarIcon}
+                        scopeBadge={isStoreScoped ? 'escopo: sua loja' : null}
+                        actions={[
+                            { type: 'back', label: 'Voltar à listagem', href: route('consignments.index') },
+                        ]}
+                    />
 
                     {/* KPIs */}
                     <StatisticsGrid cards={statsCards} cols={6} />

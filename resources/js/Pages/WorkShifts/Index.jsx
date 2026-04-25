@@ -9,11 +9,10 @@ import WorkShiftViewModal from "@/Components/WorkShiftViewModal";
 import WorkShiftEditModal from "@/Components/WorkShiftEditModal";
 import WorkShiftExportModal from "@/Components/WorkShiftExportModal";
 import DeleteConfirmModal from "@/Components/Shared/DeleteConfirmModal";
+import PageHeader from "@/Components/Shared/PageHeader";
 import StatusBadge from "@/Components/Shared/StatusBadge";
 import StatisticsGrid from "@/Components/Shared/StatisticsGrid";
 import {
-    DocumentArrowDownIcon,
-    PlusIcon,
     XMarkIcon,
     ClockIcon,
     CalendarDaysIcon,
@@ -164,34 +163,23 @@ export default function Index({ workShifts, stats, employees, stores, types, fil
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                                <CalendarDaysIcon className="h-8 w-8 text-indigo-600" />
-                                Controle de Jornada
-                            </h1>
-                            <p className="mt-1 text-sm text-gray-500">
-                                Gerencie e visualize as jornadas de trabalho dos funcionários.
-                            </p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            <Button
-                                variant="secondary"
-                                onClick={() => openModal('export')}
-                                icon={DocumentArrowDownIcon}
-                            >
-                                Exportar
-                            </Button>
-                            <Button
-                                variant="primary"
-                                onClick={() => openModal('create')}
-                                icon={PlusIcon}
-                            >
-                                Nova Jornada
-                            </Button>
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Controle de Jornada"
+                        icon={CalendarDaysIcon}
+                        subtitle="Gerencie e visualize as jornadas de trabalho dos funcionários."
+                        actions={[
+                            {
+                                type: 'download',
+                                onClick: () => openModal('export'),
+                                title: 'Exportar jornadas (XLSX/PDF)',
+                            },
+                            {
+                                type: 'create',
+                                label: 'Nova Jornada',
+                                onClick: () => openModal('create'),
+                            },
+                        ]}
+                    />
 
                     {/* Statistics */}
                     <StatisticsGrid cards={statsCards} />

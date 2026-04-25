@@ -2,11 +2,12 @@ import { Head, router, Link } from '@inertiajs/react';
 import { useState, useMemo } from 'react';
 import {
     BookOpenIcon,
-    ArrowLeftIcon,
     EyeIcon,
     PencilSquareIcon,
+    CheckIcon,
 } from '@heroicons/react/24/outline';
 import Button from '@/Components/Button';
+import PageHeader from '@/Components/Shared/PageHeader';
 import InputLabel from '@/Components/InputLabel';
 import InputError from '@/Components/InputError';
 import TextInput from '@/Components/TextInput';
@@ -69,34 +70,27 @@ export default function Edit({ article, departments = [], categories = [] }) {
         <>
             <Head title={isNew ? 'Novo artigo' : `Editar: ${article.title}`} />
             <div className="py-6 sm:py-12">
-                <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8">
-                    {/* Header with back button */}
-                    <div className="flex items-start justify-between gap-3 mb-4 sm:mb-6">
-                        <div>
-                            <Link href={route('helpdesk.articles.index')}
-                                className="inline-flex items-center gap-1 text-xs sm:text-sm text-gray-500 hover:text-gray-700 mb-2">
-                                <ArrowLeftIcon className="w-4 h-4" />
-                                Voltar para a lista
-                            </Link>
-                            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
-                                <BookOpenIcon className="w-6 h-6 sm:w-7 sm:h-7 text-indigo-600 shrink-0" />
-                                <span>{isNew ? 'Novo artigo' : 'Editar artigo'}</span>
-                            </h1>
-                        </div>
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm"
-                                icon={showPreview ? PencilSquareIcon : EyeIcon}
-                                onClick={() => setShowPreview(v => !v)}>
-                                <span className="hidden sm:inline">
-                                    {showPreview ? 'Editar' : 'Pré-visualizar'}
-                                </span>
-                            </Button>
-                            <Button variant="primary" size="sm" onClick={handleSave} loading={processing}>
-                                Salvar
-                            </Button>
-                        </div>
-                    </div>
-
+                <div className="max-w-full mx-auto px-3 sm:px-6 lg:px-8">
+                    <PageHeader
+                        title={isNew ? 'Novo artigo' : 'Editar artigo'}
+                        icon={BookOpenIcon}
+                        actions={[
+                            { type: 'back', label: 'Voltar para a lista', href: route('helpdesk.articles.index') },
+                            {
+                                label: showPreview ? 'Editar' : 'Pré-visualizar',
+                                icon: showPreview ? PencilSquareIcon : EyeIcon,
+                                variant: 'info-soft',
+                                onClick: () => setShowPreview(v => !v),
+                            },
+                            {
+                                type: 'create',
+                                label: 'Salvar',
+                                icon: CheckIcon,
+                                onClick: handleSave,
+                                loading: processing,
+                            },
+                        ]}
+                    />
                     {/* Metadata card */}
                     <div className="bg-white shadow-sm rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

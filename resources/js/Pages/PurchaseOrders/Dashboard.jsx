@@ -4,11 +4,12 @@ import {
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import {
-    ArrowLeftIcon, ShoppingCartIcon, ExclamationTriangleIcon,
+    ShoppingCartIcon, ExclamationTriangleIcon,
     BuildingStorefrontIcon, TagIcon, CalendarDaysIcon,
 } from '@heroicons/react/24/outline';
 import Button from '@/Components/Button';
 import EmptyState from '@/Components/Shared/EmptyState';
+import PageHeader from '@/Components/Shared/PageHeader';
 
 const STATUS_HEX = {
     warning: '#eab308',
@@ -60,19 +61,14 @@ export default function Dashboard({
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="mb-6 flex items-center gap-3">
-                        <Link href={route('purchase-orders.index')}>
-                            <Button variant="outline" size="sm" icon={ArrowLeftIcon}>Voltar</Button>
-                        </Link>
-                        <div className="flex-1">
-                            <h1 className="text-2xl font-bold text-gray-900">
-                                Dashboard — Ordens de Compra
-                                {isStoreScoped && <span className="ml-2 text-base text-indigo-600 font-medium">(Loja {scopedStoreCode})</span>}
-                            </h1>
-                            <p className="text-sm text-gray-600">Visão consolidada do módulo</p>
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Dashboard — Ordens de Compra"
+                        subtitle="Visão consolidada do módulo"
+                        scopeBadge={isStoreScoped ? `Loja ${scopedStoreCode}` : null}
+                        actions={[
+                            { type: 'back', href: route('purchase-orders.index') },
+                        ]}
+                    />
 
                     {totalOrders === 0 ? (
                         <EmptyState

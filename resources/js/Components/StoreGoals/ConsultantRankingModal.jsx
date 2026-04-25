@@ -34,7 +34,7 @@ export default function ConsultantRankingModal({ show, onClose, month, year, sto
             headerColor="bg-indigo-700"
             headerIcon={<TrophyIcon className="h-5 w-5" />}
             loading={loading}
-            maxWidth="5xl"
+            maxWidth="7xl"
             footer={<StandardModal.Footer onCancel={onClose} cancelLabel="Fechar" />}
         >
             {data.length > 0 ? (
@@ -50,7 +50,7 @@ export default function ConsultantRankingModal({ show, onClose, month, year, sto
                                 <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Vendas</th>
                                 <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">%</th>
                                 <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Faixa</th>
-                                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Comissão %</th>
+                                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Comissão %</th>
                                 <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Valor</th>
                             </tr>
                         </thead>

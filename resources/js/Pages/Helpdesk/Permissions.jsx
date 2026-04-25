@@ -8,6 +8,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Button from '@/Components/Button';
 import StandardModal from '@/Components/StandardModal';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import InputLabel from '@/Components/InputLabel';
 import useModalManager from '@/Hooks/useModalManager';
@@ -56,17 +57,15 @@ export default function Permissions({ departments, selectedDepartmentId, permiss
         <>
             <Head title="Permissões Helpdesk" />
             <div className="py-6 sm:py-12">
-                <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="mb-4 sm:mb-6">
-                        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
-                            <ShieldCheckIcon className="w-6 h-6 sm:w-7 sm:h-7 text-indigo-600 shrink-0" />
-                            <span>Permissões do Helpdesk</span>
-                        </h1>
-                        <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                            Atribua técnicos e gerentes aos departamentos do helpdesk.
-                        </p>
-                    </div>
+                <div className="max-w-full mx-auto px-3 sm:px-6 lg:px-8">
+                    <PageHeader
+                        title="Permissões do Helpdesk"
+                        icon={ShieldCheckIcon}
+                        subtitle="Atribua técnicos e gerentes aos departamentos do helpdesk."
+                        actions={[
+                            { type: 'back', href: route('helpdesk.index') },
+                        ]}
+                    />
 
                     {/* Department selector */}
                     <div className="bg-white shadow-sm rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">

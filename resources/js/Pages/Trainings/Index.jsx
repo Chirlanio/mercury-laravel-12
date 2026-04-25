@@ -20,6 +20,7 @@ import useModalManager from '@/Hooks/useModalManager';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import DataTable from '@/Components/DataTable';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import LoadingSpinner from '@/Components/Shared/LoadingSpinner';
@@ -364,33 +365,12 @@ export default function Index({ trainings, filters, statusOptions, statusCounts,
     // Tab action button
     // ==========================================
 
-    const renderTabAction = () => {
-        switch (activeTab) {
-            case 'events':
-                return canCreateEvent && (
-                    <Button variant="primary" size="sm" icon={PlusIcon} onClick={() => openModal('eventCreate')}>
-                        Novo Treinamento
-                    </Button>
-                );
-            case 'contents':
-                return canManageContent && (
-                    <Button variant="primary" size="sm" icon={PlusIcon} onClick={() => openModal('contentCreate')}>
-                        Novo Conteúdo
-                    </Button>
-                );
-            case 'courses':
-                return canCreateCourse && (
-                    <Button variant="primary" size="sm" icon={PlusIcon} onClick={() => openModal('courseCreate')}>
-                        Novo Curso
-                    </Button>
-                );
-            case 'quizzes':
-                return canManageQuiz && (
-                    <Button variant="primary" size="sm" icon={PlusIcon} onClick={() => openModal('quizCreate')}>
-                        Novo Quiz
-                    </Button>
-                );
-        }
+    // Ação de criação muda conforme a aba ativa — cada aba tem seu modal de cadastro próprio.
+    const TAB_CREATE_ACTIONS = {
+        events:   { label: 'Novo Treinamento', modal: 'eventCreate',   visible: canCreateEvent },
+        contents: { label: 'Novo Conteúdo',    modal: 'contentCreate', visible: canManageContent },
+        courses:  { label: 'Novo Curso',       modal: 'courseCreate',  visible: canCreateCourse },
+        quizzes:  { label: 'Novo Quiz',        modal: 'quizCreate',    visible: canManageQuiz },
     };
 
     // ==========================================
@@ -402,21 +382,22 @@ export default function Index({ trainings, filters, statusOptions, statusCounts,
             <Head title="Treinamentos" />
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="flex items-center justify-between mb-6">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Treinamentos</h1>
-                            <p className="mt-1 text-sm text-gray-500">Gestão de treinamentos, conteúdos, cursos e quizzes</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            {activeTab === 'events' && (
-                                <Button variant="outline" size="sm" icon={FunnelIcon} onClick={() => setShowFilters(!showFilters)}>
-                                    Filtros
-                                </Button>
-                            )}
-                            {renderTabAction()}
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Treinamentos"
+                        subtitle="Gestão de treinamentos, conteúdos, cursos e quizzes"
+                        actions={[
+                            activeTab === 'events' && {
+                                type: 'filter',
+                                onClick: () => setShowFilters(!showFilters),
+                            },
+                            TAB_CREATE_ACTIONS[activeTab] && {
+                                type: 'create',
+                                label: TAB_CREATE_ACTIONS[activeTab].label,
+                                onClick: () => openModal(TAB_CREATE_ACTIONS[activeTab].modal),
+                                visible: TAB_CREATE_ACTIONS[activeTab].visible,
+                            },
+                        ].filter(Boolean)}
+                    />
 
                     {/* Tabs */}
                     <div className="border-b border-gray-200 mb-6">

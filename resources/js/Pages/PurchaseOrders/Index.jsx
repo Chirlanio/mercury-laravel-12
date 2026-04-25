@@ -5,7 +5,7 @@ import {
     ShoppingCartIcon, TruckIcon, CurrencyDollarIcon, DocumentTextIcon,
     ClipboardDocumentListIcon, ClockIcon, BuildingStorefrontIcon,
     ArrowPathIcon, CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon,
-    InboxArrowDownIcon, ArrowDownTrayIcon, BoltIcon, QrCodeIcon, ChartPieIcon,
+    InboxArrowDownIcon, BoltIcon, QrCodeIcon,
 } from '@heroicons/react/24/outline';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
@@ -13,6 +13,7 @@ import { maskMoney, parseMoney } from '@/Hooks/useMasks';
 import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import StandardModal from '@/Components/StandardModal';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import FormSection from '@/Components/Shared/FormSection';
@@ -224,23 +225,18 @@ export default function Index({
 
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Header */}
-                    <div className="mb-6 flex justify-between items-center">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900">Ordens de Compra</h1>
-                            <p className="mt-1 text-sm text-gray-600">
-                                Gestão de pedidos de coleções com fornecedores
-                                {isStoreScoped && <span className="ml-2 text-indigo-600 font-medium">(Loja {scopedStoreCode})</span>}
-                            </p>
-                        </div>
-                        <div className="flex gap-2">
-                            <Link href={route('purchase-orders.dashboard')}>
-                                <Button variant="outline" icon={ChartPieIcon}>
-                                    Dashboard
-                                </Button>
-                            </Link>
-                            {canExport && (
-                                <a href={route('purchase-orders.export', {
+                    <PageHeader
+                        title="Ordens de Compra"
+                        subtitle="Gestão de pedidos de coleções com fornecedores"
+                        scopeBadge={isStoreScoped ? `Loja ${scopedStoreCode}` : null}
+                        actions={[
+                            {
+                                type: 'dashboard',
+                                href: route('purchase-orders.dashboard'),
+                            },
+                            {
+                                type: 'download',
+                                download: route('purchase-orders.export', {
                                     format: 'excel',
                                     search: search || undefined,
                                     status: statusFilter || undefined,
@@ -248,26 +244,22 @@ export default function Index({
                                     brand_id: brandFilter || undefined,
                                     date_from: dateFrom || undefined,
                                     date_to: dateTo || undefined,
-                                })}>
-                                    <Button variant="outline" icon={ArrowDownTrayIcon}>
-                                        Exportar
-                                    </Button>
-                                </a>
-                            )}
-                            {canImport && (
-                                <Link href={route('purchase-orders.import.page')}>
-                                    <Button variant="outline" icon={DocumentTextIcon}>
-                                        Importar
-                                    </Button>
-                                </Link>
-                            )}
-                            {canCreate && (
-                                <Button variant="primary" onClick={() => openModal('create')} icon={PlusIcon}>
-                                    Nova Ordem
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                                }),
+                                visible: canExport,
+                            },
+                            {
+                                type: 'import',
+                                href: route('purchase-orders.import.page'),
+                                visible: canImport,
+                            },
+                            {
+                                type: 'create',
+                                label: 'Nova Ordem',
+                                onClick: () => openModal('create'),
+                                visible: canCreate,
+                            },
+                        ]}
+                    />
 
                     {/* Stats */}
                     <div className="mb-6">

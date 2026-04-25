@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
 import Button from '@/Components/Button';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import StatisticsCards from '@/Components/Movements/StatisticsCards';
 import SyncModal from '@/Components/Movements/SyncModal';
@@ -10,7 +11,7 @@ import SyncLogsModal from '@/Components/Movements/SyncLogsModal';
 import ViewModal from '@/Components/Movements/ViewModal';
 import InvoiceDetailModal from '@/Components/Movements/InvoiceDetailModal';
 import {
-    ArrowPathIcon, ClockIcon, MagnifyingGlassIcon, XMarkIcon,
+    MagnifyingGlassIcon, XMarkIcon,
     DocumentArrowDownIcon, PrinterIcon,
 } from '@heroicons/react/24/outline';
 
@@ -74,32 +75,43 @@ export default function Index({ movements, stores, movementTypes, filters, cigam
             <div className="py-6">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
                     {/* Header */}
-                    <div className="mb-6 flex justify-between items-center">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Movimentações Diárias</h1>
-                            <p className="mt-1 text-sm text-gray-600">Dados granulares do CIGAM - fonte de verdade para vendas e estoque</p>
-                        </div>
-                        <div className="flex gap-2">
-                            <Button variant="outline" onClick={() => downloadExport('xlsx')} icon={DocumentArrowDownIcon}
-                                disabled={!movements.total}>
-                                XLSX
-                            </Button>
-                            <Button variant="outline" onClick={() => downloadExport('pdf')} icon={PrinterIcon}
-                                disabled={!movements.total}>
-                                PDF
-                            </Button>
-                            {canSync && (
-                                <>
-                                    <Button variant="outline" onClick={() => openModal('syncLogs')} icon={ClockIcon}>
-                                        Histórico
-                                    </Button>
-                                    <Button variant="primary" onClick={() => openModal('sync')} icon={ArrowPathIcon}>
-                                        Sincronizar
-                                    </Button>
-                                </>
-                            )}
-                        </div>
-                    </div>
+                    <PageHeader
+                        title="Movimentações Diárias"
+                        subtitle="Dados granulares do CIGAM — fonte de verdade para vendas e estoque"
+                        actions={[
+                            {
+                                type: 'download',
+                                disabled: !movements.total,
+                                title: movements.total
+                                    ? 'Exportar movimentações filtradas'
+                                    : 'Aplique filtros para gerar export',
+                                items: [
+                                    {
+                                        label: 'Planilha XLSX',
+                                        icon: DocumentArrowDownIcon,
+                                        download: buildExportUrl('xlsx'),
+                                    },
+                                    {
+                                        label: 'PDF',
+                                        icon: PrinterIcon,
+                                        download: buildExportUrl('pdf'),
+                                    },
+                                ],
+                            },
+                            {
+                                type: 'history',
+                                onClick: () => openModal('syncLogs'),
+                                visible: canSync,
+                                title: 'Histórico de sincronizações',
+                            },
+                            {
+                                type: 'sync',
+                                variant: 'primary',
+                                onClick: () => openModal('sync'),
+                                visible: canSync,
+                            },
+                        ]}
+                    />
 
                     {/* Estatísticas */}
                     <StatisticsCards date={localFilters.date_start} />
