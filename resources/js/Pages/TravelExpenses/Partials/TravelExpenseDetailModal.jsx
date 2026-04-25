@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { PaperAirplaneIcon, PaperClipIcon } from '@heroicons/react/24/outline';
+import { PaperAirplaneIcon, PaperClipIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import StandardModal from '@/Components/StandardModal';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import LoadingSpinner from '@/Components/Shared/LoadingSpinner';
@@ -44,6 +44,7 @@ export default function TravelExpenseDetailModal({
     expense,
     loading = false,
     onOpenAccountability,
+    canExport = false,
 }) {
     const timelineItems = useMemo(() => {
         if (!expense?.history) return [];
@@ -74,6 +75,16 @@ export default function TravelExpenseDetailModal({
                     variant: COLOR_MAP[expense.accountability_status_color] ?? 'gray',
                 },
             ] : []}
+            headerActions={canExport && expense ? (
+                <a
+                    href={route('travel-expenses.pdf', expense.ulid)}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-white/10 hover:bg-white/20 text-white text-xs font-medium px-2.5 py-1.5 transition-colors"
+                    title="Baixar comprovante em PDF"
+                >
+                    <ArrowDownTrayIcon className="h-4 w-4" />
+                    PDF
+                </a>
+            ) : null}
             maxWidth="4xl"
             loading={loading}
         >

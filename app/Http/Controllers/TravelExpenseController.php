@@ -14,15 +14,19 @@ use App\Models\TypeExpense;
 use App\Models\TypeKeyPix;
 use App\Models\User;
 use App\Services\TravelExpenseAccountabilityService;
+use App\Services\TravelExpenseExportService;
 use App\Services\TravelExpenseService;
 use App\Services\TravelExpenseTransitionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class TravelExpenseController extends Controller
 {
@@ -30,6 +34,7 @@ class TravelExpenseController extends Controller
         private TravelExpenseService $service,
         private TravelExpenseTransitionService $transitionService,
         private TravelExpenseAccountabilityService $accountabilityService,
+        private TravelExpenseExportService $exportService,
     ) {}
 
     public function index(Request $request): Response
@@ -317,6 +322,218 @@ class TravelExpenseController extends Controller
         }
 
         return redirect()->back()->with('success', 'Item removido.');
+    }
+
+    // ==================================================================
+    // Export (XLSX listagem + PDF comprovante individual)
+    // ==================================================================
+
+    public function export(Request $request): BinaryFileResponse
+    {
+        $user = $request->user();
+
+        $query = $this->service->scopedQuery($user);
+        $this->applyExportFilters($query, $request);
+
+        return $this->exportService->exportExcel($query);
+    }
+
+    public function exportPdf(TravelExpense $travelExpense, Request $request): HttpResponse
+    {
+        $this->ensureCanView($request->user(), $travelExpense);
+
+        return $this->exportService->exportPdf($travelExpense);
+    }
+
+    /**
+     * Aplica os mesmos filtros do index() ao export. Mantido inline pra
+     * espelhar exatamente a query da listagem (paridade index/export).
+     */
+    protected function applyExportFilters($query, Request $request): void
+    {
+        if ($request->filled('store_code')) {
+            $query->forStore($request->store_code);
+        }
+
+        if ($request->filled('status')) {
+            $query->forStatus($request->status);
+        } elseif (! $request->boolean('include_terminal')) {
+            $query->whereNotIn('status', [
+                TravelExpenseStatus::REJECTED->value,
+                TravelExpenseStatus::FINALIZED->value,
+                TravelExpenseStatus::CANCELLED->value,
+            ]);
+        }
+
+        if ($request->filled('accountability_status')) {
+            $query->where('accountability_status', $request->accountability_status);
+        }
+
+        if ($request->filled('employee_id')) {
+            $query->where('employee_id', $request->employee_id);
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('origin', 'like', "%{$search}%")
+                    ->orWhere('destination', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhereHas('employee', fn ($qq) => $qq->where('name', 'like', "%{$search}%"));
+            });
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('initial_date', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('end_date', '<=', $request->date_to);
+        }
+    }
+
+    // ==================================================================
+    // Dashboard
+    // ==================================================================
+
+    public function dashboard(Request $request): Response
+    {
+        $user = $request->user();
+        $scopedStoreCode = $this->resolveScopedStoreCode($user);
+
+        $period = (int) $request->input('months', 12);
+        $period = max(3, min(24, $period)); // clamp 3..24
+
+        $analytics = $this->buildDashboardAnalytics($scopedStoreCode, $period);
+
+        return Inertia::render('TravelExpenses/Dashboard', [
+            'analytics' => $analytics,
+            'period' => $period,
+            'isStoreScoped' => $scopedStoreCode !== null,
+            'scopedStoreCode' => $scopedStoreCode,
+            'permissions' => [
+                'export' => $user->hasPermissionTo(Permission::EXPORT_TRAVEL_EXPENSES->value),
+            ],
+        ]);
+    }
+
+    /**
+     * 4 séries: gasto mensal, top destinos, distribuição por tipo,
+     * top beneficiados.
+     */
+    protected function buildDashboardAnalytics(?string $scopedStoreCode, int $months): array
+    {
+        $base = TravelExpense::notDeleted()
+            ->whereIn('status', [
+                TravelExpenseStatus::APPROVED->value,
+                TravelExpenseStatus::FINALIZED->value,
+            ]);
+
+        if ($scopedStoreCode) {
+            $base->forStore($scopedStoreCode);
+        }
+
+        $startDate = now()->subMonths($months - 1)->startOfMonth();
+        $base->where('initial_date', '>=', $startDate->toDateString());
+
+        // 1) Gasto mensal (linha)
+        $monthly = (clone $base)
+            ->select(
+                DB::raw("DATE_FORMAT(initial_date, '%Y-%m') as month"),
+                DB::raw('COUNT(*) as count'),
+                DB::raw('COALESCE(SUM(value), 0) as total_value'),
+            )
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get()
+            ->keyBy('month');
+
+        // Preenche meses sem registros com zero (front recebe série completa)
+        $monthlySeries = [];
+        for ($i = 0; $i < $months; $i++) {
+            $cursor = $startDate->copy()->addMonths($i);
+            $key = $cursor->format('Y-m');
+            $row = $monthly->get($key);
+            $monthlySeries[] = [
+                'month' => $key,
+                'month_label' => $cursor->locale('pt_BR')->isoFormat('MMM/YY'),
+                'count' => (int) ($row->count ?? 0),
+                'total_value' => (float) ($row->total_value ?? 0),
+            ];
+        }
+
+        // 2) Top destinos (barra)
+        $topDestinations = (clone $base)
+            ->select('destination', DB::raw('COUNT(*) as count'), DB::raw('COALESCE(SUM(value), 0) as total_value'))
+            ->groupBy('destination')
+            ->orderByDesc('count')
+            ->limit(10)
+            ->get()
+            ->map(fn ($r) => [
+                'destination' => $r->destination,
+                'count' => (int) $r->count,
+                'total_value' => (float) $r->total_value,
+            ])
+            ->all();
+
+        // 3) Distribuição por tipo de despesa (pizza)
+        $byType = DB::table('travel_expense_items')
+            ->join('travel_expenses', 'travel_expenses.id', '=', 'travel_expense_items.travel_expense_id')
+            ->join('type_expenses', 'type_expenses.id', '=', 'travel_expense_items.type_expense_id')
+            ->whereNull('travel_expense_items.deleted_at')
+            ->whereNull('travel_expenses.deleted_at')
+            ->where('travel_expenses.initial_date', '>=', $startDate->toDateString())
+            ->when($scopedStoreCode, fn ($q) => $q->where('travel_expenses.store_code', $scopedStoreCode))
+            ->select(
+                'type_expenses.id',
+                'type_expenses.name',
+                'type_expenses.color',
+                DB::raw('COUNT(*) as count'),
+                DB::raw('COALESCE(SUM(travel_expense_items.value), 0) as total_value'),
+            )
+            ->groupBy('type_expenses.id', 'type_expenses.name', 'type_expenses.color')
+            ->orderByDesc('total_value')
+            ->get()
+            ->map(fn ($r) => [
+                'name' => $r->name,
+                'color' => $r->color,
+                'count' => (int) $r->count,
+                'total_value' => (float) $r->total_value,
+            ])
+            ->all();
+
+        // 4) Top beneficiados (barra horizontal)
+        $topBeneficiaries = (clone $base)
+            ->select('employee_id', DB::raw('COUNT(*) as count'), DB::raw('COALESCE(SUM(value), 0) as total_value'))
+            ->groupBy('employee_id')
+            ->orderByDesc('total_value')
+            ->limit(10)
+            ->with('employee:id,name')
+            ->get()
+            ->map(fn ($r) => [
+                'employee_id' => $r->employee_id,
+                'name' => $r->employee?->name ?? '—',
+                'count' => (int) $r->count,
+                'total_value' => (float) $r->total_value,
+            ])
+            ->all();
+
+        // Resumo
+        $totalCount = (clone $base)->count();
+        $totalValue = (float) (clone $base)->sum('value');
+        $avgTicket = $totalCount > 0 ? $totalValue / $totalCount : 0;
+
+        return [
+            'summary' => [
+                'count' => $totalCount,
+                'total_value' => $totalValue,
+                'avg_ticket' => $avgTicket,
+                'period_label' => $months.' meses (desde '.$startDate->format('m/Y').')',
+            ],
+            'monthly' => $monthlySeries,
+            'top_destinations' => $topDestinations,
+            'by_type' => $byType,
+            'top_beneficiaries' => $topBeneficiaries,
+        ];
     }
 
     public function downloadAttachment(TravelExpense $travelExpense, TravelExpenseItem $item, Request $request)

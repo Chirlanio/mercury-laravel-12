@@ -66,6 +66,7 @@ export default function Index({
     const canApprove = serverPerms.approve ?? hasPermission(PERMISSIONS.APPROVE_TRAVEL_EXPENSES);
     const canManage = serverPerms.manage ?? hasPermission(PERMISSIONS.MANAGE_TRAVEL_EXPENSES);
     const canManageAccountability = serverPerms.manageAccountability ?? hasPermission(PERMISSIONS.MANAGE_ACCOUNTABILITY);
+    const canExport = serverPerms.export ?? hasPermission(PERMISSIONS.EXPORT_TRAVEL_EXPENSES);
 
     const { modals, selected, openModal, closeModal, switchModal } = useModalManager([
         'create', 'edit', 'detail', 'accountability', 'transition', 'delete',
@@ -388,6 +389,24 @@ export default function Index({
                         scopeBadge={isStoreScoped ? `Escopo: ${scopedStoreCode}` : null}
                         actions={[
                             {
+                                type: 'dashboard',
+                                href: route('travel-expenses.dashboard'),
+                            },
+                            {
+                                type: 'download',
+                                download: route('travel-expenses.export', {
+                                    search: search || undefined,
+                                    status: status || undefined,
+                                    accountability_status: accountabilityStatus || undefined,
+                                    store_code: storeCode || undefined,
+                                    employee_id: employeeId || undefined,
+                                    date_from: dateFrom || undefined,
+                                    date_to: dateTo || undefined,
+                                    include_terminal: includeTerminal ? 1 : undefined,
+                                }),
+                                visible: canExport,
+                            },
+                            {
                                 type: 'create',
                                 label: 'Nova Solicitação',
                                 onClick: () => openModal('create'),
@@ -553,6 +572,7 @@ export default function Index({
                 expense={detailExpense}
                 loading={detailLoading}
                 onOpenAccountability={() => switchModal('detail', 'accountability')}
+                canExport={canExport}
             />
 
             {/* === Modal: Prestação de Contas === */}

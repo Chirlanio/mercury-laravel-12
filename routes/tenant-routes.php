@@ -1843,6 +1843,14 @@ Route::middleware(['auth'])->group(function () {
     // ==========================================
     Route::middleware(['tenant.module:travel_expenses', 'permission:'.Permission::VIEW_TRAVEL_EXPENSES->value])->group(function () {
         Route::get('/travel-expenses', [\App\Http\Controllers\TravelExpenseController::class, 'index'])->name('travel-expenses.index');
+        Route::get('/travel-expenses/dashboard', [\App\Http\Controllers\TravelExpenseController::class, 'dashboard'])->name('travel-expenses.dashboard');
+
+        // Export (XLSX da listagem + PDF individual). Rotas sem {travelExpense}
+        // antes do pattern de ULID/numérico para não colidir.
+        Route::middleware('permission:'.Permission::EXPORT_TRAVEL_EXPENSES->value)->group(function () {
+            Route::get('/travel-expenses/export', [\App\Http\Controllers\TravelExpenseController::class, 'export'])->name('travel-expenses.export');
+            Route::get('/travel-expenses/{travelExpense}/pdf', [\App\Http\Controllers\TravelExpenseController::class, 'exportPdf'])->name('travel-expenses.pdf');
+        });
 
         // Detalhes (JSON, usado pelo modal). Resolve por ULID via getRouteKeyName.
         Route::get('/travel-expenses/{travelExpense}', [\App\Http\Controllers\TravelExpenseController::class, 'show'])->name('travel-expenses.show');
