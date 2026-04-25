@@ -85,6 +85,7 @@ class TravelExpense extends Model
         'accountability_approved_at',
         'accountability_rejected_at',
         'accountability_rejection_reason',
+        'helpdesk_ticket_id',
         'created_by_user_id',
         'updated_by_user_id',
         'deleted_at',
