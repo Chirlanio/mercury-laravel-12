@@ -188,3 +188,20 @@ Schedule::command('customers:vip-suggest')
     ->weeklyOn(1, '05:30') // Segunda-feira 05:30
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/customers-vip-suggest.log'));
+
+// Travel Expenses — alerta diário às 09:00 sobre verbas APROVADAS cuja
+// viagem terminou há ≥3 dias e que ainda não tiveram prestação de contas
+// enviada/aprovada. Substitui o cron v1 check_travel_expenses_cron.php.
+// Notifica solicitante + Financeiro (APPROVE_TRAVEL_EXPENSES).
+Schedule::command('travel-expenses:accountability-overdue')
+    ->dailyAt('09:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/travel-expenses-accountability-overdue.log'));
+
+// Travel Expenses — limpeza noturna (02:00) de verbas em DRAFT criadas há
+// >30 dias sem submissão. Reduz lixo de rascunhos abandonados sem afetar
+// rascunhos legítimos. Operação silenciosa (não dispara evento de status).
+Schedule::command('travel-expenses:auto-cancel-stale')
+    ->dailyAt('02:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/travel-expenses-auto-cancel-stale.log'));
