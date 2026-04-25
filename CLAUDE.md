@@ -119,6 +119,22 @@ vendor/bin/pint        # Laravel Pint (PHP code style fixer)
 - UI: cadastro do par Black+Gold em uma operação via endpoint `POST /customers/vip/config/year` (validação Black>=Gold). Campo Ano é `<select>` dinâmico populado pelo backend (`availableYears` = anos cadastrados ∪ ano corrente ∪ próximo). Layout `lg:flex-row` (não estoura iPad mini).
 - Detalhes em `C:\Users\MSDEV\.claude\projects\C--xampp-htdocs-mercury-laravel\memory\customers_vip_module.md`
 
+**Travel Expenses (Verbas de Viagem — paridade v1 `adms_travel_expenses` + melhorias):**
+- 2 state machines paralelas e independentes: `TravelExpenseStatus` (6 estados: draft → submitted → approved → finalized | cancelled, com rejected terminal) e `AccountabilityStatus` (5 estados: pending → in_progress → submitted → approved | rejected) — campos `status` e `accountability_status` separados (v1 tinha as 2 colunas mas só usava uma).
+- **Daily rate persistido** (`daily_rate` decimal + `days_count` int + `value` calculado), não hardcoded como na v1 onde era `R$ 100` fixo no Service. Permite mudança de política sem recalcular registros antigos.
+- **CPF + cpf_hash HMAC-SHA256** (mesmo padrão de Coupons): `cpf_encrypted` armazena valor encriptado via `Crypt::encryptString`, `cpf_hash` permite busca/dedup sem expor claro. **Mutator setCpfAttribute recalcula hash automaticamente** — não usar cast `encrypted` nativo. PIX key também encriptada via mutator próprio.
+- **Pagamento dual XOR** (bank_id+branch+account ou pix_type_id+pix_key) — validação no `TransitionService` antes de DRAFT → SUBMITTED via `ensurePaymentInfo()`. Pelo menos um esperado, ambos aceitos.
+- **History com kind discriminator**: tabela `travel_expense_status_histories` tem coluna `kind` (`expense` | `accountability`) — uma única tabela atende as 2 state machines, identificável via scope `expenseKind()` / `accountabilityKind()`.
+- **Auto-transição da prestação**: ao adicionar primeiro item (qualquer source), `accountability_status` vai de PENDING → IN_PROGRESS automaticamente. Ao remover último item, volta para PENDING. Operações silenciosas (sem evento), apenas history gravado.
+- **FINALIZED requer accountability APPROVED** — pré-condição validada no `TransitionService::validateExpenseTransitionPreconditions()`. Erro de UX comum: tentar finalizar antes de aprovar a prestação.
+- **Hook Helpdesk fail-safe**: ao rejeitar verba ou prestação, abre ticket no depto "Financeiro" via `OpenHelpdeskTicketForTravelExpense` (auto-discovered). 3 camadas de fail-safe: módulo desinstalado / depto inexistente / erro inesperado → log + skip silencioso. Idempotente via `helpdesk_ticket_id` na verba.
+- **Commands agendados**: `travel-expenses:accountability-overdue` (daily 09:00) substitui o cron v1 — alerta solicitante + financeiro sobre verbas APROVADAS com prestação ≥3 dias atrasada após end_date. `travel-expenses:auto-cancel-stale` (daily 02:00) cancela DRAFTs >30d abandonados (silencioso, sem evento).
+- **Vínculo opcional `accounting_class_id` em TypeExpense** — preparação para futura projeção DRE (cada item da prestação herdará a classe contábil do tipo). Hook em si fica para iteração futura.
+- **Scoping por loja automático**: usuário sem `MANAGE_TRAVEL_EXPENSES` nem `APPROVE_TRAVEL_EXPENSES` só vê verbas da própria loja (via `user.store_id`). Approver (Financeiro) vê todas.
+- **Upload disk='public'**, dir `travel-expenses/{ulid}/`, max 5MB, aceita PDF/JPG/PNG/WebP. Mime+size validados em `TravelExpenseAccountabilityService::validateUpload()`.
+- ULID público (substitui hash_id UUID v7 da v1) — `getRouteKeyName()` resolve por `ulid` em todas as rotas com `{travelExpense}`.
+- Detalhes em `C:\Users\MSDEV\.claude\projects\C--xampp-htdocs-mercury-laravel\memory\travel_expenses_module.md`
+
 ### Frontend Structure
 
 ```
@@ -147,6 +163,7 @@ resources/js/
 │   ├── EmployeeAvatar.jsx       # Avatar com fallback de iniciais
 │   ├── Sidebar.jsx              # Navegação com menu do CentralMenuResolver
 │   └── Shared/                  # Componentes compartilhados obrigatórios
+│       ├── PageHeader.jsx      # Header padronizado de página (título + botões de ação responsivos)
 │       ├── StatisticsGrid.jsx   # Grid de cards de KPIs (label, value, format, icon, onClick, active)
 │       ├── StatusBadge.jsx      # Badge de status com variantes de cor e ícone
 │       ├── FormSection.jsx      # Seção de formulário com titulo e grid responsivo
@@ -178,6 +195,7 @@ resources/js/
 
 | Componente | Quando usar | Nunca fazer |
 |---|---|---|
+| `PageHeader` | **Header padronizado de TODA página de listagem/detalhe.** Container mobile-first (stack em mobile, linha em `sm:` ou `lg:` conforme quantidade de ações). API declarativa via `actions[]` — cada ação aceita **`type`** (preset com icon+variant+label default — ver tabela abaixo), `label`, `icon`, `variant`, `compact` (`'auto'`\|`true`\|`false`), `visible`, **uma** de `onClick`/`href`/`download`/`items[]` (dropdown). Props do header: `title`, `subtitle` (string ou JSX), `icon` (Heroicon), `scopeBadge`, `breakpoint` (`auto`\|`sm`\|`lg`). Touch target `min-h-[44px]` automático. **Compact `'auto'` (default)**: ações com variant ≠ `primary` viram icon-only sempre, label vira tooltip — só a ação primária mostra label completo (padrão visual do OrderPayments). Aceita `children` para casos custom. | Criar headers com `<div className="flex justify-between...">` inline, duplicar classes Tailwind, usar `<a>` puro com classes inline para export, aninhar `<Button>` dentro de `<Link>` (gera `<button>` dentro de `<a>`, HTML inválido). |
 | `StatisticsGrid` | Cards de estatísticas/KPIs no topo de qualquer pagina de listagem. Aceita `cards[]` com `label`, `value`, `format` (currency/number/percentage), `icon` (Heroicon), `color`, `sub`, `variation`, `onClick`, `active`. Suporta estado de `loading` com skeleton automático. **Layout responsivo**: cols 1-6 escalam progressivamente (cols=4 vira `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`); valor usa `text-lg sm:text-xl xl:text-2xl` + `tabular-nums` + `truncate` + `title=valor` (tooltip hover) — não estoura em iPad mini para valores monetários longos. | Criar cards de estatísticas inline com HTML/Tailwind avulso ou componentes específico por módulo (ex: `SaleStatisticsCards`, `XyzStats`). |
 | `StatusBadge` | Exibir status, tipo ou qualquer label categorizado com cor. Variantes: success, warning, danger, info, purple, indigo, teal, orange, gray. Aceita `icon` e `dot`. | Criar badges manuais com `<span className="bg-green-100 text-green-800...">`. |
 | `FormSection` | Agrupar campos de formulário com titulo e grid responsivo. Props: `title`, `cols` (1-4). | Criar `<div>` com titulo e grid manual para agrupar campos. |
@@ -215,13 +233,13 @@ Toda nova pagina de módulo **deve** seguir esta estrutura:
 
 ```jsx
 import { Head, router } from '@inertiajs/react';
-import { PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, ChartBarIcon, DocumentArrowDownIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
-import Button from '@/Components/Button';
 import ActionButtons from '@/Components/ActionButtons';
 import DataTable from '@/Components/DataTable';
 import StandardModal from '@/Components/StandardModal';
+import PageHeader from '@/Components/Shared/PageHeader';
 import StatusBadge from '@/Components/Shared/StatusBadge';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 
@@ -234,12 +252,18 @@ export default function Index({ items, filters, stats }) {
             <Head title="módulo" />
             <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* 1. Header — vertical até lg pra não estourar em iPad mini (768).
-                           Padrão: <div className="flex flex-col gap-3 lg:flex-row lg:justify-between lg:items-center">
-                               <div className="min-w-0"> Título + subtítulo (ícones com shrink-0) </div>
-                               <div className="flex flex-wrap gap-2 lg:shrink-0"> Botões com flex-1 sm:flex-none whitespace-nowrap </div>
-                           </div>
-                           NÃO usar sm:flex-row no header — em 640-1023 estoura com 3+ botões. */}
+                    {/* 1. PageHeader — SEMPRE usar. Type presets aplicam icon+variant+label automaticamente. */}
+                    <PageHeader
+                        title="Meu módulo"
+                        subtitle="Descrição do módulo"
+                        scopeBadge={isStoreScoped ? 'escopo: sua loja' : null}
+                        actions={[
+                            { type: 'dashboard', href: route('modulo.dashboard') },
+                            { type: 'download', download: route('modulo.export', filters), visible: canExport },
+                            { type: 'import', href: route('modulo.import'), visible: canImport },
+                            { type: 'create', label: 'Novo', onClick: () => openModal('create'), visible: canCreate },
+                        ]}
+                    />
                     {/* 2. StatisticsGrid com cards de KPIs (responsivo automaticamente) */}
                     {/* 3. Filtros em bg-white shadow-sm rounded-lg p-4 mb-6 */}
                     {/* 4. DataTable com colunas, ActionButtons, StatusBadge */}
@@ -269,6 +293,59 @@ export default function Index({ items, filters, stats }) {
     );
 }
 ```
+
+**Ações do PageHeader — 3 formas mutuamente exclusivas por ação:**
+
+| Prop | Renderiza | Usar para |
+|---|---|---|
+| `onClick: () => fn()` | `<Button>` | Abrir modal, rodar função da página (sync, gerar sugestões, etc.) |
+| `href: route('...')` | `<Link>` (Inertia) | Navegar para outra página dentro do app (Dashboard, Histórico, sub-rotas) |
+| `download: route('...')` | `<a>` nativo | Download direto (XLSX/PDF/CSV) preservando query params de filtros |
+
+**Type presets disponíveis** (aplicam icon + variant + label default; props explícitas sobrescrevem):
+
+| `type:` | Ícone | Variant | Label default | Quando usar |
+|---|---|---|---|---|
+| `'create'` | `PlusIcon` | `primary` (preenchido) | `'Novo'` | Ação principal de criação — único type que mostra label sempre |
+| `'back'` | `ArrowLeftIcon` | `outline` | `'Voltar'` | Botão de retorno em dashboards/imports/show |
+| `'download'` | `ArrowDownTrayIcon` | `success-soft` (verde) | `'Exportar'` | Export XLSX/PDF/CSV — passar `download: route(...)` |
+| `'print'` | `PrinterIcon` | `info-soft` (azul) | `'Imprimir'` | `onClick: () => window.print()` ou rota de impressão |
+| `'import'` | `ArrowUpTrayIcon` | `info-soft` | `'Importar'` | Upload de planilha — modal ou página dedicada |
+| `'dashboard'` | `ChartBarIcon` | `primary-soft` (indigo) | `'Dashboard'` | Link para dashboard analítico do módulo |
+| `'reports'` | `ChartBarIcon` | `primary-soft` | `'Relatórios'` | Geralmente com `items[]` (dropdown de relatórios) |
+| `'history'` | `ClockIcon` | `outline` | `'Histórico'` | Histórico/log/auditoria |
+| `'sync'` | `ArrowPathIcon` | `warning-soft` (âmbar) | `'Sincronizar'` | Sync com sistema externo (CIGAM etc) |
+| `'refresh'` | `ArrowPathIcon` | `warning-soft` | `'Atualizar'` | Recálculo de dados internos |
+| `'filter'` | `FunnelIcon` | `outline` | `'Filtros'` | Toggle de painel de filtros |
+| `'settings'` | `Cog6ToothIcon` | `outline` | `'Configurações'` | Sub-página de configuração do módulo |
+| `'edit'` | `PencilSquareIcon` | `warning-soft` | `'Editar'` | Edição global (raro no header — geralmente está em ActionButtons da linha) |
+| `'delete'` | `TrashIcon` | `danger-soft` (vermelho) | `'Excluir'` | Ação destrutiva |
+| `'view'` | `EyeIcon` | `info-soft` | `'Visualizar'` | Visualização |
+
+**Variants soft** (`primary-soft`, `info-soft`, `success-soft`, `warning-soft`, `danger-soft`): borda + texto coloridos com fundo branco. Identificação visual por cor sem peso de variant preenchida — perfeito para botões compactos no header.
+
+**Comportamento `compact` (default `'auto'`):**
+- `'auto'`: variant ≠ `primary` E tem ícone → icon-only sempre, label vira tooltip via `title`. Padrão visual do OrderPayments — secundárias compactas, primária com label.
+- `true`: força icon-only mesmo sendo `primary`.
+- `false`: força label sempre visível.
+
+Touch target `min-h-[44px]` automático. Container responsivo: stack em mobile → linha em `sm:` (1-2 ações) ou `lg:` (3+ ações, iPad-mini safe).
+
+**Dropdown via `items[]`:**
+
+```jsx
+{
+    type: 'reports',  // herda ChartBarIcon + primary-soft + label "Relatórios"
+    items: [
+        { label: 'Vendas', icon: CurrencyDollarIcon, href: route('reports.sales') },
+        { label: 'Estoque', icon: ArchiveBoxIcon, href: route('reports.stock') },
+        { divider: true },
+        { label: 'Personalizado', icon: Cog6ToothIcon, onClick: () => openModal('reportConfig') },
+    ],
+}
+```
+
+Cada item suporta `href` (Link Inertia), `download` (`<a>` nativo), `onClick`, e `divider: true` (separador). Click outside e tecla Esc fecham.
 
 ### Database
 
