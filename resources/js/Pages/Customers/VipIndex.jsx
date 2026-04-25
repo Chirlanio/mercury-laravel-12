@@ -256,14 +256,14 @@ export default function VipIndex({ tiers, year, availableYears, filters, statist
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
                                     <tr>
-                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
-                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Sugerido</th>
-                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tier final</th>
-                                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Faturamento {year}</th>
-                                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">NFs</th>
-                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Loja preferida</th>
-                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden xl:table-cell">Curadoria</th>
-                                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
+                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Cliente</th>
+                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap hidden md:table-cell" title="Tier sugerido pela classificação automática">Sugerido</th>
+                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap" title="Tier final após curadoria">Tier</th>
+                                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap" title={`Faturamento ${year} (rede Meia Sola)`}>Fat. {year}</th>
+                                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap hidden lg:table-cell" title="Quantidade de notas fiscais">NFs</th>
+                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap hidden lg:table-cell" title="Loja de preferência (maior faturamento)">Loja pref.</th>
+                                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap hidden xl:table-cell" title="Data e responsável pela curadoria">Curado</th>
+                                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
