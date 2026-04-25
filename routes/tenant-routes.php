@@ -60,6 +60,8 @@ use App\Http\Controllers\Config\StockAdjustmentStatusController as ConfigStockAd
 use App\Http\Controllers\Config\StockAuditCycleController as ConfigStockAuditCycleController;
 use App\Http\Controllers\Config\StockAuditVendorController as ConfigStockAuditVendorController;
 use App\Http\Controllers\Config\TransferStatusController as ConfigTransferStatusController;
+use App\Http\Controllers\Config\TypeExpenseController as ConfigTypeExpenseController;
+use App\Http\Controllers\Config\TypeKeyPixController as ConfigTypeKeyPixController;
 use App\Http\Controllers\Config\TypeMovimentController as ConfigTypeMovimentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeeController;
@@ -389,6 +391,8 @@ Route::middleware(['auth', 'tenant.module:config', 'permission:'.Permission::MAN
     Route::resource('reversal-reasons', ConfigReversalReasonController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('return-reasons', ConfigReturnReasonController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('social-media', ConfigSocialMediaController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('type-key-pixs', ConfigTypeKeyPixController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('type-expenses', ConfigTypeExpenseController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('transfer-statuses', ConfigTransferStatusController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('order-payment-statuses', ConfigOrderPaymentStatusController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('management-reasons', ConfigManagementReasonController::class)->only(['index', 'store', 'update', 'destroy']);

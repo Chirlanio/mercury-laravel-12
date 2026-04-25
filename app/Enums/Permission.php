@@ -311,6 +311,16 @@ enum Permission: string
     case IMPORT_CONSIGNMENTS = 'consignments.import';
     case OVERRIDE_CONSIGNMENT_LOCK = 'consignments.override_lock';
 
+    // Verbas de Viagem (solicitação + prestação de contas)
+    case VIEW_TRAVEL_EXPENSES = 'travel_expenses.view';
+    case CREATE_TRAVEL_EXPENSES = 'travel_expenses.create';
+    case EDIT_TRAVEL_EXPENSES = 'travel_expenses.edit';
+    case DELETE_TRAVEL_EXPENSES = 'travel_expenses.delete';
+    case APPROVE_TRAVEL_EXPENSES = 'travel_expenses.approve';
+    case MANAGE_TRAVEL_EXPENSES = 'travel_expenses.manage';
+    case MANAGE_ACCOUNTABILITY = 'travel_expenses.manage_accountability';
+    case EXPORT_TRAVEL_EXPENSES = 'travel_expenses.export';
+
     public function label(): string
     {
         return match ($this) {
@@ -572,6 +582,15 @@ enum Permission: string
             self::EXPORT_CONSIGNMENTS => 'Exportar consignações (XLSX/PDF)',
             self::IMPORT_CONSIGNMENTS => 'Importar consignações (planilha)',
             self::OVERRIDE_CONSIGNMENT_LOCK => 'Ignorar bloqueio de inadimplência e editar finalizadas',
+
+            self::VIEW_TRAVEL_EXPENSES => 'Visualizar verbas de viagem',
+            self::CREATE_TRAVEL_EXPENSES => 'Solicitar verba de viagem',
+            self::EDIT_TRAVEL_EXPENSES => 'Editar solicitação de verba',
+            self::DELETE_TRAVEL_EXPENSES => 'Excluir solicitação de verba',
+            self::APPROVE_TRAVEL_EXPENSES => 'Aprovar/rejeitar verbas (financeiro)',
+            self::MANAGE_TRAVEL_EXPENSES => 'Gerenciar verbas (todas as lojas)',
+            self::MANAGE_ACCOUNTABILITY => 'Lançar prestação de contas',
+            self::EXPORT_TRAVEL_EXPENSES => 'Exportar verbas (XLSX/PDF)',
         };
     }
 
@@ -836,6 +855,15 @@ enum Permission: string
             self::EXPORT_CONSIGNMENTS => 'Permite exportar consignações para Excel (2 abas: cabeçalhos + itens) ou PDF comprovante individual',
             self::IMPORT_CONSIGNMENTS => 'Permite importar consignações via planilha (XLSX/CSV) — usado na migração de dados históricos v1',
             self::OVERRIDE_CONSIGNMENT_LOCK => 'Permite (a) criar consignação para destinatário com outra em atraso (override do bloqueio por inadimplência) e (b) editar consignações já finalizadas ou canceladas. Exige justificativa que fica no histórico.',
+
+            self::VIEW_TRAVEL_EXPENSES => 'Permite visualizar verbas de viagem. Sem MANAGE_TRAVEL_EXPENSES, o usuário só vê verbas que solicitou ou onde é beneficiado',
+            self::CREATE_TRAVEL_EXPENSES => 'Permite criar solicitações de verba de viagem para si ou outro colaborador',
+            self::EDIT_TRAVEL_EXPENSES => 'Permite editar a solicitação enquanto estiver em rascunho ou submetida (antes da aprovação). Após aprovação só com MANAGE_TRAVEL_EXPENSES',
+            self::DELETE_TRAVEL_EXPENSES => 'Permite excluir solicitação (soft delete). Bloqueado se já tiver prestação de contas com itens lançados',
+            self::APPROVE_TRAVEL_EXPENSES => 'Permite aprovar/rejeitar solicitações de verba (transição submitted → approved/rejected) e a prestação de contas (accountability submitted → approved/rejected). Pertence ao Financeiro/Contas a Pagar',
+            self::MANAGE_TRAVEL_EXPENSES => 'Permite gerenciar verbas de todas as lojas (sem filtro de escopo) e operar em qualquer status, inclusive cancelar verbas já aprovadas',
+            self::MANAGE_ACCOUNTABILITY => 'Permite lançar/editar itens da prestação de contas (recibos, NFs, comprovantes). Solicitante e beneficiado têm essa permissão por padrão',
+            self::EXPORT_TRAVEL_EXPENSES => 'Permite exportar verbas para Excel (listagem) ou PDF (comprovante individual com prestação de contas)',
         };
     }
 

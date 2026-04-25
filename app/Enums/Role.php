@@ -297,6 +297,15 @@ enum Role: string
                 Permission::MANAGE_VIP_ACTIVITIES->value,
                 Permission::MANAGE_VIP_TIER_CONFIG->value,
                 Permission::IMPORT_VIP_CUSTOMERS->value,
+                // Verbas de Viagem (todas)
+                Permission::VIEW_TRAVEL_EXPENSES->value,
+                Permission::CREATE_TRAVEL_EXPENSES->value,
+                Permission::EDIT_TRAVEL_EXPENSES->value,
+                Permission::DELETE_TRAVEL_EXPENSES->value,
+                Permission::APPROVE_TRAVEL_EXPENSES->value,
+                Permission::MANAGE_TRAVEL_EXPENSES->value,
+                Permission::MANAGE_ACCOUNTABILITY->value,
+                Permission::EXPORT_TRAVEL_EXPENSES->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -541,6 +550,15 @@ enum Role: string
                 Permission::MANAGE_VIP_ACTIVITIES->value,
                 Permission::MANAGE_VIP_TIER_CONFIG->value,
                 Permission::IMPORT_VIP_CUSTOMERS->value,
+                // Verbas de Viagem (todas)
+                Permission::VIEW_TRAVEL_EXPENSES->value,
+                Permission::CREATE_TRAVEL_EXPENSES->value,
+                Permission::EDIT_TRAVEL_EXPENSES->value,
+                Permission::DELETE_TRAVEL_EXPENSES->value,
+                Permission::APPROVE_TRAVEL_EXPENSES->value,
+                Permission::MANAGE_TRAVEL_EXPENSES->value,
+                Permission::MANAGE_ACCOUNTABILITY->value,
+                Permission::EXPORT_TRAVEL_EXPENSES->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -684,6 +702,14 @@ enum Role: string
                 // Clientes — view + export (sync fica com admin+)
                 Permission::VIEW_CUSTOMERS->value,
                 Permission::EXPORT_CUSTOMERS->value,
+                // Verbas de Viagem — solicita, edita as próprias e lança prestação.
+                // Aprovação fica com Financeiro. Sem MANAGE faz scoping automático
+                // por solicitante/beneficiado.
+                Permission::VIEW_TRAVEL_EXPENSES->value,
+                Permission::CREATE_TRAVEL_EXPENSES->value,
+                Permission::EDIT_TRAVEL_EXPENSES->value,
+                Permission::MANAGE_ACCOUNTABILITY->value,
+                Permission::EXPORT_TRAVEL_EXPENSES->value,
             ],
             self::FINANCE => [
                 // Financeira — contas a pagar, orçamentos, imports de realizado DRE.
@@ -736,6 +762,17 @@ enum Role: string
                 Permission::VIEW_MOVEMENTS->value,
                 Permission::VIEW_REVERSALS->value,
                 Permission::VIEW_RETURNS->value,
+
+                // Verbas de Viagem (full lifecycle de aprovação) — Contas a Pagar
+                // recebia as notificações na v1; aqui mantém o controle financeiro.
+                Permission::VIEW_TRAVEL_EXPENSES->value,
+                Permission::CREATE_TRAVEL_EXPENSES->value,
+                Permission::EDIT_TRAVEL_EXPENSES->value,
+                Permission::DELETE_TRAVEL_EXPENSES->value,
+                Permission::APPROVE_TRAVEL_EXPENSES->value,
+                Permission::MANAGE_TRAVEL_EXPENSES->value,
+                Permission::MANAGE_ACCOUNTABILITY->value,
+                Permission::EXPORT_TRAVEL_EXPENSES->value,
             ],
             self::ACCOUNTING => [
                 // Contabilidade — plano de contas, classes gerenciais, centros de
@@ -893,6 +930,11 @@ enum Role: string
                 Permission::REGISTER_CONSIGNMENT_RETURN->value,
                 // Clientes — view apenas (vendedor busca cliente ao cadastrar consignação)
                 Permission::VIEW_CUSTOMERS->value,
+                // Verbas de Viagem — colaborador solicita verba e lança prestação
+                // de contas das próprias viagens. Sem MANAGE limita escopo a si.
+                Permission::VIEW_TRAVEL_EXPENSES->value,
+                Permission::CREATE_TRAVEL_EXPENSES->value,
+                Permission::MANAGE_ACCOUNTABILITY->value,
             ],
             self::DRIVER => [
                 // Perfil próprio

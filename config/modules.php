@@ -309,4 +309,11 @@ return [
         'icon' => 'UserGroupIcon',
         'dependencies' => [],
     ],
+    'travel_expenses' => [
+        'name' => 'Verbas de Viagem',
+        'description' => 'Solicitação de adiantamento para viagens corporativas com cálculo automático de diárias, prestação de contas (anexos NF/recibo) e fluxo de aprovação financeira. Substitui o módulo "Verbas de Viagem" do Mercury v1.',
+        'routes' => ['travel-expenses.*'],
+        'icon' => 'PaperAirplaneIcon',
+        'dependencies' => ['employees', 'stores'],
+    ],
 ];
