@@ -283,6 +283,16 @@ export const PERMISSIONS = {
     VIEW_VIP_REPORTS: 'customer_vips.view_reports',
     MANAGE_VIP_ACTIVITIES: 'customer_vips.manage_activities',
     MANAGE_VIP_TIER_CONFIG: 'customer_vips.manage_config',
+
+    // Verbas de Viagem
+    VIEW_TRAVEL_EXPENSES: 'travel_expenses.view',
+    CREATE_TRAVEL_EXPENSES: 'travel_expenses.create',
+    EDIT_TRAVEL_EXPENSES: 'travel_expenses.edit',
+    DELETE_TRAVEL_EXPENSES: 'travel_expenses.delete',
+    APPROVE_TRAVEL_EXPENSES: 'travel_expenses.approve',
+    MANAGE_TRAVEL_EXPENSES: 'travel_expenses.manage',
+    MANAGE_ACCOUNTABILITY: 'travel_expenses.manage_accountability',
+    EXPORT_TRAVEL_EXPENSES: 'travel_expenses.export',
 };
 
 export const ROLES = {

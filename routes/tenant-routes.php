@@ -1839,6 +1839,48 @@ Route::middleware(['auth'])->group(function () {
         });
 
     // ==========================================
+    // Travel Expenses (Verbas de Viagem)
+    // ==========================================
+    Route::middleware(['tenant.module:travel_expenses', 'permission:'.Permission::VIEW_TRAVEL_EXPENSES->value])->group(function () {
+        Route::get('/travel-expenses', [\App\Http\Controllers\TravelExpenseController::class, 'index'])->name('travel-expenses.index');
+
+        // Detalhes (JSON, usado pelo modal). Resolve por ULID via getRouteKeyName.
+        Route::get('/travel-expenses/{travelExpense}', [\App\Http\Controllers\TravelExpenseController::class, 'show'])->name('travel-expenses.show');
+
+        // Download de comprovante (somente quem tem acesso à verba)
+        Route::get('/travel-expenses/{travelExpense}/items/{item}/download', [\App\Http\Controllers\TravelExpenseController::class, 'downloadAttachment'])
+            ->whereNumber('item')
+            ->name('travel-expenses.items.download');
+
+        Route::middleware('permission:'.Permission::CREATE_TRAVEL_EXPENSES->value)->group(function () {
+            Route::post('/travel-expenses', [\App\Http\Controllers\TravelExpenseController::class, 'store'])->name('travel-expenses.store');
+        });
+
+        // Edit + transitions: a permission específica da transição é validada
+        // pelo TravelExpenseTransitionService.
+        Route::middleware('permission:'.Permission::EDIT_TRAVEL_EXPENSES->value)->group(function () {
+            Route::put('/travel-expenses/{travelExpense}', [\App\Http\Controllers\TravelExpenseController::class, 'update'])->name('travel-expenses.update');
+            Route::post('/travel-expenses/{travelExpense}/transition', [\App\Http\Controllers\TravelExpenseController::class, 'transition'])->name('travel-expenses.transition');
+        });
+
+        // Itens da prestação de contas — exige MANAGE_ACCOUNTABILITY
+        // (solicitante e beneficiado têm essa permission por padrão).
+        Route::middleware('permission:'.Permission::MANAGE_ACCOUNTABILITY->value)->group(function () {
+            Route::post('/travel-expenses/{travelExpense}/items', [\App\Http\Controllers\TravelExpenseController::class, 'storeItem'])->name('travel-expenses.items.store');
+            Route::post('/travel-expenses/{travelExpense}/items/{item}', [\App\Http\Controllers\TravelExpenseController::class, 'updateItem'])
+                ->whereNumber('item')
+                ->name('travel-expenses.items.update');
+            Route::delete('/travel-expenses/{travelExpense}/items/{item}', [\App\Http\Controllers\TravelExpenseController::class, 'destroyItem'])
+                ->whereNumber('item')
+                ->name('travel-expenses.items.destroy');
+        });
+
+        Route::middleware('permission:'.Permission::DELETE_TRAVEL_EXPENSES->value)->group(function () {
+            Route::delete('/travel-expenses/{travelExpense}', [\App\Http\Controllers\TravelExpenseController::class, 'destroy'])->name('travel-expenses.destroy');
+        });
+    });
+
+    // ==========================================
     // Placeholder Coming Soon
     // ==========================================
     Route::get('/ecommerce', fn () => Inertia::render('ComingSoon', ['title' => 'E-commerce']))->name('ecommerce');
