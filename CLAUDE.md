@@ -140,6 +140,20 @@ vendor/bin/pint        # Laravel Pint (PHP code style fixer)
 - ULID público (substitui hash_id UUID v7 da v1) — `getRouteKeyName()` resolve por `ulid` em todas as rotas com `{travelExpense}`.
 - Detalhes em `C:\Users\MSDEV\.claude\projects\C--xampp-htdocs-mercury-laravel\memory\travel_expenses_module.md`
 
+**TurnList (Lista da Vez — paridade v1 `adms_ldv_*` + melhorias):**
+- Quadro de fila de atendimento das consultoras no PDV. **Tablet-first** com Fullscreen API + drag-and-drop entre painéis via `@dnd-kit/core` (PointerSensor + TouchSensor + KeyboardSensor) — vendedoras usam em tablet na loja física.
+- 4 painéis: **Available** (consultoras ativas sem fila/atendimento/pausa), **Queue** (fila ordenada por position), **Attending** (atendimentos ativos com timer), **OnBreak** (pausas com `is_exceeded` calculado). Polling silencioso 30s via fetch direto (não Inertia) pra não disparar re-render do shell. Tick 1Hz client-side mantém timers fluidos entre poll cycles.
+- Filtro estrito de consultoras: `position_id=1 (Consultora) + status_id=2 (Ativo) + store_id=$storeCode`. Constantes `CONSULTORA_POSITION_ID=1` e `ACTIVE_EMPLOYEE_STATUS_ID=2` no `TurnListBoardService`.
+- **Algoritmo aheadCount de ajuste de posição** (paridade fiel da v1): quando outcome tem `restore_queue_position=true`, posição de retorno = `max(1, original_queue_position - aheadCount)`, onde aheadCount = consultoras que estavam à FRENTE na fila E também saíram pra atender DEPOIS desta (e ainda atendendo). Evita "buracos" quando várias saem juntas.
+- **Pausa requer estar na fila** (regra refinada vs v1): v1 permitia pausa partindo do "Disponível", confundia operadoras. v2 valida `getPosition() != null` em `TurnListBreakService::start()`.
+- **Cleanup via cron, não lazy**: `turn-list:cleanup` daily 23:00 (após fechamento PDV). Finaliza atendimentos/pausas órfãos >12h e esvazia a fila. `return_to_queue=false` pra distinguir do fluxo normal. Substitui `ldv_attendance_history` da v1 (decisão deliberada — agregamos on-demand em vez de tabela redundante).
+- **Stats com cache 5min** via `Cache::store('array')` em `TurnListStatsService`. Períodos: today/week/month/custom. Métricas: summary, top employees, by_outcome, by_day, by_hour, break_stats. Página `/turn-list/reports` protegida por `VIEW_TURN_LIST_REPORTS` com 4 gráficos recharts.
+- 6 permissions: VIEW_TURN_LIST, OPERATE_TURN_LIST, MANAGE_TURN_LIST, MANAGE_TURN_LIST_OUTCOMES, MANAGE_TURN_LIST_BREAK_TYPES, VIEW_TURN_LIST_REPORTS. USER (vendedora) tem só VIEW+OPERATE com scoping automático por `user.store_id`. MANAGE permite trocar de loja via `?store=`.
+- Reuso do enum `TurnListAttendanceStatus` (active/finished) em attendances E breaks — evita criar enum extra.
+- **Gotchas testáveis**: defaults de status via `$attributes` no Model (sem isso casts enum retornam null em instâncias novas); boundary de meia-noite UTC em testes de período (use `now()->startOfDay()->addHours(10)` em vez de `now()->subMinutes(30)`); `scanTenant()` precisa de `OutputStyle` injetado em testes (chamada direta causa "writeln() on null").
+- 83 tests / 273 assertions (Queue 14 + Attendance 11 + Break 8 + Board 8 + Stats 11 + Controller 24 + Cleanup 7).
+- Detalhes em `C:\Users\MSDEV\.claude\projects\C--xampp-htdocs-mercury-laravel\memory\turn_list_module.md`
+
 ### Frontend Structure
 
 ```
