@@ -609,7 +609,7 @@ export default function Index({
                 processing={deleteProcessing}
             />
 
-            {ConfirmDialogComponent}
+            <ConfirmDialogComponent />
         </>
     );
 }
