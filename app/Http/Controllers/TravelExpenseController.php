@@ -121,7 +121,9 @@ class TravelExpenseController extends Controller
                 'stores' => $scopedStoreCode
                     ? Store::where('code', $scopedStoreCode)->get(['id', 'code', 'name'])
                     : Store::orderBy('name')->get(['id', 'code', 'name']),
-                'employees' => Employee::orderBy('name')->get(['id', 'name', 'store_id']),
+                'employees' => Employee::where('status_id', 2)
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'store_id']),
                 'banks' => Bank::orderBy('bank_name')->get(['id', 'bank_name', 'cod_bank']),
                 'pixTypes' => TypeKeyPix::active()->orderBy('sort_order')->get(['id', 'name']),
                 'typeExpenses' => TypeExpense::active()->orderBy('sort_order')->get(['id', 'name', 'icon', 'color']),
