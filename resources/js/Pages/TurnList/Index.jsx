@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     UserGroupIcon,
@@ -170,25 +170,39 @@ export default function Index({
     };
 
     // ──────────────────────────────────────────────────────
-    // Ações de transição (centralizadas)
+    // Ações de transição (axios — sem reload via Inertia)
+    //
+    // O backend devolve 204 No Content para XHR; após o POST chamamos
+    // fetchBoard() pra atualizar o estado silenciosamente. Erros 422
+    // (validação) retornam JSON e tbm disparam refetch pra refletir o
+    // estado real da loja.
     // ──────────────────────────────────────────────────────
-    const inertiaPost = (url, data, opts = {}) => {
-        router.post(url, data, {
-            preserveScroll: true,
-            preserveState: true,
-            onSuccess: fetchBoard,
-            onError: () => fetchBoard(),
-            ...opts,
-        });
-    };
+    const apiPost = useCallback(async (url, data = {}) => {
+        try {
+            await window.axios.post(url, data);
+        } catch (err) {
+            const status = err?.response?.status;
+            const errors = err?.response?.data?.errors;
+            if (status === 422 && errors) {
+                const firstField = Object.keys(errors)[0];
+                const msg = errors[firstField];
+                setLoadError(Array.isArray(msg) ? msg[0] : String(msg));
+            } else if (status && status !== 204) {
+                console.error('Falha na ação:', err);
+                setLoadError('Falha ao executar a ação. Atualizando painel.');
+            }
+        } finally {
+            await fetchBoard();
+        }
+    }, [fetchBoard]);
 
     const handlePanelTransition = (employeeId, from, to, payload) => {
         if (from === 'available' && to === 'queue') {
-            inertiaPost(route('turn-list.queue.enter'), { employee_id: employeeId, store_code: storeCode });
+            apiPost(route('turn-list.queue.enter'), { employee_id: employeeId, store_code: storeCode });
         } else if (from === 'queue' && to === 'available') {
-            inertiaPost(route('turn-list.queue.leave'), { employee_id: employeeId, store_code: storeCode });
+            apiPost(route('turn-list.queue.leave'), { employee_id: employeeId, store_code: storeCode });
         } else if (from === 'queue' && to === 'attending') {
-            inertiaPost(route('turn-list.attendances.start'), { employee_id: employeeId, store_code: storeCode });
+            apiPost(route('turn-list.attendances.start'), { employee_id: employeeId, store_code: storeCode });
         } else if (from === 'queue' && to === 'on_break') {
             setBreakModal({ open: true, employeeId });
         } else if (from === 'attending' && to === 'queue') {
@@ -196,13 +210,13 @@ export default function Index({
         } else if (from === 'on_break' && to === 'queue') {
             const breakId = payload?.break_id;
             if (breakId) {
-                inertiaPost(route('turn-list.breaks.finish', breakId), {});
+                apiPost(route('turn-list.breaks.finish', breakId), {});
             }
         }
     };
 
     const doReorder = (employeeId, newPosition) => {
-        inertiaPost(route('turn-list.queue.reorder'), {
+        apiPost(route('turn-list.queue.reorder'), {
             employee_id: employeeId,
             store_code: storeCode,
             new_position: newPosition,
@@ -214,20 +228,20 @@ export default function Index({
     // ──────────────────────────────────────────────────────
     const cardActions = useMemo(() => ({
         enterQueue: (employeeId) =>
-            inertiaPost(route('turn-list.queue.enter'), { employee_id: employeeId, store_code: storeCode }),
+            apiPost(route('turn-list.queue.enter'), { employee_id: employeeId, store_code: storeCode }),
         leaveQueue: (employeeId) =>
-            inertiaPost(route('turn-list.queue.leave'), { employee_id: employeeId, store_code: storeCode }),
+            apiPost(route('turn-list.queue.leave'), { employee_id: employeeId, store_code: storeCode }),
         startAttendance: (employeeId) =>
-            inertiaPost(route('turn-list.attendances.start'), { employee_id: employeeId, store_code: storeCode }),
+            apiPost(route('turn-list.attendances.start'), { employee_id: employeeId, store_code: storeCode }),
         openBreakModal: (employeeId) => setBreakModal({ open: true, employeeId }),
         finishAttendance: (item) => setOutcomeModal({ open: true, attendance: item }),
-        finishBreak: (breakId) => inertiaPost(route('turn-list.breaks.finish', breakId), {}),
-    }), [storeCode]);
+        finishBreak: (breakId) => apiPost(route('turn-list.breaks.finish', breakId), {}),
+    }), [storeCode, apiPost]);
 
     const onConfirmOutcome = ({ outcomeId, returnToQueue, notes }) => {
         const att = outcomeModal.attendance;
         if (!att?.attendance_ulid) return;
-        inertiaPost(route('turn-list.attendances.finish', att.attendance_ulid), {
+        apiPost(route('turn-list.attendances.finish', att.attendance_ulid), {
             outcome_id: outcomeId,
             return_to_queue: returnToQueue,
             notes,
@@ -237,7 +251,7 @@ export default function Index({
 
     const onConfirmBreakType = ({ breakTypeId }) => {
         if (!breakModal.employeeId) return;
-        inertiaPost(route('turn-list.breaks.start'), {
+        apiPost(route('turn-list.breaks.start'), {
             employee_id: breakModal.employeeId,
             store_code: storeCode,
             break_type_id: breakTypeId,

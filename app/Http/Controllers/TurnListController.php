@@ -18,7 +18,7 @@ use App\Services\TurnListStatsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Http\Response as HttpResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -110,7 +110,7 @@ class TurnListController extends Controller
     // Queue
     // ==================================================================
 
-    public function enterQueue(Request $request): RedirectResponse
+    public function enterQueue(Request $request): RedirectResponse|HttpResponse
     {
         $data = $request->validate([
             'employee_id' => 'required|integer|exists:employees,id',
@@ -119,16 +119,12 @@ class TurnListController extends Controller
 
         $this->ensureCanOperateStore($request->user(), $data['store_code']);
 
-        try {
-            $this->queueService->enter($data['employee_id'], $data['store_code'], $request->user());
-        } catch (ValidationException $e) {
-            return redirect()->back()->withErrors($e->errors());
-        }
+        $this->queueService->enter($data['employee_id'], $data['store_code'], $request->user());
 
-        return redirect()->back();
+        return $this->respondOk($request);
     }
 
-    public function leaveQueue(Request $request): RedirectResponse
+    public function leaveQueue(Request $request): RedirectResponse|HttpResponse
     {
         $data = $request->validate([
             'employee_id' => 'required|integer|exists:employees,id',
@@ -139,10 +135,10 @@ class TurnListController extends Controller
 
         $this->queueService->leave($data['employee_id'], $data['store_code']);
 
-        return redirect()->back();
+        return $this->respondOk($request);
     }
 
-    public function reorderQueue(Request $request): RedirectResponse
+    public function reorderQueue(Request $request): RedirectResponse|HttpResponse
     {
         $data = $request->validate([
             'employee_id' => 'required|integer|exists:employees,id',
@@ -152,20 +148,16 @@ class TurnListController extends Controller
 
         $this->ensureCanOperateStore($request->user(), $data['store_code']);
 
-        try {
-            $this->queueService->reorder($data['employee_id'], $data['store_code'], $data['new_position']);
-        } catch (ValidationException $e) {
-            return redirect()->back()->withErrors($e->errors());
-        }
+        $this->queueService->reorder($data['employee_id'], $data['store_code'], $data['new_position']);
 
-        return redirect()->back();
+        return $this->respondOk($request);
     }
 
     // ==================================================================
     // Attendance
     // ==================================================================
 
-    public function startAttendance(Request $request): RedirectResponse
+    public function startAttendance(Request $request): RedirectResponse|HttpResponse
     {
         $data = $request->validate([
             'employee_id' => 'required|integer|exists:employees,id',
@@ -174,16 +166,12 @@ class TurnListController extends Controller
 
         $this->ensureCanOperateStore($request->user(), $data['store_code']);
 
-        try {
-            $this->attendanceService->start($data['employee_id'], $data['store_code'], $request->user());
-        } catch (ValidationException $e) {
-            return redirect()->back()->withErrors($e->errors());
-        }
+        $this->attendanceService->start($data['employee_id'], $data['store_code'], $request->user());
 
-        return redirect()->back();
+        return $this->respondOk($request);
     }
 
-    public function finishAttendance(TurnListAttendance $attendance, Request $request): RedirectResponse
+    public function finishAttendance(TurnListAttendance $attendance, Request $request): RedirectResponse|HttpResponse
     {
         $this->ensureCanOperateStore($request->user(), $attendance->store_code);
 
@@ -193,26 +181,22 @@ class TurnListController extends Controller
             'notes' => 'nullable|string|max:500',
         ]);
 
-        try {
-            $this->attendanceService->finish(
-                $attendance,
-                (int) $data['outcome_id'],
-                $data['return_to_queue'] ?? true,
-                $data['notes'] ?? null,
-                $request->user(),
-            );
-        } catch (ValidationException $e) {
-            return redirect()->back()->withErrors($e->errors());
-        }
+        $this->attendanceService->finish(
+            $attendance,
+            (int) $data['outcome_id'],
+            $data['return_to_queue'] ?? true,
+            $data['notes'] ?? null,
+            $request->user(),
+        );
 
-        return redirect()->back();
+        return $this->respondOk($request);
     }
 
     // ==================================================================
     // Break
     // ==================================================================
 
-    public function startBreak(Request $request): RedirectResponse
+    public function startBreak(Request $request): RedirectResponse|HttpResponse
     {
         $data = $request->validate([
             'employee_id' => 'required|integer|exists:employees,id',
@@ -222,38 +206,30 @@ class TurnListController extends Controller
 
         $this->ensureCanOperateStore($request->user(), $data['store_code']);
 
-        try {
-            $this->breakService->start(
-                $data['employee_id'],
-                $data['store_code'],
-                (int) $data['break_type_id'],
-                $request->user(),
-            );
-        } catch (ValidationException $e) {
-            return redirect()->back()->withErrors($e->errors());
-        }
+        $this->breakService->start(
+            $data['employee_id'],
+            $data['store_code'],
+            (int) $data['break_type_id'],
+            $request->user(),
+        );
 
-        return redirect()->back();
+        return $this->respondOk($request);
     }
 
-    public function finishBreak(TurnListBreak $break, Request $request): RedirectResponse
+    public function finishBreak(TurnListBreak $break, Request $request): RedirectResponse|HttpResponse
     {
         $this->ensureCanOperateStore($request->user(), $break->store_code);
 
-        try {
-            $this->breakService->finish($break, $request->user());
-        } catch (ValidationException $e) {
-            return redirect()->back()->withErrors($e->errors());
-        }
+        $this->breakService->finish($break, $request->user());
 
-        return redirect()->back();
+        return $this->respondOk($request);
     }
 
     // ==================================================================
     // Settings (toggle return_to_position por loja)
     // ==================================================================
 
-    public function updateSettings(Request $request): RedirectResponse
+    public function updateSettings(Request $request): RedirectResponse|HttpResponse
     {
         $data = $request->validate([
             'store_code' => 'required|string|max:10',
@@ -272,12 +248,27 @@ class TurnListController extends Controller
             ],
         );
 
-        return redirect()->back();
+        return $this->respondOk($request);
     }
 
     // ==================================================================
     // Helpers
     // ==================================================================
+
+    /**
+     * Resposta OK pra mutações: 204 No Content em XHR/AJAX (frontend faz
+     * refresh do board via fetch separado), redirect back para fallback
+     * Inertia/form clássico. Evita o ciclo redirect → re-render do Index
+     * que recarregava props desnecessariamente.
+     */
+    protected function respondOk(Request $request): RedirectResponse|HttpResponse
+    {
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->noContent();
+        }
+
+        return redirect()->back();
+    }
 
     /**
      * Resolve a loja a operar. Usuários com MANAGE podem trocar via query
