@@ -5,7 +5,64 @@ import StandardModal from '@/Components/StandardModal';
 import InputLabel from '@/Components/InputLabel';
 import InputError from '@/Components/InputError';
 import TextInput from '@/Components/TextInput';
-import { maskCpf } from '@/Hooks/useMasks';
+import { maskCpf, maskCpfCnpj, maskPhone } from '@/Hooks/useMasks';
+
+// ───────────────────────────────────────────────────────────────────
+// Máscara/validação dinâmica de chave PIX por tipo. Mapeia pelo NOME
+// do tipo (vindo do config TypeKeyPix), case-insensitive e tolerante
+// a variações ("E-mail" / "Email", "CPF/CNPJ" / "CPF").
+// ───────────────────────────────────────────────────────────────────
+function maskRandomKey(value) {
+    // UUID v4-ish: 8-4-4-4-12 hex (aceita o que cola, formata se já couber)
+    const hex = String(value).replace(/[^0-9a-fA-F]/g, '').slice(0, 32).toLowerCase();
+    if (hex.length <= 8) return hex;
+    if (hex.length <= 12) return `${hex.slice(0, 8)}-${hex.slice(8)}`;
+    if (hex.length <= 16) return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12)}`;
+    if (hex.length <= 20) return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16)}`;
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+const PIX_KEY_KIND = {
+    cpf_cnpj: {
+        match: (name) => /cpf|cnpj/i.test(name),
+        mask: maskCpfCnpj,
+        placeholder: '000.000.000-00 ou 00.000.000/0000-00',
+        validate: (v) => {
+            const digits = String(v).replace(/\D/g, '');
+            return digits.length === 11 || digits.length === 14;
+        },
+        errorMessage: 'CPF (11 dígitos) ou CNPJ (14 dígitos) inválido.',
+    },
+    email: {
+        match: (name) => /e-?mail/i.test(name),
+        mask: (v) => String(v).trim(),
+        placeholder: 'usuario@dominio.com',
+        validate: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).trim()),
+        errorMessage: 'E-mail inválido.',
+    },
+    phone: {
+        match: (name) => /celular|telefone|fone/i.test(name),
+        mask: maskPhone,
+        placeholder: '(00) 00000-0000',
+        validate: (v) => {
+            const digits = String(v).replace(/\D/g, '');
+            return digits.length === 10 || digits.length === 11;
+        },
+        errorMessage: 'Telefone com DDD (10 ou 11 dígitos) inválido.',
+    },
+    random: {
+        match: (name) => /aleat/i.test(name),
+        mask: maskRandomKey,
+        placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+        validate: (v) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v).trim()),
+        errorMessage: 'Chave aleatória deve seguir o formato UUID (8-4-4-4-12 hex).',
+    },
+};
+
+function resolvePixKind(typeName) {
+    if (!typeName) return null;
+    return Object.values(PIX_KEY_KIND).find((k) => k.match(typeName)) ?? null;
+}
 
 const emptyForm = {
     employee_id: '',
@@ -103,6 +160,26 @@ export default function TravelExpenseFormModal({
         );
     }, [form.store_code, selects.employees]);
 
+    // Tipo PIX selecionado → resolve mask/placeholder/validator dinâmicos
+    const pixKind = useMemo(() => {
+        if (!form.pix_type_id) return null;
+        const type = (selects.pixTypes || []).find(
+            (t) => String(t.id) === String(form.pix_type_id)
+        );
+        return type ? resolvePixKind(type.name) : null;
+    }, [form.pix_type_id, selects.pixTypes]);
+
+    // Ao trocar o tipo de PIX, reaplica a máscara correspondente sobre o
+    // valor existente (se houver) — evita ficar com formato anterior preso.
+    useEffect(() => {
+        if (!form.pix_key || !pixKind) return;
+        const remasked = pixKind.mask(form.pix_key);
+        if (remasked !== form.pix_key) {
+            setForm((p) => ({ ...p, pix_key: remasked }));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pixKind]);
+
     // Limpa beneficiado se a loja muda e o funcionário atual não pertence à nova loja
     useEffect(() => {
         if (!form.store_code || !form.employee_id) return;
@@ -129,6 +206,22 @@ export default function TravelExpenseFormModal({
 
     const handleSubmit = (e) => {
         e?.preventDefault?.();
+
+        // Validação inline da chave PIX antes de bater no backend.
+        // Tipo escolhido sem chave OU chave preenchida sem tipo → erro.
+        const localErrors = {};
+        if (form.pix_type_id && !form.pix_key.trim()) {
+            localErrors.pix_key = 'Informe a chave PIX para o tipo selecionado.';
+        } else if (!form.pix_type_id && form.pix_key.trim()) {
+            localErrors.pix_type_id = 'Selecione o tipo de chave PIX.';
+        } else if (form.pix_type_id && form.pix_key && pixKind && !pixKind.validate(form.pix_key)) {
+            localErrors.pix_key = pixKind.errorMessage;
+        }
+        if (Object.keys(localErrors).length > 0) {
+            setErrors(localErrors);
+            return;
+        }
+
         setProcessing(true);
         setErrors({});
 
@@ -411,8 +504,14 @@ export default function TravelExpenseFormModal({
                         <TextInput
                             id="pix_key"
                             value={form.pix_key}
-                            onChange={setField('pix_key')}
-                            className="w-full mt-1"
+                            onChange={(e) => {
+                                const raw = e.target.value;
+                                const masked = pixKind ? pixKind.mask(raw) : raw;
+                                setForm((p) => ({ ...p, pix_key: masked }));
+                            }}
+                            placeholder={pixKind?.placeholder ?? 'Selecione o tipo primeiro'}
+                            disabled={!form.pix_type_id}
+                            className="w-full mt-1 disabled:bg-gray-100 disabled:text-gray-400"
                         />
                         <InputError message={errors.pix_key} />
                     </div>

@@ -60,6 +60,10 @@ class TravelExpenseService
     public function create(array $data, User $actor, bool $autoSubmit = false): TravelExpense
     {
         $this->validateDates($data['initial_date'] ?? null, $data['end_date'] ?? null);
+        $this->validatePixKey(
+            isset($data['pix_type_id']) ? (int) $data['pix_type_id'] : null,
+            $data['pix_key'] ?? null
+        );
 
         $dailyRate = isset($data['daily_rate'])
             ? (float) $data['daily_rate']
@@ -158,6 +162,14 @@ class TravelExpenseService
             $data = array_intersect_key($data, array_flip($allowedFields));
         }
 
+        // Valida chave PIX se foi alterada (mantém compatibilidade com PATCH parcial)
+        if (array_key_exists('pix_type_id', $data) || array_key_exists('pix_key', $data)) {
+            $this->validatePixKey(
+                isset($data['pix_type_id']) ? (int) $data['pix_type_id'] : ($te->pix_type_id ?? null),
+                $data['pix_key'] ?? $te->pix_key
+            );
+        }
+
         // Recalcular valor se datas/rate mudaram
         $datesChanged = (isset($data['initial_date']) && $data['initial_date'] !== $te->initial_date->format('Y-m-d'))
             || (isset($data['end_date']) && $data['end_date'] !== $te->end_date->format('Y-m-d'));
@@ -241,6 +253,43 @@ class TravelExpenseService
         if (! $hasBank && ! $hasPix) {
             throw ValidationException::withMessages([
                 'payment' => 'Informe ao menos uma forma de pagamento (dados bancários completos OU chave PIX).',
+            ]);
+        }
+    }
+
+    /**
+     * Valida a chave PIX conforme o tipo selecionado. Espelha a validação
+     * client-side do TravelExpenseFormModal — defesa em profundidade contra
+     * payload manipulado fora da UI.
+     *
+     * @throws ValidationException
+     */
+    public function validatePixKey(?int $typeId, ?string $key): void
+    {
+        if (! $typeId || ! $key) {
+            return;
+        }
+
+        $type = \App\Models\TypeKeyPix::find($typeId);
+        if (! $type) {
+            return; // Tipo inexistente cai na validação `exists` do FormRequest
+        }
+
+        $name = (string) $type->name;
+        $key = trim($key);
+        $digits = preg_replace('/\D/', '', $key);
+
+        $valid = match (true) {
+            (bool) preg_match('/cpf|cnpj/iu', $name) => in_array(strlen($digits), [11, 14], true),
+            (bool) preg_match('/e-?mail/iu', $name) => filter_var($key, FILTER_VALIDATE_EMAIL) !== false,
+            (bool) preg_match('/celular|telefone|fone/iu', $name) => in_array(strlen($digits), [10, 11], true),
+            (bool) preg_match('/aleat/iu', $name) => (bool) preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu', $key),
+            default => true,
+        };
+
+        if (! $valid) {
+            throw ValidationException::withMessages([
+                'pix_key' => "Chave PIX inválida para o tipo \"{$name}\".",
             ]);
         }
     }
