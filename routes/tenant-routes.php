@@ -1939,6 +1939,18 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/', [\App\Http\Controllers\DamagedProductController::class, 'index'])->name('index');
             Route::get('/statistics', [\App\Http\Controllers\DamagedProductController::class, 'statistics'])->name('statistics');
             Route::get('/lookup/products', [\App\Http\Controllers\DamagedProductController::class, 'searchProducts'])->name('lookup.products');
+
+            // Export — exige EXPORT_DAMAGED_PRODUCTS (preserva filtros via query string)
+            Route::middleware('permission:'.Permission::EXPORT_DAMAGED_PRODUCTS->value)->group(function () {
+                Route::get('/export', [\App\Http\Controllers\DamagedProductController::class, 'export'])->name('export');
+                Route::get('/{damagedProduct}/pdf', [\App\Http\Controllers\DamagedProductController::class, 'exportPdf'])->name('export.pdf');
+            });
+
+            // Import — exige CREATE (mesma permission de cadastro manual)
+            Route::middleware('permission:'.Permission::CREATE_DAMAGED_PRODUCTS->value)->group(function () {
+                Route::post('/import', [\App\Http\Controllers\DamagedProductController::class, 'import'])->name('import');
+            });
+
             Route::get('/{damagedProduct}', [\App\Http\Controllers\DamagedProductController::class, 'show'])->name('show');
             Route::get('/{damagedProduct}/matches', [\App\Http\Controllers\DamagedProductController::class, 'loadMatches'])->name('matches.load');
 

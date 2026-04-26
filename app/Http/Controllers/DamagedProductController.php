@@ -19,6 +19,8 @@ use App\Models\Product;
 use App\Models\ProductBrand;
 use App\Models\Store;
 use App\Models\User;
+use App\Services\DamagedProductExportService;
+use App\Services\DamagedProductImportService;
 use App\Services\DamagedProductMatchingService;
 use App\Services\DamagedProductService;
 use App\Services\DamagedProductTransitionService;
@@ -29,6 +31,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class DamagedProductController extends Controller
 {
@@ -36,6 +40,8 @@ class DamagedProductController extends Controller
         private DamagedProductService $service,
         private DamagedProductTransitionService $transitions,
         private DamagedProductMatchingService $matching,
+        private DamagedProductExportService $exportService,
+        private DamagedProductImportService $importService,
     ) {}
 
     // ==================================================================
@@ -351,6 +357,97 @@ class DamagedProductController extends Controller
         $scopedStoreId = $this->resolveScopedStoreId($request->user());
 
         return response()->json($this->buildStatistics($scopedStoreId));
+    }
+
+    // ==================================================================
+    // Export / Import
+    // ==================================================================
+
+    /**
+     * Export XLSX (2 abas: Registros + Matches) com os mesmos filtros
+     * aplicados na listagem. Respeita scoping por loja.
+     */
+    public function export(Request $request): BinaryFileResponse
+    {
+        $user = $request->user();
+        $scopedStoreId = $this->resolveScopedStoreId($user);
+
+        $query = DamagedProduct::query()->latest();
+
+        if ($scopedStoreId) {
+            $query->where('store_id', $scopedStoreId);
+        } elseif ($request->filled('store_id')) {
+            $query->where('store_id', $request->integer('store_id'));
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->string('status'));
+        } elseif (! $request->boolean('include_terminal')) {
+            $query->notFinal();
+        }
+
+        if ($request->filled('issue_type')) {
+            $issueType = $request->string('issue_type')->toString();
+            if ($issueType === 'mismatched') $query->where('is_mismatched', true);
+            elseif ($issueType === 'damaged') $query->where('is_damaged', true);
+        }
+
+        if ($request->filled('damage_type_id')) {
+            $query->where('damage_type_id', $request->integer('damage_type_id'));
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->string('search')->toString();
+            $query->where(function ($q) use ($search) {
+                $q->where('product_reference', 'like', "%{$search}%")
+                    ->orWhere('product_name', 'like', "%{$search}%")
+                    ->orWhere('product_color', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date('date_to'));
+        }
+
+        return $this->exportService->exportExcel($query);
+    }
+
+    /**
+     * Gera o laudo PDF individual de um produto avariado.
+     */
+    public function exportPdf(DamagedProduct $damagedProduct, Request $request): HttpResponse
+    {
+        $this->ensureCanView($request->user(), $damagedProduct);
+
+        return $this->exportService->exportPdf($damagedProduct);
+    }
+
+    /**
+     * Importa produtos avariados via XLSX (migração v1).
+     * Retorna sumário com contagem de imported + lista de erros por linha.
+     */
+    public function import(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:10240', // 10MB
+        ]);
+
+        $result = $this->importService->importFromUploadedFile(
+            $request->file('file'),
+            $request->user(),
+        );
+
+        $message = "Importação concluída: {$result['imported']} registros importados.";
+        if (! empty($result['errors'])) {
+            $message .= ' ' . count($result['errors']) . ' linha(s) com erro.';
+        }
+
+        return redirect()->route('damaged-products.index')
+            ->with('success', $message)
+            ->with('import_errors', $result['errors']);
     }
 
     // ==================================================================
