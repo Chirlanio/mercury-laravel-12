@@ -112,8 +112,11 @@ export default function Index({
     const [detailExpense, setDetailExpense] = useState(null);
     const [detailLoading, setDetailLoading] = useState(false);
 
-    const loadDetail = async (expense) => {
-        setDetailLoading(true);
+    // silent=true não dispara o spinner full-modal — usado em refreshes
+    // pós-ação (adicionar/editar/remover item) para atualizar só os
+    // campos derivados do payload sem flash de loading.
+    const loadDetail = async (expense, { silent = false } = {}) => {
+        if (!silent) setDetailLoading(true);
         try {
             const res = await fetch(route('travel-expenses.show', expense.ulid), {
                 headers: { 'Accept': 'application/json' },
@@ -122,9 +125,9 @@ export default function Index({
             setDetailExpense(json.expense);
         } catch (err) {
             console.error(err);
-            alert('Erro ao carregar detalhes.');
+            if (!silent) alert('Erro ao carregar detalhes.');
         } finally {
-            setDetailLoading(false);
+            if (!silent) setDetailLoading(false);
         }
     };
 
@@ -589,7 +592,7 @@ export default function Index({
                 expense={detailExpense}
                 loading={detailLoading}
                 typeExpenses={selects.typeExpenses ?? []}
-                onReload={() => detailExpense && loadDetail({ ulid: detailExpense.ulid })}
+                onReload={() => detailExpense && loadDetail({ ulid: detailExpense.ulid }, { silent: true })}
                 canManageAccountability={canManageAccountability || canManage}
                 canApprove={canApprove}
             />
