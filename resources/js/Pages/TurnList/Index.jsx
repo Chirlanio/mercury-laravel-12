@@ -5,6 +5,10 @@ import {
     ClockIcon,
     PlayIcon,
     PauseIcon,
+    StopIcon,
+    ArrowRightOnRectangleIcon,
+    ArrowLeftOnRectangleIcon,
+    ArrowUturnLeftIcon,
     ArrowsPointingOutIcon,
     ArrowsPointingInIcon,
     ArrowPathIcon,
@@ -17,24 +21,25 @@ import {
     KeyboardSensor,
     useSensor,
     useSensors,
+    useDroppable,
     closestCenter,
     DragOverlay,
 } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
+import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import EmployeeAvatar from '@/Components/EmployeeAvatar';
 import SelectOutcomeModal from './Partials/SelectOutcomeModal';
 import SelectBreakTypeModal from './Partials/SelectBreakTypeModal';
 
 // ───────────────────────────────────────────────────────────────────
-// Painéis
+// Definições dos painéis
 // ───────────────────────────────────────────────────────────────────
-const PANELS = [
-    { key: 'available', title: 'Disponível', color: 'bg-gray-100 border-gray-300', headerColor: 'bg-gray-700' },
-    { key: 'queue',     title: 'Na Fila',     color: 'bg-amber-50 border-amber-300', headerColor: 'bg-amber-600' },
-    { key: 'attending', title: 'Atendendo',   color: 'bg-blue-50 border-blue-300',   headerColor: 'bg-blue-600' },
-    { key: 'on_break',  title: 'Em Pausa',    color: 'bg-purple-50 border-purple-300', headerColor: 'bg-purple-600' },
-];
+const PANEL_DEFS = {
+    queue:     { key: 'queue',     title: 'Na Fila',     color: 'bg-amber-50 border-amber-300',   headerColor: 'bg-amber-600' },
+    attending: { key: 'attending', title: 'Atendendo',   color: 'bg-blue-50 border-blue-300',     headerColor: 'bg-blue-600' },
+    on_break:  { key: 'on_break',  title: 'Em Pausa',    color: 'bg-purple-50 border-purple-300', headerColor: 'bg-purple-600' },
+    available: { key: 'available', title: 'Disponível',  color: 'bg-gray-100 border-gray-300',    headerColor: 'bg-gray-700' },
+};
 
 // Mapa de transições permitidas: origem → destinos válidos via drag
 const VALID_TRANSITIONS = {
@@ -61,7 +66,7 @@ export default function Index({
     const [loadError, setLoadError] = useState(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [activeDrag, setActiveDrag] = useState(null);
-    const [tickNow, setTickNow] = useState(Date.now()); // pra timers realtime
+    const [tickNow, setTickNow] = useState(Date.now());
     const containerRef = useRef(null);
 
     // Modais
@@ -141,12 +146,14 @@ export default function Index({
         if (!over) return;
 
         const fromPanel = active.data.current?.panel;
-        const toPanel = over.data.current?.panel ?? over.id; // droppable de painel usa id direto
+        // over.data.current?.panel quando solta sobre um card; over.id começa com `panel:` quando solta na zona do painel
+        const toPanel = over.data.current?.panel
+            ?? (typeof over.id === 'string' && over.id.startsWith('panel:') ? over.id.slice('panel:'.length) : null);
         const employeeId = active.data.current?.employee_id;
 
         if (!fromPanel || !toPanel || !employeeId) return;
 
-        // Reorder dentro do mesmo painel (apenas queue)
+        // Reorder dentro da fila
         if (fromPanel === toPanel && fromPanel === 'queue') {
             const overEmployeeId = over.data.current?.employee_id;
             if (!overEmployeeId || overEmployeeId === employeeId) return;
@@ -170,7 +177,7 @@ export default function Index({
             preserveScroll: true,
             preserveState: true,
             onSuccess: fetchBoard,
-            onError: () => fetchBoard(), // recarrega pra refletir estado real
+            onError: () => fetchBoard(),
             ...opts,
         });
     };
@@ -183,10 +190,8 @@ export default function Index({
         } else if (from === 'queue' && to === 'attending') {
             inertiaPost(route('turn-list.attendances.start'), { employee_id: employeeId, store_code: storeCode });
         } else if (from === 'queue' && to === 'on_break') {
-            // Precisa escolher tipo de pausa via modal
             setBreakModal({ open: true, employeeId });
         } else if (from === 'attending' && to === 'queue') {
-            // Precisa escolher outcome via modal
             setOutcomeModal({ open: true, attendance: payload });
         } else if (from === 'on_break' && to === 'queue') {
             const breakId = payload?.break_id;
@@ -203,6 +208,21 @@ export default function Index({
             new_position: newPosition,
         });
     };
+
+    // ──────────────────────────────────────────────────────
+    // Ações via botão (alternativa ao drag-and-drop)
+    // ──────────────────────────────────────────────────────
+    const cardActions = useMemo(() => ({
+        enterQueue: (employeeId) =>
+            inertiaPost(route('turn-list.queue.enter'), { employee_id: employeeId, store_code: storeCode }),
+        leaveQueue: (employeeId) =>
+            inertiaPost(route('turn-list.queue.leave'), { employee_id: employeeId, store_code: storeCode }),
+        startAttendance: (employeeId) =>
+            inertiaPost(route('turn-list.attendances.start'), { employee_id: employeeId, store_code: storeCode }),
+        openBreakModal: (employeeId) => setBreakModal({ open: true, employeeId }),
+        finishAttendance: (item) => setOutcomeModal({ open: true, attendance: item }),
+        finishBreak: (breakId) => inertiaPost(route('turn-list.breaks.finish', breakId), {}),
+    }), [storeCode]);
 
     const onConfirmOutcome = ({ outcomeId, returnToQueue, notes }) => {
         const att = outcomeModal.attendance;
@@ -227,11 +247,13 @@ export default function Index({
 
     const onChangeStore = (newCode) => {
         setStoreCode(newCode);
-        // Mantém URL coerente para refresh
         const url = new URL(window.location.href);
         url.searchParams.set('store', newCode);
         window.history.replaceState({}, '', url.toString());
     };
+
+    const onBreakItemsCount = board?.on_break?.length ?? 0;
+    const showOnBreakPanel = onBreakItemsCount > 0;
 
     // ──────────────────────────────────────────────────────
     // Render
@@ -259,8 +281,8 @@ export default function Index({
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                {/* Store selector */}
-                                {!isStoreScoped && stores.length > 1 && (
+                                {/* Store selector — só quem tem MANAGE_TURN_LIST */}
+                                {permissions.manage && stores.length > 1 && (
                                     <div className="flex items-center gap-1.5 text-sm">
                                         <BuildingStorefrontIcon className="h-4 w-4 text-gray-400" />
                                         <select
@@ -303,22 +325,54 @@ export default function Index({
                             </div>
                         )}
 
-                        {/* Grid de painéis: 1col mobile / 2x2 tablet / 4col desktop */}
+                        {/*
+                          Layout:
+                            • Topo (cols 2): Na Fila + Atendendo
+                            • Meio (cols 1, condicional): Em Pausa — só se tiver alguém
+                            • Base (cols 1): Disponível
+                        */}
                         <DndContext
                             sensors={sensors}
                             collisionDetection={closestCenter}
                             onDragStart={handleDragStart}
                             onDragEnd={handleDragEnd}
                         >
-                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
-                                {PANELS.map((panel) => (
+                            <div className="space-y-3 sm:space-y-4">
+                                {/* Topo: 2 painéis principais */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                                     <Panel
-                                        key={panel.key}
-                                        panel={panel}
-                                        items={board?.[panel.key] ?? []}
+                                        panel={PANEL_DEFS.queue}
+                                        items={board?.queue ?? []}
                                         tickNow={tickNow}
+                                        actions={cardActions}
                                     />
-                                ))}
+                                    <Panel
+                                        panel={PANEL_DEFS.attending}
+                                        items={board?.attending ?? []}
+                                        tickNow={tickNow}
+                                        actions={cardActions}
+                                    />
+                                </div>
+
+                                {/* Em Pausa — condicional */}
+                                {showOnBreakPanel && (
+                                    <Panel
+                                        panel={PANEL_DEFS.on_break}
+                                        items={board?.on_break ?? []}
+                                        tickNow={tickNow}
+                                        actions={cardActions}
+                                        horizontal
+                                    />
+                                )}
+
+                                {/* Disponível — sempre visível, embaixo */}
+                                <Panel
+                                    panel={PANEL_DEFS.available}
+                                    items={board?.available ?? []}
+                                    tickNow={tickNow}
+                                    actions={cardActions}
+                                    horizontal
+                                />
                             </div>
                             <DragOverlay>
                                 {activeDrag ? <CardOverlay item={activeDrag} /> : null}
@@ -347,13 +401,26 @@ export default function Index({
 }
 
 // ───────────────────────────────────────────────────────────────────
-// Painel (drop area) com lista de cards
+// Painel — droppable com lista de cards
+// `horizontal` exibe cards em grid wrap (Em Pausa e Disponível ficam
+// horizontais por ocuparem largura total da tela).
 // ───────────────────────────────────────────────────────────────────
-function Panel({ panel, items, tickNow }) {
+function Panel({ panel, items, tickNow, actions, horizontal = false }) {
     const ids = items.map((it) => `${panel.key}-${it.employee_id}`);
+    const { setNodeRef, isOver } = useDroppable({
+        id: `panel:${panel.key}`,
+        data: { panel: panel.key },
+    });
+
+    const containerCls = horizontal
+        ? 'flex-1 p-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 overflow-y-auto'
+        : 'flex-1 p-2 space-y-2 overflow-y-auto';
 
     return (
-        <div className={`rounded-lg border-2 ${panel.color} overflow-hidden flex flex-col min-h-[240px]`}>
+        <div
+            ref={setNodeRef}
+            className={`rounded-lg border-2 ${panel.color} overflow-hidden flex flex-col ${horizontal ? 'min-h-[160px]' : 'min-h-[240px]'} ${isOver ? 'ring-2 ring-indigo-400' : ''}`}
+        >
             <div className={`${panel.headerColor} text-white px-3 py-2 flex items-center justify-between sticky top-0`}>
                 <h2 className="text-sm sm:text-base font-semibold uppercase tracking-wide">{panel.title}</h2>
                 <span className="bg-white/20 rounded-full px-2 py-0.5 text-xs font-bold">
@@ -361,9 +428,9 @@ function Panel({ panel, items, tickNow }) {
                 </span>
             </div>
             <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-                <div className="flex-1 p-2 space-y-2 overflow-y-auto" data-panel={panel.key}>
+                <div className={containerCls} data-panel={panel.key}>
                     {items.length === 0 ? (
-                        <div className="text-xs text-gray-400 text-center py-6">Vazio</div>
+                        <div className="text-xs text-gray-400 text-center py-6 col-span-full">Vazio — arraste consultoras pra cá</div>
                     ) : (
                         items.map((item) => (
                             <Card
@@ -371,6 +438,7 @@ function Panel({ panel, items, tickNow }) {
                                 panel={panel}
                                 item={item}
                                 tickNow={tickNow}
+                                actions={actions}
                             />
                         ))
                     )}
@@ -381,9 +449,10 @@ function Panel({ panel, items, tickNow }) {
 }
 
 // ───────────────────────────────────────────────────────────────────
-// Card sortable de consultora
+// Card sortable de consultora — drag handle apenas na área de avatar+nome.
+// Botões de ação ficam fora do handle pra não conflitar com o drag.
 // ───────────────────────────────────────────────────────────────────
-function Card({ panel, item, tickNow }) {
+function Card({ panel, item, tickNow, actions }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: `${panel.key}-${item.employee_id}`,
         data: {
@@ -391,7 +460,7 @@ function Card({ panel, item, tickNow }) {
             employee_id: item.employee_id,
             employee_name: item.employee_name,
             employee_initials: item.employee_initials,
-            position: item.position, // só na queue
+            position: item.position,
             attendance_id: item.attendance_id,
             attendance_ulid: item.attendance_ulid,
             break_id: item.break_id,
@@ -411,25 +480,130 @@ function Card({ panel, item, tickNow }) {
         <div
             ref={setNodeRef}
             style={style}
-            {...attributes}
-            {...listeners}
-            className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 flex items-center gap-3 cursor-grab active:cursor-grabbing touch-none select-none min-h-[88px]"
+            className="bg-white rounded-lg border border-gray-200 shadow-sm flex flex-col select-none min-h-[88px]"
         >
-            <EmployeeAvatar
-                name={item.employee_name}
-                initials={item.employee_initials}
-                size="md"
-            />
-            <div className="flex-1 min-w-0">
-                <div className="font-medium text-sm text-gray-900 truncate">{item.employee_short_name || item.employee_name}</div>
-                <CardSubtitle panel={panel} item={item} tickNow={tickNow} />
-            </div>
-            {panel.key === 'queue' && (
-                <div className="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-1 rounded-full shrink-0">
-                    #{item.position}
+            {/* Drag handle: avatar + nome */}
+            <div
+                {...attributes}
+                {...listeners}
+                className="p-3 flex items-center gap-3 cursor-grab active:cursor-grabbing touch-none"
+            >
+                <EmployeeAvatar
+                    name={item.employee_name}
+                    initials={item.employee_initials}
+                    size="md"
+                />
+                <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm text-gray-900 truncate">
+                        {item.employee_short_name || item.employee_name}
+                    </div>
+                    <CardSubtitle panel={panel} item={item} tickNow={tickNow} />
                 </div>
-            )}
+                {panel.key === 'queue' && (
+                    <div className="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-1 rounded-full shrink-0">
+                        #{item.position}
+                    </div>
+                )}
+            </div>
+
+            {/* Botões de ação — fora do drag handle. */}
+            <CardActions panel={panel} item={item} actions={actions} />
         </div>
+    );
+}
+
+// ───────────────────────────────────────────────────────────────────
+// Botões de ação por painel (alternativa ao drag-and-drop)
+// `onPointerDown stopPropagation` previne que o gesto inicie um drag.
+// ───────────────────────────────────────────────────────────────────
+function CardActions({ panel, item, actions }) {
+    const stop = (e) => e.stopPropagation();
+
+    if (panel.key === 'available') {
+        return (
+            <div className="flex gap-1 p-2 pt-0">
+                <ActionBtn
+                    onClick={() => actions.enterQueue(item.employee_id)}
+                    onPointerDown={stop}
+                    color="bg-amber-600 hover:bg-amber-700"
+                    icon={<ArrowRightOnRectangleIcon className="h-4 w-4" />}
+                    label="Entrar na fila"
+                />
+            </div>
+        );
+    }
+
+    if (panel.key === 'queue') {
+        return (
+            <div className="grid grid-cols-3 gap-1 p-2 pt-0">
+                <ActionBtn
+                    onClick={() => actions.startAttendance(item.employee_id)}
+                    onPointerDown={stop}
+                    color="bg-blue-600 hover:bg-blue-700"
+                    icon={<PlayIcon className="h-4 w-4" />}
+                    label="Atender"
+                />
+                <ActionBtn
+                    onClick={() => actions.openBreakModal(item.employee_id)}
+                    onPointerDown={stop}
+                    color="bg-purple-600 hover:bg-purple-700"
+                    icon={<PauseIcon className="h-4 w-4" />}
+                    label="Pausar"
+                />
+                <ActionBtn
+                    onClick={() => actions.leaveQueue(item.employee_id)}
+                    onPointerDown={stop}
+                    color="bg-gray-500 hover:bg-gray-600"
+                    icon={<ArrowLeftOnRectangleIcon className="h-4 w-4" />}
+                    label="Sair"
+                />
+            </div>
+        );
+    }
+
+    if (panel.key === 'attending') {
+        return (
+            <div className="flex gap-1 p-2 pt-0">
+                <ActionBtn
+                    onClick={() => actions.finishAttendance(item)}
+                    onPointerDown={stop}
+                    color="bg-blue-600 hover:bg-blue-700"
+                    icon={<StopIcon className="h-4 w-4" />}
+                    label="Finalizar"
+                />
+            </div>
+        );
+    }
+
+    if (panel.key === 'on_break') {
+        return (
+            <div className="flex gap-1 p-2 pt-0">
+                <ActionBtn
+                    onClick={() => actions.finishBreak(item.break_id)}
+                    onPointerDown={stop}
+                    color="bg-purple-600 hover:bg-purple-700"
+                    icon={<ArrowUturnLeftIcon className="h-4 w-4" />}
+                    label="Voltar à fila"
+                />
+            </div>
+        );
+    }
+
+    return null;
+}
+
+function ActionBtn({ onClick, onPointerDown, color, icon, label }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            onPointerDown={onPointerDown}
+            className={`${color} text-white rounded-md text-xs font-medium px-2 py-1.5 inline-flex items-center justify-center gap-1 min-h-[36px] active:scale-95 transition`}
+            title={label}
+        >
+            {icon}
+            <span className="truncate">{label}</span>
+        </button>
     );
 }
 
