@@ -424,127 +424,130 @@ export default function Index({
         <>
             <Head title="Lista da Vez" />
 
-            <div ref={containerRef} className={`${isFullscreen ? 'fixed inset-0 z-40 overflow-auto bg-white' : ''}`}>
-                <div className="py-4 sm:py-6 lg:py-8">
-                    <div className="max-w-full mx-auto px-3 sm:px-6 lg:px-8">
-                        {/* Header */}
-                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex items-center gap-3">
-                                <UserGroupIcon className="h-7 w-7 text-indigo-600 shrink-0" />
-                                <div>
-                                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Lista da Vez</h1>
-                                    <p className="text-xs sm:text-sm text-gray-500">
-                                        {board ? (
-                                            <>
-                                                {board.counts.available} disp. · {board.counts.queue} fila · {board.counts.attending} atend. · {board.counts.on_break} pausa
-                                            </>
-                                        ) : 'Carregando…'}
-                                    </p>
-                                </div>
-                            </div>
-                            {/* Store selector — só quem tem MANAGE_TURN_LIST */}
-                            {permissions.manage && stores.length > 1 && (
-                                <div className="flex items-center gap-1.5 text-sm">
-                                    <BuildingStorefrontIcon className="h-4 w-4 text-gray-400" />
-                                    <select
-                                        value={storeCode ?? ''}
-                                        onChange={(e) => onChangeStore(e.target.value)}
-                                        className="rounded-md border-gray-300 text-sm py-1"
-                                    >
-                                        {stores.map((s) => (
-                                            <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
+            {/*
+              Dashboard tablet-first: a página inteira ocupa a altura do
+              <main> da AuthenticatedLayout (h-full), com painéis dentro
+              em flex-col. Top row (queue + attending) leva o espaço
+              sobrando via flex-1; on_break (condicional) e available
+              têm max-h fixo e scroll interno — Disponível nunca fica
+              cortado por ter altura limitada. Sem scroll de página.
+            */}
+            <div
+                ref={containerRef}
+                className={`${isFullscreen
+                    ? 'fixed inset-0 z-40 bg-white'
+                    : 'h-full'
+                } flex flex-col overflow-hidden`}
+            >
+                {/* Header — shrink-0 */}
+                <div className="shrink-0 px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-3 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <UserGroupIcon className="h-7 w-7 text-indigo-600 shrink-0" />
+                        <div>
+                            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Lista da Vez</h1>
+                            <p className="text-xs sm:text-sm text-gray-500">
+                                {board ? (
+                                    <>
+                                        {board.counts.available} disp. · {board.counts.queue} fila · {board.counts.attending} atend. · {board.counts.on_break} pausa
+                                    </>
+                                ) : 'Carregando…'}
+                            </p>
+                        </div>
+                    </div>
+                    {/* Store selector — só quem tem MANAGE_TURN_LIST */}
+                    {permissions.manage && stores.length > 1 && (
+                        <div className="flex items-center gap-1.5 text-sm">
+                            <BuildingStorefrontIcon className="h-4 w-4 text-gray-400" />
+                            <select
+                                value={storeCode ?? ''}
+                                onChange={(e) => onChangeStore(e.target.value)}
+                                className="rounded-md border-gray-300 text-sm py-1"
+                            >
+                                {stores.map((s) => (
+                                    <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                </div>
+
+                {/* Floating actions — pinned na borda direita da tela */}
+                <div className="fixed right-3 sm:right-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-2">
+                    <button
+                        type="button"
+                        onClick={fetchBoard}
+                        className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-full shadow-lg w-12 h-12 inline-flex items-center justify-center transition active:scale-95"
+                        title="Atualizar"
+                        aria-label="Atualizar"
+                    >
+                        <ArrowPathIcon className="h-5 w-5" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={toggleFullscreen}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg w-12 h-12 inline-flex items-center justify-center transition active:scale-95"
+                        title={isFullscreen ? 'Sair de tela cheia' : 'Tela cheia'}
+                        aria-label={isFullscreen ? 'Sair de tela cheia' : 'Tela cheia'}
+                    >
+                        {isFullscreen ? <ArrowsPointingInIcon className="h-5 w-5" /> : <ArrowsPointingOutIcon className="h-5 w-5" />}
+                    </button>
+                </div>
+
+                {loadError && (
+                    <div className="shrink-0 mx-3 sm:mx-6 lg:mx-8 mb-3 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+                        {loadError}
+                    </div>
+                )}
+
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                >
+                    <div className="flex-1 min-h-0 px-3 sm:px-6 lg:px-8 pb-4 flex flex-col gap-3 sm:gap-4">
+                        {/* Topo: queue + attending — fica com o espaço sobrando */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 flex-1 min-h-[200px]">
+                            <Panel
+                                panel={PANEL_DEFS.queue}
+                                items={board?.queue ?? []}
+                                tickNow={tickNow}
+                                actions={cardActions}
+                            />
+                            <Panel
+                                panel={PANEL_DEFS.attending}
+                                items={board?.attending ?? []}
+                                tickNow={tickNow}
+                                actions={cardActions}
+                            />
                         </div>
 
-                        {/* Floating actions — pinned na borda direita da tela.
-                            Atualizar + Tela cheia ficam sempre acessíveis sem
-                            competir com título por espaço, especialmente em
-                            tablet em modo cheio. */}
-                        <div className="fixed right-3 sm:right-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-2">
-                            <button
-                                type="button"
-                                onClick={fetchBoard}
-                                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-full shadow-lg w-12 h-12 inline-flex items-center justify-center transition active:scale-95"
-                                title="Atualizar"
-                                aria-label="Atualizar"
-                            >
-                                <ArrowPathIcon className="h-5 w-5" />
-                            </button>
-                            <button
-                                type="button"
-                                onClick={toggleFullscreen}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg w-12 h-12 inline-flex items-center justify-center transition active:scale-95"
-                                title={isFullscreen ? 'Sair de tela cheia' : 'Tela cheia'}
-                                aria-label={isFullscreen ? 'Sair de tela cheia' : 'Tela cheia'}
-                            >
-                                {isFullscreen ? <ArrowsPointingInIcon className="h-5 w-5" /> : <ArrowsPointingOutIcon className="h-5 w-5" />}
-                            </button>
-                        </div>
-
-                        {loadError && (
-                            <div className="mb-4 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
-                                {loadError}
-                            </div>
+                        {/* Em Pausa — condicional, altura fixa */}
+                        {showOnBreakPanel && (
+                            <Panel
+                                panel={PANEL_DEFS.on_break}
+                                items={board?.on_break ?? []}
+                                tickNow={tickNow}
+                                actions={cardActions}
+                                horizontal
+                                className="shrink-0 h-[180px]"
+                            />
                         )}
 
-                        {/*
-                          Layout:
-                            • Topo (cols 2): Na Fila + Atendendo
-                            • Meio (cols 1, condicional): Em Pausa — só se tiver alguém
-                            • Base (cols 1): Disponível
-                        */}
-                        <DndContext
-                            sensors={sensors}
-                            collisionDetection={closestCenter}
-                            onDragStart={handleDragStart}
-                            onDragEnd={handleDragEnd}
-                        >
-                            <div className="space-y-3 sm:space-y-4">
-                                {/* Topo: 2 painéis principais */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                                    <Panel
-                                        panel={PANEL_DEFS.queue}
-                                        items={board?.queue ?? []}
-                                        tickNow={tickNow}
-                                        actions={cardActions}
-                                    />
-                                    <Panel
-                                        panel={PANEL_DEFS.attending}
-                                        items={board?.attending ?? []}
-                                        tickNow={tickNow}
-                                        actions={cardActions}
-                                    />
-                                </div>
-
-                                {/* Em Pausa — condicional */}
-                                {showOnBreakPanel && (
-                                    <Panel
-                                        panel={PANEL_DEFS.on_break}
-                                        items={board?.on_break ?? []}
-                                        tickNow={tickNow}
-                                        actions={cardActions}
-                                        horizontal
-                                    />
-                                )}
-
-                                {/* Disponível — sempre visível, embaixo */}
-                                <Panel
-                                    panel={PANEL_DEFS.available}
-                                    items={board?.available ?? []}
-                                    tickNow={tickNow}
-                                    actions={cardActions}
-                                    horizontal
-                                />
-                            </div>
-                            <DragOverlay>
-                                {activeDrag ? <CardOverlay item={activeDrag} /> : null}
-                            </DragOverlay>
-                        </DndContext>
+                        {/* Disponível — altura fixa, scroll interno */}
+                        <Panel
+                            panel={PANEL_DEFS.available}
+                            items={board?.available ?? []}
+                            tickNow={tickNow}
+                            actions={cardActions}
+                            horizontal
+                            className="shrink-0 h-[260px]"
+                        />
                     </div>
-                </div>
+                    <DragOverlay>
+                        {activeDrag ? <CardOverlay item={activeDrag} /> : null}
+                    </DragOverlay>
+                </DndContext>
             </div>
 
             {/* Modais */}
@@ -570,7 +573,7 @@ export default function Index({
 // `horizontal` exibe cards em grid wrap (Em Pausa e Disponível ficam
 // horizontais por ocuparem largura total da tela).
 // ───────────────────────────────────────────────────────────────────
-function Panel({ panel, items, tickNow, actions, horizontal = false }) {
+function Panel({ panel, items, tickNow, actions, horizontal = false, className = '' }) {
     const ids = items.map((it) => `${panel.key}-${it.employee_id}`);
     const { setNodeRef, isOver } = useDroppable({
         id: `panel:${panel.key}`,
@@ -578,13 +581,13 @@ function Panel({ panel, items, tickNow, actions, horizontal = false }) {
     });
 
     const containerCls = horizontal
-        ? 'flex-1 p-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 overflow-y-auto'
-        : 'flex-1 p-2 space-y-2 overflow-y-auto';
+        ? 'flex-1 min-h-0 p-2 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 overflow-y-auto'
+        : 'flex-1 min-h-0 p-2 space-y-2 overflow-y-auto';
 
     return (
         <div
             ref={setNodeRef}
-            className={`rounded-lg border-2 ${panel.color} overflow-hidden flex flex-col ${horizontal ? 'min-h-[160px]' : 'min-h-[240px]'} ${isOver ? 'ring-2 ring-indigo-400' : ''}`}
+            className={`rounded-lg border-2 ${panel.color} overflow-hidden flex flex-col ${isOver ? 'ring-2 ring-indigo-400' : ''} ${className}`}
         >
             <div className={`${panel.headerColor} text-white px-3 py-2 flex items-center justify-between sticky top-0`}>
                 <h2 className="text-sm sm:text-base font-semibold uppercase tracking-wide">{panel.title}</h2>
