@@ -51,7 +51,7 @@ export default function DeleteWithReasonModal({
                     onCancel={onClose}
                     onSubmit="submit"
                     submitLabel="Excluir verba"
-                    submitColor="danger"
+                    submitColor="bg-red-600 hover:bg-red-700"
                     processing={processing}
                 />
             )}

@@ -68,7 +68,7 @@ export default function TransitionModal({ show, onClose, config }) {
                     onCancel={onClose}
                     onSubmit="submit"
                     submitLabel={config.label}
-                    submitColor={isDestructive ? 'danger' : 'primary'}
+                    submitColor={isDestructive ? 'bg-red-600 hover:bg-red-700' : undefined}
                     processing={processing}
                 />
             )}
