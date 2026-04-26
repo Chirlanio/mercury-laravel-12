@@ -294,7 +294,7 @@ export default function Index({
                 >
                     {canManageAccountabilityRow(row) && (
                         <ActionButtons.Custom
-                            label="Prestação de contas"
+                            title="Prestação de contas"
                             icon={PaperClipIcon}
                             onClick={() => openAccountability(row)}
                             variant="info-soft"
@@ -302,7 +302,7 @@ export default function Index({
                     )}
                     {canSubmit(row) && (
                         <ActionButtons.Custom
-                            label="Enviar para aprovação"
+                            title="Enviar para aprovação"
                             icon={SendIcon}
                             onClick={() => startTransition(row, 'expense', 'submitted', 'Enviar para aprovação')}
                             variant="primary-soft"
@@ -311,13 +311,13 @@ export default function Index({
                     {canApproveRow(row) && (
                         <>
                             <ActionButtons.Custom
-                                label="Aprovar"
+                                title="Aprovar"
                                 icon={HandThumbUpIcon}
                                 onClick={() => startTransition(row, 'expense', 'approved', 'Aprovar verba')}
                                 variant="success-soft"
                             />
                             <ActionButtons.Custom
-                                label="Rejeitar"
+                                title="Rejeitar"
                                 icon={HandThumbDownIcon}
                                 onClick={() => startTransition(row, 'expense', 'rejected', 'Rejeitar verba', true)}
                                 variant="danger-soft"
@@ -326,7 +326,7 @@ export default function Index({
                     )}
                     {canCancelRow(row) && (
                         <ActionButtons.Custom
-                            label="Cancelar"
+                            title="Cancelar"
                             icon={XCircleIcon}
                             onClick={() => startTransition(row, 'expense', 'cancelled', 'Cancelar verba', true)}
                             variant="danger-soft"
