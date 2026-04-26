@@ -1,5 +1,5 @@
 import { Head, router } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     PaperAirplaneIcon,
     ClockIcon,
@@ -85,24 +85,52 @@ export default function Index({
     const [dateTo, setDateTo] = useState(filters.date_to ?? '');
     const [includeTerminal, setIncludeTerminal] = useState(filters.include_terminal === '1' || filters.include_terminal === true);
 
-    const handleApplyFilters = (e) => {
-        e?.preventDefault?.();
+    // Aplica filtros imediatamente. Aceita `overrides` para evitar
+    // depender do state que pode não estar atualizado dentro do mesmo
+    // ciclo do onChange. Usado por cada handler de filtro.
+    const applyFilters = (overrides = {}) => {
+        const merged = {
+            search,
+            status,
+            accountability_status: accountabilityStatus,
+            store_code: storeCode,
+            employee_id: employeeId,
+            date_from: dateFrom,
+            date_to: dateTo,
+            include_terminal: includeTerminal,
+            ...overrides,
+        };
         router.get(route('travel-expenses.index'), {
-            search: search || undefined,
-            status: status || undefined,
-            accountability_status: accountabilityStatus || undefined,
-            store_code: storeCode || undefined,
-            employee_id: employeeId || undefined,
-            date_from: dateFrom || undefined,
-            date_to: dateTo || undefined,
-            include_terminal: includeTerminal ? 1 : undefined,
-        }, { preserveState: true, preserveScroll: true });
+            search: merged.search || undefined,
+            status: merged.status || undefined,
+            accountability_status: merged.accountability_status || undefined,
+            store_code: merged.store_code || undefined,
+            employee_id: merged.employee_id || undefined,
+            date_from: merged.date_from || undefined,
+            date_to: merged.date_to || undefined,
+            include_terminal: merged.include_terminal ? 1 : undefined,
+        }, { preserveState: true, preserveScroll: true, replace: true });
     };
+
+    // Debounce do campo de busca — evita disparar request a cada tecla.
+    // Pula primeira renderização para não rodar com o valor inicial.
+    const isFirstRender = useRef(true);
+    useEffect(() => {
+        if (isFirstRender.current) {
+            isFirstRender.current = false;
+            return;
+        }
+        const t = setTimeout(() => applyFilters({ search }), 400);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search]);
 
     const handleClearFilters = () => {
         setSearch(''); setStatus(''); setAccountabilityStatus('');
         setStoreCode(''); setEmployeeId(''); setDateFrom(''); setDateTo('');
         setIncludeTerminal(false);
+        // Reseta o ref do debounce para evitar request duplicado
+        isFirstRender.current = true;
         router.get(route('travel-expenses.index'), {}, { preserveScroll: true });
     };
 
@@ -179,7 +207,7 @@ export default function Index({
             format: 'number',
             icon: ClockIcon,
             color: 'warning',
-            onClick: () => { setStatus('submitted'); handleApplyFilters(); },
+            onClick: () => { setStatus('submitted'); applyFilters({ status: 'submitted' }); },
             active: status === 'submitted',
         },
         {
@@ -188,7 +216,7 @@ export default function Index({
             format: 'number',
             icon: CheckCircleIcon,
             color: 'info',
-            onClick: () => { setStatus('approved'); handleApplyFilters(); },
+            onClick: () => { setStatus('approved'); applyFilters({ status: 'approved' }); },
             active: status === 'approved',
         },
         {
@@ -436,9 +464,8 @@ export default function Index({
                         <StatisticsGrid cards={statsCards} cols={6} />
                     </div>
 
-                    {/* Filtros */}
-                    <form
-                        onSubmit={handleApplyFilters}
+                    {/* Filtros (aplicação automática no onChange) */}
+                    <div
                         className="bg-white shadow-sm rounded-lg p-4 mb-6 space-y-4"
                     >
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -456,7 +483,7 @@ export default function Index({
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
                                 <select
                                     value={status}
-                                    onChange={(e) => setStatus(e.target.value)}
+                                    onChange={(e) => { const v = e.target.value; setStatus(v); applyFilters({ status: v }); }}
                                     className="w-full text-sm rounded-md border-gray-300"
                                 >
                                     <option value="">Todos</option>
@@ -469,7 +496,7 @@ export default function Index({
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Prestação</label>
                                 <select
                                     value={accountabilityStatus}
-                                    onChange={(e) => setAccountabilityStatus(e.target.value)}
+                                    onChange={(e) => { const v = e.target.value; setAccountabilityStatus(v); applyFilters({ accountability_status: v }); }}
                                     className="w-full text-sm rounded-md border-gray-300"
                                 >
                                     <option value="">Todas</option>
@@ -483,7 +510,7 @@ export default function Index({
                                     <label className="block text-xs font-medium text-gray-700 mb-1">Loja</label>
                                     <select
                                         value={storeCode}
-                                        onChange={(e) => setStoreCode(e.target.value)}
+                                        onChange={(e) => { const v = e.target.value; setStoreCode(v); applyFilters({ store_code: v }); }}
                                         className="w-full text-sm rounded-md border-gray-300"
                                     >
                                         <option value="">Todas</option>
@@ -497,7 +524,7 @@ export default function Index({
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Beneficiado</label>
                                 <select
                                     value={employeeId}
-                                    onChange={(e) => setEmployeeId(e.target.value)}
+                                    onChange={(e) => { const v = e.target.value; setEmployeeId(v); applyFilters({ employee_id: v }); }}
                                     className="w-full text-sm rounded-md border-gray-300"
                                 >
                                     <option value="">Todos</option>
@@ -511,7 +538,7 @@ export default function Index({
                                 <input
                                     type="date"
                                     value={dateFrom}
-                                    onChange={(e) => setDateFrom(e.target.value)}
+                                    onChange={(e) => { const v = e.target.value; setDateFrom(v); applyFilters({ date_from: v }); }}
                                     className="w-full text-sm rounded-md border-gray-300"
                                 />
                             </div>
@@ -520,7 +547,7 @@ export default function Index({
                                 <input
                                     type="date"
                                     value={dateTo}
-                                    onChange={(e) => setDateTo(e.target.value)}
+                                    onChange={(e) => { const v = e.target.value; setDateTo(v); applyFilters({ date_to: v }); }}
                                     className="w-full text-sm rounded-md border-gray-300"
                                 />
                             </div>
@@ -529,7 +556,7 @@ export default function Index({
                                     <input
                                         type="checkbox"
                                         checked={includeTerminal}
-                                        onChange={(e) => setIncludeTerminal(e.target.checked)}
+                                        onChange={(e) => { const v = e.target.checked; setIncludeTerminal(v); applyFilters({ include_terminal: v }); }}
                                         className="rounded border-gray-300"
                                     />
                                     Mostrar finalizadas/canceladas
@@ -538,18 +565,16 @@ export default function Index({
                         </div>
                         <div className="flex justify-end gap-2">
                             <Button type="button" variant="outline" size="sm" onClick={handleClearFilters}>
-                                Limpar
-                            </Button>
-                            <Button type="submit" variant="primary" size="sm">
-                                Aplicar filtros
+                                Limpar filtros
                             </Button>
                         </div>
-                    </form>
+                    </div>
 
                     <div className="bg-white shadow-sm rounded-lg overflow-hidden">
                         <DataTable
                             data={expenses}
                             columns={columns}
+                            searchable={false}
                             emptyMessage="Nenhuma verba encontrada."
                         />
                     </div>
