@@ -523,24 +523,23 @@ export default function Index({
                     onDragEnd={handleDragEnd}
                 >
                     {/*
-                      Layout proporcional via flex-grow — adapta a qualquer
-                      viewport (mobile, tablet, desktop, fullscreen) sem
-                      cortar conteúdo. Cada painel tem scroll interno
-                      próprio se houver muitos cards.
+                      Layout: top row toma todo o espaço sobrando; bottom
+                      panels (Em Pausa, Disponível) têm altura adaptativa
+                      ao conteúdo (shrink-0 + max-h-[Xvh] como teto).
+                      Combinado com `auto-rows-min` no grid interno, isso
+                      elimina o problema de cards esticarem quando há só
+                      1 linha — o painel cresce só até a altura dos cards
+                      reais, e o top row absorve o resto da viewport.
 
-                        • Top row (queue + attending): flex-[4]  — dominante
-                        • Em Pausa (condicional):       flex-[1]  — compacto
-                        • Disponível:                   flex-[2]  — médio
-
-                      Sem on_break: top fica com 67%, available 33%.
-                      Com on_break: top 57%, on_break 14%, available 29%.
-                      min-h previne que algum painel colapse demais.
+                      Sem cards: panel mantém min-h pequeno (estado vazio).
+                      Cards excedem o teto: scroll interno via overflow-y-auto.
                     */}
                     <div className="flex-1 min-h-0 px-3 sm:px-6 lg:px-8 pb-4 flex flex-col gap-3 sm:gap-4">
                         {/* Topo: queue + attending. Mobile (< 768px)
                             empilhado; md+ (tablet portrait incl. iPad
-                            768px, Galaxy Tab, e desktop) lado a lado. */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-[4] min-h-[180px]">
+                            768px, Galaxy Tab, e desktop) lado a lado.
+                            flex-1 + min-h-0 fica com o resto da altura. */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-[180px]">
                             <Panel
                                 panel={PANEL_DEFS.queue}
                                 items={board?.queue ?? []}
@@ -555,7 +554,7 @@ export default function Index({
                             />
                         </div>
 
-                        {/* Em Pausa — condicional, faixa compacta */}
+                        {/* Em Pausa — altura ao conteúdo, teto 30vh */}
                         {showOnBreakPanel && (
                             <Panel
                                 panel={PANEL_DEFS.on_break}
@@ -563,18 +562,18 @@ export default function Index({
                                 tickNow={tickNow}
                                 actions={cardActions}
                                 horizontal
-                                className="flex-[1] min-h-[100px]"
+                                className="shrink-0 min-h-[120px] max-h-[30vh]"
                             />
                         )}
 
-                        {/* Disponível — espaço médio, scroll interno */}
+                        {/* Disponível — altura ao conteúdo, teto 40vh */}
                         <Panel
                             panel={PANEL_DEFS.available}
                             items={board?.available ?? []}
                             tickNow={tickNow}
                             actions={cardActions}
                             horizontal
-                            className="flex-[2] min-h-[140px]"
+                            className="shrink-0 min-h-[140px] max-h-[40vh]"
                         />
                     </div>
                     <DragOverlay>
@@ -613,10 +612,14 @@ function Panel({ panel, items, tickNow, actions, horizontal = false, className =
         data: { panel: panel.key },
     });
 
-    // Horizontal: grid responsivo (1/2/3/4 cols por breakpoint).
-    // Vertical: lista com gap proporcional ao p-3 do container.
+    // Horizontal: grid responsivo (1/2/3/4 cols por breakpoint) com
+    // `auto-rows-min` — rows usam altura mínima do conteúdo, evitando
+    // que cards estiquem verticalmente quando há só 1 linha. Sem flex-1:
+    // o painel cresce com o conteúdo até o cap (max-h) definido no caller.
+    // Vertical (queue/attending no top row): mantém flex-1 pra preencher
+    // a altura forçada pela linha do grid pai.
     const containerCls = horizontal
-        ? 'flex-1 min-h-0 p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto'
+        ? 'p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-min overflow-y-auto'
         : 'flex-1 min-h-0 p-3 space-y-3 overflow-y-auto';
 
     return (
