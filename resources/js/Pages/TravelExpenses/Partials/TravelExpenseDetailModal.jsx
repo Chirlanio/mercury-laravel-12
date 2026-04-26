@@ -159,10 +159,9 @@ export default function TravelExpenseDetailModal({
                     <StandardModal.Section title="Prestação de Contas">
                         <div className="flex items-center justify-between mb-3">
                             <div>
-                                <StatusBadge
-                                    label={expense.accountability_status_label}
-                                    variant={COLOR_MAP[expense.accountability_status_color] ?? 'gray'}
-                                />
+                                <StatusBadge variant={COLOR_MAP[expense.accountability_status_color] ?? 'gray'}>
+                                    {expense.accountability_status_label}
+                                </StatusBadge>
                                 <span className="ml-3 text-sm text-gray-500">
                                     {(expense.items?.length ?? 0)} {(expense.items?.length === 1 ? 'item' : 'itens')}
                                 </span>

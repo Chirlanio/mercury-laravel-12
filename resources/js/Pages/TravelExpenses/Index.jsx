@@ -258,10 +258,9 @@ export default function Index({
             label: 'Solicitação',
             sortable: false,
             render: (row) => (
-                <StatusBadge
-                    label={row.status_label}
-                    variant={COLOR_MAP[row.status_color] ?? 'gray'}
-                />
+                <StatusBadge variant={COLOR_MAP[row.status_color] ?? 'gray'}>
+                    {row.status_label}
+                </StatusBadge>
             ),
         },
         {
@@ -270,10 +269,9 @@ export default function Index({
             sortable: false,
             render: (row) => (
                 <div className="flex items-center gap-2">
-                    <StatusBadge
-                        label={row.accountability_status_label}
-                        variant={COLOR_MAP[row.accountability_status_color] ?? 'gray'}
-                    />
+                    <StatusBadge variant={COLOR_MAP[row.accountability_status_color] ?? 'gray'}>
+                        {row.accountability_status_label}
+                    </StatusBadge>
                     {row.is_overdue && (
                         <span title="Prestação atrasada (≥ 3 dias após retorno)">
                             <ExclamationTriangleIcon className="h-5 w-5 text-red-500" />
