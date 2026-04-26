@@ -172,6 +172,18 @@ export default function Index({
     const [tickNow, setTickNow] = useState(Date.now());
     const containerRef = useRef(null);
 
+    // Estado da sidebar — sincronizado com a AuthenticatedLayout via
+    // localStorage + custom event. Usado pra calcular o offset esquerdo
+    // do container em modo tela cheia (push layout, sem cobrir sidebar).
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+        try { return localStorage.getItem('sidebar_collapsed') === 'true'; } catch { return false; }
+    });
+    useEffect(() => {
+        const handler = (e) => setSidebarCollapsed(Boolean(e.detail));
+        window.addEventListener('sidebar-collapsed-change', handler);
+        return () => window.removeEventListener('sidebar-collapsed-change', handler);
+    }, []);
+
     // Modais
     const [outcomeModal, setOutcomeModal] = useState({ open: false, attendance: null });
     const [breakModal, setBreakModal] = useState({ open: false, employeeId: null, item: null });
@@ -431,12 +443,17 @@ export default function Index({
               sobrando via flex-1; on_break (condicional) e available
               têm max-h fixo e scroll interno — Disponível nunca fica
               cortado por ter altura limitada. Sem scroll de página.
+
+              Em modo tela cheia (lg+), o container começa DEPOIS da
+              sidebar fixa (`lg:left-16` collapsed ou `lg:left-64`
+              expanded) — push layout, sem cobrir a navegação. Em
+              mobile a sidebar vira drawer e o container ocupa tudo.
             */}
             <div
                 ref={containerRef}
                 className={`${isFullscreen
-                    ? 'fixed inset-0 z-40 bg-white'
-                    : 'h-full'
+                    ? `fixed inset-y-0 right-0 left-0 z-40 bg-white ${sidebarCollapsed ? 'lg:left-16' : 'lg:left-64'}`
+                    : 'h-full w-full'
                 } flex flex-col overflow-hidden`}
             >
                 {/* Header — shrink-0 */}

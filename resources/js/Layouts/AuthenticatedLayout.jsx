@@ -36,6 +36,10 @@ export default function AuthenticatedLayout({ children }) {
             const next = !prev;
             try {
                 localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
+                // Notifica páginas que precisam reagir (ex.: TurnList em
+                // modo tela cheia ajusta o offset esquerdo pra encaixar
+                // ao lado da sidebar em vez de cobrir).
+                window.dispatchEvent(new CustomEvent('sidebar-collapsed-change', { detail: next }));
             } catch {}
             return next;
         });
