@@ -321,6 +321,14 @@ enum Permission: string
     case MANAGE_ACCOUNTABILITY = 'travel_expenses.manage_accountability';
     case EXPORT_TRAVEL_EXPENSES = 'travel_expenses.export';
 
+    // Lista da Vez (TurnList — fila de atendimento das consultoras no PDV)
+    case VIEW_TURN_LIST = 'turn_list.view';
+    case OPERATE_TURN_LIST = 'turn_list.operate';
+    case MANAGE_TURN_LIST = 'turn_list.manage';
+    case MANAGE_TURN_LIST_OUTCOMES = 'turn_list.manage_outcomes';
+    case MANAGE_TURN_LIST_BREAK_TYPES = 'turn_list.manage_break_types';
+    case VIEW_TURN_LIST_REPORTS = 'turn_list.view_reports';
+
     public function label(): string
     {
         return match ($this) {
@@ -591,6 +599,13 @@ enum Permission: string
             self::MANAGE_TRAVEL_EXPENSES => 'Gerenciar verbas (todas as lojas)',
             self::MANAGE_ACCOUNTABILITY => 'Lançar prestação de contas',
             self::EXPORT_TRAVEL_EXPENSES => 'Exportar verbas (XLSX/PDF)',
+
+            self::VIEW_TURN_LIST => 'Visualizar Lista da Vez',
+            self::OPERATE_TURN_LIST => 'Operar Lista da Vez (entrar fila, atender, pausar)',
+            self::MANAGE_TURN_LIST => 'Gerenciar Lista da Vez (todas as lojas, reordenar)',
+            self::MANAGE_TURN_LIST_OUTCOMES => 'Gerenciar resultados de atendimento',
+            self::MANAGE_TURN_LIST_BREAK_TYPES => 'Gerenciar tipos de pausa',
+            self::VIEW_TURN_LIST_REPORTS => 'Ver relatórios da Lista da Vez',
         };
     }
 
@@ -864,6 +879,13 @@ enum Permission: string
             self::MANAGE_TRAVEL_EXPENSES => 'Permite gerenciar verbas de todas as lojas (sem filtro de escopo) e operar em qualquer status, inclusive cancelar verbas já aprovadas',
             self::MANAGE_ACCOUNTABILITY => 'Permite lançar/editar itens da prestação de contas (recibos, NFs, comprovantes). Solicitante e beneficiado têm essa permissão por padrão',
             self::EXPORT_TRAVEL_EXPENSES => 'Permite exportar verbas para Excel (listagem) ou PDF (comprovante individual com prestação de contas)',
+
+            self::VIEW_TURN_LIST => 'Permite visualizar o painel da Lista da Vez. Sem MANAGE_TURN_LIST, o usuário só vê o painel da própria loja',
+            self::OPERATE_TURN_LIST => 'Permite operar a Lista da Vez no PDV: colocar consultora na fila, iniciar/finalizar atendimento, registrar pausas, escolher resultados (outcomes). Concedida a vendedoras e gerentes de loja',
+            self::MANAGE_TURN_LIST => 'Permite operar Lista da Vez de qualquer loja (sem filtro de scoping). Inclui reordenação manual da fila via drag-drop e ajuste forçado de estados (corrigir registros travados)',
+            self::MANAGE_TURN_LIST_OUTCOMES => 'Permite cadastrar e editar resultados de atendimento (Venda Realizada, Pesquisa, Troca convertida etc) — controla a flag `restore_queue_position` que define se o outcome volta a consultora na posição original',
+            self::MANAGE_TURN_LIST_BREAK_TYPES => 'Permite cadastrar e editar tipos de pausa (Intervalo, Almoço) e seus tempos máximos antes de gerar alerta de pausa excedida',
+            self::VIEW_TURN_LIST_REPORTS => 'Permite ver relatórios analíticos da Lista da Vez (top consultoras, tempo médio, conversão por outcome, distribuição diária/semanal/mensal)',
         };
     }
 

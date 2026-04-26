@@ -306,6 +306,13 @@ enum Role: string
                 Permission::MANAGE_TRAVEL_EXPENSES->value,
                 Permission::MANAGE_ACCOUNTABILITY->value,
                 Permission::EXPORT_TRAVEL_EXPENSES->value,
+                // Lista da Vez (todas)
+                Permission::VIEW_TURN_LIST->value,
+                Permission::OPERATE_TURN_LIST->value,
+                Permission::MANAGE_TURN_LIST->value,
+                Permission::MANAGE_TURN_LIST_OUTCOMES->value,
+                Permission::MANAGE_TURN_LIST_BREAK_TYPES->value,
+                Permission::VIEW_TURN_LIST_REPORTS->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -559,6 +566,13 @@ enum Role: string
                 Permission::MANAGE_TRAVEL_EXPENSES->value,
                 Permission::MANAGE_ACCOUNTABILITY->value,
                 Permission::EXPORT_TRAVEL_EXPENSES->value,
+                // Lista da Vez (todas)
+                Permission::VIEW_TURN_LIST->value,
+                Permission::OPERATE_TURN_LIST->value,
+                Permission::MANAGE_TURN_LIST->value,
+                Permission::MANAGE_TURN_LIST_OUTCOMES->value,
+                Permission::MANAGE_TURN_LIST_BREAK_TYPES->value,
+                Permission::VIEW_TURN_LIST_REPORTS->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -710,6 +724,12 @@ enum Role: string
                 Permission::EDIT_TRAVEL_EXPENSES->value,
                 Permission::MANAGE_ACCOUNTABILITY->value,
                 Permission::EXPORT_TRAVEL_EXPENSES->value,
+                // Lista da Vez — view + operate + manage (qualquer loja) + reports.
+                // Sem permissions de config (outcomes/break_types) — fica com Admin.
+                Permission::VIEW_TURN_LIST->value,
+                Permission::OPERATE_TURN_LIST->value,
+                Permission::MANAGE_TURN_LIST->value,
+                Permission::VIEW_TURN_LIST_REPORTS->value,
             ],
             self::FINANCE => [
                 // Financeira — contas a pagar, orçamentos, imports de realizado DRE.
@@ -935,6 +955,10 @@ enum Role: string
                 Permission::VIEW_TRAVEL_EXPENSES->value,
                 Permission::CREATE_TRAVEL_EXPENSES->value,
                 Permission::MANAGE_ACCOUNTABILITY->value,
+                // Lista da Vez — vendedora opera no PDV apenas na própria loja.
+                // Sem MANAGE_TURN_LIST → scoping automático por user.store_id.
+                Permission::VIEW_TURN_LIST->value,
+                Permission::OPERATE_TURN_LIST->value,
             ],
             self::DRIVER => [
                 // Perfil próprio

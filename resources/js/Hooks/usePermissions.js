@@ -293,6 +293,14 @@ export const PERMISSIONS = {
     MANAGE_TRAVEL_EXPENSES: 'travel_expenses.manage',
     MANAGE_ACCOUNTABILITY: 'travel_expenses.manage_accountability',
     EXPORT_TRAVEL_EXPENSES: 'travel_expenses.export',
+
+    // Lista da Vez (TurnList)
+    VIEW_TURN_LIST: 'turn_list.view',
+    OPERATE_TURN_LIST: 'turn_list.operate',
+    MANAGE_TURN_LIST: 'turn_list.manage',
+    MANAGE_TURN_LIST_OUTCOMES: 'turn_list.manage_outcomes',
+    MANAGE_TURN_LIST_BREAK_TYPES: 'turn_list.manage_break_types',
+    VIEW_TURN_LIST_REPORTS: 'turn_list.view_reports',
 };
 
 export const ROLES = {

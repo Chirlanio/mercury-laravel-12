@@ -60,6 +60,8 @@ use App\Http\Controllers\Config\StockAdjustmentStatusController as ConfigStockAd
 use App\Http\Controllers\Config\StockAuditCycleController as ConfigStockAuditCycleController;
 use App\Http\Controllers\Config\StockAuditVendorController as ConfigStockAuditVendorController;
 use App\Http\Controllers\Config\TransferStatusController as ConfigTransferStatusController;
+use App\Http\Controllers\Config\TurnListAttendanceOutcomeController as ConfigTurnListOutcomeController;
+use App\Http\Controllers\Config\TurnListBreakTypeController as ConfigTurnListBreakTypeController;
 use App\Http\Controllers\Config\TypeExpenseController as ConfigTypeExpenseController;
 use App\Http\Controllers\Config\TypeKeyPixController as ConfigTypeKeyPixController;
 use App\Http\Controllers\Config\TypeMovimentController as ConfigTypeMovimentController;
@@ -393,6 +395,8 @@ Route::middleware(['auth', 'tenant.module:config', 'permission:'.Permission::MAN
     Route::resource('social-media', ConfigSocialMediaController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('type-key-pixs', ConfigTypeKeyPixController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('type-expenses', ConfigTypeExpenseController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('turn-list-break-types', ConfigTurnListBreakTypeController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('turn-list-attendance-outcomes', ConfigTurnListOutcomeController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('transfer-statuses', ConfigTransferStatusController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('order-payment-statuses', ConfigOrderPaymentStatusController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::resource('management-reasons', ConfigManagementReasonController::class)->only(['index', 'store', 'update', 'destroy']);
@@ -1885,6 +1889,37 @@ Route::middleware(['auth'])->group(function () {
 
         Route::middleware('permission:'.Permission::DELETE_TRAVEL_EXPENSES->value)->group(function () {
             Route::delete('/travel-expenses/{travelExpense}', [\App\Http\Controllers\TravelExpenseController::class, 'destroy'])->name('travel-expenses.destroy');
+        });
+    });
+
+    // ==========================================
+    // Lista da Vez (TurnList)
+    // ==========================================
+    Route::middleware(['tenant.module:turn_list', 'permission:'.Permission::VIEW_TURN_LIST->value])->group(function () {
+        Route::get('/turn-list', [\App\Http\Controllers\TurnListController::class, 'index'])->name('turn-list.index');
+        Route::get('/turn-list/board', [\App\Http\Controllers\TurnListController::class, 'board'])->name('turn-list.board');
+
+        // Operações de fila/atendimento/pausa — exigem OPERATE_TURN_LIST.
+        // O ensureCanOperateStore() no controller restringe à própria loja
+        // se não tiver MANAGE.
+        Route::middleware('permission:'.Permission::OPERATE_TURN_LIST->value)->group(function () {
+            // Queue
+            Route::post('/turn-list/queue/enter', [\App\Http\Controllers\TurnListController::class, 'enterQueue'])->name('turn-list.queue.enter');
+            Route::post('/turn-list/queue/leave', [\App\Http\Controllers\TurnListController::class, 'leaveQueue'])->name('turn-list.queue.leave');
+            Route::post('/turn-list/queue/reorder', [\App\Http\Controllers\TurnListController::class, 'reorderQueue'])->name('turn-list.queue.reorder');
+
+            // Attendance
+            Route::post('/turn-list/attendances/start', [\App\Http\Controllers\TurnListController::class, 'startAttendance'])->name('turn-list.attendances.start');
+            Route::post('/turn-list/attendances/{attendance}/finish', [\App\Http\Controllers\TurnListController::class, 'finishAttendance'])->name('turn-list.attendances.finish');
+
+            // Break
+            Route::post('/turn-list/breaks/start', [\App\Http\Controllers\TurnListController::class, 'startBreak'])->name('turn-list.breaks.start');
+            Route::post('/turn-list/breaks/{break}/finish', [\App\Http\Controllers\TurnListController::class, 'finishBreak'])->whereNumber('break')->name('turn-list.breaks.finish');
+        });
+
+        // Settings — exige MANAGE_TURN_LIST (o controller também valida)
+        Route::middleware('permission:'.Permission::MANAGE_TURN_LIST->value)->group(function () {
+            Route::put('/turn-list/settings', [\App\Http\Controllers\TurnListController::class, 'updateSettings'])->name('turn-list.settings.update');
         });
     });
 

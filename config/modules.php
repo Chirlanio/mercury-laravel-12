@@ -316,4 +316,11 @@ return [
         'icon' => 'PaperAirplaneIcon',
         'dependencies' => ['employees', 'stores'],
     ],
+    'turn_list' => [
+        'name' => 'Lista da Vez',
+        'description' => 'Quadro de fila de atendimento das consultoras no PDV (4 painéis: Disponível / Na Fila / Atendendo / Em Pausa). Suporta drag-and-drop entre painéis, modo tela cheia para tablets de loja, timer realtime, registro de outcomes (com flag "volta na vez") e tipos de pausa configuráveis com alerta de tempo excedido.',
+        'routes' => ['turn-list.*'],
+        'icon' => 'QueueListIcon',
+        'dependencies' => ['employees', 'stores'],
+    ],
 ];
