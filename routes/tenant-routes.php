@@ -1929,6 +1929,49 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ==========================================
+    // Produtos Avariados (DamagedProducts)
+    // ==========================================
+    Route::middleware(['tenant.module:damaged_products', 'permission:'.Permission::VIEW_DAMAGED_PRODUCTS->value])
+        ->prefix('damaged-products')
+        ->name('damaged-products.')
+        ->group(function () {
+            // Listing + visualização (escopo por loja sem MANAGE — controller valida)
+            Route::get('/', [\App\Http\Controllers\DamagedProductController::class, 'index'])->name('index');
+            Route::get('/statistics', [\App\Http\Controllers\DamagedProductController::class, 'statistics'])->name('statistics');
+            Route::get('/lookup/products', [\App\Http\Controllers\DamagedProductController::class, 'searchProducts'])->name('lookup.products');
+            Route::get('/{damagedProduct}', [\App\Http\Controllers\DamagedProductController::class, 'show'])->name('show');
+            Route::get('/{damagedProduct}/matches', [\App\Http\Controllers\DamagedProductController::class, 'loadMatches'])->name('matches.load');
+
+            // Criação — exige CREATE (USER tem; MANAGE bypassa)
+            Route::middleware('permission:'.Permission::CREATE_DAMAGED_PRODUCTS->value)->group(function () {
+                Route::post('/', [\App\Http\Controllers\DamagedProductController::class, 'store'])->name('store');
+            });
+
+            // Edição — exige EDIT
+            Route::middleware('permission:'.Permission::EDIT_DAMAGED_PRODUCTS->value)->group(function () {
+                Route::put('/{damagedProduct}', [\App\Http\Controllers\DamagedProductController::class, 'update'])->name('update');
+                Route::patch('/{damagedProduct}', [\App\Http\Controllers\DamagedProductController::class, 'update']);
+            });
+
+            // Cancelamento — exige DELETE (state machine)
+            Route::middleware('permission:'.Permission::DELETE_DAMAGED_PRODUCTS->value)->group(function () {
+                Route::delete('/{damagedProduct}', [\App\Http\Controllers\DamagedProductController::class, 'destroy'])->name('destroy');
+            });
+
+            // Aceite/rejeição/resolução de matches — exige APPROVE_MATCHES (controller também valida loja)
+            Route::middleware('permission:'.Permission::APPROVE_DAMAGED_PRODUCT_MATCHES->value)->group(function () {
+                Route::post('/matches/{match}/accept', [\App\Http\Controllers\DamagedProductController::class, 'acceptMatch'])->name('matches.accept');
+                Route::post('/matches/{match}/reject', [\App\Http\Controllers\DamagedProductController::class, 'rejectMatch'])->name('matches.reject');
+                Route::post('/matches/{match}/resolve', [\App\Http\Controllers\DamagedProductController::class, 'resolveMatch'])->name('matches.resolve');
+            });
+
+            // Disparar full matching manual — exige RUN_MATCHING (admin/super_admin)
+            Route::middleware('permission:'.Permission::RUN_DAMAGED_PRODUCT_MATCHING->value)->group(function () {
+                Route::post('/run-matching', [\App\Http\Controllers\DamagedProductController::class, 'runMatching'])->name('run-matching');
+            });
+        });
+
+    // ==========================================
     // Placeholder Coming Soon
     // ==========================================
     Route::get('/ecommerce', fn () => Inertia::render('ComingSoon', ['title' => 'E-commerce']))->name('ecommerce');
