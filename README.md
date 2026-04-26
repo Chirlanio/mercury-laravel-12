@@ -165,9 +165,9 @@ Gerenciamento de tenants, planos e billing.
 |-------|-------|------|
 | `admin@mercury.com.br` | `password` | super_admin |
 
-### Tenants (Aplicacao por Empresa)
+### Tenants (Aplicação por Empresa)
 
-Cada tenant e acessado via subdominio. Os tenants sao criados pelo painel central.
+Cada tenant e acessado via subdomínio. Os tenants sao criados pelo painel central.
 
 **Tenant Meia Sola:**
 

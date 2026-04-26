@@ -83,8 +83,15 @@ class CentralRoleResolver
             'user' => 1,
             'drivers' => 1,
             'support' => 2,
-            'admin' => 3,
-            'super_admin' => 4,
+            'store' => 3,
+            'manager' => 5,
+            'commercial_supervisor' => 7,
+            'finance' => 8,
+            'accounting' => 8,
+            'fiscal' => 8,
+            'marketing' => 8,
+            'admin' => 9,
+            'super_admin' => 10,
         ];
 
         return $hierarchy[$roleSlug] ?? 0;
@@ -115,7 +122,10 @@ class CentralRoleResolver
             'hierarchy_level' => match ($r) {
                 Role::SUPER_ADMIN => 10,
                 Role::ADMIN => 9,
-                Role::FINANCE, Role::ACCOUNTING, Role::FISCAL => 8,
+                Role::FINANCE, Role::ACCOUNTING, Role::FISCAL, Role::MARKETING => 8,
+                Role::COMMERCIAL_SUPERVISOR => 7,
+                Role::MANAGER => 5,
+                Role::STORE => 3,
                 Role::SUPPORT => 2,
                 Role::USER, Role::DRIVER => 1,
             },

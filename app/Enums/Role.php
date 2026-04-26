@@ -10,6 +10,9 @@ enum Role: string
     case ACCOUNTING = 'accounting';
     case FISCAL = 'fiscal';
     case MARKETING = 'marketing';
+    case COMMERCIAL_SUPERVISOR = 'commercial_supervisor';
+    case MANAGER = 'manager';
+    case STORE = 'store';
     case SUPPORT = 'support';
     case USER = 'user';
     case DRIVER = 'drivers';
@@ -23,6 +26,9 @@ enum Role: string
             self::ACCOUNTING => 'Contabilidade',
             self::FISCAL => 'Fiscal',
             self::MARKETING => 'Marketing',
+            self::COMMERCIAL_SUPERVISOR => 'Supervisão Comercial',
+            self::MANAGER => 'Gerente',
+            self::STORE => 'Lojas',
             self::SUPPORT => 'Suporte',
             self::USER => 'Usuário',
             self::DRIVER => 'Motorista',
@@ -37,6 +43,9 @@ enum Role: string
             self::USER->value => 1,
             self::DRIVER->value => 1,
             self::SUPPORT->value => 2,
+            self::STORE->value => 3,
+            self::MANAGER->value => 5,
+            self::COMMERCIAL_SUPERVISOR->value => 7,
             self::FINANCE->value => 8,
             self::ACCOUNTING->value => 8,
             self::FISCAL->value => 8,
@@ -908,6 +917,30 @@ enum Role: string
 
                 // Movimentações (view — contexto pra entender o faturamento do VIP)
                 Permission::VIEW_MOVEMENTS->value,
+            ],
+            // Supervisão Comercial — supervisor regional, vê todas as lojas.
+            // Sem scoping por user.store_id; permissions específicas (acesso a
+            // vendas/metas/movements/etc) serão atribuídas via SaaS admin.
+            self::COMMERCIAL_SUPERVISOR => [
+                Permission::VIEW_OWN_PROFILE->value,
+                Permission::EDIT_OWN_PROFILE->value,
+                Permission::ACCESS_DASHBOARD->value,
+            ],
+            // Gerente — gerente de loja. Restrito à própria loja (user.store_id)
+            // pelo padrão de cada módulo (ausência de MANAGE_X faz scoping
+            // automático). Permissions específicas atribuídas via SaaS admin.
+            self::MANAGER => [
+                Permission::VIEW_OWN_PROFILE->value,
+                Permission::EDIT_OWN_PROFILE->value,
+                Permission::ACCESS_DASHBOARD->value,
+            ],
+            // Lojas — operador/vendedor da loja. Restrito à própria loja
+            // (user.store_id) pelo padrão de cada módulo. Permissions
+            // específicas atribuídas via SaaS admin.
+            self::STORE => [
+                Permission::VIEW_OWN_PROFILE->value,
+                Permission::EDIT_OWN_PROFILE->value,
+                Permission::ACCESS_DASHBOARD->value,
             ],
             self::USER => [
                 // Apenas próprio perfil
