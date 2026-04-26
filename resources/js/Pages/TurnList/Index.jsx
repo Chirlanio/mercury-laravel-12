@@ -537,10 +537,10 @@ export default function Index({
                       min-h previne que algum painel colapse demais.
                     */}
                     <div className="flex-1 min-h-0 px-3 sm:px-6 lg:px-8 pb-4 flex flex-col gap-3 sm:gap-4">
-                        {/* Topo: queue + attending. Mobile e tablet em
-                            portrait (até 1023px) ficam empilhados; lg+
-                            (tablet landscape, desktop) lado a lado. */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-[4] min-h-[180px]">
+                        {/* Topo: queue + attending. Mobile (< 768px)
+                            empilhado; md+ (tablet portrait incl. iPad
+                            768px, Galaxy Tab, e desktop) lado a lado. */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-[4] min-h-[180px]">
                             <Panel
                                 panel={PANEL_DEFS.queue}
                                 items={board?.queue ?? []}
