@@ -140,6 +140,15 @@ export default function Index({
         loadDetail(expense);
     };
 
+    const openEdit = (expense) => {
+        // Edição precisa do payload detalhado (description, dados bancários,
+        // pix decriptado, internal_notes) — formatExpense da listagem traz só
+        // campos básicos. Faz fetch antes de mostrar o form pra preencher tudo.
+        setDetailExpense(null);
+        openModal('edit', expense);
+        loadDetail(expense);
+    };
+
     // ------------------------------------------------------------------
     // Transições (aprovar/rejeitar/cancelar)
     // ------------------------------------------------------------------
@@ -280,7 +289,7 @@ export default function Index({
             render: (row) => (
                 <ActionButtons
                     onView={() => openDetail(row)}
-                    onEdit={canEditRow(row) ? () => openModal('edit', row) : undefined}
+                    onEdit={canEditRow(row) ? () => openEdit(row) : undefined}
                     onDelete={canDeleteRow(row) ? () => openModal('delete', row) : undefined}
                 >
                     {canManageAccountabilityRow(row) && (
@@ -556,7 +565,8 @@ export default function Index({
                 show={modals.edit}
                 onClose={() => closeModal('edit')}
                 mode="edit"
-                expense={selected}
+                expense={detailExpense}
+                loading={detailLoading}
                 selects={selects}
                 isStoreScoped={isStoreScoped}
                 scopedStoreCode={scopedStoreCode}

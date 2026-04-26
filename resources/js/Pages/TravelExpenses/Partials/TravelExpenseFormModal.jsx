@@ -92,6 +92,7 @@ export default function TravelExpenseFormModal({
     onClose,
     mode = 'create',
     expense = null,
+    loading = false,
     selects = {},
     isStoreScoped = false,
     scopedStoreCode = null,
@@ -103,10 +104,13 @@ export default function TravelExpenseFormModal({
     const [processing, setProcessing] = useState(false);
     const [autoSubmit, setAutoSubmit] = useState(false);
 
-    // Reset/preenchimento quando abre
+    // Reset/preenchimento quando abre OU quando o expense detalhado chega.
+    // No edit, `expense` chega via fetch async — precisa re-popular o form
+    // na hora que os dados completos aparecerem.
     useEffect(() => {
         if (!show) return;
-        if (mode === 'edit' && expense) {
+        if (mode === 'edit') {
+            if (!expense) return; // ainda carregando — espera próxima atualização
             setForm({
                 employee_id: expense.employee?.id ?? '',
                 store_code: expense.store?.code ?? expense.store_code ?? '',
@@ -255,7 +259,8 @@ export default function TravelExpenseFormModal({
             subtitle={mode === 'create' ? 'Preencha os dados da viagem e do pagamento' : `${expense?.origin ?? ''} → ${expense?.destination ?? ''}`}
             headerColor="bg-indigo-600"
             headerIcon={<PaperAirplaneIcon className="h-6 w-6" />}
-            maxWidth="3xl"
+            maxWidth="5xl"
+            loading={mode === 'edit' && loading}
             onSubmit={handleSubmit}
             footer={(
                 <StandardModal.Footer>
@@ -437,8 +442,8 @@ export default function TravelExpenseFormModal({
                     </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="md:col-span-2">
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="md:col-span-3">
                         <h4 className="text-sm font-semibold text-gray-700">Conta bancária</h4>
                     </div>
                     <div>
@@ -447,7 +452,7 @@ export default function TravelExpenseFormModal({
                             id="bank_id"
                             value={form.bank_id}
                             onChange={setField('bank_id')}
-                            className="w-full mt-1 rounded-md border-gray-300 text-sm"
+                            className="w-full mt-1 rounded-md border-gray-300"
                         >
                             <option value="">— Selecione —</option>
                             {(selects.banks || []).map((b) => (
@@ -490,7 +495,7 @@ export default function TravelExpenseFormModal({
                             id="pix_type_id"
                             value={form.pix_type_id}
                             onChange={setField('pix_type_id')}
-                            className="w-full mt-1 rounded-md border-gray-300 text-sm"
+                            className="w-full mt-1 rounded-md border-gray-300"
                         >
                             <option value="">— Selecione —</option>
                             {(selects.pixTypes || []).map((t) => (
