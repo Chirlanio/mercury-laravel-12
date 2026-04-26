@@ -50,6 +50,7 @@ class TravelExpenseControllerTest extends TestCase
             'initial_date' => '2026-05-10',
             'end_date' => '2026-05-12',
             'description' => 'Teste',
+            'cpf' => '111.222.333-44',
             'pix_type_id' => 1,
             'pix_key' => '11122233344',
         ], $overrides);
@@ -132,7 +133,7 @@ class TravelExpenseControllerTest extends TestCase
         $response = $this->actingAs($this->adminUser)->post(route('travel-expenses.store'), [
             // sem campos obrigatórios
         ]);
-        $response->assertSessionHasErrors(['employee_id', 'store_code', 'origin', 'destination', 'initial_date', 'end_date', 'description']);
+        $response->assertSessionHasErrors(['employee_id', 'store_code', 'origin', 'destination', 'initial_date', 'end_date', 'description', 'cpf']);
     }
 
     public function test_store_rejects_end_before_start(): void

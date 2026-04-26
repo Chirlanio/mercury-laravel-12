@@ -123,7 +123,8 @@ class TravelExpenseController extends Controller
                     : Store::orderBy('name')->get(['id', 'code', 'name']),
                 'employees' => Employee::where('status_id', 2)
                     ->orderBy('name')
-                    ->get(['id', 'name', 'store_id']),
+                    ->get(['id', 'name', 'store_id', 'cpf'])
+                    ->makeVisible('cpf'), // CPF normalmente é hidden — exposto aqui pra auto-fill no form
                 'banks' => Bank::orderBy('bank_name')->get(['id', 'bank_name', 'cod_bank']),
                 'pixTypes' => TypeKeyPix::active()->orderBy('sort_order')->get(['id', 'name']),
                 'typeExpenses' => TypeExpense::active()->orderBy('sort_order')->get(['id', 'name', 'icon', 'color']),
@@ -634,7 +635,7 @@ class TravelExpenseController extends Controller
             'description' => ['required', 'string', 'max:1000'],
             'daily_rate' => ['nullable', 'numeric', 'min:0'],
             'client_name' => ['nullable', 'string', 'max:150'],
-            'cpf' => ['nullable', 'string', 'max:20'],
+            'cpf' => ['required', 'string', 'max:20'],
             'bank_id' => ['nullable', 'exists:banks,id'],
             'bank_branch' => ['nullable', 'string', 'max:10'],
             'bank_account' => ['nullable', 'string', 'max:20'],

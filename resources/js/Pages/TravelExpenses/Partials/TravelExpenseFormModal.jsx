@@ -184,6 +184,24 @@ export default function TravelExpenseFormModal({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pixKind]);
 
+    // Auto-preenche CPF ao selecionar beneficiado (mantendo edição manual
+    // possível caso o CPF cadastrado precise de correção pontual)
+    useEffect(() => {
+        if (!form.employee_id) return;
+        const emp = (selects.employees || []).find(
+            (e) => String(e.id) === String(form.employee_id)
+        );
+        if (emp?.cpf) {
+            const masked = maskCpf(emp.cpf);
+            // Só sobrescreve se o CPF atual está vazio ou era de outro emp
+            // (evita atrapalhar se usuário acabou de editar manualmente)
+            if (!form.cpf || form.cpf !== masked) {
+                setForm((p) => ({ ...p, cpf: masked }));
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [form.employee_id, selects.employees]);
+
     // Limpa beneficiado se a loja muda e o funcionário atual não pertence à nova loja
     useEffect(() => {
         if (!form.store_code || !form.employee_id) return;
@@ -431,7 +449,7 @@ export default function TravelExpenseFormModal({
             <StandardModal.Section title="Dados de Pagamento (informe ao menos uma forma)">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
-                        <InputLabel htmlFor="cpf" value="CPF do beneficiado (opcional)" />
+                        <InputLabel htmlFor="cpf" value="CPF do beneficiado *" />
                         <TextInput
                             id="cpf"
                             value={form.cpf}
