@@ -205,3 +205,12 @@ Schedule::command('travel-expenses:auto-cancel-stale')
     ->dailyAt('02:00')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/travel-expenses-auto-cancel-stale.log'));
+
+// Lista da Vez — cleanup do dia (daily 23:00, após fechamento do PDV).
+// Finaliza atendimentos/pausas que ficaram ativos por mais de 12h
+// (vendedora esqueceu de fechar) e esvazia a fila — fila não persiste
+// entre dias. Substitui o cleanup "lazy" da v1 que rodava a cada page load.
+Schedule::command('turn-list:cleanup')
+    ->dailyAt('23:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/turn-list-cleanup.log'));
