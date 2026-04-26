@@ -239,7 +239,7 @@ export default function Index({
     };
 
     return (
-        <AuthenticatedLayout>
+        <>
             <Head title="Produtos Avariados" />
 
             <div className="py-6">
@@ -459,6 +459,6 @@ export default function Index({
                     </>
                 )}
             </StandardModal>
-        </AuthenticatedLayout>
+        </>
     );
 }

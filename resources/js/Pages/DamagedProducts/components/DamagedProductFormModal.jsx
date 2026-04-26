@@ -177,7 +177,7 @@ export default function DamagedProductFormModal({
             subtitle={isEdit ? `${initial?.product_reference}` : 'Cadastre um par trocado, avariado ou ambos'}
             headerColor="bg-indigo-600"
             headerIcon={isEdit ? <PencilSquareIcon className="h-5 w-5" /> : <DocumentTextIcon className="h-5 w-5" />}
-            maxWidth="3xl"
+            maxWidth="5xl"
             onSubmit={onSubmit}
             footer={
                 <StandardModal.Footer
@@ -198,7 +198,7 @@ export default function DamagedProductFormModal({
                         <InputLabel htmlFor="store_id" value="Loja *" />
                         <select
                             id="store_id"
-                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             value={data.store_id}
                             onChange={(e) => setData('store_id', e.target.value)}
                             disabled={isStoreScoped || isEdit}

@@ -99,11 +99,21 @@ class DamagedProductService
             ]);
         }
 
-        $merged = array_merge($product->only([
+        // Snapshot dos atributos atuais com enums normalizados pra string —
+        // validateBusinessRules() compara com in_array(..., true) que precisa
+        // de tipo idêntico (enum object vs string string falha).
+        $current = $product->only([
             'store_id', 'product_id', 'product_reference', 'is_mismatched', 'is_damaged',
             'mismatched_foot', 'mismatched_actual_size', 'mismatched_expected_size',
             'damage_type_id', 'damaged_foot',
-        ]), $data);
+        ]);
+        foreach (['mismatched_foot', 'damaged_foot'] as $enumKey) {
+            if (isset($current[$enumKey]) && $current[$enumKey] instanceof \BackedEnum) {
+                $current[$enumKey] = $current[$enumKey]->value;
+            }
+        }
+
+        $merged = array_merge($current, $data);
 
         $this->validateBusinessRules($merged);
 

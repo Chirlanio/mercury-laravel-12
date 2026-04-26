@@ -15,7 +15,7 @@ return new class extends Migration
             $table->string('invoice_number')->nullable();
             $table->integer('volumes_qty')->nullable();
             $table->integer('products_qty')->nullable();
-            $table->enum('transfer_type', ['transfer', 'relocation', 'return', 'exchange'])->default('transfer');
+            $table->enum('transfer_type', ['transfer', 'relocation', 'return', 'exchange', 'damage_match'])->default('transfer');
             $table->enum('status', ['pending', 'in_transit', 'delivered', 'confirmed', 'cancelled'])->default('pending');
             $table->text('observations')->nullable();
             $table->foreignId('created_by_user_id')->constrained('users')->cascadeOnDelete();

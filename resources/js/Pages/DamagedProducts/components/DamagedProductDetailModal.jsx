@@ -61,7 +61,7 @@ export default function DamagedProductDetailModal({ show, onClose, ulid }) {
                 label: STATUS_LABEL[item.status] ?? item.status,
                 variant: STATUS_VARIANT[item.status] ?? 'gray',
             }] : []}
-            maxWidth="3xl"
+            maxWidth="5xl"
             loading={loading}
             errorMessage={error}
         >
