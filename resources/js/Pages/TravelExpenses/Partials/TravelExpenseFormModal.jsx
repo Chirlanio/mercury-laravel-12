@@ -265,7 +265,7 @@ export default function TravelExpenseFormModal({
             footer={(
                 <StandardModal.Footer>
                     {mode === 'create' && (
-                        <label className="inline-flex items-center text-sm text-gray-700 gap-2 mr-auto">
+                        <label className="inline-flex items-center text-sm text-gray-700 gap-2">
                             <input
                                 type="checkbox"
                                 checked={autoSubmit}
@@ -275,22 +275,24 @@ export default function TravelExpenseFormModal({
                             Enviar para aprovação imediatamente
                         </label>
                     )}
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                        Cancelar
-                    </button>
-                    <button
-                        type="submit"
-                        disabled={processing}
-                        className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 transition-colors"
-                    >
-                        {processing
-                            ? 'Salvando...'
-                            : (mode === 'create' && autoSubmit ? 'Salvar e Enviar' : 'Salvar')}
-                    </button>
+                    <div className="flex items-center gap-3 ml-auto">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={processing}
+                            className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 transition-colors"
+                        >
+                            {processing
+                                ? 'Salvando...'
+                                : (mode === 'create' && autoSubmit ? 'Salvar e Enviar' : 'Salvar')}
+                        </button>
+                    </div>
                 </StandardModal.Footer>
             )}
         >
