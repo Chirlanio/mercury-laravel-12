@@ -154,7 +154,7 @@ class TurnListBoardServiceTest extends TestCase
 
         $this->assertCount(1, $board['on_break']);
         $this->assertNotNull($board['on_break'][0]['break_type']);
-        $this->assertSame('Intervalo', $board['on_break'][0]['break_type']['name']);
+        $this->assertSame('Lanche', $board['on_break'][0]['break_type']['name']);
         $this->assertArrayHasKey('is_exceeded', $board['on_break'][0]);
         $this->assertFalse($board['on_break'][0]['is_exceeded']); // recém-iniciada
     }

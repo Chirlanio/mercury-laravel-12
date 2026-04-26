@@ -208,25 +208,23 @@ export default function Index({
         return () => clearInterval(id);
     }, []);
 
-    // Fullscreen API
+    // Fullscreen CSS-only — a API nativa de fullscreen esconde portais do
+    // HeadlessUI (modais renderizam no <body>, fora do elemento solicitado),
+    // o que deixava os modais invisíveis. Usar `fixed inset-0` resolve sem
+    // perder o efeito de "tela cheia" no tablet.
     const toggleFullscreen = useCallback(() => {
-        const el = containerRef.current;
-        if (!document.fullscreenElement) {
-            (el?.requestFullscreen || el?.webkitRequestFullscreen)?.call(el);
-        } else {
-            (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
-        }
+        setIsFullscreen((v) => !v);
     }, []);
 
+    // Esc sai do modo tela-cheia (paridade com o comportamento nativo)
     useEffect(() => {
-        const handler = () => setIsFullscreen(Boolean(document.fullscreenElement));
-        document.addEventListener('fullscreenchange', handler);
-        document.addEventListener('webkitfullscreenchange', handler);
-        return () => {
-            document.removeEventListener('fullscreenchange', handler);
-            document.removeEventListener('webkitfullscreenchange', handler);
+        if (!isFullscreen) return;
+        const onKey = (e) => {
+            if (e.key === 'Escape') setIsFullscreen(false);
         };
-    }, []);
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [isFullscreen]);
 
     // ──────────────────────────────────────────────────────
     // Drag and Drop
@@ -426,7 +424,7 @@ export default function Index({
         <>
             <Head title="Lista da Vez" />
 
-            <div ref={containerRef} className={`${isFullscreen ? 'fixed inset-0 z-50 overflow-auto bg-white' : ''}`}>
+            <div ref={containerRef} className={`${isFullscreen ? 'fixed inset-0 z-40 overflow-auto bg-white' : ''}`}>
                 <div className="py-4 sm:py-6 lg:py-8">
                     <div className="max-w-full mx-auto px-3 sm:px-6 lg:px-8">
                         {/* Header */}
@@ -690,7 +688,7 @@ function CardActions({ panel, item, actions }) {
                     onClick={() => actions.enterQueue(item)}
                     onPointerDown={stop}
                     color="bg-amber-600 hover:bg-amber-700"
-                    icon={<ArrowRightOnRectangleIcon className="h-4 w-4" />}
+                    icon={<ArrowRightOnRectangleIcon className="h-5 w-5" />}
                     label="Entrar na fila"
                 />
             </div>
@@ -704,21 +702,21 @@ function CardActions({ panel, item, actions }) {
                     onClick={() => actions.startAttendance(item)}
                     onPointerDown={stop}
                     color="bg-blue-600 hover:bg-blue-700"
-                    icon={<PlayIcon className="h-4 w-4" />}
+                    icon={<PlayIcon className="h-5 w-5" />}
                     label="Atender"
                 />
                 <ActionBtn
                     onClick={() => actions.openBreakModal(item)}
                     onPointerDown={stop}
                     color="bg-purple-600 hover:bg-purple-700"
-                    icon={<PauseIcon className="h-4 w-4" />}
+                    icon={<PauseIcon className="h-5 w-5" />}
                     label="Pausar"
                 />
                 <ActionBtn
                     onClick={() => actions.leaveQueue(item)}
                     onPointerDown={stop}
                     color="bg-gray-500 hover:bg-gray-600"
-                    icon={<ArrowLeftOnRectangleIcon className="h-4 w-4" />}
+                    icon={<ArrowLeftOnRectangleIcon className="h-5 w-5" />}
                     label="Sair"
                 />
             </div>
@@ -732,7 +730,7 @@ function CardActions({ panel, item, actions }) {
                     onClick={() => actions.finishAttendance(item)}
                     onPointerDown={stop}
                     color="bg-blue-600 hover:bg-blue-700"
-                    icon={<StopIcon className="h-4 w-4" />}
+                    icon={<StopIcon className="h-5 w-5" />}
                     label="Finalizar"
                 />
             </div>
@@ -746,7 +744,7 @@ function CardActions({ panel, item, actions }) {
                     onClick={() => actions.finishBreak(item)}
                     onPointerDown={stop}
                     color="bg-purple-600 hover:bg-purple-700"
-                    icon={<ArrowUturnLeftIcon className="h-4 w-4" />}
+                    icon={<ArrowUturnLeftIcon className="h-5 w-5" />}
                     label="Voltar à fila"
                 />
             </div>
@@ -762,11 +760,11 @@ function ActionBtn({ onClick, onPointerDown, color, icon, label }) {
             type="button"
             onClick={onClick}
             onPointerDown={onPointerDown}
-            className={`${color} text-white rounded-md text-xs font-medium px-2 py-1.5 inline-flex items-center justify-center gap-1 min-h-[36px] active:scale-95 transition`}
+            className={`${color} text-white rounded-md inline-flex items-center justify-center min-h-[40px] min-w-[40px] active:scale-95 transition`}
             title={label}
+            aria-label={label}
         >
             {icon}
-            <span className="truncate">{label}</span>
         </button>
     );
 }

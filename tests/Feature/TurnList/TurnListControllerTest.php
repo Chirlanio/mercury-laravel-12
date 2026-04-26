@@ -271,7 +271,7 @@ class TurnListControllerTest extends TestCase
 
     public function test_startBreak_requires_employee_in_queue(): void
     {
-        $intervaloId = TurnListBreakType::where('name', 'Intervalo')->value('id');
+        $intervaloId = TurnListBreakType::where('name', 'Lanche')->value('id');
 
         $response = $this->actingAs($this->adminUser)
             ->from(route('turn-list.index'))
@@ -288,7 +288,7 @@ class TurnListControllerTest extends TestCase
     public function test_startBreak_creates_active_break(): void
     {
         app(TurnListQueueService::class)->enter($this->employeeA, $this->storeA);
-        $intervaloId = TurnListBreakType::where('name', 'Intervalo')->value('id');
+        $intervaloId = TurnListBreakType::where('name', 'Lanche')->value('id');
 
         $response = $this->actingAs($this->adminUser)->post(route('turn-list.breaks.start'), [
             'employee_id' => $this->employeeA,
@@ -308,7 +308,7 @@ class TurnListControllerTest extends TestCase
     public function test_finishBreak_finalizes(): void
     {
         app(TurnListQueueService::class)->enter($this->employeeA, $this->storeA);
-        $intervaloId = TurnListBreakType::where('name', 'Intervalo')->value('id');
+        $intervaloId = TurnListBreakType::where('name', 'Lanche')->value('id');
         $break = app(TurnListBreakService::class)->start($this->employeeA, $this->storeA, $intervaloId);
 
         $response = $this->actingAs($this->adminUser)->post(

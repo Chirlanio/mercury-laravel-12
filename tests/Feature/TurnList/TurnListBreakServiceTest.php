@@ -29,7 +29,7 @@ class TurnListBreakServiceTest extends TestCase
 
         $this->createTestStore($this->storeCode);
 
-        $this->intervaloId = TurnListBreakType::where('name', 'Intervalo')->value('id');
+        $this->intervaloId = TurnListBreakType::where('name', 'Lanche')->value('id');
         $this->almocoId = TurnListBreakType::where('name', 'Almoço')->value('id');
 
         $this->service = app(TurnListBreakService::class);

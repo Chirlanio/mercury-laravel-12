@@ -198,7 +198,7 @@ class TurnListStatsServiceTest extends TestCase
 
     public function test_break_stats_calculates_exceeded_pct(): void
     {
-        // Intervalo (id=1, max 15min) — 1 dentro, 1 excedida
+        // Lanche (id=1, max 15min) — 1 dentro, 1 excedida
         $this->makeFinishedBreak($this->employeeA, 1, 600); // 10min — ok
         $this->makeFinishedBreak($this->employeeA, 1, 1_800); // 30min — excedida
 
@@ -207,7 +207,7 @@ class TurnListStatsServiceTest extends TestCase
 
         $report = $this->service->getReport($this->storeCode, 'month');
 
-        $intervalo = collect($report['break_stats'])->firstWhere('type_name', 'Intervalo');
+        $intervalo = collect($report['break_stats'])->firstWhere('type_name', 'Lanche');
         $almoco = collect($report['break_stats'])->firstWhere('type_name', 'Almoço');
 
         $this->assertSame(2, $intervalo['count']);

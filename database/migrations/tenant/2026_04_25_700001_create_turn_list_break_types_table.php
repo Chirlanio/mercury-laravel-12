@@ -28,8 +28,8 @@ return new class extends Migration
 
         $now = now();
         DB::table('turn_list_break_types')->insert([
-            ['name' => 'Intervalo', 'max_duration_minutes' => 15, 'color' => 'info',    'icon' => 'fa-solid fa-mug-hot',  'sort_order' => 10, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
-            ['name' => 'Almoço',    'max_duration_minutes' => 60, 'color' => 'warning', 'icon' => 'fa-solid fa-utensils', 'sort_order' => 20, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['name' => 'Lanche', 'max_duration_minutes' => 15, 'color' => 'info',    'icon' => 'fa-solid fa-mug-hot',  'sort_order' => 10, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
+            ['name' => 'Almoço', 'max_duration_minutes' => 60, 'color' => 'warning', 'icon' => 'fa-solid fa-utensils', 'sort_order' => 20, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now],
         ]);
     }
 
