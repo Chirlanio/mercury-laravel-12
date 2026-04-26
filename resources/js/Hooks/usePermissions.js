@@ -301,6 +301,16 @@ export const PERMISSIONS = {
     MANAGE_TURN_LIST_OUTCOMES: 'turn_list.manage_outcomes',
     MANAGE_TURN_LIST_BREAK_TYPES: 'turn_list.manage_break_types',
     VIEW_TURN_LIST_REPORTS: 'turn_list.view_reports',
+
+    // Produtos Avariados (DamagedProducts)
+    VIEW_DAMAGED_PRODUCTS: 'damaged_products.view',
+    CREATE_DAMAGED_PRODUCTS: 'damaged_products.create',
+    EDIT_DAMAGED_PRODUCTS: 'damaged_products.edit',
+    DELETE_DAMAGED_PRODUCTS: 'damaged_products.delete',
+    MANAGE_DAMAGED_PRODUCTS: 'damaged_products.manage',
+    RUN_DAMAGED_PRODUCT_MATCHING: 'damaged_products.run_matching',
+    APPROVE_DAMAGED_PRODUCT_MATCHES: 'damaged_products.approve_matches',
+    EXPORT_DAMAGED_PRODUCTS: 'damaged_products.export',
 };
 
 export const ROLES = {
