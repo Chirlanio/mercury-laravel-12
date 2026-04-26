@@ -68,7 +68,7 @@ class TravelExpenseExportService
                         public function headings(): array
                         {
                             return [
-                                'ID', 'ULID', 'Beneficiado', 'Loja', 'Solicitante',
+                                'ID', 'Beneficiado', 'Loja', 'Solicitante',
                                 'Origem', 'Destino', 'Saída', 'Retorno', 'Dias',
                                 'Diária', 'Valor Verba', 'Total Prestado', 'Saldo',
                                 'Status Solicitação', 'Status Prestação',
@@ -87,7 +87,6 @@ class TravelExpenseExportService
 
                             return [
                                 $te->id,
-                                $te->ulid,
                                 $te->employee?->name ?? '',
                                 $te->store?->code ? ($te->store->code.' — '.$te->store->name) : ($te->store_code ?? ''),
                                 $te->createdBy?->name ?? '',
@@ -136,10 +135,11 @@ class TravelExpenseExportService
                                 return $te->items->map(function ($item) use ($te) {
                                     return (object) [
                                         'expense_id' => $te->id,
-                                        'expense_ulid' => $te->ulid,
                                         'expense_route' => "{$te->origin} → {$te->destination}",
                                         'employee' => $te->employee?->name ?? '',
-                                        'store_code' => $te->store_code,
+                                        'store_label' => $te->store?->code
+                                            ? ($te->store->code.' — '.$te->store->name)
+                                            : ($te->store_code ?? ''),
                                         'item' => $item,
                                     ];
                                 });
@@ -149,8 +149,8 @@ class TravelExpenseExportService
                         public function headings(): array
                         {
                             return [
-                                'ID Verba', 'ULID Verba', 'Trecho', 'Beneficiado', 'Loja',
-                                'ID Item', 'Data Despesa', 'Tipo', 'Valor',
+                                'ID Verba', 'Trecho', 'Beneficiado', 'Loja',
+                                'Data Despesa', 'Tipo', 'Valor',
                                 'NF/Recibo', 'Descrição', 'Tem Comprovante',
                             ];
                         }
@@ -159,11 +159,9 @@ class TravelExpenseExportService
                         {
                             return [
                                 $row->expense_id,
-                                $row->expense_ulid,
                                 $row->expense_route,
                                 $row->employee,
-                                $row->store_code,
-                                $row->item->id,
+                                $row->store_label,
                                 $row->item->expense_date?->format('d/m/Y'),
                                 $row->item->typeExpense?->name ?? '',
                                 (float) $row->item->value,
