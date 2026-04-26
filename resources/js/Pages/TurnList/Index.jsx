@@ -35,8 +35,8 @@ import SelectBreakTypeModal from './Partials/SelectBreakTypeModal';
 // Definições dos painéis
 // ───────────────────────────────────────────────────────────────────
 const PANEL_DEFS = {
-    queue:     { key: 'queue',     title: 'Na Fila',     color: 'bg-amber-50 border-amber-300',   headerColor: 'bg-amber-600' },
-    attending: { key: 'attending', title: 'Atendendo',   color: 'bg-blue-50 border-blue-300',     headerColor: 'bg-blue-600' },
+    queue:     { key: 'queue',     title: 'Na Fila',     color: 'bg-blue-50 border-blue-300',     headerColor: 'bg-blue-600' },
+    attending: { key: 'attending', title: 'Atendendo',   color: 'bg-green-50 border-green-300',   headerColor: 'bg-green-600' },
     on_break:  { key: 'on_break',  title: 'Em Pausa',    color: 'bg-purple-50 border-purple-300', headerColor: 'bg-purple-600' },
     available: { key: 'available', title: 'Disponível',  color: 'bg-gray-100 border-gray-300',    headerColor: 'bg-gray-700' },
 };
@@ -682,7 +682,7 @@ function Card({ panel, item, tickNow, actions }) {
                     <CardSubtitle panel={panel} item={item} tickNow={tickNow} />
                 </div>
                 {panel.key === 'queue' && (
-                    <div className="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-1 rounded-full shrink-0">
+                    <div className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded-full shrink-0">
                         #{item.position}
                     </div>
                 )}
@@ -721,7 +721,7 @@ function CardActions({ panel, item, actions }) {
                 <ActionBtn
                     onClick={() => actions.startAttendance(item)}
                     onPointerDown={stop}
-                    color="bg-blue-600 hover:bg-blue-700"
+                    color="bg-green-600 hover:bg-green-700"
                     icon={<PlayIcon className="h-5 w-5" />}
                     label="Atender"
                 />
@@ -815,7 +815,7 @@ function CardSubtitle({ panel, item, tickNow }) {
 
     if (panel.key === 'attending') {
         return (
-            <div className="text-xs text-blue-700 font-medium flex items-center gap-1">
+            <div className="text-xs text-green-700 font-medium flex items-center gap-1">
                 <PlayIcon className="h-3 w-3" />
                 {formatElapsed(elapsedFromIso(item.started_at, tickNow))}
             </div>
