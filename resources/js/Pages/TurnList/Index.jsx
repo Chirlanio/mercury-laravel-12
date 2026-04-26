@@ -520,8 +520,10 @@ export default function Index({
                       min-h previne que algum painel colapse demais.
                     */}
                     <div className="flex-1 min-h-0 px-3 sm:px-6 lg:px-8 pb-4 flex flex-col gap-3 sm:gap-4">
-                        {/* Topo: queue + attending */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 flex-[4] min-h-[180px]">
+                        {/* Topo: queue + attending. Mobile e tablet em
+                            portrait (até 1023px) ficam empilhados; lg+
+                            (tablet landscape, desktop) lado a lado. */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-[4] min-h-[180px]">
                             <Panel
                                 panel={PANEL_DEFS.queue}
                                 items={board?.queue ?? []}
@@ -594,9 +596,11 @@ function Panel({ panel, items, tickNow, actions, horizontal = false, className =
         data: { panel: panel.key },
     });
 
+    // Horizontal: grid responsivo (1/2/3/4 cols por breakpoint).
+    // Vertical: lista com gap proporcional ao p-3 do container.
     const containerCls = horizontal
-        ? 'flex-1 min-h-0 p-2 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 overflow-y-auto'
-        : 'flex-1 min-h-0 p-2 space-y-2 overflow-y-auto';
+        ? 'flex-1 min-h-0 p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto'
+        : 'flex-1 min-h-0 p-3 space-y-3 overflow-y-auto';
 
     return (
         <div
@@ -662,13 +666,15 @@ function Card({ panel, item, tickNow, actions }) {
         <div
             ref={setNodeRef}
             style={style}
-            className="bg-white rounded-lg border border-gray-200 shadow-sm flex flex-col select-none min-h-[88px]"
+            className="bg-white rounded-lg border border-gray-200 shadow-sm flex flex-row items-center justify-between gap-3 p-4 select-none"
         >
-            {/* Drag handle: avatar + nome */}
+            {/* Drag handle (esquerda): avatar + nome + subtítulo.
+                flex-1 + min-w-0 garante truncamento de nomes longos sem
+                empurrar os botões pra fora do card. */}
             <div
                 {...attributes}
                 {...listeners}
-                className="p-3 flex items-center gap-3 cursor-grab active:cursor-grabbing touch-none"
+                className="flex flex-row items-center gap-3 flex-1 min-w-0 cursor-grab active:cursor-grabbing touch-none"
             >
                 <EmployeeAvatar
                     name={item.employee_name}
@@ -681,14 +687,17 @@ function Card({ panel, item, tickNow, actions }) {
                     </div>
                     <CardSubtitle panel={panel} item={item} tickNow={tickNow} />
                 </div>
-                {panel.key === 'queue' && (
-                    <div className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded-full shrink-0">
-                        #{item.position}
-                    </div>
-                )}
             </div>
 
-            {/* Botões de ação — fora do drag handle. */}
+            {/* Badge de posição da fila (entre texto e botões) */}
+            {panel.key === 'queue' && (
+                <div className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded-full shrink-0">
+                    #{item.position}
+                </div>
+            )}
+
+            {/* Botões de ação (direita) — shrink-0 evita serem
+                comprimidos quando o nome ocupa toda a largura. */}
             <CardActions panel={panel} item={item} actions={actions} />
         </div>
     );
@@ -703,21 +712,19 @@ function CardActions({ panel, item, actions }) {
 
     if (panel.key === 'available') {
         return (
-            <div className="flex gap-1 p-2 pt-0">
-                <ActionBtn
-                    onClick={() => actions.enterQueue(item)}
-                    onPointerDown={stop}
-                    color="bg-amber-600 hover:bg-amber-700"
-                    icon={<ArrowRightOnRectangleIcon className="h-5 w-5" />}
-                    label="Entrar na fila"
-                />
-            </div>
+            <ActionBtn
+                onClick={() => actions.enterQueue(item)}
+                onPointerDown={stop}
+                color="bg-amber-600 hover:bg-amber-700"
+                icon={<ArrowRightOnRectangleIcon className="h-5 w-5" />}
+                label="Entrar na fila"
+            />
         );
     }
 
     if (panel.key === 'queue') {
         return (
-            <div className="grid grid-cols-3 gap-1 p-2 pt-0">
+            <div className="flex gap-1 shrink-0">
                 <ActionBtn
                     onClick={() => actions.startAttendance(item)}
                     onPointerDown={stop}
@@ -745,29 +752,25 @@ function CardActions({ panel, item, actions }) {
 
     if (panel.key === 'attending') {
         return (
-            <div className="flex gap-1 p-2 pt-0">
-                <ActionBtn
-                    onClick={() => actions.finishAttendance(item)}
-                    onPointerDown={stop}
-                    color="bg-blue-600 hover:bg-blue-700"
-                    icon={<StopIcon className="h-5 w-5" />}
-                    label="Finalizar"
-                />
-            </div>
+            <ActionBtn
+                onClick={() => actions.finishAttendance(item)}
+                onPointerDown={stop}
+                color="bg-blue-600 hover:bg-blue-700"
+                icon={<StopIcon className="h-5 w-5" />}
+                label="Finalizar"
+            />
         );
     }
 
     if (panel.key === 'on_break') {
         return (
-            <div className="flex gap-1 p-2 pt-0">
-                <ActionBtn
-                    onClick={() => actions.finishBreak(item)}
-                    onPointerDown={stop}
-                    color="bg-purple-600 hover:bg-purple-700"
-                    icon={<ArrowUturnLeftIcon className="h-5 w-5" />}
-                    label="Voltar à fila"
-                />
-            </div>
+            <ActionBtn
+                onClick={() => actions.finishBreak(item)}
+                onPointerDown={stop}
+                color="bg-purple-600 hover:bg-purple-700"
+                icon={<ArrowUturnLeftIcon className="h-5 w-5" />}
+                label="Voltar à fila"
+            />
         );
     }
 
@@ -780,7 +783,7 @@ function ActionBtn({ onClick, onPointerDown, color, icon, label }) {
             type="button"
             onClick={onClick}
             onPointerDown={onPointerDown}
-            className={`${color} text-white rounded-md inline-flex items-center justify-center min-h-[40px] min-w-[40px] active:scale-95 transition`}
+            className={`${color} text-white rounded-md inline-flex items-center justify-center min-h-[44px] min-w-[44px] shrink-0 active:scale-95 transition`}
             title={label}
             aria-label={label}
         >
