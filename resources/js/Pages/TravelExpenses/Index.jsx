@@ -531,9 +531,8 @@ export default function Index({
 
                     <div className="bg-white shadow-sm rounded-lg overflow-hidden">
                         <DataTable
-                            data={expenses?.data ?? []}
+                            data={expenses}
                             columns={columns}
-                            pagination={expenses}
                             emptyMessage="Nenhuma verba encontrada."
                         />
                     </div>
