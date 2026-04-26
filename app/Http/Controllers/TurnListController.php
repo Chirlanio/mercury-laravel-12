@@ -14,6 +14,7 @@ use App\Services\TurnListAttendanceService;
 use App\Services\TurnListBoardService;
 use App\Services\TurnListBreakService;
 use App\Services\TurnListQueueService;
+use App\Services\TurnListStatsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,7 +29,34 @@ class TurnListController extends Controller
         protected TurnListQueueService $queueService,
         protected TurnListAttendanceService $attendanceService,
         protected TurnListBreakService $breakService,
+        protected TurnListStatsService $statsService,
     ) {}
+
+    /**
+     * Página de relatórios (Inertia).
+     */
+    public function reports(Request $request): Response
+    {
+        $user = $request->user();
+        $storeCode = $this->resolveStoreCode($user, $request);
+        $period = $request->query('period', 'month');
+        $from = $request->query('from');
+        $to = $request->query('to');
+
+        return Inertia::render('TurnList/Reports', [
+            'storeCode' => $storeCode,
+            'isStoreScoped' => $this->isStoreScoped($user),
+            'stores' => $this->resolveAvailableStores($user),
+            'report' => $storeCode || ! $this->isStoreScoped($user)
+                ? $this->statsService->getReport($storeCode, $period, $from, $to)
+                : null,
+            'filters' => [
+                'period' => $period,
+                'from' => $from,
+                'to' => $to,
+            ],
+        ]);
+    }
 
     /**
      * Página principal — render do board (Inertia).

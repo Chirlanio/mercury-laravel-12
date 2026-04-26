@@ -1899,6 +1899,11 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/turn-list', [\App\Http\Controllers\TurnListController::class, 'index'])->name('turn-list.index');
         Route::get('/turn-list/board', [\App\Http\Controllers\TurnListController::class, 'board'])->name('turn-list.board');
 
+        // Relatórios — exige VIEW_TURN_LIST_REPORTS
+        Route::middleware('permission:'.Permission::VIEW_TURN_LIST_REPORTS->value)->group(function () {
+            Route::get('/turn-list/reports', [\App\Http\Controllers\TurnListController::class, 'reports'])->name('turn-list.reports');
+        });
+
         // Operações de fila/atendimento/pausa — exigem OPERATE_TURN_LIST.
         // O ensureCanOperateStore() no controller restringe à própria loja
         // se não tiver MANAGE.
