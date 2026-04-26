@@ -329,6 +329,16 @@ enum Permission: string
     case MANAGE_TURN_LIST_BREAK_TYPES = 'turn_list.manage_break_types';
     case VIEW_TURN_LIST_REPORTS = 'turn_list.view_reports';
 
+    // Produtos Avariados (DamagedProducts — pares trocados + avarias complementares)
+    case VIEW_DAMAGED_PRODUCTS = 'damaged_products.view';
+    case CREATE_DAMAGED_PRODUCTS = 'damaged_products.create';
+    case EDIT_DAMAGED_PRODUCTS = 'damaged_products.edit';
+    case DELETE_DAMAGED_PRODUCTS = 'damaged_products.delete';
+    case MANAGE_DAMAGED_PRODUCTS = 'damaged_products.manage';
+    case RUN_DAMAGED_PRODUCT_MATCHING = 'damaged_products.run_matching';
+    case APPROVE_DAMAGED_PRODUCT_MATCHES = 'damaged_products.approve_matches';
+    case EXPORT_DAMAGED_PRODUCTS = 'damaged_products.export';
+
     public function label(): string
     {
         return match ($this) {
@@ -606,6 +616,15 @@ enum Permission: string
             self::MANAGE_TURN_LIST_OUTCOMES => 'Gerenciar resultados de atendimento',
             self::MANAGE_TURN_LIST_BREAK_TYPES => 'Gerenciar tipos de pausa',
             self::VIEW_TURN_LIST_REPORTS => 'Ver relatórios da Lista da Vez',
+
+            self::VIEW_DAMAGED_PRODUCTS => 'Visualizar produtos avariados',
+            self::CREATE_DAMAGED_PRODUCTS => 'Cadastrar produtos avariados',
+            self::EDIT_DAMAGED_PRODUCTS => 'Editar produtos avariados',
+            self::DELETE_DAMAGED_PRODUCTS => 'Excluir/cancelar produtos avariados',
+            self::MANAGE_DAMAGED_PRODUCTS => 'Gerenciar produtos avariados (todas as lojas)',
+            self::RUN_DAMAGED_PRODUCT_MATCHING => 'Disparar matching manual de produtos avariados',
+            self::APPROVE_DAMAGED_PRODUCT_MATCHES => 'Aceitar/rejeitar matches sugeridos',
+            self::EXPORT_DAMAGED_PRODUCTS => 'Exportar produtos avariados (XLSX/PDF)',
         };
     }
 
@@ -886,6 +905,15 @@ enum Permission: string
             self::MANAGE_TURN_LIST_OUTCOMES => 'Permite cadastrar e editar resultados de atendimento (Venda Realizada, Pesquisa, Troca convertida etc) — controla a flag `restore_queue_position` que define se o outcome volta a consultora na posição original',
             self::MANAGE_TURN_LIST_BREAK_TYPES => 'Permite cadastrar e editar tipos de pausa (Intervalo, Almoço) e seus tempos máximos antes de gerar alerta de pausa excedida',
             self::VIEW_TURN_LIST_REPORTS => 'Permite ver relatórios analíticos da Lista da Vez (top consultoras, tempo médio, conversão por outcome, distribuição diária/semanal/mensal)',
+
+            self::VIEW_DAMAGED_PRODUCTS => 'Permite visualizar produtos avariados. Sem MANAGE_DAMAGED_PRODUCTS, o usuário só vê registros da própria loja',
+            self::CREATE_DAMAGED_PRODUCTS => 'Permite cadastrar novos produtos avariados (par trocado ou avariado). Sem MANAGE só pode cadastrar para a própria loja',
+            self::EDIT_DAMAGED_PRODUCTS => 'Permite editar produtos avariados em estados não-finais (open, matched, transfer_requested). Após resolved/cancelled só com MANAGE',
+            self::DELETE_DAMAGED_PRODUCTS => 'Permite cancelar produtos avariados (estado terminal). Expira matches pendentes vinculados',
+            self::MANAGE_DAMAGED_PRODUCTS => 'Permite gerenciar produtos avariados de todas as lojas (sem filtro de scoping). Pode editar em qualquer status',
+            self::RUN_DAMAGED_PRODUCT_MATCHING => 'Permite disparar a engine completa de matching manualmente, fora do schedule diário (06:00). Útil após mudança de regras de marca/rede',
+            self::APPROVE_DAMAGED_PRODUCT_MATCHES => 'Permite aceitar matches sugeridos (gera Transfer entre lojas com transfer_type=damage_match) ou rejeitar com motivo. Sem MANAGE só matches da própria loja',
+            self::EXPORT_DAMAGED_PRODUCTS => 'Permite exportar produtos avariados para Excel (listagem 2 abas: registros + matches) ou PDF (laudo individual com fotos)',
         };
     }
 

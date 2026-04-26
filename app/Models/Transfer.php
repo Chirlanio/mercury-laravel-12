@@ -49,6 +49,7 @@ class Transfer extends Model
         'relocation' => 'Remanejo',
         'return' => 'Devolução',
         'exchange' => 'Troca',
+        'damage_match' => 'Match de Avaria',
     ];
 
     public function originStore(): BelongsTo

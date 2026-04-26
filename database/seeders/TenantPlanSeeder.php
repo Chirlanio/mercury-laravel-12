@@ -20,6 +20,7 @@ class TenantPlanSeeder extends Seeder
             'config', 'integrations', 'store_goals', 'movements',
             'vacations', 'stock_audits', 'personnel_movements',
             'training', 'experience-tracker', 'delivery', 'reversals', 'returns',
+            'damaged_products',
         ];
 
         // Essential modules for Starter plan

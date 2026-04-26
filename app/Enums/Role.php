@@ -322,6 +322,15 @@ enum Role: string
                 Permission::MANAGE_TURN_LIST_OUTCOMES->value,
                 Permission::MANAGE_TURN_LIST_BREAK_TYPES->value,
                 Permission::VIEW_TURN_LIST_REPORTS->value,
+                // Produtos Avariados (todas)
+                Permission::VIEW_DAMAGED_PRODUCTS->value,
+                Permission::CREATE_DAMAGED_PRODUCTS->value,
+                Permission::EDIT_DAMAGED_PRODUCTS->value,
+                Permission::DELETE_DAMAGED_PRODUCTS->value,
+                Permission::MANAGE_DAMAGED_PRODUCTS->value,
+                Permission::RUN_DAMAGED_PRODUCT_MATCHING->value,
+                Permission::APPROVE_DAMAGED_PRODUCT_MATCHES->value,
+                Permission::EXPORT_DAMAGED_PRODUCTS->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -582,6 +591,15 @@ enum Role: string
                 Permission::MANAGE_TURN_LIST_OUTCOMES->value,
                 Permission::MANAGE_TURN_LIST_BREAK_TYPES->value,
                 Permission::VIEW_TURN_LIST_REPORTS->value,
+                // Produtos Avariados (todas)
+                Permission::VIEW_DAMAGED_PRODUCTS->value,
+                Permission::CREATE_DAMAGED_PRODUCTS->value,
+                Permission::EDIT_DAMAGED_PRODUCTS->value,
+                Permission::DELETE_DAMAGED_PRODUCTS->value,
+                Permission::MANAGE_DAMAGED_PRODUCTS->value,
+                Permission::RUN_DAMAGED_PRODUCT_MATCHING->value,
+                Permission::APPROVE_DAMAGED_PRODUCT_MATCHES->value,
+                Permission::EXPORT_DAMAGED_PRODUCTS->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -739,6 +757,16 @@ enum Role: string
                 Permission::OPERATE_TURN_LIST->value,
                 Permission::MANAGE_TURN_LIST->value,
                 Permission::VIEW_TURN_LIST_REPORTS->value,
+                // Produtos Avariados — full lifecycle de operação. Sem MANAGE
+                // o suporte enxerga todas as lojas (por hierarquia >= 2 + escopo
+                // de scope_query do service); RUN_MATCHING fica com Admin.
+                Permission::VIEW_DAMAGED_PRODUCTS->value,
+                Permission::CREATE_DAMAGED_PRODUCTS->value,
+                Permission::EDIT_DAMAGED_PRODUCTS->value,
+                Permission::DELETE_DAMAGED_PRODUCTS->value,
+                Permission::MANAGE_DAMAGED_PRODUCTS->value,
+                Permission::APPROVE_DAMAGED_PRODUCT_MATCHES->value,
+                Permission::EXPORT_DAMAGED_PRODUCTS->value,
             ],
             self::FINANCE => [
                 // Financeira — contas a pagar, orçamentos, imports de realizado DRE.
@@ -992,6 +1020,13 @@ enum Role: string
                 // Sem MANAGE_TURN_LIST → scoping automático por user.store_id.
                 Permission::VIEW_TURN_LIST->value,
                 Permission::OPERATE_TURN_LIST->value,
+                // Produtos Avariados — vendedor cadastra avaria/par trocado da
+                // própria loja e edita enquanto não-final. Aceitar/rejeitar
+                // matches fica com gerente (APPROVE) e admin. Sem MANAGE limita
+                // scoping a user.store_id automaticamente no service.
+                Permission::VIEW_DAMAGED_PRODUCTS->value,
+                Permission::CREATE_DAMAGED_PRODUCTS->value,
+                Permission::EDIT_DAMAGED_PRODUCTS->value,
             ],
             self::DRIVER => [
                 // Perfil próprio

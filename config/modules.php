@@ -323,4 +323,11 @@ return [
         'icon' => 'QueueListIcon',
         'dependencies' => ['employees', 'stores'],
     ],
+    'damaged_products' => [
+        'name' => 'Produtos Avariados',
+        'description' => 'Controle de avarias e pares trocados entre lojas com engine de matching automático. Identifica complementos viáveis (par trocado: A com pé esquerdo X / B com inverso; avaria complementar: A com pé esquerdo bom + B com pé direito bom) respeitando regras de marca por rede. Match aceito gera transferência automática (transfer_type=damage_match).',
+        'routes' => ['damaged-products.*'],
+        'icon' => 'ExclamationTriangleIcon',
+        'dependencies' => ['products', 'stores', 'transfers'],
+    ],
 ];
