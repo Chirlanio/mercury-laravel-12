@@ -260,11 +260,19 @@ class TravelExpenseController extends Controller
 
         $data = $request->validate([
             'type_expense_id' => 'required|exists:type_expenses,id',
-            'expense_date' => 'required|date',
+            'expense_date' => [
+                'required',
+                'date',
+                'after_or_equal:'.$travelExpense->initial_date->toDateString(),
+                'before_or_equal:'.$travelExpense->end_date->toDateString(),
+            ],
             'value' => 'required|numeric|min:0.01',
             'description' => 'required|string|max:250',
             'invoice_number' => 'nullable|string|max:30',
             'attachment' => 'nullable|file|max:5120|mimes:pdf,jpg,jpeg,png,webp',
+        ], [
+            'expense_date.after_or_equal' => 'A data da despesa deve ser igual ou posterior ao início da viagem ('.$travelExpense->initial_date->format('d/m/Y').').',
+            'expense_date.before_or_equal' => 'A data da despesa deve ser igual ou anterior ao fim da viagem ('.$travelExpense->end_date->format('d/m/Y').').',
         ]);
 
         if ($request->hasFile('attachment')) {
@@ -290,11 +298,19 @@ class TravelExpenseController extends Controller
 
         $data = $request->validate([
             'type_expense_id' => 'sometimes|exists:type_expenses,id',
-            'expense_date' => 'sometimes|date',
+            'expense_date' => [
+                'sometimes',
+                'date',
+                'after_or_equal:'.$travelExpense->initial_date->toDateString(),
+                'before_or_equal:'.$travelExpense->end_date->toDateString(),
+            ],
             'value' => 'sometimes|numeric|min:0.01',
             'description' => 'sometimes|string|max:250',
             'invoice_number' => 'nullable|string|max:30',
             'attachment' => 'nullable|file|max:5120|mimes:pdf,jpg,jpeg,png,webp',
+        ], [
+            'expense_date.after_or_equal' => 'A data da despesa deve ser igual ou posterior ao início da viagem ('.$travelExpense->initial_date->format('d/m/Y').').',
+            'expense_date.before_or_equal' => 'A data da despesa deve ser igual ou anterior ao fim da viagem ('.$travelExpense->end_date->format('d/m/Y').').',
         ]);
 
         if ($request->hasFile('attachment')) {

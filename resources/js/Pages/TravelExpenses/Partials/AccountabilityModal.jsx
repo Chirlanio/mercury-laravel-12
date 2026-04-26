@@ -15,6 +15,7 @@ import Button from '@/Components/Button';
 import InputLabel from '@/Components/InputLabel';
 import InputError from '@/Components/InputError';
 import TextInput from '@/Components/TextInput';
+import { maskMoney, parseMoney } from '@/Hooks/useMasks';
 
 const COLOR_MAP = {
     success: 'success', warning: 'warning', info: 'info', danger: 'danger',
@@ -76,7 +77,8 @@ export default function AccountabilityModal({
         setItemForm({
             type_expense_id: item.type_expense?.id ?? '',
             expense_date: item.expense_date ?? '',
-            value: item.value ?? '',
+            // Aplica máscara BR no valor decimal vindo do backend
+            value: item.value != null ? maskMoney(String(item.value).replace('.', ',')) : '',
             description: item.description ?? '',
             invoice_number: item.invoice_number ?? '',
             attachment: null,
@@ -94,10 +96,31 @@ export default function AccountabilityModal({
         e?.preventDefault?.();
         if (!expense) return;
 
+        // Validações inline antes de bater no backend
+        const localErrors = {};
+
+        // Data dentro do intervalo da viagem
+        if (itemForm.expense_date && expense.initial_date && expense.end_date) {
+            if (itemForm.expense_date < expense.initial_date || itemForm.expense_date > expense.end_date) {
+                localErrors.expense_date = `Data deve estar entre ${formatDate(expense.initial_date)} e ${formatDate(expense.end_date)}.`;
+            }
+        }
+
+        // Valor parseado deve ser positivo
+        const parsedValue = parseMoney(itemForm.value);
+        if (!parsedValue || parsedValue <= 0) {
+            localErrors.value = 'Informe um valor maior que zero.';
+        }
+
+        if (Object.keys(localErrors).length > 0) {
+            setItemErrors(localErrors);
+            return;
+        }
+
         const formData = new FormData();
         formData.append('type_expense_id', itemForm.type_expense_id);
         formData.append('expense_date', itemForm.expense_date);
-        formData.append('value', itemForm.value);
+        formData.append('value', String(parsedValue)); // envia decimal puro
         formData.append('description', itemForm.description);
         if (itemForm.invoice_number) formData.append('invoice_number', itemForm.invoice_number);
         if (itemForm.attachment) formData.append('attachment', itemForm.attachment);
@@ -230,19 +253,24 @@ export default function AccountabilityModal({
                                             type="date"
                                             value={itemForm.expense_date}
                                             onChange={setField('expense_date')}
+                                            min={expense?.initial_date ?? undefined}
+                                            max={expense?.end_date ?? undefined}
                                             className="w-full mt-1"
                                         />
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Período da viagem: {formatDate(expense?.initial_date)} a {formatDate(expense?.end_date)}
+                                        </p>
                                         <InputError message={itemErrors.expense_date} />
                                     </div>
                                     <div>
                                         <InputLabel htmlFor="value" value="Valor (R$) *" />
                                         <TextInput
                                             id="value"
-                                            type="number"
-                                            step="0.01"
-                                            min="0.01"
+                                            type="text"
+                                            inputMode="numeric"
                                             value={itemForm.value}
-                                            onChange={setField('value')}
+                                            onChange={(e) => setItemForm((p) => ({ ...p, value: maskMoney(e.target.value) }))}
+                                            placeholder="0,00"
                                             className="w-full mt-1"
                                         />
                                         <InputError message={itemErrors.value} />
