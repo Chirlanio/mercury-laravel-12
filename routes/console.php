@@ -214,3 +214,27 @@ Schedule::command('turn-list:cleanup')
     ->dailyAt('23:00')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/turn-list-cleanup.log'));
+
+// Damaged Products — full scan diário às 06:00 (antes do expediente).
+// Já rodamos matching pós-create no controller, mas o full scan re-tenta
+// matches que ficaram órfãos por mudança de regras de marca/rede.
+Schedule::command('damaged-products:run-matching')
+    ->dailyAt('06:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/damaged-products-run-matching.log'));
+
+// Damaged Products — lembrete diário às 09:00 sobre matches pending há 3+
+// dias sem ação. Notifica APPROVE_MATCHES das lojas envolvidas (origem +
+// destino) com mail no destino (toma a decisão).
+Schedule::command('damaged-products:remind-pending-matches')
+    ->dailyAt('09:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/damaged-products-remind-pending.log'));
+
+// Damaged Products — relatório semanal de registros stale (open há 60+
+// dias sem nenhum match). Roda na segunda às 02:00 — admins veem o
+// resumo no log; sinaliza ajuste de regras de marca/rede ou cadastro.
+Schedule::command('damaged-products:cleanup-stale-open')
+    ->weeklyOn(1, '02:00')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/damaged-products-stale-open.log'));
