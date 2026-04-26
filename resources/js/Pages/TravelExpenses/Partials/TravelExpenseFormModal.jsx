@@ -90,11 +90,16 @@ export default function TravelExpenseFormModal({
         return rate * days;
     }, [form.daily_rate, form.initial_date, form.end_date]);
 
-    // Funcionários filtrados pela loja selecionada
+    // Funcionários filtrados pela loja selecionada.
+    // Fallback: se o payload não trouxe `store_id` em nenhum emp (versão
+    // antiga em cache), mostra todos pra não bloquear o cadastro.
     const filteredEmployees = useMemo(() => {
         if (!form.store_code) return [];
-        return (selects.employees || []).filter(
-            (emp) => String(emp.store_id) === String(form.store_code)
+        const all = selects.employees || [];
+        const hasStoreData = all.some((e) => e.store_id);
+        if (!hasStoreData) return all;
+        return all.filter(
+            (emp) => String(emp.store_id ?? '').trim() === String(form.store_code).trim()
         );
     }, [form.store_code, selects.employees]);
 
