@@ -205,8 +205,49 @@ export default function AccountabilityModal({
             headerBadges={expense ? [
                 { text: expense.accountability_status_label },
             ] : []}
-            maxWidth="4xl"
+            maxWidth="5xl"
             loading={loading}
+            footer={(canSubmitForApproval || canApproveOrReject) ? (
+                <StandardModal.Footer>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                        Fechar
+                    </button>
+                    <div className="flex items-center gap-3 ml-auto">
+                        {canSubmitForApproval && (
+                            <Button
+                                variant="primary"
+                                size="md"
+                                icon={PaperAirplaneIcon}
+                                onClick={handleSubmitForApproval}
+                            >
+                                Enviar para aprovação
+                            </Button>
+                        )}
+                        {canApproveOrReject && (
+                            <>
+                                <Button
+                                    variant="danger"
+                                    size="md"
+                                    onClick={handleRejectAccountability}
+                                >
+                                    Rejeitar / Devolver
+                                </Button>
+                                <Button
+                                    variant="success"
+                                    size="md"
+                                    onClick={handleApproveAccountability}
+                                >
+                                    Aprovar prestação
+                                </Button>
+                            </>
+                        )}
+                    </div>
+                </StandardModal.Footer>
+            ) : undefined}
         >
             {!expense ? (
                 <div className="flex justify-center py-12"><LoadingSpinner /></div>
@@ -237,7 +278,7 @@ export default function AccountabilityModal({
                                             id="type_expense_id"
                                             value={itemForm.type_expense_id}
                                             onChange={setField('type_expense_id')}
-                                            className="w-full mt-1 rounded-md border-gray-300 text-sm"
+                                            className="w-full mt-1 rounded-md border-gray-300"
                                         >
                                             <option value="">— Selecione —</option>
                                             {typeExpenses.map((t) => (
@@ -417,41 +458,6 @@ export default function AccountabilityModal({
                         )}
                     </StandardModal.Section>
 
-                    {/* Ações de finalização */}
-                    {(canSubmitForApproval || canApproveOrReject) && (
-                        <StandardModal.Section title="Ações">
-                            <div className="flex flex-wrap items-center gap-2">
-                                {canSubmitForApproval && (
-                                    <Button
-                                        variant="primary"
-                                        size="sm"
-                                        icon={PaperAirplaneIcon}
-                                        onClick={handleSubmitForApproval}
-                                    >
-                                        Enviar para aprovação
-                                    </Button>
-                                )}
-                                {canApproveOrReject && (
-                                    <>
-                                        <Button
-                                            variant="success"
-                                            size="sm"
-                                            onClick={handleApproveAccountability}
-                                        >
-                                            Aprovar prestação
-                                        </Button>
-                                        <Button
-                                            variant="danger"
-                                            size="sm"
-                                            onClick={handleRejectAccountability}
-                                        >
-                                            Rejeitar / Devolver
-                                        </Button>
-                                    </>
-                                )}
-                            </div>
-                        </StandardModal.Section>
-                    )}
                 </>
             )}
         </StandardModal>
