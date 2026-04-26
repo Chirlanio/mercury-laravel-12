@@ -505,9 +505,23 @@ export default function Index({
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                 >
+                    {/*
+                      Layout proporcional via flex-grow — adapta a qualquer
+                      viewport (mobile, tablet, desktop, fullscreen) sem
+                      cortar conteúdo. Cada painel tem scroll interno
+                      próprio se houver muitos cards.
+
+                        • Top row (queue + attending): flex-[4]  — dominante
+                        • Em Pausa (condicional):       flex-[1]  — compacto
+                        • Disponível:                   flex-[2]  — médio
+
+                      Sem on_break: top fica com 67%, available 33%.
+                      Com on_break: top 57%, on_break 14%, available 29%.
+                      min-h previne que algum painel colapse demais.
+                    */}
                     <div className="flex-1 min-h-0 px-3 sm:px-6 lg:px-8 pb-4 flex flex-col gap-3 sm:gap-4">
-                        {/* Topo: queue + attending — fica com o espaço sobrando */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 flex-1 min-h-[200px]">
+                        {/* Topo: queue + attending */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 flex-[4] min-h-[180px]">
                             <Panel
                                 panel={PANEL_DEFS.queue}
                                 items={board?.queue ?? []}
@@ -522,7 +536,7 @@ export default function Index({
                             />
                         </div>
 
-                        {/* Em Pausa — condicional, altura fixa */}
+                        {/* Em Pausa — condicional, faixa compacta */}
                         {showOnBreakPanel && (
                             <Panel
                                 panel={PANEL_DEFS.on_break}
@@ -530,18 +544,18 @@ export default function Index({
                                 tickNow={tickNow}
                                 actions={cardActions}
                                 horizontal
-                                className="shrink-0 h-[180px]"
+                                className="flex-[1] min-h-[100px]"
                             />
                         )}
 
-                        {/* Disponível — altura fixa, scroll interno */}
+                        {/* Disponível — espaço médio, scroll interno */}
                         <Panel
                             panel={PANEL_DEFS.available}
                             items={board?.available ?? []}
                             tickNow={tickNow}
                             actions={cardActions}
                             horizontal
-                            className="shrink-0 h-[260px]"
+                            className="flex-[2] min-h-[140px]"
                         />
                     </div>
                     <DragOverlay>
