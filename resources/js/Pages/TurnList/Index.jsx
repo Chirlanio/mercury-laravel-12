@@ -442,43 +442,46 @@ export default function Index({
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                {/* Store selector — só quem tem MANAGE_TURN_LIST */}
-                                {permissions.manage && stores.length > 1 && (
-                                    <div className="flex items-center gap-1.5 text-sm">
-                                        <BuildingStorefrontIcon className="h-4 w-4 text-gray-400" />
-                                        <select
-                                            value={storeCode ?? ''}
-                                            onChange={(e) => onChangeStore(e.target.value)}
-                                            className="rounded-md border-gray-300 text-sm py-1"
-                                        >
-                                            {stores.map((s) => (
-                                                <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
-                                {/* Refresh manual */}
-                                <button
-                                    type="button"
-                                    onClick={fetchBoard}
-                                    className="inline-flex items-center gap-1 text-xs sm:text-sm text-gray-600 hover:text-gray-900 px-2 py-1.5 rounded-md hover:bg-gray-100"
-                                    title="Atualizar"
-                                >
-                                    <ArrowPathIcon className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Atualizar</span>
-                                </button>
-                                {/* Fullscreen toggle */}
-                                <button
-                                    type="button"
-                                    onClick={toggleFullscreen}
-                                    className="inline-flex items-center gap-1 text-xs sm:text-sm text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-md min-h-[44px]"
-                                    title={isFullscreen ? 'Sair de tela cheia' : 'Tela cheia'}
-                                >
-                                    {isFullscreen ? <ArrowsPointingInIcon className="h-5 w-5" /> : <ArrowsPointingOutIcon className="h-5 w-5" />}
-                                    <span className="hidden sm:inline">{isFullscreen ? 'Sair' : 'Tela cheia'}</span>
-                                </button>
-                            </div>
+                            {/* Store selector — só quem tem MANAGE_TURN_LIST */}
+                            {permissions.manage && stores.length > 1 && (
+                                <div className="flex items-center gap-1.5 text-sm">
+                                    <BuildingStorefrontIcon className="h-4 w-4 text-gray-400" />
+                                    <select
+                                        value={storeCode ?? ''}
+                                        onChange={(e) => onChangeStore(e.target.value)}
+                                        className="rounded-md border-gray-300 text-sm py-1"
+                                    >
+                                        {stores.map((s) => (
+                                            <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Floating actions — pinned na borda direita da tela.
+                            Atualizar + Tela cheia ficam sempre acessíveis sem
+                            competir com título por espaço, especialmente em
+                            tablet em modo cheio. */}
+                        <div className="fixed right-3 sm:right-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-2">
+                            <button
+                                type="button"
+                                onClick={fetchBoard}
+                                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-full shadow-lg w-12 h-12 inline-flex items-center justify-center transition active:scale-95"
+                                title="Atualizar"
+                                aria-label="Atualizar"
+                            >
+                                <ArrowPathIcon className="h-5 w-5" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={toggleFullscreen}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg w-12 h-12 inline-flex items-center justify-center transition active:scale-95"
+                                title={isFullscreen ? 'Sair de tela cheia' : 'Tela cheia'}
+                                aria-label={isFullscreen ? 'Sair de tela cheia' : 'Tela cheia'}
+                            >
+                                {isFullscreen ? <ArrowsPointingInIcon className="h-5 w-5" /> : <ArrowsPointingOutIcon className="h-5 w-5" />}
+                            </button>
                         </div>
 
                         {loadError && (
