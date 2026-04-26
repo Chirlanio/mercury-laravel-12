@@ -60,7 +60,7 @@ export default function TransitionModal({ show, onClose, config }) {
             title={config.label}
             subtitle={config.expense ? `${config.expense.origin} → ${config.expense.destination}` : ''}
             headerColor={headerColor}
-            headerIcon={ArrowPathIcon}
+            headerIcon={<ArrowPathIcon className="h-6 w-6" />}
             maxWidth="lg"
             onSubmit={handleSubmit}
             footer={(

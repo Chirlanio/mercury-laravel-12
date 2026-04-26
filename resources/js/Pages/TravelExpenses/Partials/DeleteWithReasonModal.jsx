@@ -43,7 +43,7 @@ export default function DeleteWithReasonModal({
             title="Excluir verba de viagem"
             subtitle={itemName}
             headerColor="bg-red-600"
-            headerIcon={TrashIcon}
+            headerIcon={<TrashIcon className="h-6 w-6" />}
             maxWidth="lg"
             onSubmit={handleSubmit}
             footer={(

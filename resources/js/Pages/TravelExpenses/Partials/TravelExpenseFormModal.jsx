@@ -137,7 +137,7 @@ export default function TravelExpenseFormModal({
             title={mode === 'create' ? 'Nova Verba de Viagem' : 'Editar Verba de Viagem'}
             subtitle={mode === 'create' ? 'Preencha os dados da viagem e do pagamento' : `${expense?.origin ?? ''} → ${expense?.destination ?? ''}`}
             headerColor="bg-indigo-600"
-            headerIcon={PaperAirplaneIcon}
+            headerIcon={<PaperAirplaneIcon className="h-6 w-6" />}
             maxWidth="3xl"
             onSubmit={handleSubmit}
             footer={(

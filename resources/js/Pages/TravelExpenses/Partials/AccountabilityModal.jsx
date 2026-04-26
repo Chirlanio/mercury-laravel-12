@@ -178,12 +178,9 @@ export default function AccountabilityModal({
             title="Prestação de Contas"
             subtitle={expense ? `${expense.origin} → ${expense.destination}` : ''}
             headerColor="bg-blue-700"
-            headerIcon={PaperClipIcon}
+            headerIcon={<PaperClipIcon className="h-6 w-6" />}
             headerBadges={expense ? [
-                {
-                    label: expense.accountability_status_label,
-                    variant: COLOR_MAP[expense.accountability_status_color] ?? 'gray',
-                },
+                { text: expense.accountability_status_label },
             ] : []}
             maxWidth="4xl"
             loading={loading}

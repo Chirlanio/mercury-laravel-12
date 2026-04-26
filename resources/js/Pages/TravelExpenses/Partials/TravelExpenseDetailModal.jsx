@@ -64,16 +64,10 @@ export default function TravelExpenseDetailModal({
             title={expense ? `${expense.origin} → ${expense.destination}` : 'Detalhes'}
             subtitle={expense ? `Beneficiado: ${expense.employee?.name ?? '—'}` : ''}
             headerColor="bg-gray-700"
-            headerIcon={PaperAirplaneIcon}
+            headerIcon={<PaperAirplaneIcon className="h-6 w-6" />}
             headerBadges={expense ? [
-                {
-                    label: expense.status_label,
-                    variant: COLOR_MAP[expense.status_color] ?? 'gray',
-                },
-                {
-                    label: `Prestação: ${expense.accountability_status_label}`,
-                    variant: COLOR_MAP[expense.accountability_status_color] ?? 'gray',
-                },
+                { text: expense.status_label },
+                { text: `Prestação: ${expense.accountability_status_label}` },
             ] : []}
             headerActions={canExport && expense ? (
                 <a
