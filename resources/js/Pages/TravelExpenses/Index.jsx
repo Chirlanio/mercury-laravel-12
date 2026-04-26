@@ -228,7 +228,10 @@ export default function Index({
                 <div className="font-medium text-gray-900">
                     {row.employee?.name ?? '—'}
                     <div className="text-xs text-gray-500 font-normal">
-                        {row.store?.code ?? row.store_code ?? '—'} · solicitado por {row.created_by?.name ?? '—'}
+                        {row.store
+                            ? `${row.store.code} — ${row.store.name}`
+                            : (row.store_code ?? '—')}
+                        {' '}· solicitado por {row.created_by?.name ?? '—'}
                     </div>
                 </div>
             ),
