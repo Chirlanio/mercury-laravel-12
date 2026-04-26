@@ -679,42 +679,57 @@ function Card({ panel, item, tickNow, actions }) {
         opacity: isDragging ? 0.4 : 1,
     };
 
+    // Drag handle (avatar + nome + subtítulo) — reusado nos 2 layouts.
+    const dragHandle = (
+        <div
+            {...attributes}
+            {...listeners}
+            className="flex flex-row items-center gap-3 flex-1 min-w-0 cursor-grab active:cursor-grabbing touch-none"
+        >
+            <EmployeeAvatar
+                name={item.employee_name}
+                initials={item.employee_initials}
+                size="md"
+            />
+            <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm text-gray-900 truncate">
+                    {item.employee_short_name || item.employee_name}
+                </div>
+                <CardSubtitle panel={panel} item={item} tickNow={tickNow} />
+            </div>
+        </div>
+    );
+
+    // Queue: layout vertical — avatar+nome+badge no topo, 3 botões
+    // ocupando largura total na linha de baixo. Garante que o nome
+    // tenha espaço suficiente sem competir com os botões.
+    if (panel.key === 'queue') {
+        return (
+            <div
+                ref={setNodeRef}
+                style={style}
+                className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 select-none flex flex-col gap-3"
+            >
+                <div className="flex flex-row items-center gap-3">
+                    {dragHandle}
+                    <div className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded-full shrink-0">
+                        #{item.position}
+                    </div>
+                </div>
+                <CardActions panel={panel} item={item} actions={actions} />
+            </div>
+        );
+    }
+
+    // Demais painéis (available/attending/on_break): layout horizontal
+    // — avatar+nome à esquerda, botão único à direita.
     return (
         <div
             ref={setNodeRef}
             style={style}
             className="bg-white rounded-lg border border-gray-200 shadow-sm flex flex-row items-center justify-between gap-3 p-4 select-none"
         >
-            {/* Drag handle (esquerda): avatar + nome + subtítulo.
-                flex-1 + min-w-0 garante truncamento de nomes longos sem
-                empurrar os botões pra fora do card. */}
-            <div
-                {...attributes}
-                {...listeners}
-                className="flex flex-row items-center gap-3 flex-1 min-w-0 cursor-grab active:cursor-grabbing touch-none"
-            >
-                <EmployeeAvatar
-                    name={item.employee_name}
-                    initials={item.employee_initials}
-                    size="md"
-                />
-                <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm text-gray-900 truncate">
-                        {item.employee_short_name || item.employee_name}
-                    </div>
-                    <CardSubtitle panel={panel} item={item} tickNow={tickNow} />
-                </div>
-            </div>
-
-            {/* Badge de posição da fila (entre texto e botões) */}
-            {panel.key === 'queue' && (
-                <div className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded-full shrink-0">
-                    #{item.position}
-                </div>
-            )}
-
-            {/* Botões de ação (direita) — shrink-0 evita serem
-                comprimidos quando o nome ocupa toda a largura. */}
+            {dragHandle}
             <CardActions panel={panel} item={item} actions={actions} />
         </div>
     );
@@ -741,13 +756,14 @@ function CardActions({ panel, item, actions }) {
 
     if (panel.key === 'queue') {
         return (
-            <div className="flex gap-1 shrink-0">
+            <div className="grid grid-cols-3 gap-2 w-full">
                 <ActionBtn
                     onClick={() => actions.startAttendance(item)}
                     onPointerDown={stop}
                     color="bg-green-600 hover:bg-green-700"
                     icon={<PlayIcon className="h-5 w-5" />}
                     label="Atender"
+                    className="w-full"
                 />
                 <ActionBtn
                     onClick={() => actions.openBreakModal(item)}
@@ -755,6 +771,7 @@ function CardActions({ panel, item, actions }) {
                     color="bg-purple-600 hover:bg-purple-700"
                     icon={<PauseIcon className="h-5 w-5" />}
                     label="Pausar"
+                    className="w-full"
                 />
                 <ActionBtn
                     onClick={() => actions.leaveQueue(item)}
@@ -762,6 +779,7 @@ function CardActions({ panel, item, actions }) {
                     color="bg-gray-500 hover:bg-gray-600"
                     icon={<ArrowLeftOnRectangleIcon className="h-5 w-5" />}
                     label="Sair"
+                    className="w-full"
                 />
             </div>
         );
@@ -794,13 +812,13 @@ function CardActions({ panel, item, actions }) {
     return null;
 }
 
-function ActionBtn({ onClick, onPointerDown, color, icon, label }) {
+function ActionBtn({ onClick, onPointerDown, color, icon, label, className = '' }) {
     return (
         <button
             type="button"
             onClick={onClick}
             onPointerDown={onPointerDown}
-            className={`${color} text-white rounded-md inline-flex items-center justify-center min-h-[44px] min-w-[44px] shrink-0 active:scale-95 transition`}
+            className={`${color} text-white rounded-md inline-flex items-center justify-center min-h-[44px] min-w-[44px] shrink-0 active:scale-95 transition ${className}`}
             title={label}
             aria-label={label}
         >
