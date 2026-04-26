@@ -90,6 +90,25 @@ export default function TravelExpenseFormModal({
         return rate * days;
     }, [form.daily_rate, form.initial_date, form.end_date]);
 
+    // Funcionários filtrados pela loja selecionada
+    const filteredEmployees = useMemo(() => {
+        if (!form.store_code) return [];
+        return (selects.employees || []).filter(
+            (emp) => String(emp.store_id) === String(form.store_code)
+        );
+    }, [form.store_code, selects.employees]);
+
+    // Limpa beneficiado se a loja muda e o funcionário atual não pertence à nova loja
+    useEffect(() => {
+        if (!form.store_code || !form.employee_id) return;
+        const stillValid = filteredEmployees.some(
+            (emp) => String(emp.id) === String(form.employee_id)
+        );
+        if (!stillValid) {
+            setForm((p) => ({ ...p, employee_id: '' }));
+        }
+    }, [form.store_code, form.employee_id, filteredEmployees]);
+
     const daysPreview = useMemo(() => {
         if (!form.initial_date || !form.end_date) return 0;
         const start = new Date(`${form.initial_date}T00:00:00`);
@@ -164,21 +183,6 @@ export default function TravelExpenseFormModal({
             <StandardModal.Section title="Dados da Viagem">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <InputLabel htmlFor="employee_id" value="Beneficiado *" />
-                        <select
-                            id="employee_id"
-                            value={form.employee_id}
-                            onChange={setField('employee_id')}
-                            className="w-full mt-1 rounded-md border-gray-300 text-sm"
-                        >
-                            <option value="">Selecione o beneficiado</option>
-                            {(selects.employees || []).map((emp) => (
-                                <option key={emp.id} value={emp.id}>{emp.name}</option>
-                            ))}
-                        </select>
-                        <InputError message={errors.employee_id} />
-                    </div>
-                    <div>
                         <InputLabel htmlFor="store_code" value="Loja *" />
                         <select
                             id="store_code"
@@ -193,6 +197,28 @@ export default function TravelExpenseFormModal({
                             ))}
                         </select>
                         <InputError message={errors.store_code} />
+                    </div>
+                    <div>
+                        <InputLabel htmlFor="employee_id" value="Beneficiado *" />
+                        <select
+                            id="employee_id"
+                            value={form.employee_id}
+                            onChange={setField('employee_id')}
+                            disabled={!form.store_code}
+                            className="w-full mt-1 rounded-md border-gray-300 text-sm disabled:bg-gray-100 disabled:text-gray-400"
+                        >
+                            <option value="">
+                                {!form.store_code
+                                    ? 'Selecione uma loja primeiro'
+                                    : filteredEmployees.length === 0
+                                        ? 'Nenhum colaborador nesta loja'
+                                        : 'Selecione o beneficiado'}
+                            </option>
+                            {filteredEmployees.map((emp) => (
+                                <option key={emp.id} value={emp.id}>{emp.name}</option>
+                            ))}
+                        </select>
+                        <InputError message={errors.employee_id} />
                     </div>
                     <div>
                         <InputLabel htmlFor="origin" value="Origem *" />
