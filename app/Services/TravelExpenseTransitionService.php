@@ -221,10 +221,22 @@ class TravelExpenseTransitionService
             ]);
         }
 
-        if ($target === TravelExpenseStatus::CANCELLED && (! $note || trim($note) === '')) {
-            throw ValidationException::withMessages([
-                'note' => 'Informe o motivo do cancelamento.',
-            ]);
+        if ($target === TravelExpenseStatus::CANCELLED) {
+            if (! $note || trim($note) === '') {
+                throw ValidationException::withMessages([
+                    'note' => 'Informe o motivo do cancelamento.',
+                ]);
+            }
+
+            // Não permite cancelar depois que a prestação de contas foi
+            // iniciada — itens já lançados, possivelmente comprovantes
+            // anexados, e o fluxo correto passa a ser aprovar/rejeitar
+            // a prestação, nunca jogar fora a verba inteira.
+            if ($te->accountability_status !== AccountabilityStatus::PENDING) {
+                throw ValidationException::withMessages([
+                    'status' => 'Não é possível cancelar uma verba com prestação de contas '.$te->accountability_status->label().'. Resolva a prestação primeiro (aprovar ou rejeitar).',
+                ]);
+            }
         }
 
         if ($target === TravelExpenseStatus::FINALIZED

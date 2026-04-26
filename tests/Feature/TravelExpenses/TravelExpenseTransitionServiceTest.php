@@ -141,6 +141,38 @@ class TravelExpenseTransitionServiceTest extends TestCase
         $this->transition->transitionExpense($te, 'finalized', $this->adminUser);
     }
 
+    public function test_cancel_blocked_when_accountability_not_pending(): void
+    {
+        $te = $this->makeApprovedExpense();
+
+        // Simula início da prestação — adiciona um item e accountability vai
+        // pra IN_PROGRESS via auto-transição.
+        TravelExpenseItem::create([
+            'travel_expense_id' => $te->id,
+            'type_expense_id' => 1,
+            'expense_date' => '2026-05-10',
+            'value' => 80,
+            'description' => 'Almoço',
+        ]);
+        $te->update(['accountability_status' => AccountabilityStatus::IN_PROGRESS->value]);
+
+        // Tentar cancelar agora deve falhar
+        $this->expectException(ValidationException::class);
+        $this->transition->transitionExpense($te->fresh(), 'cancelled', $this->adminUser, 'Mudei de ideia');
+    }
+
+    public function test_cancel_allowed_when_accountability_still_pending(): void
+    {
+        $te = $this->makeApprovedExpense();
+        // accountability_status é PENDING por padrão após approve
+
+        $te = $this->transition->transitionExpense($te, 'cancelled', $this->adminUser, 'Não vai mais');
+
+        $this->assertSame(TravelExpenseStatus::CANCELLED, $te->status);
+        $this->assertNotNull($te->cancelled_at);
+        $this->assertSame('Não vai mais', $te->cancelled_reason);
+    }
+
     public function test_complete_happy_path(): void
     {
         $te = $this->makeApprovedExpense();

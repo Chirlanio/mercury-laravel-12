@@ -368,7 +368,11 @@ export default function Index({
 
     function canCancelRow(row) {
         if (!canApprove && !canManage) return false;
-        return ['draft', 'submitted', 'approved'].includes(row.status);
+        if (!['draft', 'submitted', 'approved'].includes(row.status)) return false;
+        // Verba aprovada só pode ser cancelada se a prestação ainda não começou
+        // (espelha a regra do TransitionService::validateExpenseTransitionPreconditions).
+        if (row.status === 'approved' && row.accountability_status !== 'pending') return false;
+        return true;
     }
 
     // ------------------------------------------------------------------
