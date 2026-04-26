@@ -50,6 +50,109 @@ const VALID_TRANSITIONS = {
 };
 
 // ───────────────────────────────────────────────────────────────────
+// Optimistic UI — aplicam mudanças no board localmente antes do POST.
+// Em caso de erro, fetchBoard() reverte ao estado real do servidor.
+// ───────────────────────────────────────────────────────────────────
+function applyOptimisticMove(prev, item, fromPanel, toPanel) {
+    if (!prev) return prev;
+    const employeeId = item.employee_id;
+
+    const next = {
+        available: [...(prev.available ?? [])],
+        queue: [...(prev.queue ?? [])],
+        attending: [...(prev.attending ?? [])],
+        on_break: [...(prev.on_break ?? [])],
+    };
+
+    // Remove do painel de origem
+    if (fromPanel === 'queue') {
+        next.queue = next.queue
+            .filter((i) => i.employee_id !== employeeId)
+            .map((i, idx) => ({ ...i, position: idx + 1 }));
+    } else if (fromPanel) {
+        next[fromPanel] = next[fromPanel].filter((i) => i.employee_id !== employeeId);
+    }
+
+    const baseItem = {
+        employee_id: item.employee_id,
+        employee_name: item.employee_name,
+        employee_short_name: item.employee_short_name,
+        employee_initials: item.employee_initials,
+        store_code: item.store_code,
+    };
+
+    // Adiciona no destino com defaults razoáveis (servidor sobrescreve no fetchBoard)
+    if (toPanel === 'queue') {
+        next.queue.push({
+            ...baseItem,
+            queue_id: -Date.now(),
+            position: next.queue.length + 1,
+            entered_at: new Date().toISOString(),
+            waiting_seconds: 0,
+        });
+    } else if (toPanel === 'attending') {
+        next.attending.push({
+            ...baseItem,
+            attendance_id: -Date.now(),
+            attendance_ulid: `pending-${Date.now()}`,
+            started_at: new Date().toISOString(),
+            elapsed_seconds: 0,
+            original_queue_position: item.position ?? null,
+        });
+    } else if (toPanel === 'on_break') {
+        next.on_break.push({
+            ...baseItem,
+            break_id: -Date.now(),
+            break_type: item.break_type ?? null,
+            started_at: new Date().toISOString(),
+            elapsed_seconds: 0,
+            elapsed_minutes: 0,
+            is_exceeded: false,
+            original_queue_position: item.position ?? null,
+        });
+    } else if (toPanel === 'available') {
+        next.available.push({ ...baseItem });
+    }
+
+    next.counts = {
+        available: next.available.length,
+        queue: next.queue.length,
+        attending: next.attending.length,
+        on_break: next.on_break.length,
+    };
+
+    return next;
+}
+
+function applyOptimisticRemove(prev, item, fromPanel) {
+    if (!prev) return prev;
+    const employeeId = item.employee_id;
+    const filtered = (prev[fromPanel] ?? []).filter((i) => i.employee_id !== employeeId);
+    const next = {
+        ...prev,
+        [fromPanel]: fromPanel === 'queue'
+            ? filtered.map((i, idx) => ({ ...i, position: idx + 1 }))
+            : filtered,
+    };
+    next.counts = { ...(prev.counts ?? {}), [fromPanel]: filtered.length };
+    return next;
+}
+
+function applyOptimisticReorder(prev, employeeId, newPosition) {
+    if (!prev?.queue) return prev;
+    const idx = prev.queue.findIndex((i) => i.employee_id === employeeId);
+    if (idx === -1) return prev;
+    const queue = [...prev.queue];
+    const [moved] = queue.splice(idx, 1);
+    const target = Math.max(1, Math.min(newPosition, queue.length + 1));
+    queue.splice(target - 1, 0, moved);
+    return {
+        ...prev,
+        queue: queue.map((i, i2) => ({ ...i, position: i2 + 1 })),
+    };
+}
+
+// ───────────────────────────────────────────────────────────────────
 // Página
 // ───────────────────────────────────────────────────────────────────
 export default function Index({
@@ -71,7 +174,7 @@ export default function Index({
 
     // Modais
     const [outcomeModal, setOutcomeModal] = useState({ open: false, attendance: null });
-    const [breakModal, setBreakModal] = useState({ open: false, employeeId: null });
+    const [breakModal, setBreakModal] = useState({ open: false, employeeId: null, item: null });
 
     // ──────────────────────────────────────────────────────
     // Fetch board (silencioso — não passa pelo Inertia)
@@ -172,12 +275,15 @@ export default function Index({
     // ──────────────────────────────────────────────────────
     // Ações de transição (axios — sem reload via Inertia)
     //
-    // O backend devolve 204 No Content para XHR; após o POST chamamos
-    // fetchBoard() pra atualizar o estado silenciosamente. Erros 422
-    // (validação) retornam JSON e tbm disparam refetch pra refletir o
-    // estado real da loja.
+    // Fluxo: aplica optimistic update ANTES do POST → POST roda em
+    // paralelo → fetchBoard() no finally confirma (sucesso) ou reverte
+    // (erro) ao estado real do servidor. Backend devolve 204 No Content
+    // para XHR; erros 422 mostram mensagem do banner.
     // ──────────────────────────────────────────────────────
-    const apiPost = useCallback(async (url, data = {}) => {
+    const apiPost = useCallback(async (url, data = {}, optimisticFn = null) => {
+        if (optimisticFn) {
+            setBoard(optimisticFn);
+        }
         try {
             await window.axios.post(url, data);
         } catch (err) {
@@ -198,65 +304,109 @@ export default function Index({
 
     const handlePanelTransition = (employeeId, from, to, payload) => {
         if (from === 'available' && to === 'queue') {
-            apiPost(route('turn-list.queue.enter'), { employee_id: employeeId, store_code: storeCode });
+            apiPost(
+                route('turn-list.queue.enter'),
+                { employee_id: employeeId, store_code: storeCode },
+                (prev) => applyOptimisticMove(prev, payload, from, to),
+            );
         } else if (from === 'queue' && to === 'available') {
-            apiPost(route('turn-list.queue.leave'), { employee_id: employeeId, store_code: storeCode });
+            apiPost(
+                route('turn-list.queue.leave'),
+                { employee_id: employeeId, store_code: storeCode },
+                (prev) => applyOptimisticMove(prev, payload, from, to),
+            );
         } else if (from === 'queue' && to === 'attending') {
-            apiPost(route('turn-list.attendances.start'), { employee_id: employeeId, store_code: storeCode });
+            apiPost(
+                route('turn-list.attendances.start'),
+                { employee_id: employeeId, store_code: storeCode },
+                (prev) => applyOptimisticMove(prev, payload, from, to),
+            );
         } else if (from === 'queue' && to === 'on_break') {
-            setBreakModal({ open: true, employeeId });
+            setBreakModal({ open: true, employeeId, item: payload });
         } else if (from === 'attending' && to === 'queue') {
             setOutcomeModal({ open: true, attendance: payload });
         } else if (from === 'on_break' && to === 'queue') {
             const breakId = payload?.break_id;
             if (breakId) {
-                apiPost(route('turn-list.breaks.finish', breakId), {});
+                apiPost(
+                    route('turn-list.breaks.finish', breakId),
+                    {},
+                    (prev) => applyOptimisticMove(prev, payload, from, to),
+                );
             }
         }
     };
 
     const doReorder = (employeeId, newPosition) => {
-        apiPost(route('turn-list.queue.reorder'), {
-            employee_id: employeeId,
-            store_code: storeCode,
-            new_position: newPosition,
-        });
+        apiPost(
+            route('turn-list.queue.reorder'),
+            { employee_id: employeeId, store_code: storeCode, new_position: newPosition },
+            (prev) => applyOptimisticReorder(prev, employeeId, newPosition),
+        );
     };
 
     // ──────────────────────────────────────────────────────
     // Ações via botão (alternativa ao drag-and-drop)
     // ──────────────────────────────────────────────────────
     const cardActions = useMemo(() => ({
-        enterQueue: (employeeId) =>
-            apiPost(route('turn-list.queue.enter'), { employee_id: employeeId, store_code: storeCode }),
-        leaveQueue: (employeeId) =>
-            apiPost(route('turn-list.queue.leave'), { employee_id: employeeId, store_code: storeCode }),
-        startAttendance: (employeeId) =>
-            apiPost(route('turn-list.attendances.start'), { employee_id: employeeId, store_code: storeCode }),
-        openBreakModal: (employeeId) => setBreakModal({ open: true, employeeId }),
+        enterQueue: (item) =>
+            apiPost(
+                route('turn-list.queue.enter'),
+                { employee_id: item.employee_id, store_code: storeCode },
+                (prev) => applyOptimisticMove(prev, item, 'available', 'queue'),
+            ),
+        leaveQueue: (item) =>
+            apiPost(
+                route('turn-list.queue.leave'),
+                { employee_id: item.employee_id, store_code: storeCode },
+                (prev) => applyOptimisticMove(prev, item, 'queue', 'available'),
+            ),
+        startAttendance: (item) =>
+            apiPost(
+                route('turn-list.attendances.start'),
+                { employee_id: item.employee_id, store_code: storeCode },
+                (prev) => applyOptimisticMove(prev, item, 'queue', 'attending'),
+            ),
+        openBreakModal: (item) => setBreakModal({ open: true, employeeId: item.employee_id, item }),
         finishAttendance: (item) => setOutcomeModal({ open: true, attendance: item }),
-        finishBreak: (breakId) => apiPost(route('turn-list.breaks.finish', breakId), {}),
+        finishBreak: (item) =>
+            apiPost(
+                route('turn-list.breaks.finish', item.break_id),
+                {},
+                (prev) => applyOptimisticMove(prev, item, 'on_break', 'queue'),
+            ),
     }), [storeCode, apiPost]);
 
     const onConfirmOutcome = ({ outcomeId, returnToQueue, notes }) => {
         const att = outcomeModal.attendance;
         if (!att?.attendance_ulid) return;
-        apiPost(route('turn-list.attendances.finish', att.attendance_ulid), {
-            outcome_id: outcomeId,
-            return_to_queue: returnToQueue,
-            notes,
-        });
+        apiPost(
+            route('turn-list.attendances.finish', att.attendance_ulid),
+            { outcome_id: outcomeId, return_to_queue: returnToQueue, notes },
+            (prev) => returnToQueue
+                ? applyOptimisticMove(prev, att, 'attending', 'queue')
+                : applyOptimisticRemove(prev, att, 'attending'),
+        );
         setOutcomeModal({ open: false, attendance: null });
     };
 
     const onConfirmBreakType = ({ breakTypeId }) => {
-        if (!breakModal.employeeId) return;
-        apiPost(route('turn-list.breaks.start'), {
-            employee_id: breakModal.employeeId,
-            store_code: storeCode,
-            break_type_id: breakTypeId,
-        });
-        setBreakModal({ open: false, employeeId: null });
+        const employeeId = breakModal.employeeId;
+        if (!employeeId) return;
+
+        // Localiza o item da fila pra montar o optimistic; fallback ao item
+        // do drag (breakModal.item) se não estiver mais na fila local.
+        const queueItem = board?.queue?.find((i) => i.employee_id === employeeId) ?? breakModal.item;
+        const breakType = breakTypes.find((b) => b.id === breakTypeId);
+
+        apiPost(
+            route('turn-list.breaks.start'),
+            { employee_id: employeeId, store_code: storeCode, break_type_id: breakTypeId },
+            (prev) => queueItem
+                ? applyOptimisticMove(prev, { ...queueItem, break_type: breakType }, 'queue', 'on_break')
+                : prev,
+        );
+        setBreakModal({ open: false, employeeId: null, item: null });
     };
 
     const onChangeStore = (newCode) => {
@@ -537,7 +687,7 @@ function CardActions({ panel, item, actions }) {
         return (
             <div className="flex gap-1 p-2 pt-0">
                 <ActionBtn
-                    onClick={() => actions.enterQueue(item.employee_id)}
+                    onClick={() => actions.enterQueue(item)}
                     onPointerDown={stop}
                     color="bg-amber-600 hover:bg-amber-700"
                     icon={<ArrowRightOnRectangleIcon className="h-4 w-4" />}
@@ -551,21 +701,21 @@ function CardActions({ panel, item, actions }) {
         return (
             <div className="grid grid-cols-3 gap-1 p-2 pt-0">
                 <ActionBtn
-                    onClick={() => actions.startAttendance(item.employee_id)}
+                    onClick={() => actions.startAttendance(item)}
                     onPointerDown={stop}
                     color="bg-blue-600 hover:bg-blue-700"
                     icon={<PlayIcon className="h-4 w-4" />}
                     label="Atender"
                 />
                 <ActionBtn
-                    onClick={() => actions.openBreakModal(item.employee_id)}
+                    onClick={() => actions.openBreakModal(item)}
                     onPointerDown={stop}
                     color="bg-purple-600 hover:bg-purple-700"
                     icon={<PauseIcon className="h-4 w-4" />}
                     label="Pausar"
                 />
                 <ActionBtn
-                    onClick={() => actions.leaveQueue(item.employee_id)}
+                    onClick={() => actions.leaveQueue(item)}
                     onPointerDown={stop}
                     color="bg-gray-500 hover:bg-gray-600"
                     icon={<ArrowLeftOnRectangleIcon className="h-4 w-4" />}
@@ -593,7 +743,7 @@ function CardActions({ panel, item, actions }) {
         return (
             <div className="flex gap-1 p-2 pt-0">
                 <ActionBtn
-                    onClick={() => actions.finishBreak(item.break_id)}
+                    onClick={() => actions.finishBreak(item)}
                     onPointerDown={stop}
                     color="bg-purple-600 hover:bg-purple-700"
                     icon={<ArrowUturnLeftIcon className="h-4 w-4" />}
