@@ -1,9 +1,44 @@
 import { useEffect, useState } from 'react';
-import { SparklesIcon } from '@heroicons/react/24/outline';
+import { SparklesIcon, ArrowTrendingUpIcon } from '@heroicons/react/24/outline';
 import StandardModal from '@/Components/StandardModal';
 import Button from '@/Components/Button';
 import InputLabel from '@/Components/InputLabel';
 import StatusBadge from '@/Components/Shared/StatusBadge';
+
+const CURVE_STYLES = {
+    A: { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-300', label: 'A' },
+    B: { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-300', label: 'B' },
+    C: { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300', label: 'C' },
+};
+
+function CurveBadge({ curve, cumulativePct }) {
+    const style = CURVE_STYLES[curve] || CURVE_STYLES.C;
+    const tooltip = curve === 'A'
+        ? `Best-seller (acumula ${cumulativePct}% das vendas)`
+        : curve === 'B'
+            ? `Volume médio (acumula ${cumulativePct}%)`
+            : `Cauda longa (acumula ${cumulativePct}%)`;
+    return (
+        <span
+            title={tooltip}
+            className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold border ${style.bg} ${style.text} ${style.border}`}
+        >
+            {style.label}
+        </span>
+    );
+}
+
+function SeasonalBadge({ ratio, priorQty }) {
+    return (
+        <span
+            title={`Vendendo ${ratio}× vs mesma janela do ano anterior (${priorQty} un)`}
+            className="ml-1 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-orange-100 text-orange-800 border border-orange-300"
+        >
+            <ArrowTrendingUpIcon className="h-3 w-3" />
+            {ratio}×
+        </span>
+    );
+}
 
 const DAYS_OPTIONS = [
     { value: 30, label: 'Últimos 30 dias' },
@@ -202,11 +237,31 @@ export default function SuggestionsModal({
                         </div>
                     }
                 >
+                    <div className="bg-gray-50 border border-gray-200 rounded p-2 mb-3 flex items-center gap-4 text-xs flex-wrap">
+                        <span className="font-semibold text-gray-700">Legenda:</span>
+                        <span className="inline-flex items-center gap-1">
+                            <CurveBadge curve="A" cumulativePct={80} />
+                            <span className="text-gray-600">A — best-seller (até 80% das vendas)</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                            <CurveBadge curve="B" cumulativePct={95} />
+                            <span className="text-gray-600">B — volume médio (até 95%)</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                            <CurveBadge curve="C" cumulativePct={100} />
+                            <span className="text-gray-600">C — cauda longa</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                            <SeasonalBadge ratio={1.5} priorQty={3} />
+                            <span className="text-gray-600">Sazonal — venda &gt; 1.5× ano anterior</span>
+                        </span>
+                    </div>
                     <div className="overflow-x-auto">
                         <table className="min-w-full text-sm">
                             <thead className="bg-gray-50 text-xs uppercase text-gray-600">
                                 <tr>
                                     <th className="px-2 py-2 w-8"></th>
+                                    <th className="px-2 py-2 text-center" title="Curva ABC + sazonalidade">Curva</th>
                                     <th className="px-2 py-2 text-left">Referência / Barcode</th>
                                     <th className="px-2 py-2 text-left">Produto</th>
                                     <th className="px-2 py-2 text-left">Tamanho</th>
@@ -228,6 +283,12 @@ export default function SuggestionsModal({
                                                     onChange={(e) => updateRow(idx, 'checked', e.target.checked)}
                                                     className="rounded border-gray-300"
                                                 />
+                                            </td>
+                                            <td className="px-2 py-2 text-center">
+                                                <CurveBadge curve={s.curve} cumulativePct={s.cumulative_pct} />
+                                                {s.is_seasonal && (
+                                                    <SeasonalBadge ratio={s.seasonality_ratio} priorQty={s.prior_year_qty} />
+                                                )}
                                             </td>
                                             <td className="px-2 py-2">
                                                 <div className="font-mono text-xs">{s.product_reference || s.barcode}</div>

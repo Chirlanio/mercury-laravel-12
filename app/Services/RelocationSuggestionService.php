@@ -35,6 +35,23 @@ class RelocationSuggestionService
     private const COVERAGE_DAYS = 14;          // Cobertura desejada
     private const MAX_TOP = 50;
 
+    /**
+     * Curva ABC — limites em % acumulado das vendas:
+     *  - até 80%  → A (best-sellers, ~Pareto 20/80)
+     *  - até 95%  → B (volume médio, próximos 15%)
+     *  - resto    → C (cauda longa, baixo giro)
+     */
+    private const ABC_THRESHOLD_A = 80.0;
+    private const ABC_THRESHOLD_B = 95.0;
+
+    /**
+     * Sazonalidade: ratio (vendas atual / vendas mesma janela 1 ano antes)
+     * acima deste limiar marca o produto como "subindo". Threshold mínimo
+     * de vendas no ano anterior evita falsos positivos com produtos novos.
+     */
+    private const SEASONALITY_RATIO_THRESHOLD = 1.5;
+    private const SEASONALITY_MIN_PRIOR_QTY = 3;
+
     public function __construct(
         protected CigamStockService $stock,
     ) {}
@@ -86,6 +103,12 @@ class RelocationSuggestionService
 
         $barcodes = $sales->pluck('barcode')->filter()->unique()->values()->all();
 
+        // Curva ABC — calcula em memória (cheap) sobre o resultado já paginado
+        $abcByBarcode = $this->classifyAbc($sales);
+
+        // Sazonalidade — query batch comparando com mesma janela 1 ano antes
+        $seasonalityByKey = $this->detectSeasonality($destStore->code, $sales, $days);
+
         // Estoque real CIGAM, filtrado pela rede do destino
         $stocks = $this->stock->availableForBarcodes(
             $barcodes,
@@ -127,6 +150,10 @@ class RelocationSuggestionService
             // Nunca sugerir mais do que a origem tem
             $qtySuggested = min($idealQty, (int) $primary->saldo);
 
+            $abc = $abcByBarcode[$row->barcode] ?? ['curve' => 'C', 'cumulative_pct' => 100.0];
+            $seasonKey = $row->barcode.'|'.($row->ref_size ?? '');
+            $seasonality = $seasonalityByKey[$seasonKey] ?? null;
+
             $suggestions[] = [
                 'barcode' => $row->barcode,
                 'ref_size' => $row->ref_size,
@@ -138,6 +165,12 @@ class RelocationSuggestionService
                 'sales_count' => (int) $row->sales_count,
                 'daily_average' => round($dailyAvg, 2),
                 'qty_suggested' => $qtySuggested,
+                'curve' => $abc['curve'],
+                'curve_label' => 'Curva '.$abc['curve'],
+                'cumulative_pct' => $abc['cumulative_pct'],
+                'is_seasonal' => $seasonality['is_seasonal'] ?? false,
+                'seasonality_ratio' => $seasonality['ratio'] ?? null,
+                'prior_year_qty' => $seasonality['prior_qty'] ?? 0,
                 'suggested_origin' => $this->formatOrigin($primary, $storesByCode),
                 'other_origins' => $others
                     ->map(fn ($c) => $this->formatOrigin($c, $storesByCode))
@@ -146,6 +179,14 @@ class RelocationSuggestionService
                     ->all(),
             ];
         }
+
+        // Ordena: A primeiro, depois B, depois C; dentro da curva por sales_qty desc
+        usort($suggestions, function ($a, $b) {
+            $curveOrder = ['A' => 1, 'B' => 2, 'C' => 3];
+            $cmp = ($curveOrder[$a['curve']] ?? 9) <=> ($curveOrder[$b['curve']] ?? 9);
+            if ($cmp !== 0) return $cmp;
+            return $b['sales_qty'] <=> $a['sales_qty'];
+        });
 
         return [
             'destination_store' => $this->formatStore($destStore),
@@ -160,6 +201,96 @@ class RelocationSuggestionService
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
+
+    /**
+     * Classifica produtos em curvas A/B/C baseado no Pareto:
+     *  - A: produtos cujo acumulado de vendas está dentro de 80%
+     *  - B: até 95%
+     *  - C: até 100%
+     *
+     * Indexa por `barcode` pra lookup rápido no loop principal.
+     *
+     * @return array<string, array{curve: string, cumulative_pct: float}>
+     */
+    protected function classifyAbc(Collection $sales): array
+    {
+        $totalQty = $sales->sum('sales_qty');
+        if ($totalQty <= 0) return [];
+
+        // Já vem ordenado por sales_qty DESC do topSellingItems()
+        $cumulative = 0.0;
+        $result = [];
+        foreach ($sales as $row) {
+            $cumulative += (float) $row->sales_qty;
+            $pct = round(($cumulative / $totalQty) * 100, 2);
+
+            $curve = $pct <= self::ABC_THRESHOLD_A
+                ? 'A'
+                : ($pct <= self::ABC_THRESHOLD_B ? 'B' : 'C');
+
+            $result[$row->barcode] = [
+                'curve' => $curve,
+                'cumulative_pct' => $pct,
+            ];
+        }
+        return $result;
+    }
+
+    /**
+     * Detecta tendência sazonal comparando vendas do período atual com a
+     * MESMA janela exatamente 1 ano antes. Marca como sazonal quando o
+     * ratio supera SEASONALITY_RATIO_THRESHOLD E o ano anterior tem pelo
+     * menos SEASONALITY_MIN_PRIOR_QTY vendas (filtra produtos novos com
+     * 0 ou 1 unidade no ano anterior, que dariam ratio infinito).
+     *
+     * Performance: 1 query batch agregando todos os barcodes de uma vez.
+     *
+     * @param  Collection $sales  Vendas atuais (com barcode + ref_size + sales_qty)
+     * @return array<string, array{is_seasonal: bool, ratio: float|null, prior_qty: int}>
+     *         indexado por "barcode|ref_size"
+     */
+    protected function detectSeasonality(string $storeCode, Collection $sales, int $days): array
+    {
+        if ($sales->isEmpty()) return [];
+
+        // Janela do ano anterior (mesmos `days` dias, recuo de 1 ano)
+        $priorFrom = now()->subYear()->subDays($days)->toDateString();
+        $priorTo = now()->subYear()->toDateString();
+
+        $barcodes = $sales->pluck('barcode')->filter()->unique()->values()->all();
+        if (empty($barcodes)) return [];
+
+        $priorRows = DB::table('movements')
+            ->where('store_code', $storeCode)
+            ->where('movement_code', 2)
+            ->whereIn('barcode', $barcodes)
+            ->whereBetween('movement_date', [$priorFrom, $priorTo])
+            ->selectRaw('barcode, ref_size, SUM(quantity) as prior_qty')
+            ->groupBy('barcode', 'ref_size')
+            ->get()
+            ->keyBy(fn ($r) => $r->barcode.'|'.($r->ref_size ?? ''));
+
+        $result = [];
+        foreach ($sales as $row) {
+            $key = $row->barcode.'|'.($row->ref_size ?? '');
+            $priorQty = (float) ($priorRows->get($key)?->prior_qty ?? 0);
+
+            $ratio = null;
+            $isSeasonal = false;
+
+            if ($priorQty >= self::SEASONALITY_MIN_PRIOR_QTY) {
+                $ratio = round((float) $row->sales_qty / $priorQty, 2);
+                $isSeasonal = $ratio >= self::SEASONALITY_RATIO_THRESHOLD;
+            }
+
+            $result[$key] = [
+                'is_seasonal' => $isSeasonal,
+                'ratio' => $ratio,
+                'prior_qty' => (int) $priorQty,
+            ];
+        }
+        return $result;
+    }
 
     protected function emptyResult(int $days): array
     {
