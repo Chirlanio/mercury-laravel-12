@@ -163,13 +163,14 @@ function ModalBody({ errorMessage, children }) {
  *     <div className="grid grid-cols-2 gap-4">...</div>
  * </StandardModal.Section>
  */
-function Section({ title, icon, children }) {
+function Section({ title, icon, actions, children }) {
     return (
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200">
+            <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200 flex items-center justify-between gap-2">
                 <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide flex items-center gap-1.5">
                     {icon} {title}
                 </h4>
+                {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
             </div>
             <div className="p-4">{children}</div>
         </div>

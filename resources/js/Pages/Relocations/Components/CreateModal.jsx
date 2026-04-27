@@ -558,7 +558,7 @@ function ItemCard({ idx, item, canRemove, onChange, onRemove, onLookupBarcode, o
                 {/* Código de barras (input principal — match exato) */}
                 <div className="sm:col-span-3">
                     <InputLabel value="Código de barras / EAN" className="text-xs" />
-                    <div className="relative">
+                    <div className="flex items-stretch">
                         <TextInput
                             value={item.barcode}
                             onChange={(e) => onChange('barcode', e.target.value)}
@@ -572,12 +572,13 @@ function ItemCard({ idx, item, canRemove, onChange, onRemove, onLookupBarcode, o
                             placeholder="Bipe ou digite e pressione Enter"
                             maxLength={50}
                             disabled={isLoading}
-                            className="w-full text-sm font-mono pr-9"
+                            className="flex-1 min-w-0 text-sm font-mono rounded-r-none focus:z-10"
                         />
                         <button
                             type="button"
                             onClick={onLookupBarcode}
-                            className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 text-gray-500 hover:text-indigo-700"
+                            disabled={isLoading}
+                            className="shrink-0 px-3 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 hover:bg-gray-100 text-gray-600 hover:text-indigo-700 disabled:opacity-50"
                             title="Consultar catálogo"
                         >
                             <MagnifyingGlassIcon className="h-4 w-4" />
@@ -588,7 +589,7 @@ function ItemCard({ idx, item, canRemove, onChange, onRemove, onLookupBarcode, o
                 {/* Referência (alternativa — exige depois escolher tamanho) */}
                 <div className="sm:col-span-3">
                     <InputLabel value="Referência (alternativa ao EAN)" className="text-xs" />
-                    <div className="relative">
+                    <div className="flex items-stretch">
                         <TextInput
                             value={item.product_reference}
                             onChange={(e) => onChange('product_reference', e.target.value)}
@@ -606,12 +607,13 @@ function ItemCard({ idx, item, canRemove, onChange, onRemove, onLookupBarcode, o
                             placeholder="SKU do produto"
                             maxLength={100}
                             disabled={isLoading}
-                            className="w-full text-sm pr-9"
+                            className="flex-1 min-w-0 text-sm rounded-r-none focus:z-10"
                         />
                         <button
                             type="button"
                             onClick={onLookupReference}
-                            className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 text-gray-500 hover:text-indigo-700"
+                            disabled={isLoading}
+                            className="shrink-0 px-3 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 hover:bg-gray-100 text-gray-600 hover:text-indigo-700 disabled:opacity-50"
                             title="Consultar catálogo"
                         >
                             <MagnifyingGlassIcon className="h-4 w-4" />
