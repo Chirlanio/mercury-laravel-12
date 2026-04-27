@@ -658,8 +658,11 @@ class DamagedProductController extends Controller
             $base['cancelled_at'] = $p->cancelled_at?->toIso8601String();
             $base['resolved_at'] = $p->resolved_at?->toIso8601String();
             $base['expires_at'] = $p->expires_at?->toIso8601String();
+            // tenant_asset() (não asset('storage/...')): imagens de produto
+            // são salvas no disk='public' do tenant — mesma situação das
+            // photos de damaged_products. Ver DamagedProductPhoto::getUrlAttribute.
             $base['product_image_url'] = $p->relationLoaded('product') && $p->product?->image
-                ? asset('storage/'.$p->product->image)
+                ? tenant_asset($p->product->image)
                 : null;
             // Tamanhos do catálogo (variants) — usados pra renderizar grids
             // de tamanhos no modal de visualização (mesmo padrão do form).

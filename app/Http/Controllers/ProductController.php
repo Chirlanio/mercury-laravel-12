@@ -113,7 +113,13 @@ class ProductController extends Controller
         ]);
 
         $data = $product->toArray();
-        $data['image_url'] = $product->image ? asset('storage/'.$product->image) : null;
+        // tenant_asset() (não asset('storage/...')): imagens de produto são
+        // salvas no disk='public' DENTRO do contexto tenant — em
+        // storage/tenant{id}/app/public/products/. asset_helper_tenancy
+        // reescreve asset('storage/foo') → /tenancy/assets/storage/foo
+        // mantendo storage/ literal no path → 404 no TenantAssetsController.
+        // tenant_asset(foo) gera /tenancy/assets/foo direto (200 OK).
+        $data['image_url'] = $product->image ? tenant_asset($product->image) : null;
         $data['markup'] = ($product->cost_price && $product->cost_price > 0)
             ? round((($product->sale_price - $product->cost_price) / $product->cost_price) * 100, 1)
             : null;
@@ -402,7 +408,7 @@ class ProductController extends Controller
         return response()->json([
             'message' => 'Imagem atualizada.',
             'image' => $path,
-            'image_url' => asset('storage/'.$path),
+            'image_url' => tenant_asset($path),
         ]);
     }
 
