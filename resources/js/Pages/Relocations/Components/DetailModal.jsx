@@ -230,93 +230,17 @@ export default function DetailModal({ show, onClose, ulid, permissions = {}, onT
                         )}
                     </StandardModal.Section>
 
-                    {/* Métricas */}
-                    <StandardModal.Section title="Itens e atendimento">
-                        <div className="grid grid-cols-3 gap-3 mb-3">
-                            <StandardModal.InfoCard
-                                label="Solicitado"
-                                value={r.total_requested ?? 0}
-                            />
-                            <StandardModal.InfoCard
-                                label="Recebido"
-                                value={r.total_received ?? 0}
-                            />
-                            <StandardModal.InfoCard
-                                label="Atendimento"
-                                value={`${r.fulfillment_percentage ?? 0}%`}
-                            />
-                        </div>
-
-                        {/* Tabela de itens */}
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full text-sm">
-                                <thead className="bg-gray-50 text-xs uppercase text-gray-600">
-                                    <tr>
-                                        <th className="px-2 py-2 text-left">Referência</th>
-                                        <th className="px-2 py-2 text-left">Produto</th>
-                                        <th className="px-2 py-2 text-left">Tamanho</th>
-                                        <th className="px-2 py-2 text-right">Solicitado</th>
-                                        <th className="px-2 py-2 text-right">
-                                            {r.status === 'in_separation' || r.status === 'approved'
-                                                ? 'Separar'
-                                                : 'Separado'}
-                                        </th>
-                                        <th className="px-2 py-2 text-right">Recebido</th>
-                                        <th className="px-2 py-2 text-right" title="Saída registrada no CIGAM">CIGAM ↗</th>
-                                        <th className="px-2 py-2 text-right" title="Entrada registrada no CIGAM">CIGAM ↘</th>
-                                        <th className="px-2 py-2 text-left">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200">
-                                    {(r.items || []).map((it) => (
-                                        <tr key={it.id}>
-                                            <td className="px-2 py-2 font-mono text-xs">{it.product_reference}</td>
-                                            <td className="px-2 py-2">
-                                                <div>{it.product_name || '—'}</div>
-                                                {it.product_color && <div className="text-xs text-gray-500">{it.product_color}</div>}
-                                            </td>
-                                            <td className="px-2 py-2">{it.size || '—'}</td>
-                                            <td className="px-2 py-2 text-right tabular-nums">{it.qty_requested}</td>
-                                            <td className="px-2 py-2 text-right tabular-nums">
-                                                {(r.status === 'in_separation' || r.status === 'approved') && permissions.separate ? (
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        max={it.qty_requested}
-                                                        value={separatedQty[it.id] ?? 0}
-                                                        onChange={(e) => setSeparatedQty({ ...separatedQty, [it.id]: e.target.value })}
-                                                        className="w-20 rounded-md border-gray-300 text-sm text-right tabular-nums"
-                                                    />
-                                                ) : (
-                                                    it.qty_separated
-                                                )}
-                                            </td>
-                                            <td className="px-2 py-2 text-right tabular-nums">{it.qty_received}</td>
-                                            <td className="px-2 py-2 text-right tabular-nums text-gray-600">
-                                                {it.dispatched_quantity > 0 ? it.dispatched_quantity : <span className="text-gray-300">—</span>}
-                                            </td>
-                                            <td className="px-2 py-2 text-right tabular-nums text-gray-600">
-                                                {it.received_quantity > 0 ? it.received_quantity : <span className="text-gray-300">—</span>}
-                                            </td>
-                                            <td className="px-2 py-2">
-                                                <StatusBadge variant={itemStatusVariant(it.item_status)}>
-                                                    {itemStatusLabel(it.item_status)}
-                                                </StatusBadge>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </StandardModal.Section>
-
-                    {/* Confirmar envio (NF) — visível em in_separation */}
+                    {/* Confirmar envio (NF) — visível em in_separation; aparece ANTES
+                        da tabela de itens pra que o usuário informe a NF e valide
+                        primeiro contra o CIGAM, depois confira itens abaixo. */}
                     {r.status === 'in_separation' && permissions.separate && (
                         <StandardModal.Section title="Confirmar envio (gera transferência)">
                             <p className="text-sm text-gray-600 mb-3">
-                                Informe a NF de transferência e <strong>valide</strong> contra o CIGAM antes
-                                de confirmar. O sistema compara os itens separados com a NF emitida pra
-                                detectar divergências (faltando, sobrando ou qty diferente).
+                                Informe a NF de transferência <strong>primeiro</strong> e clique em
+                                <strong> Validar NF no CIGAM</strong> — o sistema busca a NF nas
+                                movimentações e compara com o que foi separado, mostrando
+                                divergências (faltando, sobrando ou qty diferente). Depois confira
+                                a tabela abaixo e confirme o envio.
                             </p>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div>
@@ -396,6 +320,86 @@ export default function DetailModal({ show, onClose, ulid, permissions = {}, onT
                             )}
                         </StandardModal.Section>
                     )}
+
+                    {/* Métricas */}
+                    <StandardModal.Section title="Itens e atendimento">
+                        <div className="grid grid-cols-3 gap-3 mb-3">
+                            <StandardModal.InfoCard
+                                label="Solicitado"
+                                value={r.total_requested ?? 0}
+                            />
+                            <StandardModal.InfoCard
+                                label="Recebido"
+                                value={r.total_received ?? 0}
+                            />
+                            <StandardModal.InfoCard
+                                label="Atendimento"
+                                value={`${r.fulfillment_percentage ?? 0}%`}
+                            />
+                        </div>
+
+                        {/* Tabela de itens */}
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full text-sm">
+                                <thead className="bg-gray-50 text-xs uppercase text-gray-600">
+                                    <tr>
+                                        <th className="px-2 py-2 text-left">Referência</th>
+                                        <th className="px-2 py-2 text-left">Produto</th>
+                                        <th className="px-2 py-2 text-left">Tamanho</th>
+                                        <th className="px-2 py-2 text-right">Solicitado</th>
+                                        <th className="px-2 py-2 text-right">
+                                            {r.status === 'in_separation' || r.status === 'approved'
+                                                ? 'Separar'
+                                                : 'Separado'}
+                                        </th>
+                                        <th className="px-2 py-2 text-right">Recebido</th>
+                                        <th className="px-2 py-2 text-right" title="Saída registrada no CIGAM">CIGAM ↗</th>
+                                        <th className="px-2 py-2 text-right" title="Entrada registrada no CIGAM">CIGAM ↘</th>
+                                        <th className="px-2 py-2 text-left">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                    {(r.items || []).map((it) => (
+                                        <tr key={it.id}>
+                                            <td className="px-2 py-2 font-mono text-xs">{it.product_reference}</td>
+                                            <td className="px-2 py-2">
+                                                <div>{it.product_name || '—'}</div>
+                                                {it.product_color && <div className="text-xs text-gray-500">{it.product_color}</div>}
+                                            </td>
+                                            <td className="px-2 py-2">{it.size || '—'}</td>
+                                            <td className="px-2 py-2 text-right tabular-nums">{it.qty_requested}</td>
+                                            <td className="px-2 py-2 text-right tabular-nums">
+                                                {(r.status === 'in_separation' || r.status === 'approved') && permissions.separate ? (
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max={it.qty_requested}
+                                                        value={separatedQty[it.id] ?? 0}
+                                                        onChange={(e) => setSeparatedQty({ ...separatedQty, [it.id]: e.target.value })}
+                                                        className="w-20 rounded-md border-gray-300 text-sm text-right tabular-nums"
+                                                    />
+                                                ) : (
+                                                    it.qty_separated
+                                                )}
+                                            </td>
+                                            <td className="px-2 py-2 text-right tabular-nums">{it.qty_received}</td>
+                                            <td className="px-2 py-2 text-right tabular-nums text-gray-600">
+                                                {it.dispatched_quantity > 0 ? it.dispatched_quantity : <span className="text-gray-300">—</span>}
+                                            </td>
+                                            <td className="px-2 py-2 text-right tabular-nums text-gray-600">
+                                                {it.received_quantity > 0 ? it.received_quantity : <span className="text-gray-300">—</span>}
+                                            </td>
+                                            <td className="px-2 py-2">
+                                                <StatusBadge variant={itemStatusVariant(it.item_status)}>
+                                                    {itemStatusLabel(it.item_status)}
+                                                </StatusBadge>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </StandardModal.Section>
 
                     {/* Timeline */}
                     <StandardModal.Section title="Histórico de status">
