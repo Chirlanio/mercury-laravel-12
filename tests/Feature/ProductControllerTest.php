@@ -155,6 +155,71 @@ class ProductControllerTest extends TestCase
         $this->assertEquals(1, $props['stats']['sync_locked']);
     }
 
+    public function test_products_index_filters_by_has_image_zero_returns_only_without_image(): void
+    {
+        $this->createTestProduct(['reference' => 'WITH-IMG', 'image' => 'products/foo.jpg']);
+        $this->createTestProduct(['reference' => 'NO-IMG', 'image' => null]);
+        $this->createTestProduct(['reference' => 'EMPTY-IMG', 'image' => '']);
+
+        $response = $this->actingAs($this->adminUser)->get('/products?has_image=0');
+        $props = $response->original->getData()['page']['props'];
+
+        $refs = collect($props['products']['data'])->pluck('reference')->all();
+        $this->assertCount(2, $refs);
+        $this->assertContains('NO-IMG', $refs);
+        $this->assertContains('EMPTY-IMG', $refs);
+    }
+
+    public function test_products_index_filters_by_has_image_one_returns_only_with_image(): void
+    {
+        $this->createTestProduct(['reference' => 'WITH-IMG', 'image' => 'products/foo.jpg']);
+        $this->createTestProduct(['reference' => 'NO-IMG', 'image' => null]);
+
+        $response = $this->actingAs($this->adminUser)->get('/products?has_image=1');
+        $props = $response->original->getData()['page']['props'];
+
+        $refs = collect($props['products']['data'])->pluck('reference')->all();
+        $this->assertSame(['WITH-IMG'], $refs);
+    }
+
+    public function test_products_stats_include_without_image_count(): void
+    {
+        $this->createTestProduct(['image' => 'products/a.jpg']);
+        $this->createTestProduct(['image' => null]);
+        $this->createTestProduct(['image' => '']);
+
+        $response = $this->actingAs($this->adminUser)->get('/products');
+        $props = $response->original->getData()['page']['props'];
+
+        $this->assertEquals(2, $props['stats']['without_image']);
+    }
+
+    public function test_export_without_image_requires_edit_permission(): void
+    {
+        $this->actingAs($this->regularUser)
+            ->get('/products/export-without-image')
+            ->assertStatus(403);
+    }
+
+    public function test_export_without_image_streams_csv_with_only_products_missing_image(): void
+    {
+        $brand = $this->createTestProductBrand(['cigam_code' => 'AREZZO', 'name' => 'Arezzo']);
+        $this->createTestProduct(['reference' => 'WITH-IMG', 'description' => 'TEM FOTO', 'image' => 'products/x.jpg']);
+        $this->createTestProduct(['reference' => 'NEEDS-PHOTO-1', 'description' => 'PRECISA FOTO', 'brand_cigam_code' => 'AREZZO', 'image' => null]);
+        $this->createTestProduct(['reference' => 'NEEDS-PHOTO-2', 'description' => 'OUTRA SEM FOTO', 'image' => '']);
+
+        $response = $this->actingAs($this->adminUser)->get('/products/export-without-image');
+        $response->assertStatus(200);
+        $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+
+        $csv = $response->streamedContent();
+        $this->assertStringContainsString('NEEDS-PHOTO-1', $csv);
+        $this->assertStringContainsString('NEEDS-PHOTO-2', $csv);
+        $this->assertStringContainsString('Arezzo', $csv);
+        $this->assertStringNotContainsString('WITH-IMG', $csv);
+        $this->assertStringContainsString('referencia;descricao;marca', $csv);
+    }
+
     // ==================== SHOW ====================
 
     public function test_show_returns_product_with_variants(): void

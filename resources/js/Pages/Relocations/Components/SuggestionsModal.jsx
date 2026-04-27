@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { SparklesIcon, ArrowTrendingUpIcon } from '@heroicons/react/24/outline';
+import { SparklesIcon, ArrowTrendingUpIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
 import StandardModal from '@/Components/StandardModal';
 import Button from '@/Components/Button';
 import InputLabel from '@/Components/InputLabel';
@@ -57,6 +57,8 @@ export default function SuggestionsModal({
     onClose,
     destinationStoreId,
     destinationStoreLabel,
+    originStoreId = null,
+    originStoreLabel = null,
     onApply,
 }) {
     const [days, setDays] = useState(30);
@@ -65,15 +67,21 @@ export default function SuggestionsModal({
     const [errorMsg, setErrorMsg] = useState(null);
     const [data, setData] = useState(null);
     const [selected, setSelected] = useState({});  // {idx: {checked, qty}}
+    const [showHelp, setShowHelp] = useState(false);
+    // Quando o usuário já escolheu a origem no form, default = filtrar
+    // por essa origem. Toggle permite ver toda a rede sem fechar o modal.
+    const [restrictToOrigin, setRestrictToOrigin] = useState(true);
 
     const load = async () => {
         if (!destinationStoreId) return;
         setLoading(true);
         setErrorMsg(null);
         try {
-            const res = await window.axios.get(route('relocations.suggestions'), {
-                params: { destination_store_id: destinationStoreId, days, top },
-            });
+            const params = { destination_store_id: destinationStoreId, days, top };
+            if (originStoreId && restrictToOrigin) {
+                params.origin_store_id = originStoreId;
+            }
+            const res = await window.axios.get(route('relocations.suggestions'), { params });
             setData(res.data);
             // Inicializa selected: tudo marcado por padrão, qty = qty_suggested
             const initial = {};
@@ -92,7 +100,17 @@ export default function SuggestionsModal({
     useEffect(() => {
         if (show) load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [show, destinationStoreId, days, top]);
+    }, [show, destinationStoreId, originStoreId, restrictToOrigin, days, top]);
+
+    // Quando o modal abre sem origem, garante toggle desligado pra
+    // não confundir o usuário com checkbox marcado mas sem efeito.
+    useEffect(() => {
+        if (show && !originStoreId) {
+            setRestrictToOrigin(false);
+        } else if (show && originStoreId) {
+            setRestrictToOrigin(true);
+        }
+    }, [show, originStoreId]);
 
     const toggleAll = (checked) => {
         if (!data) return;
@@ -128,6 +146,8 @@ export default function SuggestionsModal({
                 // pré-popula o seletor de loja origem se ainda não foi escolhido)
                 _suggested_origin_id: s.suggested_origin?.id ?? null,
                 _suggested_origin_code: s.suggested_origin?.code ?? null,
+                _suggested_origin_name: s.suggested_origin?.name ?? null,
+                _suggested_origin_stock: s.suggested_origin?.stock ?? null,
             });
         });
 
@@ -136,6 +156,7 @@ export default function SuggestionsModal({
     };
 
     return (
+        <>
         <StandardModal
             show={show}
             onClose={onClose}
@@ -143,6 +164,17 @@ export default function SuggestionsModal({
             subtitle={destinationStoreLabel ? `Destino: ${destinationStoreLabel}` : null}
             headerColor="bg-purple-600"
             headerIcon={<SparklesIcon className="h-5 w-5" />}
+            headerActions={
+                <button
+                    type="button"
+                    onClick={() => setShowHelp(true)}
+                    title="Como funciona a classificação?"
+                    className="inline-flex items-center gap-1 text-white/90 hover:text-white text-sm font-medium px-2 py-1 rounded hover:bg-white/10 transition-colors"
+                >
+                    <QuestionMarkCircleIcon className="h-5 w-5" />
+                    <span className="hidden sm:inline">Como funciona?</span>
+                </button>
+            }
             maxWidth="6xl"
             loading={loading}
             errorMessage={errorMsg}
@@ -194,6 +226,26 @@ export default function SuggestionsModal({
                         </p>
                     </div>
                 </div>
+
+                {originStoreId && originStoreLabel && (
+                    <div className="mt-3 bg-indigo-50 border border-indigo-200 rounded p-2 flex items-start gap-2">
+                        <input
+                            id="restrict-to-origin"
+                            type="checkbox"
+                            checked={restrictToOrigin}
+                            onChange={(e) => setRestrictToOrigin(e.target.checked)}
+                            className="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <label htmlFor="restrict-to-origin" className="text-xs text-indigo-900 cursor-pointer flex-1">
+                            <strong>Apenas produtos com saldo em {originStoreLabel}</strong>
+                            <span className="text-indigo-700 font-normal block">
+                                Desmarque pra ver os produtos vendidos no destino que outras lojas
+                                da rede também têm — útil pra avaliar se essa origem é a melhor
+                                escolha ou se outra loja teria mais variedade pra repor.
+                            </span>
+                        </label>
+                    </div>
+                )}
             </StandardModal.Section>
 
             {data && data.cigam_available === false && (
@@ -339,5 +391,125 @@ export default function SuggestionsModal({
                 </StandardModal.Section>
             )}
         </StandardModal>
+
+        <StandardModal
+            show={showHelp}
+            onClose={() => setShowHelp(false)}
+            title="Como a classificação funciona"
+            subtitle="Curva ABC e sinal de sazonalidade — base do ranqueamento das sugestões"
+            headerColor="bg-indigo-600"
+            headerIcon={<QuestionMarkCircleIcon className="h-5 w-5" />}
+            maxWidth="2xl"
+            footer={
+                <StandardModal.Footer>
+                    <div className="flex-1" />
+                    <Button variant="primary" onClick={() => setShowHelp(false)}>Entendi</Button>
+                </StandardModal.Footer>
+            }
+        >
+            <StandardModal.Section title="O que a sugestão analisa">
+                <p className="text-sm text-gray-700">
+                    Olhamos as <strong>vendas reais da loja destino</strong> nos últimos {data?.period?.days ?? days} dias
+                    (movimento CIGAM código 2). Cada produto vendido vira um candidato a remanejo, ordenado pela
+                    quantidade vendida no período (mais vendido primeiro).
+                </p>
+                <p className="text-sm text-gray-700 mt-2">
+                    A <strong>curva ABC</strong> classifica esses candidatos pelo princípio de Pareto: poucos produtos
+                    representam a maior parte das vendas. Em vez de tratar todos igual, separamos em 3 grupos pra
+                    priorizar reposição.
+                </p>
+            </StandardModal.Section>
+
+            <StandardModal.Section title="Curvas A, B e C">
+                <div className="space-y-3">
+                    <div className="border border-emerald-200 bg-emerald-50 rounded p-3">
+                        <div className="flex items-center gap-2 mb-1">
+                            <CurveBadge curve="A" cumulativePct={80} />
+                            <strong className="text-sm text-emerald-900">Curva A — Best-sellers</strong>
+                        </div>
+                        <p className="text-xs text-emerald-900">
+                            Produtos cujas vendas <strong>acumuladas</strong> chegam a até <strong>80%</strong> do
+                            total vendido no período. Tipicamente os ~20% de itens responsáveis por 80% do giro
+                            (Pareto). <strong>Prioridade máxima de reposição</strong> — uma falha aqui custa muita
+                            venda perdida.
+                        </p>
+                    </div>
+
+                    <div className="border border-amber-200 bg-amber-50 rounded p-3">
+                        <div className="flex items-center gap-2 mb-1">
+                            <CurveBadge curve="B" cumulativePct={95} />
+                            <strong className="text-sm text-amber-900">Curva B — Volume médio</strong>
+                        </div>
+                        <p className="text-xs text-amber-900">
+                            Os próximos produtos cujo acumulado vai de <strong>80% até 95%</strong> das vendas. Giro
+                            relevante mas não crítico. Vale repor com base na disponibilidade de estoque na rede.
+                        </p>
+                    </div>
+
+                    <div className="border border-gray-300 bg-gray-50 rounded p-3">
+                        <div className="flex items-center gap-2 mb-1">
+                            <CurveBadge curve="C" cumulativePct={100} />
+                            <strong className="text-sm text-gray-800">Curva C — Cauda longa</strong>
+                        </div>
+                        <p className="text-xs text-gray-700">
+                            Os <strong>5% finais</strong> das vendas, distribuídos numa cauda longa de produtos com
+                            baixo giro individual. Reposição opcional — avalie caso a caso. Produtos C costumam ser
+                            ofertas pontuais, fim de coleção ou itens de nicho.
+                        </p>
+                    </div>
+                </div>
+            </StandardModal.Section>
+
+            <StandardModal.Section title="Como o produto entra em cada curva">
+                <ol className="list-decimal list-inside text-sm text-gray-700 space-y-1.5">
+                    <li>Somamos a quantidade vendida de todos os produtos do período.</li>
+                    <li>Ordenamos do mais vendido pro menos vendido.</li>
+                    <li>Vamos acumulando o percentual de cada item sobre o total vendido.</li>
+                    <li>
+                        Enquanto o acumulado for <strong>≤ 80%</strong> → <strong>A</strong>;
+                        de <strong>80% a 95%</strong> → <strong>B</strong>;
+                        acima de <strong>95%</strong> → <strong>C</strong>.
+                    </li>
+                </ol>
+                <p className="text-xs text-gray-500 mt-3">
+                    Ex.: se o top 3 produtos somam 82% das vendas, os 2 primeiros entram em A (acumulado ainda
+                    abaixo de 80%) e o terceiro entra em B (acumulado passou dos 80%).
+                </p>
+            </StandardModal.Section>
+
+            <StandardModal.Section title="Sinal de sazonalidade">
+                <div className="border border-orange-200 bg-orange-50 rounded p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                        <SeasonalBadge ratio={1.5} priorQty={3} />
+                        <strong className="text-sm text-orange-900">Produto sazonal — em alta</strong>
+                    </div>
+                    <p className="text-xs text-orange-900">
+                        Marcamos como sazonal quando as vendas atuais são <strong>1,5× ou mais</strong> que as vendas
+                        da <strong>mesma janela exatamente 1 ano antes</strong>, com pelo menos <strong>3
+                        unidades</strong> vendidas no ano anterior. O mínimo evita falsos positivos (produto novo
+                        com 0 venda no ano anterior daria razão infinita).
+                    </p>
+                    <p className="text-xs text-orange-900 mt-2">
+                        O badge é independente da curva ABC — um produto C pode estar subindo (sazonal) e merecer
+                        reposição mesmo com baixo acumulado. Use os dois sinais juntos pra decidir.
+                    </p>
+                </div>
+            </StandardModal.Section>
+
+            <StandardModal.Section title="Quanto sugerimos repor">
+                <p className="text-sm text-gray-700">
+                    Pra cada produto sugerido, calculamos:
+                </p>
+                <code className="block bg-gray-100 border border-gray-200 rounded p-2 mt-2 text-xs font-mono text-gray-800">
+                    qty_sugerida = mín( ⌈ média_diária × cobertura ⌉, saldo_da_origem )
+                </code>
+                <p className="text-xs text-gray-600 mt-2">
+                    Onde <strong>cobertura = {data?.period?.coverage_days ?? 14} dias</strong> (objetivo de
+                    estoque a manter no ritmo atual de vendas) e <strong>saldo_da_origem</strong> é o estoque real
+                    da loja origem no CIGAM. Nunca sugerimos mais do que a origem tem disponível.
+                </p>
+            </StandardModal.Section>
+        </StandardModal>
+        </>
     );
 }

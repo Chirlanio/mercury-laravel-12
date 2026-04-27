@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\Store;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -57,8 +58,14 @@ class RelocationSuggestionService
     ) {}
 
     /**
+     * @param  int|null  $originStoreId  Quando informado, restringe as origens
+     *   sugeridas a essa loja específica (e zera `other_origins`). Útil quando
+     *   o usuário já decidiu de qual loja quer transferir e só quer ver os
+     *   produtos daquela origem que vendem bem no destino.
+     *
      * @return array{
      *   destination_store: array{id:int, code:string, name:string, network_id:?int, network_name:?string}|null,
+     *   origin_store: array{id:int, code:string, name:string}|null,
      *   period: array{days:int, from:string, to:string, coverage_days:int},
      *   cigam_available: bool,
      *   cigam_unavailable_reason: ?string,
@@ -66,7 +73,7 @@ class RelocationSuggestionService
      *   suppressed_no_stock: int,
      * }
      */
-    public function suggestForStore(int $destinationStoreId, int $days = 30, int $top = 20): array
+    public function suggestForStore(int $destinationStoreId, int $days = 30, int $top = 20, ?int $originStoreId = null): array
     {
         $top = max(1, min($top, self::MAX_TOP));
         $days = max(7, $days);
@@ -81,18 +88,38 @@ class RelocationSuggestionService
             return $this->emptyResult($days);
         }
 
-        // Lojas da mesma rede (excluindo a destino) — pool de origens válidas
-        $networkStoreCodes = Store::query()
-            ->where('network_id', $destStore->network_id)
-            ->where('id', '!=', $destStore->id)
-            ->pluck('code')
-            ->toArray();
+        // Resolve loja origem (se informada) e valida que está na mesma rede.
+        $originStore = null;
+        if ($originStoreId) {
+            $originStore = Store::query()
+                ->where('id', $originStoreId)
+                ->where('network_id', $destStore->network_id)
+                ->where('id', '!=', $destStore->id)
+                ->select('id', 'code', 'name')
+                ->first();
+            // Se origem inválida (rede diferente, mesma loja, inexistente),
+            // ignoramos silenciosamente — comportamento = "toda a rede".
+        }
+
+        // Pool de origens: única loja se origem fixa; toda a rede senão.
+        $networkStoreCodes = $originStore
+            ? [$originStore->code]
+            : Store::query()
+                ->where('network_id', $destStore->network_id)
+                ->where('id', '!=', $destStore->id)
+                ->pluck('code')
+                ->toArray();
 
         $sales = $this->topSellingItems($destStore->code, $days, $top);
 
         if ($sales->isEmpty()) {
             return [
                 'destination_store' => $this->formatStore($destStore),
+                'origin_store' => $originStore ? [
+                    'id' => $originStore->id,
+                    'code' => $originStore->code,
+                    'name' => $originStore->name,
+                ] : null,
                 'period' => $this->periodMeta($days),
                 'cigam_available' => $this->stock->isAvailable(),
                 'cigam_unavailable_reason' => $this->stock->getUnavailableReason(),
@@ -109,7 +136,8 @@ class RelocationSuggestionService
         // Sazonalidade — query batch comparando com mesma janela 1 ano antes
         $seasonalityByKey = $this->detectSeasonality($destStore->code, $sales, $days);
 
-        // Estoque real CIGAM, filtrado pela rede do destino
+        // Estoque real CIGAM, filtrado pela rede do destino (ou loja única
+        // se o usuário fixou origem).
         $stocks = $this->stock->availableForBarcodes(
             $barcodes,
             excludeStoreCode: $destStore->code,
@@ -190,6 +218,11 @@ class RelocationSuggestionService
 
         return [
             'destination_store' => $this->formatStore($destStore),
+            'origin_store' => $originStore ? [
+                'id' => $originStore->id,
+                'code' => $originStore->code,
+                'name' => $originStore->name,
+            ] : null,
             'period' => $this->periodMeta($days),
             'cigam_available' => $this->stock->isAvailable(),
             'cigam_unavailable_reason' => $this->stock->getUnavailableReason(),
@@ -296,6 +329,7 @@ class RelocationSuggestionService
     {
         return [
             'destination_store' => null,
+            'origin_store' => null,
             'period' => $this->periodMeta($days),
             'cigam_available' => $this->stock->isAvailable(),
             'cigam_unavailable_reason' => $this->stock->getUnavailableReason(),
@@ -322,26 +356,42 @@ class RelocationSuggestionService
     }
 
     /**
+     * Indexado por código que aparece nas vendas (barcode ou aux_reference).
+     * `products.reference` é o SKU do produto-pai e não bate com o barcode da venda;
+     * a relação correta passa por `product_variants`.
+     *
      * @return array<string, array{reference: string, description: string|null, color_name: string|null}>
      */
     protected function lookupProducts(array $barcodes): array
     {
         if (empty($barcodes)) return [];
 
-        $rows = Product::query()
+        $rows = ProductVariant::query()
+            ->join('products', 'products.id', '=', 'product_variants.product_id')
             ->leftJoin('product_colors', 'product_colors.cigam_code', '=', 'products.color_cigam_code')
-            ->whereIn('products.reference', $barcodes)
-            ->get(['products.reference', 'products.description', 'product_colors.name as color_name']);
+            ->where(function ($q) use ($barcodes) {
+                $q->whereIn('product_variants.barcode', $barcodes)
+                    ->orWhereIn('product_variants.aux_reference', $barcodes);
+            })
+            ->get([
+                'product_variants.barcode',
+                'product_variants.aux_reference',
+                'products.reference',
+                'products.description',
+                'product_colors.name as color_name',
+            ]);
 
-        $byRef = [];
+        $byKey = [];
         foreach ($rows as $r) {
-            $byRef[$r->reference] = [
+            $entry = [
                 'reference' => $r->reference,
                 'description' => $r->description,
                 'color_name' => $r->color_name,
             ];
+            if ($r->barcode) $byKey[$r->barcode] = $entry;
+            if ($r->aux_reference) $byKey[$r->aux_reference] = $entry;
         }
-        return $byRef;
+        return $byKey;
     }
 
     protected function matchProduct(array $products, $salesRow): array

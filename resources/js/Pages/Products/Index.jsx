@@ -1,5 +1,5 @@
 import { Head, router } from "@inertiajs/react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import axios from "axios";
 import { usePermissions } from "@/Hooks/usePermissions";
 import useModalManager from "@/Hooks/useModalManager";
@@ -7,21 +7,34 @@ import Button from "@/Components/Button";
 import PageHeader from "@/Components/Shared/PageHeader";
 import StatusBadge from "@/Components/Shared/StatusBadge";
 import StatisticsGrid from "@/Components/Shared/StatisticsGrid";
-import ProductFilterBar from "@/Components/ProductFilterBar";
 import ProductDetailModal from "@/Components/ProductDetailModal";
 import ProductEditModal from "@/Components/ProductEditModal";
 import ProductSyncModal from "@/Components/ProductSyncModal";
 import ProductSyncLogsModal from "@/Components/ProductSyncLogsModal";
 import ProductPriceImportModal from "@/Components/ProductPriceImportModal";
+import ProductBulkImageUploadModal from "@/Components/ProductBulkImageUploadModal";
 import PrintLabelsModal from "@/Components/PrintLabelsModal";
 import {
     LockClosedIcon, CubeIcon, CheckCircleIcon, ArrowPathIcon,
-    TagIcon, ArrowDownTrayIcon,
+    TagIcon, ArrowDownTrayIcon, PhotoIcon, NoSymbolIcon, XMarkIcon,
 } from "@heroicons/react/24/outline";
+
+const FILTER_DEFAULTS = {
+    search: '',
+    brand: '',
+    collection: '',
+    category: '',
+    color: '',
+    material: '',
+    supplier: '',
+    is_active: '',
+    sync_locked: '',
+    has_image: '',
+};
 
 export default function Index({ products, filters, stats, cigamAvailable, activeSyncLog }) {
     const { canEditProducts, canSyncProducts } = usePermissions();
-    const { modals, openModal, closeModal } = useModalManager(['sync', 'syncLogs', 'priceImport', 'printLabels']);
+    const { modals, openModal, closeModal } = useModalManager(['sync', 'syncLogs', 'priceImport', 'printLabels', 'imageImport']);
 
     const [detailProductId, setDetailProductId] = useState(null);
     const [editProductId, setEditProductId] = useState(null);
@@ -57,31 +70,86 @@ export default function Index({ products, filters, stats, cigamAvailable, active
         if (activeSyncLog) setLiveSync(activeSyncLog);
     }, [activeSyncLog]);
 
-    const navigateWithFilters = (params) => {
-        delete params.page;
-        router.get('/products', params, { preserveState: true, preserveScroll: true });
+    // ------------------------------------------------------------------
+    // Filtros (debounced para search; immediate para selects)
+    // ------------------------------------------------------------------
+    const [filterState, setFilterState] = useState({
+        ...FILTER_DEFAULTS,
+        ...Object.fromEntries(
+            Object.entries(FILTER_DEFAULTS).map(([k]) => [k, filters[k] ?? FILTER_DEFAULTS[k]])
+        ),
+    });
+
+    const [filterOptions, setFilterOptions] = useState(null);
+    useEffect(() => {
+        fetch('/products/filter-options')
+            .then(res => res.json())
+            .then(data => setFilterOptions(data))
+            .catch(() => setFilterOptions({}));
+    }, []);
+
+    const searchDebounceRef = useRef(null);
+    const isFirstRender = useRef(true);
+
+    const applyFilters = (overrides = {}) => {
+        const merged = { ...filterState, ...overrides };
+        const params = Object.fromEntries(
+            Object.entries(merged).filter(([, v]) => v !== '' && v !== null && v !== undefined)
+        );
+        if (filters.sort) params.sort = filters.sort;
+        if (filters.direction) params.direction = filters.direction;
+        router.get('/products', params, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        });
     };
 
-    const handleFilterChange = (key, value) => {
-        const params = { ...filters };
-        if (value !== '' && value !== undefined && value !== null) {
-            params[key] = value;
-        } else {
-            delete params[key];
+    useEffect(() => {
+        if (isFirstRender.current) {
+            isFirstRender.current = false;
+            return;
         }
-        navigateWithFilters(params);
+        if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+        searchDebounceRef.current = setTimeout(() => applyFilters(), 400);
+        return () => clearTimeout(searchDebounceRef.current);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filterState.search]);
+
+    const handleSelectChange = (key, value) => {
+        const next = { ...filterState, [key]: value };
+        setFilterState(next);
+        applyFilters(next);
     };
 
-    const handleClearFilters = () => {
+    const hasActiveFilters = useMemo(() => {
+        return Object.entries(filterState).some(([, v]) => v !== '' && v !== null && v !== undefined);
+    }, [filterState]);
+
+    const clearFilters = () => {
+        setFilterState({ ...FILTER_DEFAULTS });
         const params = {};
         if (filters.sort) params.sort = filters.sort;
         if (filters.direction) params.direction = filters.direction;
-        navigateWithFilters(params);
+        router.get('/products', params, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        });
     };
 
     const handleSort = (field) => {
         const direction = filters.sort === field && filters.direction === 'asc' ? 'desc' : 'asc';
-        navigateWithFilters({ ...filters, sort: field, direction });
+        const params = Object.fromEntries(
+            Object.entries(filterState).filter(([, v]) => v !== '' && v !== null && v !== undefined)
+        );
+        params.sort = field;
+        params.direction = direction;
+        router.get('/products', params, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        });
     };
 
     const handlePageChange = (url) => {
@@ -98,6 +166,15 @@ export default function Index({ products, filters, stats, cigamAvailable, active
     const statisticsCards = [
         { label: 'Total de Produtos', value: stats.total, format: 'number', icon: CubeIcon, color: 'indigo' },
         { label: 'Produtos Ativos', value: stats.active, format: 'number', icon: CheckCircleIcon, color: 'green' },
+        {
+            label: 'Sem Foto',
+            value: stats.without_image ?? 0,
+            format: 'number',
+            icon: NoSymbolIcon,
+            color: 'red',
+            onClick: () => handleSelectChange('has_image', filterState.has_image === '0' ? '' : '0'),
+            active: filterState.has_image === '0',
+        },
         { label: 'Sync Bloqueado', value: stats.sync_locked, format: 'number', icon: LockClosedIcon, color: 'yellow' },
         { label: 'Última Sync', value: stats.last_sync ? new Date(stats.last_sync).toLocaleString('pt-BR') : 'Nunca', icon: ArrowPathIcon, color: 'blue' },
     ];
@@ -126,6 +203,20 @@ export default function Index({ products, filters, stats, cigamAvailable, active
                             visible: canEditProducts(),
                         },
                         {
+                            label: 'Importar Imagens',
+                            icon: PhotoIcon,
+                            variant: 'outline',
+                            onClick: () => openModal('imageImport'),
+                            visible: canEditProducts(),
+                        },
+                        {
+                            label: 'Sem Foto (CSV)',
+                            icon: NoSymbolIcon,
+                            variant: 'outline',
+                            download: '/products/export-without-image',
+                            visible: canEditProducts(),
+                        },
+                        {
                             type: 'history',
                             onClick: () => openModal('syncLogs'),
                             visible: canSyncProducts(),
@@ -140,7 +231,7 @@ export default function Index({ products, filters, stats, cigamAvailable, active
                 />
 
                 {/* Estatísticas */}
-                <StatisticsGrid cards={statisticsCards} cols={4} />
+                <StatisticsGrid cards={statisticsCards} cols={5} />
 
                 {/* CIGAM unavailable warning */}
                 {!cigamAvailable && canSyncProducts() && (
@@ -195,8 +286,152 @@ export default function Index({ products, filters, stats, cigamAvailable, active
                     </div>
                 )}
 
-                {/* Filters */}
-                <ProductFilterBar filters={filters} onFilterChange={handleFilterChange} onClearFilters={handleClearFilters} />
+                {/* Filtros */}
+                <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                        <div className="lg:col-span-2">
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Buscar</label>
+                            <input
+                                type="text"
+                                value={filterState.search}
+                                onChange={(e) => setFilterState({ ...filterState, search: e.target.value })}
+                                placeholder="Referência ou descrição..."
+                                className="block w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Marca</label>
+                            <select
+                                value={filterState.brand}
+                                onChange={(e) => handleSelectChange('brand', e.target.value)}
+                                className="block w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
+                            >
+                                <option value="">Todas</option>
+                                {filterOptions?.brands?.map((b) => (
+                                    <option key={b.cigam_code} value={b.cigam_code}>{b.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Estação</label>
+                            <select
+                                value={filterState.collection}
+                                onChange={(e) => handleSelectChange('collection', e.target.value)}
+                                className="block w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
+                            >
+                                <option value="">Todas</option>
+                                {filterOptions?.collections?.map((c) => (
+                                    <option key={c.cigam_code} value={c.cigam_code}>{c.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Tipo</label>
+                            <select
+                                value={filterState.category}
+                                onChange={(e) => handleSelectChange('category', e.target.value)}
+                                className="block w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
+                            >
+                                <option value="">Todos</option>
+                                {filterOptions?.categories?.map((c) => (
+                                    <option key={c.cigam_code} value={c.cigam_code}>{c.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Cor</label>
+                            <select
+                                value={filterState.color}
+                                onChange={(e) => handleSelectChange('color', e.target.value)}
+                                className="block w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
+                            >
+                                <option value="">Todas</option>
+                                {filterOptions?.colors?.map((c) => (
+                                    <option key={c.cigam_code} value={c.cigam_code}>{c.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Material</label>
+                            <select
+                                value={filterState.material}
+                                onChange={(e) => handleSelectChange('material', e.target.value)}
+                                className="block w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
+                            >
+                                <option value="">Todos</option>
+                                {filterOptions?.materials?.map((m) => (
+                                    <option key={m.cigam_code} value={m.cigam_code}>{m.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Fornecedor</label>
+                            <select
+                                value={filterState.supplier}
+                                onChange={(e) => handleSelectChange('supplier', e.target.value)}
+                                className="block w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
+                            >
+                                <option value="">Todos</option>
+                                {filterOptions?.suppliers?.map((s) => (
+                                    <option key={s.codigo_for} value={s.codigo_for}>{s.nome_fantasia || s.razao_social}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                            <select
+                                value={filterState.is_active}
+                                onChange={(e) => handleSelectChange('is_active', e.target.value)}
+                                className="block w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
+                            >
+                                <option value="">Todos</option>
+                                <option value="1">Ativo</option>
+                                <option value="0">Inativo</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Sync Lock</label>
+                            <select
+                                value={filterState.sync_locked}
+                                onChange={(e) => handleSelectChange('sync_locked', e.target.value)}
+                                className="block w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
+                            >
+                                <option value="">Todos</option>
+                                <option value="1">Bloqueado</option>
+                                <option value="0">Desbloqueado</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Imagem</label>
+                            <select
+                                value={filterState.has_image}
+                                onChange={(e) => handleSelectChange('has_image', e.target.value)}
+                                className="block w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
+                            >
+                                <option value="">Todas</option>
+                                <option value="1">Com foto</option>
+                                <option value="0">Sem foto</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {hasActiveFilters && (
+                        <div className="mt-3 flex justify-end">
+                            <Button variant="outline" size="sm" icon={XMarkIcon} onClick={clearFilters}>
+                                Limpar filtros
+                            </Button>
+                        </div>
+                    )}
+                </div>
 
                 {/* Mobile Cards / Desktop Table */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -337,6 +572,12 @@ export default function Index({ products, filters, stats, cigamAvailable, active
             <ProductPriceImportModal
                 show={modals.priceImport}
                 onClose={() => closeModal('priceImport')}
+                onCompleted={reload}
+            />
+
+            <ProductBulkImageUploadModal
+                show={modals.imageImport}
+                onClose={() => closeModal('imageImport')}
                 onCompleted={reload}
             />
 

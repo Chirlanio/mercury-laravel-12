@@ -14,6 +14,7 @@ use App\Models\RelocationItem;
 use App\Models\RelocationType;
 use App\Models\Store;
 use App\Models\User;
+use App\Services\CigamStockService;
 use App\Services\RelocationExportService;
 use App\Services\RelocationImportService;
 use App\Services\RelocationService;
@@ -38,6 +39,7 @@ class RelocationController extends Controller
         private RelocationSuggestionService $suggestionService,
         private RelocationExportService $exportService,
         private RelocationImportService $importService,
+        private CigamStockService $stockService,
     ) {}
 
     public function index(Request $request): Response
@@ -537,6 +539,73 @@ class RelocationController extends Controller
     }
 
     /**
+     * Consulta saldo CIGAM em batch pra validar se itens de um remanejo
+     * vão zerar/exceder o estoque da loja origem antes de criar.
+     *
+     * Recebe lista de itens onde cada item carrega o `store_id` da loja
+     * origem (suas sugestões podem vir de origens diferentes; itens
+     * manuais herdam a origem do form). Retorna mapa `{store_id|barcode}
+     * => saldo` pra UI cruzar com qty_requested.
+     */
+    public function lookupStock(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'items' => ['required', 'array', 'min:1', 'max:200'],
+            'items.*.store_id' => ['required', 'integer'],
+            'items.*.barcode' => ['required', 'string', 'max:50'],
+        ]);
+
+        $items = $data['items'];
+
+        // Map store_id → store_code (uma só query)
+        $storeIds = array_values(array_unique(array_column($items, 'store_id')));
+        $stores = Store::whereIn('id', $storeIds)->get(['id', 'code'])->keyBy('id');
+
+        // Agrupa barcodes por loja pra fazer 1 query por loja (evita scan global da view CIGAM)
+        $barcodesByStoreCode = [];
+        foreach ($items as $it) {
+            $store = $stores->get($it['store_id']);
+            if (! $store) continue;
+            $barcodesByStoreCode[$store->code][] = trim((string) $it['barcode']);
+        }
+
+        // Se CIGAM offline, devolve mapa vazio — UI trata como "saldo desconhecido"
+        if (! $this->stockService->isAvailable()) {
+            return response()->json([
+                'cigam_available' => false,
+                'cigam_unavailable_reason' => $this->stockService->getUnavailableReason(),
+                'stocks' => (object) [],
+            ]);
+        }
+
+        $stocks = [];
+        foreach ($barcodesByStoreCode as $storeCode => $barcodes) {
+            $rows = $this->stockService->availableForBarcodes(
+                array_values(array_unique($barcodes)),
+                onlyStoreCodes: [$storeCode],
+            );
+
+            // Indexa por barcode + somando aux_reference no mesmo bucket
+            foreach ($rows as $row) {
+                $store = $stores->first(fn ($s) => $s->code === $row->store_code);
+                if (! $store) continue;
+                $key = $store->id.'|'.$row->cod_barra;
+                $stocks[$key] = ($stocks[$key] ?? 0) + (int) $row->saldo;
+
+                if (! empty($row->refauxiliar) && $row->refauxiliar !== $row->cod_barra) {
+                    $auxKey = $store->id.'|'.$row->refauxiliar;
+                    $stocks[$auxKey] = ($stocks[$auxKey] ?? 0) + (int) $row->saldo;
+                }
+            }
+        }
+
+        return response()->json([
+            'cigam_available' => true,
+            'stocks' => (object) $stocks,
+        ]);
+    }
+
+    /**
      * Endpoint de sugestões. Consultado pelo painel "Gerar sugestões" do
      * CreateModal. Top N produtos vendidos na loja destino com sugestão
      * de origem por estimativa de saldo.
@@ -547,6 +616,7 @@ class RelocationController extends Controller
             'destination_store_id' => 'required|integer|exists:stores,id',
             'days' => 'nullable|integer|min:7|max:180',
             'top' => 'nullable|integer|min:1|max:50',
+            'origin_store_id' => 'nullable|integer|exists:stores,id',
         ]);
 
         // Scoping: usuário sem MANAGE só pode pedir sugestões pra própria loja
@@ -559,6 +629,7 @@ class RelocationController extends Controller
             (int) $data['destination_store_id'],
             (int) ($data['days'] ?? 30),
             (int) ($data['top'] ?? 20),
+            isset($data['origin_store_id']) ? (int) $data['origin_store_id'] : null,
         );
 
         return response()->json($result);

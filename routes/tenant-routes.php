@@ -540,6 +540,8 @@ Route::middleware(['auth', 'tenant.module:products', 'permission:'.Permission::V
         ->middleware('permission:'.Permission::EDIT_PRODUCTS->value)->name('products.images.preview');
     Route::post('/products/images/upload-batch', [ProductImageBulkController::class, 'uploadBatch'])
         ->middleware('permission:'.Permission::EDIT_PRODUCTS->value)->name('products.images.upload-batch');
+    Route::get('/products/export-without-image', [ProductController::class, 'exportWithoutImage'])
+        ->middleware('permission:'.Permission::EDIT_PRODUCTS->value)->name('products.export-without-image');
     Route::post('/products/print-labels', [ProductController::class, 'printLabels'])->name('products.print-labels');
     Route::get('/products', [ProductController::class, 'index'])->name('products.index');
     Route::get('/products/{product}', [ProductController::class, 'show'])->name('products.show');
@@ -1084,6 +1086,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/relocations/statistics', [\App\Http\Controllers\RelocationController::class, 'statistics'])->name('relocations.statistics');
         Route::get('/relocations/suggestions', [\App\Http\Controllers\RelocationController::class, 'suggestions'])->name('relocations.suggestions');
         Route::get('/relocations/lookup-product', [\App\Http\Controllers\RelocationController::class, 'lookupProduct'])->name('relocations.lookup-product');
+        Route::post('/relocations/lookup-stock', [\App\Http\Controllers\RelocationController::class, 'lookupStock'])->name('relocations.lookup-stock');
 
         // Export — rotas sem {relocation} antes para não colidir com pattern ULID
         Route::middleware('permission:'.Permission::EXPORT_RELOCATIONS->value)->group(function () {

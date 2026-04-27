@@ -69,6 +69,12 @@ class ProductController extends Controller
             $query->where('sync_locked', $request->boolean('sync_locked'));
         }
 
+        if ($request->has('has_image') && $request->input('has_image') !== '') {
+            $request->boolean('has_image')
+                ? $query->whereNotNull('image')->where('image', '!=', '')
+                : $query->where(fn ($q) => $q->whereNull('image')->orWhere('image', ''));
+        }
+
         $sortField = $request->input('sort', 'reference');
         $sortDirection = $request->input('direction', 'asc');
         $query->orderBy($sortField, $sortDirection);
@@ -79,6 +85,7 @@ class ProductController extends Controller
             'total' => Product::count(),
             'active' => Product::where('is_active', true)->count(),
             'sync_locked' => Product::where('sync_locked', true)->count(),
+            'without_image' => Product::where(fn ($q) => $q->whereNull('image')->orWhere('image', ''))->count(),
             'last_sync' => ProductSyncLog::where('status', 'completed')
                 ->latest('completed_at')
                 ->value('completed_at'),
@@ -97,7 +104,7 @@ class ProductController extends Controller
 
         return Inertia::render('Products/Index', [
             'products' => $products,
-            'filters' => $request->only(['search', 'brand', 'collection', 'category', 'color', 'material', 'supplier', 'is_active', 'sync_locked', 'sort', 'direction']),
+            'filters' => $request->only(['search', 'brand', 'collection', 'category', 'color', 'material', 'supplier', 'is_active', 'sync_locked', 'has_image', 'sort', 'direction']),
             'stats' => $stats,
             'cigamAvailable' => $syncService->isAvailable(),
             'activeSyncLog' => $activeSyncLog,
@@ -425,6 +432,44 @@ class ProductController extends Controller
         }
 
         return response()->json(['message' => 'Imagem removida.']);
+    }
+
+    /**
+     * Exporta CSV com produtos que ainda não têm imagem cadastrada.
+     * Útil pra equipe responsável pelas fotos saber o que falta produzir.
+     * Streaming pra suportar catálogos grandes sem estourar memória.
+     */
+    public function exportWithoutImage()
+    {
+        $filename = 'produtos-sem-foto-'.now()->format('Y-m-d').'.csv';
+
+        return response()->streamDownload(function () {
+            $out = fopen('php://output', 'w');
+            // BOM UTF-8 pra Excel reconhecer acentuação
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, ['referencia', 'descricao', 'marca', 'categoria', 'cor', 'preco_venda', 'ativo'], ';');
+
+            Product::with(['brand:cigam_code,name', 'category:cigam_code,name', 'color:cigam_code,name'])
+                ->where(fn ($q) => $q->whereNull('image')->orWhere('image', ''))
+                ->orderBy('reference')
+                ->chunk(500, function ($chunk) use ($out) {
+                    foreach ($chunk as $product) {
+                        fputcsv($out, [
+                            $product->reference,
+                            $product->description,
+                            $product->brand?->name ?? '',
+                            $product->category?->name ?? '',
+                            $product->color?->name ?? '',
+                            $product->sale_price ? number_format((float) $product->sale_price, 2, ',', '.') : '',
+                            $product->is_active ? 'Sim' : 'Não',
+                        ], ';');
+                    }
+                });
+
+            fclose($out);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
     }
 
     /**
