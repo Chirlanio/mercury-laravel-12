@@ -56,18 +56,16 @@ class DamagedProductCommandsTest extends TestCase
             'store_id' => $this->storeAId,
             'product_reference' => 'CMD-001',
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::LEFT->value,
-            'mismatched_actual_size' => '38',
-            'mismatched_expected_size' => '39',
+            'mismatched_left_size' => '38',
+            'mismatched_right_size' => '39',
         ], $this->adminUser);
 
         $service->create([
             'store_id' => $this->storeBId,
             'product_reference' => 'CMD-001',
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::RIGHT->value,
-            'mismatched_actual_size' => '39',
-            'mismatched_expected_size' => '38',
+            'mismatched_left_size' => '39',  // espelho do A pra cruzar
+            'mismatched_right_size' => '38',
         ], $this->adminUser);
 
         return $matching->findMatchesFor($a)->first();
@@ -96,9 +94,8 @@ class DamagedProductCommandsTest extends TestCase
             'store_id' => $this->storeAId,
             'product_reference' => 'CMD-AUTO',
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::LEFT->value,
-            'mismatched_actual_size' => '40',
-            'mismatched_expected_size' => '41',
+            'mismatched_left_size' => '40',
+            'mismatched_right_size' => '41',
             'status' => 'open',
             'created_by_user_id' => $this->adminUser->id,
         ]);
@@ -107,9 +104,8 @@ class DamagedProductCommandsTest extends TestCase
             'store_id' => $this->storeBId,
             'product_reference' => 'CMD-AUTO',
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::RIGHT->value,
-            'mismatched_actual_size' => '41',
-            'mismatched_expected_size' => '40',
+            'mismatched_left_size' => '41',  // espelho
+            'mismatched_right_size' => '40',
             'status' => 'open',
             'created_by_user_id' => $this->adminUser->id,
         ]);
@@ -204,9 +200,8 @@ class DamagedProductCommandsTest extends TestCase
             'store_id' => $this->storeAId,
             'product_reference' => 'STALE-001',
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::LEFT->value,
-            'mismatched_actual_size' => '38',
-            'mismatched_expected_size' => '39',
+            'mismatched_left_size' => '38',
+            'mismatched_right_size' => '39',
         ], $this->adminUser);
 
         // Backdate 70 dias
@@ -228,9 +223,8 @@ class DamagedProductCommandsTest extends TestCase
             'store_id' => $this->storeAId,
             'product_reference' => 'STALE-002',
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::LEFT->value,
-            'mismatched_actual_size' => '38',
-            'mismatched_expected_size' => '39',
+            'mismatched_left_size' => '38',
+            'mismatched_right_size' => '39',
         ], $this->adminUser);
 
         DamagedProduct::where('id', $product->id)->update(['created_at' => now()->subDays(70)]);

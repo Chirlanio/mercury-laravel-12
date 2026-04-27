@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     DocumentTextIcon,
     AdjustmentsHorizontalIcon,
     PhotoIcon,
     PencilSquareIcon,
-    XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { useForm } from '@inertiajs/react';
 import StandardModal from '@/Components/StandardModal';
@@ -12,7 +11,6 @@ import TextInput from '@/Components/TextInput';
 import InputLabel from '@/Components/InputLabel';
 import InputError from '@/Components/InputError';
 import Checkbox from '@/Components/Checkbox';
-import Button from '@/Components/Button';
 import { maskMoney, parseMoney } from '@/Hooks/useMasks';
 
 const FOOT_OPTIONS_DAMAGED = [
@@ -22,20 +20,18 @@ const FOOT_OPTIONS_DAMAGED = [
     { value: 'na',    label: 'Não se aplica (não calçado)' },
 ];
 
-const FOOT_OPTIONS_MISMATCHED = [
-    { value: 'left',  label: 'Pé esquerdo' },
-    { value: 'right', label: 'Pé direito' },
-];
+const MAX_PHOTOS = 5;
 
 export default function DamagedProductFormModal({
     show,
     onClose,
     onSuccess,
-    mode = 'create', // 'create' | 'edit'
+    mode = 'create',
     initial = null,
     selects = {},
     isStoreScoped = false,
     scopedStoreId = null,
+    canManage = false,
 }) {
     const isEdit = mode === 'edit';
     const empty = {
@@ -45,14 +41,14 @@ export default function DamagedProductFormModal({
         product_name: '',
         product_color: '',
         brand_cigam_code: '',
-        product_size: '',
+        brand_name: '',
         is_mismatched: false,
         is_damaged: false,
-        mismatched_foot: '',
-        mismatched_actual_size: '',
-        mismatched_expected_size: '',
+        mismatched_left_size: '',
+        mismatched_right_size: '',
         damage_type_id: '',
         damaged_foot: '',
+        damaged_size: '',
         damage_description: '',
         is_repairable: false,
         estimated_repair_cost: '',
@@ -60,13 +56,18 @@ export default function DamagedProductFormModal({
         photos: [],
     };
 
-    const { data, setData, post, put, processing, errors, reset, transform } = useForm(empty);
+    const { data, setData, post, processing, errors, reset, transform } = useForm(empty);
 
-    // Autocomplete de produto por reference
+    // Autocomplete de produto
     const [searchTerm, setSearchTerm] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [searching, setSearching] = useState(false);
 
+    // Tamanhos disponíveis do produto selecionado (via product-sizes endpoint)
+    const [productSizes, setProductSizes] = useState([]);
+    const [loadingSizes, setLoadingSizes] = useState(false);
+
+    // Reset/load no abrir do modal
     useEffect(() => {
         if (!show) return;
         if (isEdit && initial) {
@@ -78,14 +79,14 @@ export default function DamagedProductFormModal({
                 product_name: initial.product_name ?? '',
                 product_color: initial.product_color ?? '',
                 brand_cigam_code: initial.brand_cigam_code ?? '',
-                product_size: initial.product_size ?? '',
+                brand_name: initial.brand_name ?? '',
                 is_mismatched: !!initial.is_mismatched,
                 is_damaged: !!initial.is_damaged,
-                mismatched_foot: initial.mismatched_foot ?? '',
-                mismatched_actual_size: initial.mismatched_actual_size ?? '',
-                mismatched_expected_size: initial.mismatched_expected_size ?? '',
+                mismatched_left_size: initial.mismatched_left_size ?? '',
+                mismatched_right_size: initial.mismatched_right_size ?? '',
                 damage_type_id: initial.damage_type?.id ?? '',
                 damaged_foot: initial.damaged_foot ?? '',
+                damaged_size: initial.damaged_size ?? '',
                 damage_description: initial.damage_description ?? '',
                 is_repairable: !!initial.is_repairable,
                 estimated_repair_cost: initial.estimated_repair_cost
@@ -100,7 +101,21 @@ export default function DamagedProductFormModal({
         }
     }, [show, isEdit, initial?.id]);
 
-    // Autocomplete debounced
+    // Quando product_id muda, busca os tamanhos disponíveis (variants)
+    useEffect(() => {
+        if (!show || !data.product_id) {
+            setProductSizes([]);
+            return;
+        }
+        setLoadingSizes(true);
+        window.axios
+            .get(route('damaged-products.lookup.product-sizes', data.product_id))
+            .then((res) => setProductSizes(res.data.sizes || []))
+            .catch(() => setProductSizes([]))
+            .finally(() => setLoadingSizes(false));
+    }, [show, data.product_id]);
+
+    // Autocomplete debounced (busca produto pra resolver brand/color/sizes)
     useEffect(() => {
         if (searchTerm.length < 2) {
             setSearchResults([]);
@@ -129,7 +144,8 @@ export default function DamagedProductFormModal({
             product_reference: product.reference,
             product_name: product.description || prev.product_name,
             brand_cigam_code: product.brand_cigam_code || prev.brand_cigam_code,
-            product_color: product.color_cigam_code || prev.product_color,
+            brand_name: product.brand_name || prev.brand_name,
+            product_color: product.color_name || prev.product_color,
         }));
         setSearchTerm('');
         setSearchResults([]);
@@ -152,12 +168,12 @@ export default function DamagedProductFormModal({
                 reset();
                 setSearchTerm('');
                 setSearchResults([]);
+                setProductSizes([]);
                 onSuccess?.();
             },
         };
 
         if (isEdit) {
-            // PUT com files via _method=PUT pra Laravel processar multipart
             transform((d) => ({ ...d, _method: 'PUT' }));
             post(route('damaged-products.update', initial.ulid), config);
         } else {
@@ -166,7 +182,8 @@ export default function DamagedProductFormModal({
     };
 
     const onFileChange = (e) => {
-        setData('photos', Array.from(e.target.files || []));
+        const files = Array.from(e.target.files || []).slice(0, MAX_PHOTOS);
+        setData('photos', files);
     };
 
     return (
@@ -227,7 +244,6 @@ export default function DamagedProductFormModal({
                         />
                         <InputError message={errors.product_reference} className="mt-1" />
 
-                        {/* Dropdown de autocomplete */}
                         {searchResults.length > 0 && (
                             <div className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-white shadow-lg">
                                 {searchResults.map((p) => (
@@ -239,6 +255,9 @@ export default function DamagedProductFormModal({
                                     >
                                         <span className="font-mono font-semibold">{p.reference}</span>
                                         <span className="ml-2 text-gray-600">{p.description}</span>
+                                        {p.brand_name && (
+                                            <span className="ml-2 text-xs text-gray-500">[{p.brand_name}]</span>
+                                        )}
                                     </button>
                                 ))}
                                 {searching && (
@@ -248,47 +267,19 @@ export default function DamagedProductFormModal({
                         )}
                     </div>
 
-                    <div>
-                        <InputLabel htmlFor="product_name" value="Descrição do produto" />
-                        <TextInput
-                            id="product_name"
-                            value={data.product_name}
-                            onChange={(e) => setData('product_name', e.target.value)}
-                            className="w-full"
-                        />
-                    </div>
-
-                    <div>
-                        <InputLabel htmlFor="product_color" value="Cor" />
-                        <TextInput
-                            id="product_color"
-                            value={data.product_color}
-                            onChange={(e) => setData('product_color', e.target.value)}
-                            className="w-full"
-                        />
-                    </div>
-
-                    <div>
-                        <InputLabel htmlFor="brand_cigam_code" value="Código da marca (CIGAM)" />
-                        <TextInput
-                            id="brand_cigam_code"
-                            value={data.brand_cigam_code}
-                            onChange={(e) => setData('brand_cigam_code', e.target.value)}
-                            placeholder="Ex: AREZZO"
-                            className="w-full"
-                        />
-                    </div>
-
-                    <div>
-                        <InputLabel htmlFor="product_size" value="Tamanho do par" />
-                        <TextInput
-                            id="product_size"
-                            value={data.product_size}
-                            onChange={(e) => setData('product_size', e.target.value)}
-                            className="w-full"
-                        />
-                    </div>
+                    <ReadOnlyField label="Descrição do produto" value={data.product_name} />
+                    <ReadOnlyField label="Cor" value={data.product_color} />
+                    <ReadOnlyField
+                        label="Marca"
+                        value={data.brand_name}
+                        sub={data.brand_cigam_code ? `Código CIGAM: ${data.brand_cigam_code}` : null}
+                    />
                 </div>
+                {data.product_id ? null : (
+                    <p className="mt-2 text-xs text-amber-600">
+                        Selecione uma referência do catálogo para preencher descrição, cor e marca automaticamente.
+                    </p>
+                )}
             </StandardModal.Section>
 
             {/* Tipo de problema */}
@@ -305,7 +296,7 @@ export default function DamagedProductFormModal({
                         <div>
                             <div className="font-medium text-sm">Par trocado</div>
                             <div className="text-xs text-gray-500">
-                                Pé esquerdo ou direito está com tamanho diferente do par.
+                                Pé esquerdo e direito têm tamanhos diferentes (par embaralhado).
                             </div>
                         </div>
                     </label>
@@ -326,54 +317,45 @@ export default function DamagedProductFormModal({
                 <InputError message={errors.is_mismatched} className="mt-2" />
             </StandardModal.Section>
 
-            {/* Detalhes mismatched */}
+            {/* Detalhes mismatched — 2 grids clicáveis (Esq + Dir) */}
             {data.is_mismatched && (
                 <StandardModal.Section
                     title="Detalhes do par trocado"
-                    description="Informe qual pé está com tamanho diferente e os dois tamanhos."
+                    description={
+                        data.product_id
+                            ? 'Clique no tamanho de cada pé que está fisicamente neste par.'
+                            : 'Selecione uma referência de produto cadastrada para listar os tamanhos disponíveis.'
+                    }
                     headerClassName="bg-yellow-50"
                 >
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div>
-                            <InputLabel htmlFor="mismatched_foot" value="Pé com tamanho trocado *" />
-                            <select
-                                id="mismatched_foot"
-                                className="block w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
-                                value={data.mismatched_foot}
-                                onChange={(e) => setData('mismatched_foot', e.target.value)}
-                            >
-                                <option value="">Selecione...</option>
-                                {FOOT_OPTIONS_MISMATCHED.map((o) => (
-                                    <option key={o.value} value={o.value}>{o.label}</option>
-                                ))}
-                            </select>
-                            <InputError message={errors.mismatched_foot} className="mt-1" />
+                    {!data.product_id ? (
+                        <div className="rounded-md bg-yellow-50 border border-yellow-200 p-3 text-sm text-yellow-700">
+                            Use o autocomplete de Referência acima para escolher um produto. Os tamanhos disponíveis virão das variantes cadastradas.
                         </div>
-
-                        <div>
-                            <InputLabel htmlFor="mismatched_actual_size" value="Tamanho real *" />
-                            <TextInput
-                                id="mismatched_actual_size"
-                                value={data.mismatched_actual_size}
-                                onChange={(e) => setData('mismatched_actual_size', e.target.value)}
-                                placeholder="Ex: 38"
-                                className="w-full"
+                    ) : loadingSizes ? (
+                        <div className="text-sm text-gray-500">Carregando tamanhos...</div>
+                    ) : productSizes.length === 0 ? (
+                        <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                            Esta referência não tem variantes de tamanho cadastradas.
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            <SizeRow
+                                label="Esquerdo"
+                                sizes={productSizes}
+                                selected={data.mismatched_left_size}
+                                onSelect={(s) => setData('mismatched_left_size', s)}
                             />
-                            <InputError message={errors.mismatched_actual_size} className="mt-1" />
-                        </div>
-
-                        <div>
-                            <InputLabel htmlFor="mismatched_expected_size" value="Tamanho esperado *" />
-                            <TextInput
-                                id="mismatched_expected_size"
-                                value={data.mismatched_expected_size}
-                                onChange={(e) => setData('mismatched_expected_size', e.target.value)}
-                                placeholder="Ex: 39"
-                                className="w-full"
+                            <SizeRow
+                                label="Direito"
+                                sizes={productSizes}
+                                selected={data.mismatched_right_size}
+                                onSelect={(s) => setData('mismatched_right_size', s)}
                             />
-                            <InputError message={errors.mismatched_expected_size} className="mt-1" />
+                            <InputError message={errors.mismatched_left_size} className="mt-1" />
+                            <InputError message={errors.mismatched_right_size} className="mt-1" />
                         </div>
-                    </div>
+                    )}
                 </StandardModal.Section>
             )}
 
@@ -381,7 +363,7 @@ export default function DamagedProductFormModal({
             {data.is_damaged && (
                 <StandardModal.Section
                     title="Detalhes da avaria"
-                    description="Especifique o tipo, qual pé está afetado e a descrição."
+                    description="Especifique tipo, pé(s) e tamanho. O tamanho é necessário para o match com produtos complementares."
                     headerClassName="bg-red-50"
                 >
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -417,6 +399,32 @@ export default function DamagedProductFormModal({
                             <InputError message={errors.damaged_foot} className="mt-1" />
                         </div>
 
+                        {/* Tamanho avariado — só faz sentido se foot != 'na' */}
+                        {data.damaged_foot && data.damaged_foot !== 'na' && (
+                            <div className="sm:col-span-2">
+                                <InputLabel value="Tamanho do pé avariado *" />
+                                {!data.product_id ? (
+                                    <div className="rounded-md bg-yellow-50 border border-yellow-200 p-3 text-sm text-yellow-700">
+                                        Selecione uma referência de produto para listar os tamanhos disponíveis.
+                                    </div>
+                                ) : loadingSizes ? (
+                                    <div className="text-sm text-gray-500">Carregando tamanhos...</div>
+                                ) : productSizes.length === 0 ? (
+                                    <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                                        Esta referência não tem variantes de tamanho cadastradas.
+                                    </div>
+                                ) : (
+                                    <SizeRow
+                                        label="Tamanho"
+                                        sizes={productSizes}
+                                        selected={data.damaged_size}
+                                        onSelect={(s) => setData('damaged_size', s)}
+                                    />
+                                )}
+                                <InputError message={errors.damaged_size} className="mt-1" />
+                            </div>
+                        )}
+
                         <div className="sm:col-span-2">
                             <InputLabel htmlFor="damage_description" value="Descrição do dano" />
                             <textarea
@@ -429,35 +437,45 @@ export default function DamagedProductFormModal({
                             />
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <Checkbox
-                                id="is_repairable"
-                                checked={data.is_repairable}
-                                onChange={(e) => setData('is_repairable', e.target.checked)}
-                            />
-                            <InputLabel htmlFor="is_repairable" value="Pode ser reparado na loja" className="!mb-0" />
-                        </div>
+                        {/* Reparo: só visível pra users com MANAGE (admin/support) */}
+                        {canManage && (
+                            <>
+                                <div className="flex items-center gap-2">
+                                    <Checkbox
+                                        id="is_repairable"
+                                        checked={data.is_repairable}
+                                        onChange={(e) => setData('is_repairable', e.target.checked)}
+                                    />
+                                    <InputLabel htmlFor="is_repairable" value="Pode ser reparado na loja" className="!mb-0" />
+                                </div>
 
-                        <div>
-                            <InputLabel htmlFor="estimated_repair_cost" value="Custo estimado de reparo" />
-                            <TextInput
-                                id="estimated_repair_cost"
-                                value={data.estimated_repair_cost}
-                                onChange={(e) => setData('estimated_repair_cost', maskMoney(e.target.value))}
-                                placeholder="R$ 0,00"
-                                className="w-full"
-                                disabled={!data.is_repairable}
-                            />
-                        </div>
+                                <div>
+                                    <InputLabel htmlFor="estimated_repair_cost" value="Custo estimado de reparo" />
+                                    <TextInput
+                                        id="estimated_repair_cost"
+                                        value={data.estimated_repair_cost}
+                                        onChange={(e) => setData('estimated_repair_cost', maskMoney(e.target.value))}
+                                        placeholder="R$ 0,00"
+                                        className="w-full"
+                                        disabled={!data.is_repairable}
+                                    />
+                                </div>
+                            </>
+                        )}
                     </div>
                 </StandardModal.Section>
             )}
 
-            {/* Fotos */}
+            {/* Fotos — obrigatórias quando avariado */}
             <StandardModal.Section
-                title="Fotos do dano"
-                description="JPG, PNG ou WebP. Máximo 10 fotos, 5MB cada."
+                title={data.is_damaged ? 'Fotos do dano *' : 'Fotos do dano'}
+                description={
+                    data.is_damaged
+                        ? `JPG, PNG ou WebP. Mínimo 1 e máximo ${MAX_PHOTOS} fotos, 5MB cada. Obrigatório para documentar a avaria.`
+                        : `JPG, PNG ou WebP. Máximo ${MAX_PHOTOS} fotos, 5MB cada.`
+                }
                 icon={<PhotoIcon className="h-4 w-4" />}
+                headerClassName={data.is_damaged && (data.photos?.length ?? 0) === 0 ? 'bg-red-50' : undefined}
             >
                 <input
                     type="file"
@@ -466,11 +484,17 @@ export default function DamagedProductFormModal({
                     onChange={onFileChange}
                     className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100"
                 />
-                {data.photos?.length > 0 && (
+                {data.photos?.length > 0 ? (
                     <div className="mt-2 text-xs text-gray-600">
                         {data.photos.length} arquivo(s) selecionado(s)
+                        {data.photos.length === MAX_PHOTOS && ' (máximo atingido)'}
                     </div>
-                )}
+                ) : data.is_damaged ? (
+                    <div className="mt-2 text-xs text-red-600">
+                        Anexe ao menos uma foto do dano para concluir o cadastro.
+                    </div>
+                ) : null}
+                <InputError message={errors['photos']} className="mt-1" />
                 <InputError message={errors['photos.0']} className="mt-1" />
             </StandardModal.Section>
 
@@ -485,5 +509,55 @@ export default function DamagedProductFormModal({
                 />
             </StandardModal.Section>
         </StandardModal>
+    );
+}
+
+/**
+ * Campo readonly mostrando label + valor. Usado para Descrição/Cor/Marca
+ * (auto-preenchidos do catálogo, não editáveis pelo usuário).
+ */
+function ReadOnlyField({ label, value, sub = null }) {
+    return (
+        <div>
+            <InputLabel value={label} />
+            <div className="mt-1 px-3 py-2 rounded-md border border-gray-200 bg-gray-50 text-sm text-gray-700 min-h-[38px]">
+                {value || <span className="text-gray-400 italic">Será preenchido pelo catálogo</span>}
+            </div>
+            {sub && <p className="mt-1 text-xs text-gray-500">{sub}</p>}
+        </div>
+    );
+}
+
+/**
+ * Linha de tamanhos clicáveis. Renderiza label do pé + grid horizontal
+ * scrollável com os tamanhos disponíveis. O selecionado fica destacado
+ * em indigo.
+ */
+function SizeRow({ label, sizes, selected, onSelect }) {
+    return (
+        <div className="flex items-center gap-3">
+            <div className="w-20 shrink-0 text-sm font-medium text-gray-700">{label}</div>
+            <div className="flex flex-wrap gap-1.5">
+                {sizes.map((s) => {
+                    const isSelected = String(selected) === String(s.cigam_code);
+                    return (
+                        <button
+                            key={s.cigam_code}
+                            type="button"
+                            onClick={() => onSelect(s.cigam_code)}
+                            className={`
+                                min-w-[44px] min-h-[44px] px-3 py-2 rounded-md border text-sm font-medium transition
+                                ${isSelected
+                                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                                    : 'bg-white border-gray-300 text-gray-700 hover:bg-indigo-50 hover:border-indigo-400'
+                                }
+                            `}
+                        >
+                            {s.name}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
     );
 }

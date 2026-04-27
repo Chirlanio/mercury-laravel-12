@@ -318,7 +318,8 @@ class DamagedProductController extends Controller
 
     /**
      * Autocomplete de produto por reference (digitação no modal de criar).
-     * Retorna até 10 sugestões com brand/color/category pra auto-fill.
+     * Retorna até 10 sugestões com brand_name/color_name resolvidos pra
+     * auto-fill — UI mostra NOMES, não cigam_codes.
      */
     public function searchProducts(Request $request): JsonResponse
     {
@@ -330,6 +331,7 @@ class DamagedProductController extends Controller
 
         $products = Product::query()
             ->select(['id', 'reference', 'description', 'brand_cigam_code', 'color_cigam_code'])
+            ->with(['brand:cigam_code,name', 'color:cigam_code,name'])
             ->where(function ($q) use ($term) {
                 $q->where('reference', 'like', "{$term}%")
                     ->orWhere('description', 'like', "%{$term}%");
@@ -344,9 +346,33 @@ class DamagedProductController extends Controller
                 'reference' => $p->reference,
                 'description' => $p->description,
                 'brand_cigam_code' => $p->brand_cigam_code,
+                'brand_name' => $p->brand?->name,
                 'color_cigam_code' => $p->color_cigam_code,
+                'color_name' => $p->color?->name,
             ]),
         ]);
+    }
+
+    /**
+     * Lista os tamanhos disponíveis para um produto (via product_variants).
+     * Usado pelo card "Detalhes do par trocado" pra renderizar 2 grids
+     * clicáveis (Esquerdo + Direito).
+     */
+    public function productSizes(Product $product): JsonResponse
+    {
+        $sizes = $product->variants()
+            ->with('size:cigam_code,name')
+            ->where('is_active', true)
+            ->get()
+            ->map(fn ($v) => [
+                'cigam_code' => $v->size_cigam_code,
+                'name' => $v->size?->name ?? $v->size_cigam_code,
+            ])
+            ->unique('cigam_code')
+            ->sortBy(fn ($s) => is_numeric($s['name']) ? (int) $s['name'] : $s['name'])
+            ->values();
+
+        return response()->json(['sizes' => $sizes]);
     }
 
     /**
@@ -579,20 +605,20 @@ class DamagedProductController extends Controller
                 'code' => $p->store->code,
                 'name' => $p->store->name,
             ] : null,
+            'product_id' => $p->product_id,
             'product_reference' => $p->product_reference,
             'product_name' => $p->product_name,
-            'product_color' => $p->product_color,
-            'product_size' => $p->product_size,
+            'product_color' => $p->product_color, // armazena NOME (não cigam_code)
             'brand_cigam_code' => $p->brand_cigam_code,
+            'brand_name' => $p->brand_name,
             'is_mismatched' => (bool) $p->is_mismatched,
             'is_damaged' => (bool) $p->is_damaged,
             'damage_type' => $p->damageType ? ['id' => $p->damageType->id, 'name' => $p->damageType->name] : null,
             'damaged_foot' => $p->damaged_foot?->value,
             'damaged_foot_label' => $p->damaged_foot?->label(),
-            'mismatched_foot' => $p->mismatched_foot?->value,
-            'mismatched_foot_label' => $p->mismatched_foot?->label(),
-            'mismatched_actual_size' => $p->mismatched_actual_size,
-            'mismatched_expected_size' => $p->mismatched_expected_size,
+            'damaged_size' => $p->damaged_size,
+            'mismatched_left_size' => $p->mismatched_left_size,
+            'mismatched_right_size' => $p->mismatched_right_size,
             'status' => $p->status?->value,
             'status_label' => $p->status?->label(),
             'status_color' => $p->status?->color(),
@@ -640,10 +666,10 @@ class DamagedProductController extends Controller
                 'product_reference' => $partner->product_reference,
                 'product_name' => $partner->product_name,
                 'store' => $partner->store ? ['code' => $partner->store->code, 'name' => $partner->store->name] : null,
-                'mismatched_foot' => $partner->mismatched_foot?->value,
-                'mismatched_actual_size' => $partner->mismatched_actual_size,
-                'mismatched_expected_size' => $partner->mismatched_expected_size,
+                'mismatched_left_size' => $partner->mismatched_left_size,
+                'mismatched_right_size' => $partner->mismatched_right_size,
                 'damaged_foot' => $partner->damaged_foot?->value,
+                'damaged_size' => $partner->damaged_size,
             ] : null,
             'suggested_origin' => $m->suggestedOriginStore ? ['code' => $m->suggestedOriginStore->code, 'name' => $m->suggestedOriginStore->name] : null,
             'suggested_destination' => $m->suggestedDestinationStore ? ['code' => $m->suggestedDestinationStore->code, 'name' => $m->suggestedDestinationStore->name] : null,
@@ -667,8 +693,8 @@ class DamagedProductController extends Controller
     {
         $relevant = [
             'is_mismatched', 'is_damaged',
-            'mismatched_foot', 'mismatched_actual_size', 'mismatched_expected_size',
-            'damaged_foot', 'product_reference', 'brand_cigam_code',
+            'mismatched_left_size', 'mismatched_right_size',
+            'damaged_foot', 'damaged_size', 'product_reference', 'brand_cigam_code',
         ];
 
         foreach ($relevant as $field) {

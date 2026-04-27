@@ -42,29 +42,47 @@ class DamagedProductMatchingServiceTest extends TestCase
         $this->matching = app(DamagedProductMatchingService::class);
     }
 
-    protected function makeMismatched(int $storeId, string $reference, string $foot, string $actual, string $expected, ?string $brand = null): DamagedProduct
+    /**
+     * Cria um damaged_product mismatched com os dois tamanhos físicos por pé.
+     * Para fazer match, o par complementar deve ter os tamanhos espelhados:
+     * A=(left 38, right 39) ↔ B=(left 39, right 38).
+     */
+    protected function makeMismatched(int $storeId, string $reference, string $leftSize, string $rightSize, ?string $brand = null): DamagedProduct
     {
         return $this->service->create([
             'store_id' => $storeId,
             'product_reference' => $reference,
             'brand_cigam_code' => $brand,
             'is_mismatched' => true,
-            'mismatched_foot' => $foot,
-            'mismatched_actual_size' => $actual,
-            'mismatched_expected_size' => $expected,
+            'mismatched_left_size' => $leftSize,
+            'mismatched_right_size' => $rightSize,
         ], $this->adminUser);
     }
 
-    protected function makeDamaged(int $storeId, string $reference, string $foot, ?string $brand = null): DamagedProduct
+    /**
+     * Cria um damaged_product com pé/tamanho. Para fazer match damaged_complement
+     * ambos os produtos precisam ter o MESMO size + pés opostos. Foot 'na'/'both'
+     * passa size opcional (não usado em matching).
+     */
+    protected function makeDamaged(int $storeId, string $reference, string $foot, string $size = '38', ?string $brand = null): DamagedProduct
     {
-        return $this->service->create([
+        $payload = [
             'store_id' => $storeId,
             'product_reference' => $reference,
             'brand_cigam_code' => $brand,
             'is_damaged' => true,
             'damage_type_id' => DamageType::first()->id,
             'damaged_foot' => $foot,
-        ], $this->adminUser);
+        ];
+
+        // size só obrigatório quando há pé real envolvido
+        if (! in_array($foot, ['na'], true)) {
+            $payload['damaged_size'] = $size;
+        }
+
+        // is_damaged exige ao menos uma foto — placeholder satisfaz a guard
+        // sem disparar upload real (savePhotos só processa UploadedFile).
+        return $this->service->create($payload, $this->adminUser, photos: ['placeholder']);
     }
 
     // ==================================================================
@@ -73,8 +91,8 @@ class DamagedProductMatchingServiceTest extends TestCase
 
     public function test_finds_mismatched_pair_with_inverted_sizes(): void
     {
-        $a = $this->makeMismatched($this->storeAId, 'REF-001', FootSide::LEFT->value, '38', '39');
-        $b = $this->makeMismatched($this->storeBId, 'REF-001', FootSide::RIGHT->value, '39', '38');
+        $a = $this->makeMismatched($this->storeAId, 'REF-001', '38', '39');
+        $b = $this->makeMismatched($this->storeBId, 'REF-001', '39', '38');
 
         $matches = $this->matching->findMatchesFor($b);
 
@@ -87,8 +105,9 @@ class DamagedProductMatchingServiceTest extends TestCase
 
     public function test_does_not_match_same_store(): void
     {
-        $a = $this->makeMismatched($this->storeAId, 'REF-001', FootSide::LEFT->value, '38', '39');
-        $this->makeMismatched($this->storeAId, 'REF-001', FootSide::RIGHT->value, '39', '38');
+        $a = $this->makeMismatched($this->storeAId, 'REF-001', '38', '39');
+        // Espelho na mesma loja — não pode cruzar (ref diferente pra burlar dedup)
+        $this->makeMismatched($this->storeAId, 'REF-002', '39', '38');
 
         $matches = $this->matching->findMatchesFor($a);
 
@@ -97,19 +116,20 @@ class DamagedProductMatchingServiceTest extends TestCase
 
     public function test_does_not_match_different_references(): void
     {
-        $a = $this->makeMismatched($this->storeAId, 'REF-001', FootSide::LEFT->value, '38', '39');
-        $this->makeMismatched($this->storeBId, 'REF-OTHER', FootSide::RIGHT->value, '39', '38');
+        $a = $this->makeMismatched($this->storeAId, 'REF-001', '38', '39');
+        $this->makeMismatched($this->storeBId, 'REF-OTHER', '38', '39');
 
         $matches = $this->matching->findMatchesFor($a);
 
         $this->assertCount(0, $matches);
     }
 
-    public function test_does_not_match_same_foot(): void
+    public function test_does_not_match_when_pairs_have_same_size_layout(): void
     {
-        // Ambos têm pé esquerdo trocado — não combina
-        $a = $this->makeMismatched($this->storeAId, 'REF-001', FootSide::LEFT->value, '38', '39');
-        $this->makeMismatched($this->storeBId, 'REF-001', FootSide::LEFT->value, '39', '38');
+        // Ambos têm a MESMA distribuição de tamanhos (left=38, right=39 nos dois).
+        // Não há troca cruzada possível.
+        $a = $this->makeMismatched($this->storeAId, 'REF-001', '38', '39');
+        $this->makeMismatched($this->storeBId, 'REF-001', '38', '39');
 
         $matches = $this->matching->findMatchesFor($a);
 
@@ -119,8 +139,8 @@ class DamagedProductMatchingServiceTest extends TestCase
     public function test_does_not_match_when_sizes_not_perfectly_inverted(): void
     {
         // A tem 38→39, B tem 38→40 (não bate perfeitamente)
-        $a = $this->makeMismatched($this->storeAId, 'REF-001', FootSide::LEFT->value, '38', '39');
-        $this->makeMismatched($this->storeBId, 'REF-001', FootSide::RIGHT->value, '38', '40');
+        $a = $this->makeMismatched($this->storeAId, 'REF-001', '38', '39');
+        $this->makeMismatched($this->storeBId, 'REF-001', '40', '38');
 
         $matches = $this->matching->findMatchesFor($a);
 
@@ -131,15 +151,26 @@ class DamagedProductMatchingServiceTest extends TestCase
     // Discovery — damaged_complement
     // ==================================================================
 
-    public function test_finds_damaged_complement_with_opposite_feet(): void
+    public function test_finds_damaged_complement_with_opposite_feet_and_same_size(): void
     {
-        $a = $this->makeDamaged($this->storeAId, 'REF-DMG', FootSide::LEFT->value);
-        $b = $this->makeDamaged($this->storeBId, 'REF-DMG', FootSide::RIGHT->value);
+        $a = $this->makeDamaged($this->storeAId, 'REF-DMG', FootSide::LEFT->value, '38');
+        $b = $this->makeDamaged($this->storeBId, 'REF-DMG', FootSide::RIGHT->value, '38');
 
         $matches = $this->matching->findMatchesFor($b);
 
         $this->assertCount(1, $matches);
         $this->assertSame(DamageMatchType::DAMAGED_COMPLEMENT, $matches->first()->match_type);
+    }
+
+    public function test_does_not_match_damaged_with_different_sizes(): void
+    {
+        // Pés opostos mas tamanhos diferentes — não forma par bom
+        $a = $this->makeDamaged($this->storeAId, 'REF-DMG', FootSide::LEFT->value, '38');
+        $this->makeDamaged($this->storeBId, 'REF-DMG', FootSide::RIGHT->value, '40');
+
+        $matches = $this->matching->findMatchesFor($a);
+
+        $this->assertCount(0, $matches);
     }
 
     public function test_does_not_match_damaged_when_both_feet_damaged(): void
@@ -218,8 +249,8 @@ class DamagedProductMatchingServiceTest extends TestCase
     {
         NetworkBrandRule::create(['network_id' => 1, 'brand_cigam_code' => 'AREZZO', 'is_active' => true]);
 
-        $a = $this->makeMismatched($this->storeAId, 'REF-001', FootSide::LEFT->value, '38', '39', brand: 'AREZZO');
-        $b = $this->makeMismatched($this->storeBId, 'REF-001', FootSide::RIGHT->value, '39', '38', brand: 'SCHUTZ');
+        $a = $this->makeMismatched($this->storeAId, 'REF-001', '38', '39', brand: 'AREZZO');
+        $b = $this->makeMismatched($this->storeBId, 'REF-001', '39', '38', brand: 'SCHUTZ');
 
         $matches = $this->matching->findMatchesFor($a);
 
@@ -232,8 +263,8 @@ class DamagedProductMatchingServiceTest extends TestCase
 
     public function test_score_is_60_for_fresh_pair_without_brand_match(): void
     {
-        $a = $this->makeMismatched($this->storeAId, 'REF-001', FootSide::LEFT->value, '38', '39');
-        $b = $this->makeMismatched($this->storeBId, 'REF-001', FootSide::RIGHT->value, '39', '38');
+        $a = $this->makeMismatched($this->storeAId, 'REF-001', '38', '39');
+        $b = $this->makeMismatched($this->storeBId, 'REF-001', '39', '38');
 
         $score = $this->matching->computeMatchScore($a, $b);
 
@@ -243,8 +274,8 @@ class DamagedProductMatchingServiceTest extends TestCase
 
     public function test_score_includes_brand_bonus_when_matching(): void
     {
-        $a = $this->makeMismatched($this->storeAId, 'REF-001', FootSide::LEFT->value, '38', '39', brand: 'AREZZO');
-        $b = $this->makeMismatched($this->storeBId, 'REF-001', FootSide::RIGHT->value, '39', '38', brand: 'AREZZO');
+        $a = $this->makeMismatched($this->storeAId, 'REF-001', '38', '39', brand: 'AREZZO');
+        $b = $this->makeMismatched($this->storeBId, 'REF-001', '39', '38', brand: 'AREZZO');
 
         $score = $this->matching->computeMatchScore($a, $b);
 
@@ -253,8 +284,8 @@ class DamagedProductMatchingServiceTest extends TestCase
 
     public function test_score_capped_at_100(): void
     {
-        $a = $this->makeMismatched($this->storeAId, 'REF-001', FootSide::LEFT->value, '38', '39', brand: 'AREZZO');
-        $b = $this->makeMismatched($this->storeBId, 'REF-001', FootSide::RIGHT->value, '39', '38', brand: 'AREZZO');
+        $a = $this->makeMismatched($this->storeAId, 'REF-001', '38', '39', brand: 'AREZZO');
+        $b = $this->makeMismatched($this->storeBId, 'REF-001', '39', '38', brand: 'AREZZO');
 
         // Backdate ambos pra forçar ageBonus máximo (60+ dias)
         $a->update(['created_at' => now()->subDays(80)]);
@@ -285,8 +316,8 @@ class DamagedProductMatchingServiceTest extends TestCase
 
     public function test_suggested_direction_persisted_in_match(): void
     {
-        $a = $this->makeMismatched($this->storeAId, 'REF-001', FootSide::LEFT->value, '38', '39');
-        $b = $this->makeMismatched($this->storeBId, 'REF-001', FootSide::RIGHT->value, '39', '38');
+        $a = $this->makeMismatched($this->storeAId, 'REF-001', '38', '39');
+        $b = $this->makeMismatched($this->storeBId, 'REF-001', '39', '38');
 
         $match = $this->matching->findMatchesFor($a)->first();
 
@@ -301,8 +332,8 @@ class DamagedProductMatchingServiceTest extends TestCase
     public function test_match_persists_smaller_id_as_product_a(): void
     {
         // Cria B primeiro pra inverter ordem natural (b.id < a.id)
-        $b = $this->makeMismatched($this->storeBId, 'REF-001', FootSide::RIGHT->value, '39', '38');
-        $a = $this->makeMismatched($this->storeAId, 'REF-001', FootSide::LEFT->value, '38', '39');
+        $b = $this->makeMismatched($this->storeBId, 'REF-001', '38', '39');
+        $a = $this->makeMismatched($this->storeAId, 'REF-001', '39', '38');
 
         $match = $this->matching->findMatchesFor($a)->first();
 
@@ -311,8 +342,8 @@ class DamagedProductMatchingServiceTest extends TestCase
 
     public function test_findMatchesFor_does_not_duplicate_matches(): void
     {
-        $a = $this->makeMismatched($this->storeAId, 'REF-001', FootSide::LEFT->value, '38', '39');
-        $this->makeMismatched($this->storeBId, 'REF-001', FootSide::RIGHT->value, '39', '38');
+        $a = $this->makeMismatched($this->storeAId, 'REF-001', '38', '39');
+        $this->makeMismatched($this->storeBId, 'REF-001', '39', '38');
 
         // Primeira chamada cria o match (e transiciona ambos pra matched)
         $first = $this->matching->findMatchesFor($a);
@@ -333,8 +364,8 @@ class DamagedProductMatchingServiceTest extends TestCase
 
     public function test_reactivates_rejected_match_on_reattempt(): void
     {
-        $a = $this->makeMismatched($this->storeAId, 'REF-001', FootSide::LEFT->value, '38', '39');
-        $b = $this->makeMismatched($this->storeBId, 'REF-001', FootSide::RIGHT->value, '39', '38');
+        $a = $this->makeMismatched($this->storeAId, 'REF-001', '38', '39');
+        $b = $this->makeMismatched($this->storeBId, 'REF-001', '39', '38');
 
         $match = $this->matching->findMatchesFor($a)->first();
         $this->matching->rejectMatch($match, $this->adminUser, 'Teste de rejeição');
@@ -361,8 +392,8 @@ class DamagedProductMatchingServiceTest extends TestCase
 
     public function test_match_creation_transitions_both_products_to_matched(): void
     {
-        $a = $this->makeMismatched($this->storeAId, 'REF-001', FootSide::LEFT->value, '38', '39');
-        $b = $this->makeMismatched($this->storeBId, 'REF-001', FootSide::RIGHT->value, '39', '38');
+        $a = $this->makeMismatched($this->storeAId, 'REF-001', '38', '39');
+        $b = $this->makeMismatched($this->storeBId, 'REF-001', '39', '38');
 
         $this->matching->findMatchesFor($a);
 
@@ -378,8 +409,8 @@ class DamagedProductMatchingServiceTest extends TestCase
 
     public function test_accept_match_creates_transfer_with_damage_match_type(): void
     {
-        $a = $this->makeMismatched($this->storeAId, 'REF-001', FootSide::LEFT->value, '38', '39');
-        $b = $this->makeMismatched($this->storeBId, 'REF-001', FootSide::RIGHT->value, '39', '38');
+        $a = $this->makeMismatched($this->storeAId, 'REF-001', '38', '39');
+        $b = $this->makeMismatched($this->storeBId, 'REF-001', '39', '38');
 
         $match = $this->matching->findMatchesFor($a)->first();
         $accepted = $this->matching->acceptMatch($match, $this->adminUser, 'NF-12345');
@@ -401,8 +432,8 @@ class DamagedProductMatchingServiceTest extends TestCase
 
     public function test_accept_blocks_non_pending_match(): void
     {
-        $a = $this->makeMismatched($this->storeAId, 'REF-001', FootSide::LEFT->value, '38', '39');
-        $b = $this->makeMismatched($this->storeBId, 'REF-001', FootSide::RIGHT->value, '39', '38');
+        $a = $this->makeMismatched($this->storeAId, 'REF-001', '38', '39');
+        $b = $this->makeMismatched($this->storeBId, 'REF-001', '39', '38');
 
         $match = $this->matching->findMatchesFor($a)->first();
         $this->matching->acceptMatch($match, $this->adminUser, 'NF-1');
@@ -414,8 +445,8 @@ class DamagedProductMatchingServiceTest extends TestCase
 
     public function test_reject_reverts_product_to_open_when_no_other_pending(): void
     {
-        $a = $this->makeMismatched($this->storeAId, 'REF-001', FootSide::LEFT->value, '38', '39');
-        $b = $this->makeMismatched($this->storeBId, 'REF-001', FootSide::RIGHT->value, '39', '38');
+        $a = $this->makeMismatched($this->storeAId, 'REF-001', '38', '39');
+        $b = $this->makeMismatched($this->storeBId, 'REF-001', '39', '38');
 
         $match = $this->matching->findMatchesFor($a)->first();
         $this->matching->rejectMatch($match, $this->adminUser, 'Não me serve');
@@ -428,8 +459,8 @@ class DamagedProductMatchingServiceTest extends TestCase
 
     public function test_reject_requires_non_empty_reason(): void
     {
-        $a = $this->makeMismatched($this->storeAId, 'REF-001', FootSide::LEFT->value, '38', '39');
-        $b = $this->makeMismatched($this->storeBId, 'REF-001', FootSide::RIGHT->value, '39', '38');
+        $a = $this->makeMismatched($this->storeAId, 'REF-001', '38', '39');
+        $b = $this->makeMismatched($this->storeBId, 'REF-001', '39', '38');
         $match = $this->matching->findMatchesFor($a)->first();
 
         $this->expectException(ValidationException::class);
@@ -438,8 +469,8 @@ class DamagedProductMatchingServiceTest extends TestCase
 
     public function test_resolve_cascades_to_both_products(): void
     {
-        $a = $this->makeMismatched($this->storeAId, 'REF-001', FootSide::LEFT->value, '38', '39');
-        $b = $this->makeMismatched($this->storeBId, 'REF-001', FootSide::RIGHT->value, '39', '38');
+        $a = $this->makeMismatched($this->storeAId, 'REF-001', '38', '39');
+        $b = $this->makeMismatched($this->storeBId, 'REF-001', '39', '38');
 
         $match = $this->matching->findMatchesFor($a)->first();
         $accepted = $this->matching->acceptMatch($match, $this->adminUser, 'NF-1');
@@ -458,8 +489,8 @@ class DamagedProductMatchingServiceTest extends TestCase
 
     public function test_runFullMatching_reports_stats(): void
     {
-        $a = $this->makeMismatched($this->storeAId, 'REF-001', FootSide::LEFT->value, '38', '39');
-        $b = $this->makeMismatched($this->storeBId, 'REF-001', FootSide::RIGHT->value, '39', '38');
+        $a = $this->makeMismatched($this->storeAId, 'REF-001', '38', '39');
+        $b = $this->makeMismatched($this->storeBId, 'REF-001', '39', '38');
 
         $stats = $this->matching->runFullMatching();
 

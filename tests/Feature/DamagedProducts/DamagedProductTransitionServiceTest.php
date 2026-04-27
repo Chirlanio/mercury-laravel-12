@@ -71,9 +71,8 @@ class DamagedProductTransitionServiceTest extends TestCase
             'store_id' => $this->storeAId,
             'product_reference' => 'TRANS-' . uniqid(),
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::LEFT->value,
-            'mismatched_actual_size' => '38',
-            'mismatched_expected_size' => '39',
+            'mismatched_left_size' => '38',
+            'mismatched_right_size' => '39',
         ], $this->adminUser);
     }
 

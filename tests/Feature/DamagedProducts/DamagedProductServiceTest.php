@@ -50,7 +50,7 @@ class DamagedProductServiceTest extends TestCase
         ], $this->adminUser);
     }
 
-    public function test_mismatched_requires_foot_actual_and_expected_size(): void
+    public function test_mismatched_requires_both_foot_sizes(): void
     {
         $this->expectException(ValidationException::class);
 
@@ -58,12 +58,12 @@ class DamagedProductServiceTest extends TestCase
             'store_id' => $this->storeAId,
             'product_reference' => 'REF-001',
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::LEFT->value,
-            // sem actual/expected
+            'mismatched_left_size' => '38',
+            // sem mismatched_right_size
         ], $this->adminUser);
     }
 
-    public function test_mismatched_actual_must_differ_from_expected(): void
+    public function test_mismatched_left_must_differ_from_right(): void
     {
         $this->expectException(ValidationException::class);
 
@@ -71,9 +71,8 @@ class DamagedProductServiceTest extends TestCase
             'store_id' => $this->storeAId,
             'product_reference' => 'REF-001',
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::LEFT->value,
-            'mismatched_actual_size' => '38',
-            'mismatched_expected_size' => '38', // igual = inválido
+            'mismatched_left_size' => '38',
+            'mismatched_right_size' => '38', // igual = inválido
         ], $this->adminUser);
     }
 
@@ -95,30 +94,52 @@ class DamagedProductServiceTest extends TestCase
             'store_id' => $this->storeAId,
             'product_reference' => 'REF-001',
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::LEFT->value,
-            'mismatched_actual_size' => '38',
-            'mismatched_expected_size' => '39',
+            'mismatched_left_size' => '38',
+            'mismatched_right_size' => '39',
         ], $this->adminUser);
 
         $this->assertNotNull($product->ulid);
         $this->assertSame(DamagedProductStatus::OPEN, $product->status);
         $this->assertTrue($product->is_mismatched);
-        $this->assertSame(FootSide::LEFT, $product->mismatched_foot);
+        $this->assertSame('38', $product->mismatched_left_size);
+        $this->assertSame('39', $product->mismatched_right_size);
         $this->assertSame($this->adminUser->id, $product->created_by_user_id);
+    }
+
+    public function test_damaged_requires_at_least_one_photo(): void
+    {
+        $type = DamageType::first();
+
+        $this->expectException(ValidationException::class);
+
+        // is_damaged=true sem fotos deve falhar
+        $this->service->create([
+            'store_id' => $this->storeAId,
+            'product_reference' => 'REF-PHOTO-001',
+            'is_damaged' => true,
+            'damage_type_id' => $type->id,
+            'damaged_foot' => FootSide::BOTH->value,
+            'damaged_size' => '38',
+        ], $this->adminUser, photos: null);
     }
 
     public function test_creates_damaged_with_required_fields(): void
     {
         $type = DamageType::first();
 
+        // Mock de UploadedFile pra satisfazer ensurePhotosForDamaged.
+        // O Service.savePhotos só processa instâncias UploadedFile reais —
+        // passar 1 placeholder não-UploadedFile é o suficiente pra passar
+        // pelo guard sem disparar upload.
         $product = $this->service->create([
             'store_id' => $this->storeAId,
             'product_reference' => 'REF-001',
             'is_damaged' => true,
             'damage_type_id' => $type->id,
             'damaged_foot' => FootSide::BOTH->value,
+            'damaged_size' => '38',
             'damage_description' => 'Teste',
-        ], $this->adminUser);
+        ], $this->adminUser, photos: ['placeholder-non-uploadable']);
 
         $this->assertTrue($product->is_damaged);
         $this->assertSame($type->id, $product->damage_type_id);
@@ -131,9 +152,8 @@ class DamagedProductServiceTest extends TestCase
             'store_id' => $this->storeAId,
             'product_reference' => 'ref-001',
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::LEFT->value,
-            'mismatched_actual_size' => '38',
-            'mismatched_expected_size' => '39',
+            'mismatched_left_size' => '38',
+            'mismatched_right_size' => '39',
         ], $this->adminUser);
 
         $this->assertSame('REF-001', $product->product_reference);
@@ -149,9 +169,8 @@ class DamagedProductServiceTest extends TestCase
             'store_id' => $this->storeAId,
             'product_reference' => 'REF-001',
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::LEFT->value,
-            'mismatched_actual_size' => '38',
-            'mismatched_expected_size' => '39',
+            'mismatched_left_size' => '38',
+            'mismatched_right_size' => '39',
         ];
 
         $this->service->create($payload, $this->adminUser);
@@ -166,9 +185,8 @@ class DamagedProductServiceTest extends TestCase
             'store_id' => $this->storeAId,
             'product_reference' => 'REF-001',
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::LEFT->value,
-            'mismatched_actual_size' => '38',
-            'mismatched_expected_size' => '39',
+            'mismatched_left_size' => '38',
+            'mismatched_right_size' => '39',
         ];
 
         $first = $this->service->create($payload, $this->adminUser);
@@ -184,9 +202,8 @@ class DamagedProductServiceTest extends TestCase
         $payload = [
             'product_reference' => 'REF-001',
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::LEFT->value,
-            'mismatched_actual_size' => '38',
-            'mismatched_expected_size' => '39',
+            'mismatched_left_size' => '38',
+            'mismatched_right_size' => '39',
         ];
 
         $a = $this->service->create($payload + ['store_id' => $this->storeAId], $this->adminUser);
@@ -201,6 +218,10 @@ class DamagedProductServiceTest extends TestCase
 
     public function test_auto_fills_brand_color_from_catalog_when_reference_matches(): void
     {
+        // Cria os lookups de marca e cor (Product.brand/color resolvem por cigam_code)
+        \App\Models\ProductBrand::create(['cigam_code' => 'AREZZO', 'name' => 'Arezzo']);
+        \App\Models\ProductColor::create(['cigam_code' => 'PRETO', 'name' => 'Preto']);
+
         $catalog = Product::create([
             'reference' => 'REF-CATALOG',
             'description' => 'Sandália Catalog',
@@ -213,15 +234,15 @@ class DamagedProductServiceTest extends TestCase
             'store_id' => $this->storeAId,
             'product_reference' => 'REF-CATALOG',
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::LEFT->value,
-            'mismatched_actual_size' => '38',
-            'mismatched_expected_size' => '39',
+            'mismatched_left_size' => '38',
+            'mismatched_right_size' => '39',
         ], $this->adminUser);
 
         $this->assertSame($catalog->id, $product->product_id);
         $this->assertSame('Sandália Catalog', $product->product_name);
         $this->assertSame('AREZZO', $product->brand_cigam_code);
-        $this->assertSame('PRETO', $product->product_color);
+        $this->assertSame('Arezzo', $product->brand_name);    // snapshot do nome
+        $this->assertSame('Preto', $product->product_color);  // armazena NOME, não cigam_code
     }
 
     public function test_user_provided_values_override_catalog_autofill(): void
@@ -239,9 +260,8 @@ class DamagedProductServiceTest extends TestCase
             'product_name' => 'Custom Name',
             'brand_cigam_code' => 'CUSTOM',
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::LEFT->value,
-            'mismatched_actual_size' => '38',
-            'mismatched_expected_size' => '39',
+            'mismatched_left_size' => '38',
+            'mismatched_right_size' => '39',
         ], $this->adminUser);
 
         $this->assertSame('Custom Name', $product->product_name);
@@ -258,9 +278,8 @@ class DamagedProductServiceTest extends TestCase
             'store_id' => $this->storeAId,
             'product_reference' => 'REF-001',
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::LEFT->value,
-            'mismatched_actual_size' => '38',
-            'mismatched_expected_size' => '39',
+            'mismatched_left_size' => '38',
+            'mismatched_right_size' => '39',
         ], $this->adminUser);
 
         $product->update(['status' => DamagedProductStatus::RESOLVED->value]);
@@ -275,9 +294,8 @@ class DamagedProductServiceTest extends TestCase
             'store_id' => $this->storeAId,
             'product_reference' => 'REF-001',
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::LEFT->value,
-            'mismatched_actual_size' => '38',
-            'mismatched_expected_size' => '39',
+            'mismatched_left_size' => '38',
+            'mismatched_right_size' => '39',
         ], $this->adminUser);
 
         $updated = $this->service->update($product, [
@@ -300,18 +318,16 @@ class DamagedProductServiceTest extends TestCase
             'store_id' => $this->storeAId,
             'product_reference' => 'REF-001',
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::LEFT->value,
-            'mismatched_actual_size' => '38',
-            'mismatched_expected_size' => '39',
+            'mismatched_left_size' => '38',
+            'mismatched_right_size' => '39',
         ], $this->adminUser);
 
         $this->service->create([
             'store_id' => $this->storeBId,
             'product_reference' => 'REF-001',
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::RIGHT->value,
-            'mismatched_actual_size' => '39',
-            'mismatched_expected_size' => '38',
+            'mismatched_left_size' => '39',  // espelho pra cruzar
+            'mismatched_right_size' => '38',
         ], $this->adminUser);
 
         $matching->findMatchesFor($a);

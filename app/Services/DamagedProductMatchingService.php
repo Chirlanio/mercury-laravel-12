@@ -102,18 +102,15 @@ class DamagedProductMatchingService
 
     /**
      * Candidatos pra par trocado: mesma referência, lojas distintas, status=open,
-     * sizes invertidas. Ex: A.left=38(esperado 39) ↔ B.right=39(esperado 38).
+     * pés cruzados. Ex: A=(left 38, right 39) ↔ B=(left 39, right 38).
+     * Combinando o esquerdo de A com o direito de B (ambos 38) e o direito
+     * de A com o esquerdo de B (ambos 39) → forma 2 pares íntegros.
      *
      * @return Collection<int,DamagedProductMatch>
      */
     public function findMismatchedPairCandidates(DamagedProduct $a): Collection
     {
-        if (! $a->is_mismatched || ! $a->mismatched_foot || ! $a->mismatched_actual_size || ! $a->mismatched_expected_size) {
-            return collect();
-        }
-
-        $expectedFoot = $a->mismatched_foot->opposite();
-        if (! $expectedFoot) {
+        if (! $a->is_mismatched || ! $a->mismatched_left_size || ! $a->mismatched_right_size) {
             return collect();
         }
 
@@ -123,9 +120,8 @@ class DamagedProductMatchingService
             ->where('store_id', '!=', $a->store_id)
             ->where('id', '!=', $a->id)
             ->where('is_mismatched', true)
-            ->where('mismatched_foot', $expectedFoot->value)
-            ->where('mismatched_actual_size', $a->mismatched_expected_size)
-            ->where('mismatched_expected_size', $a->mismatched_actual_size)
+            ->where('mismatched_left_size', $a->mismatched_right_size)
+            ->where('mismatched_right_size', $a->mismatched_left_size)
             ->with(['store.network'])
             ->get();
 
@@ -136,7 +132,9 @@ class DamagedProductMatchingService
 
     /**
      * Candidatos pra avaria complementar: mesma referência, lojas distintas,
-     * pés opostos avariados (não 'both' nem 'na').
+     * pés opostos avariados (não 'both' nem 'na') E **mesmo tamanho** —
+     * só assim o pé bom de A casa anatomicamente com o pé bom de B
+     * formando um par íntegro.
      *
      * @return Collection<int,DamagedProductMatch>
      */
@@ -146,6 +144,7 @@ class DamagedProductMatchingService
             ! $a->is_damaged
             || ! $a->damaged_foot
             || ! $a->damaged_foot->isSingleFoot()
+            || empty($a->damaged_size)
         ) {
             return collect();
         }
@@ -159,6 +158,7 @@ class DamagedProductMatchingService
             ->where('id', '!=', $a->id)
             ->where('is_damaged', true)
             ->where('damaged_foot', $oppositeFoot->value)
+            ->where('damaged_size', $a->damaged_size)
             ->with(['store.network'])
             ->get();
 
@@ -297,19 +297,21 @@ class DamagedProductMatchingService
                 'id' => $lower->id,
                 'store_code' => $lower->store->code,
                 'brand' => $lower->brand_cigam_code,
-                'mismatched_foot' => $lower->mismatched_foot?->value,
-                'mismatched_actual_size' => $lower->mismatched_actual_size,
-                'mismatched_expected_size' => $lower->mismatched_expected_size,
+                'brand_name' => $lower->brand_name,
+                'mismatched_left_size' => $lower->mismatched_left_size,
+                'mismatched_right_size' => $lower->mismatched_right_size,
                 'damaged_foot' => $lower->damaged_foot?->value,
+                'damaged_size' => $lower->damaged_size,
             ],
             'product_b' => [
                 'id' => $higher->id,
                 'store_code' => $higher->store->code,
                 'brand' => $higher->brand_cigam_code,
-                'mismatched_foot' => $higher->mismatched_foot?->value,
-                'mismatched_actual_size' => $higher->mismatched_actual_size,
-                'mismatched_expected_size' => $higher->mismatched_expected_size,
+                'brand_name' => $higher->brand_name,
+                'mismatched_left_size' => $higher->mismatched_left_size,
+                'mismatched_right_size' => $higher->mismatched_right_size,
                 'damaged_foot' => $higher->damaged_foot?->value,
+                'damaged_size' => $higher->damaged_size,
             ],
         ];
 

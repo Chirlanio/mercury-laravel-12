@@ -1939,6 +1939,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/', [\App\Http\Controllers\DamagedProductController::class, 'index'])->name('index');
             Route::get('/statistics', [\App\Http\Controllers\DamagedProductController::class, 'statistics'])->name('statistics');
             Route::get('/lookup/products', [\App\Http\Controllers\DamagedProductController::class, 'searchProducts'])->name('lookup.products');
+            Route::get('/lookup/product-sizes/{product}', [\App\Http\Controllers\DamagedProductController::class, 'productSizes'])->name('lookup.product-sizes');
 
             // Export — exige EXPORT_DAMAGED_PRODUCTS (preserva filtros via query string)
             Route::middleware('permission:'.Permission::EXPORT_DAMAGED_PRODUCTS->value)->group(function () {

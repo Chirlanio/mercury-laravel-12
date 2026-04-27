@@ -50,6 +50,7 @@ export default function Index({
     const canRunMatching = pagePermissions.run_matching || hasPermission(PERMISSIONS.RUN_DAMAGED_PRODUCT_MATCHING);
     const canApproveMatches = pagePermissions.approve_matches || hasPermission(PERMISSIONS.APPROVE_DAMAGED_PRODUCT_MATCHES);
     const canExport = pagePermissions.export || hasPermission(PERMISSIONS.EXPORT_DAMAGED_PRODUCTS);
+    const canManage = pagePermissions.manage || hasPermission(PERMISSIONS.MANAGE_DAMAGED_PRODUCTS);
 
     const { modals, selected, openModal, closeModal } = useModalManager([
         'create', 'edit', 'detail', 'matches', 'delete',
@@ -391,6 +392,7 @@ export default function Index({
                 selects={selects}
                 isStoreScoped={isStoreScoped}
                 scopedStoreId={scopedStoreId}
+                canManage={canManage}
             />
 
             <DamagedProductFormModal
@@ -402,6 +404,7 @@ export default function Index({
                 selects={selects}
                 isStoreScoped={isStoreScoped}
                 scopedStoreId={scopedStoreId}
+                canManage={canManage}
             />
 
             <DamagedProductDetailModal

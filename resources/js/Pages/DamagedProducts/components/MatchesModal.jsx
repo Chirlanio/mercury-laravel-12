@@ -174,28 +174,26 @@ export default function MatchesModal({
                                     <thead>
                                         <tr className="bg-yellow-50">
                                             <th className="border px-2 py-1 text-left">Produto</th>
-                                            <th className="border px-2 py-1">Pé trocado</th>
-                                            <th className="border px-2 py-1">Tamanho real</th>
-                                            <th className="border px-2 py-1">Tamanho esperado</th>
+                                            <th className="border px-2 py-1">Pé esquerdo</th>
+                                            <th className="border px-2 py-1">Pé direito</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <tr>
                                             <td className="border px-2 py-1 font-mono">Este (#{item?.id})</td>
-                                            <td className="border px-2 py-1 text-center">{item?.mismatched_foot_label}</td>
-                                            <td className="border px-2 py-1 text-center font-mono">{item?.mismatched_actual_size}</td>
-                                            <td className="border px-2 py-1 text-center font-mono">{item?.mismatched_expected_size}</td>
+                                            <td className="border px-2 py-1 text-center font-mono">{item?.mismatched_left_size}</td>
+                                            <td className="border px-2 py-1 text-center font-mono">{item?.mismatched_right_size}</td>
                                         </tr>
                                         <tr>
                                             <td className="border px-2 py-1 font-mono">Parceiro (#{m.partner?.id})</td>
-                                            <td className="border px-2 py-1 text-center">
-                                                {m.partner?.mismatched_foot === 'left' ? 'Esquerdo' : 'Direito'}
-                                            </td>
-                                            <td className="border px-2 py-1 text-center font-mono">{m.partner?.mismatched_actual_size}</td>
-                                            <td className="border px-2 py-1 text-center font-mono">{m.partner?.mismatched_expected_size}</td>
+                                            <td className="border px-2 py-1 text-center font-mono">{m.partner?.mismatched_left_size}</td>
+                                            <td className="border px-2 py-1 text-center font-mono">{m.partner?.mismatched_right_size}</td>
                                         </tr>
                                     </tbody>
                                 </table>
+                                <p className="mt-2 text-xs text-gray-500">
+                                    Combinando o pé esquerdo de um com o direito do outro (e vice-versa) forma 2 pares íntegros.
+                                </p>
                             </div>
                         )}
 
@@ -203,12 +201,12 @@ export default function MatchesModal({
                             <div className="px-4 pb-3 text-xs text-gray-600">
                                 Este produto: avaria no <strong>
                                     {item?.damaged_foot === 'left' ? 'pé esquerdo' : item?.damaged_foot === 'right' ? 'pé direito' : '—'}
-                                </strong>
+                                </strong> tamanho <strong className="font-mono">{item?.damaged_size}</strong>
                                 {' · '}
                                 Parceiro: avaria no <strong>
                                     {m.partner?.damaged_foot === 'left' ? 'pé esquerdo' : m.partner?.damaged_foot === 'right' ? 'pé direito' : '—'}
-                                </strong>
-                                . Combinando, recupera-se um par bom.
+                                </strong> tamanho <strong className="font-mono">{m.partner?.damaged_size}</strong>
+                                . Combinando os pés bons forma 1 par íntegro tamanho <strong className="font-mono">{item?.damaged_size}</strong>.
                             </div>
                         )}
 

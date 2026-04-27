@@ -83,17 +83,13 @@
         <div class="section-title">Identificação</div>
         <div class="grid">
             <div class="grid-row">
-                <div class="grid-cell third">
+                <div class="grid-cell">
                     <div class="label">Referência</div>
                     <div class="value">{{ $product->product_reference }}</div>
                 </div>
-                <div class="grid-cell third">
+                <div class="grid-cell">
                     <div class="label">Marca</div>
-                    <div class="value">{{ $product->brand_cigam_code ?: '—' }}</div>
-                </div>
-                <div class="grid-cell third">
-                    <div class="label">Tamanho do par</div>
-                    <div class="value">{{ $product->product_size ?: '—' }}</div>
+                    <div class="value">{{ $product->brand_name ?: ($product->brand_cigam_code ?: '—') }}</div>
                 </div>
             </div>
             <div class="grid-row">
@@ -126,17 +122,13 @@
             <div class="section-title">Detalhes do par trocado</div>
             <div class="grid">
                 <div class="grid-row">
-                    <div class="grid-cell third">
-                        <div class="label">Pé com tamanho trocado</div>
-                        <div class="value">{{ $product->mismatched_foot?->label() }}</div>
+                    <div class="grid-cell">
+                        <div class="label">Tamanho do pé esquerdo</div>
+                        <div class="value">{{ $product->mismatched_left_size }}</div>
                     </div>
-                    <div class="grid-cell third">
-                        <div class="label">Tamanho real</div>
-                        <div class="value">{{ $product->mismatched_actual_size }}</div>
-                    </div>
-                    <div class="grid-cell third">
-                        <div class="label">Tamanho esperado</div>
-                        <div class="value">{{ $product->mismatched_expected_size }}</div>
+                    <div class="grid-cell">
+                        <div class="label">Tamanho do pé direito</div>
+                        <div class="value">{{ $product->mismatched_right_size }}</div>
                     </div>
                 </div>
             </div>
@@ -149,13 +141,17 @@
             <div class="section-title">Detalhes da avaria</div>
             <div class="grid">
                 <div class="grid-row">
-                    <div class="grid-cell">
+                    <div class="grid-cell third">
                         <div class="label">Tipo de dano</div>
                         <div class="value">{{ $product->damageType?->name ?: '—' }}</div>
                     </div>
-                    <div class="grid-cell">
+                    <div class="grid-cell third">
                         <div class="label">Pé(s) avariado(s)</div>
                         <div class="value">{{ $product->damaged_foot?->label() }}</div>
+                    </div>
+                    <div class="grid-cell third">
+                        <div class="label">Tamanho avariado</div>
+                        <div class="value">{{ $product->damaged_size ?: '—' }}</div>
                     </div>
                 </div>
                 @if($product->is_repairable)

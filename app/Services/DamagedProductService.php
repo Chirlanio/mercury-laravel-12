@@ -44,6 +44,7 @@ class DamagedProductService
     public function create(array $data, User $actor, ?array $photos = null): DamagedProduct
     {
         $this->validateBusinessRules($data);
+        $this->ensurePhotosForDamaged($data, $photos);
         $this->ensureUnique($data);
         $data = $this->autoFillFromCatalog($data);
 
@@ -55,14 +56,14 @@ class DamagedProductService
                 'product_name' => $data['product_name'] ?? null,
                 'product_color' => $data['product_color'] ?? null,
                 'brand_cigam_code' => $data['brand_cigam_code'] ?? null,
-                'product_size' => $data['product_size'] ?? null,
+                'brand_name' => $data['brand_name'] ?? null,
                 'is_mismatched' => (bool) ($data['is_mismatched'] ?? false),
                 'is_damaged' => (bool) ($data['is_damaged'] ?? false),
-                'mismatched_foot' => $data['mismatched_foot'] ?? null,
-                'mismatched_actual_size' => $data['mismatched_actual_size'] ?? null,
-                'mismatched_expected_size' => $data['mismatched_expected_size'] ?? null,
+                'mismatched_left_size' => $data['mismatched_left_size'] ?? null,
+                'mismatched_right_size' => $data['mismatched_right_size'] ?? null,
                 'damage_type_id' => $data['damage_type_id'] ?? null,
                 'damaged_foot' => $data['damaged_foot'] ?? null,
+                'damaged_size' => $data['damaged_size'] ?? null,
                 'damage_description' => $data['damage_description'] ?? null,
                 'is_repairable' => (bool) ($data['is_repairable'] ?? false),
                 'estimated_repair_cost' => $data['estimated_repair_cost'] ?? null,
@@ -104,13 +105,11 @@ class DamagedProductService
         // de tipo idêntico (enum object vs string string falha).
         $current = $product->only([
             'store_id', 'product_id', 'product_reference', 'is_mismatched', 'is_damaged',
-            'mismatched_foot', 'mismatched_actual_size', 'mismatched_expected_size',
-            'damage_type_id', 'damaged_foot',
+            'mismatched_left_size', 'mismatched_right_size',
+            'damage_type_id', 'damaged_foot', 'damaged_size',
         ]);
-        foreach (['mismatched_foot', 'damaged_foot'] as $enumKey) {
-            if (isset($current[$enumKey]) && $current[$enumKey] instanceof \BackedEnum) {
-                $current[$enumKey] = $current[$enumKey]->value;
-            }
+        if (isset($current['damaged_foot']) && $current['damaged_foot'] instanceof \BackedEnum) {
+            $current['damaged_foot'] = $current['damaged_foot']->value;
         }
 
         $merged = array_merge($current, $data);
@@ -130,14 +129,14 @@ class DamagedProductService
                 'product_name' => $merged['product_name'] ?? $product->product_name,
                 'product_color' => $merged['product_color'] ?? $product->product_color,
                 'brand_cigam_code' => $merged['brand_cigam_code'] ?? $product->brand_cigam_code,
-                'product_size' => $merged['product_size'] ?? $product->product_size,
+                'brand_name' => $merged['brand_name'] ?? $product->brand_name,
                 'is_mismatched' => (bool) ($merged['is_mismatched'] ?? false),
                 'is_damaged' => (bool) ($merged['is_damaged'] ?? false),
-                'mismatched_foot' => $merged['mismatched_foot'] ?? null,
-                'mismatched_actual_size' => $merged['mismatched_actual_size'] ?? null,
-                'mismatched_expected_size' => $merged['mismatched_expected_size'] ?? null,
+                'mismatched_left_size' => $merged['mismatched_left_size'] ?? null,
+                'mismatched_right_size' => $merged['mismatched_right_size'] ?? null,
                 'damage_type_id' => $merged['damage_type_id'] ?? null,
                 'damaged_foot' => $merged['damaged_foot'] ?? null,
+                'damaged_size' => $merged['damaged_size'] ?? null,
                 'damage_description' => $data['damage_description'] ?? $product->damage_description,
                 'is_repairable' => (bool) ($data['is_repairable'] ?? $product->is_repairable),
                 'estimated_repair_cost' => $data['estimated_repair_cost'] ?? $product->estimated_repair_cost,
@@ -210,26 +209,20 @@ class DamagedProductService
         }
 
         if ($isMismatched) {
-            if (empty($data['mismatched_foot'])) {
-                $errors['mismatched_foot'] = 'Informe o pé com tamanho trocado.';
-            } elseif (! in_array($data['mismatched_foot'], [FootSide::LEFT->value, FootSide::RIGHT->value], true)) {
-                $errors['mismatched_foot'] = 'Pé inválido para par trocado (deve ser esquerdo ou direito).';
+            if (empty($data['mismatched_left_size'])) {
+                $errors['mismatched_left_size'] = 'Selecione o tamanho do pé esquerdo.';
             }
 
-            if (empty($data['mismatched_actual_size'])) {
-                $errors['mismatched_actual_size'] = 'Informe o tamanho real do pé trocado.';
-            }
-
-            if (empty($data['mismatched_expected_size'])) {
-                $errors['mismatched_expected_size'] = 'Informe o tamanho esperado do pé trocado.';
+            if (empty($data['mismatched_right_size'])) {
+                $errors['mismatched_right_size'] = 'Selecione o tamanho do pé direito.';
             }
 
             if (
-                ! empty($data['mismatched_actual_size'])
-                && ! empty($data['mismatched_expected_size'])
-                && $data['mismatched_actual_size'] === $data['mismatched_expected_size']
+                ! empty($data['mismatched_left_size'])
+                && ! empty($data['mismatched_right_size'])
+                && (string) $data['mismatched_left_size'] === (string) $data['mismatched_right_size']
             ) {
-                $errors['mismatched_expected_size'] = 'O tamanho esperado deve ser diferente do tamanho real.';
+                $errors['mismatched_right_size'] = 'O tamanho do pé direito deve ser diferente do esquerdo (senão não há par trocado).';
             }
         }
 
@@ -240,6 +233,12 @@ class DamagedProductService
 
             if (empty($data['damaged_foot'])) {
                 $errors['damaged_foot'] = 'Informe qual pé está avariado.';
+            }
+
+            // damaged_size obrigatório quando há pé real envolvido (não 'na')
+            $foot = $data['damaged_foot'] ?? null;
+            if ($foot !== null && $foot !== FootSide::NA->value && empty($data['damaged_size'])) {
+                $errors['damaged_size'] = 'Selecione o tamanho do pé avariado (necessário para o match com produtos complementares).';
             }
         }
 
@@ -253,6 +252,31 @@ class DamagedProductService
 
         if (! empty($errors)) {
             throw ValidationException::withMessages($errors);
+        }
+    }
+
+    /**
+     * Garante que avarias (is_damaged=true) tenham ao menos uma foto anexada
+     * no momento da criação. Documentação visual é parte do fluxo aprovado:
+     * facilita auditoria e diferencia avaria real de cadastro errado.
+     *
+     * Update mantém opcional — fotos existentes do registro são preservadas.
+     *
+     * @param  array<string,mixed>  $data
+     * @param  array<int,UploadedFile>|null  $photos
+     *
+     * @throws ValidationException
+     */
+    protected function ensurePhotosForDamaged(array $data, ?array $photos): void
+    {
+        if (! ($data['is_damaged'] ?? false)) {
+            return;
+        }
+
+        if (empty($photos)) {
+            throw ValidationException::withMessages([
+                'photos' => 'Anexe ao menos uma foto do dano para documentar a avaria.',
+            ]);
         }
     }
 
@@ -289,12 +313,12 @@ class DamagedProductService
         // positivo entre dois pares trocados de tamanhos diferentes).
         if (! empty($data['is_mismatched'])) {
             $query->where('is_mismatched', true)
-                ->where('mismatched_foot', $data['mismatched_foot'] ?? null)
-                ->where('mismatched_actual_size', $data['mismatched_actual_size'] ?? null)
-                ->where('mismatched_expected_size', $data['mismatched_expected_size'] ?? null);
+                ->where('mismatched_left_size', $data['mismatched_left_size'] ?? null)
+                ->where('mismatched_right_size', $data['mismatched_right_size'] ?? null);
         } elseif (! empty($data['is_damaged'])) {
             $query->where('is_damaged', true)
-                ->where('damaged_foot', $data['damaged_foot'] ?? null);
+                ->where('damaged_foot', $data['damaged_foot'] ?? null)
+                ->where('damaged_size', $data['damaged_size'] ?? null);
         }
 
         if ($query->exists()) {
@@ -316,9 +340,12 @@ class DamagedProductService
         $product = null;
 
         if (! empty($data['product_id'])) {
-            $product = Product::find($data['product_id']);
+            $product = Product::with(['brand:cigam_code,name', 'color:cigam_code,name'])
+                ->find($data['product_id']);
         } elseif (! empty($data['product_reference'])) {
-            $product = Product::where('reference', $this->normalizeReference($data['product_reference']))->first();
+            $product = Product::with(['brand:cigam_code,name', 'color:cigam_code,name'])
+                ->where('reference', $this->normalizeReference($data['product_reference']))
+                ->first();
             if ($product) {
                 $data['product_id'] = $product->id;
             }
@@ -327,7 +354,9 @@ class DamagedProductService
         if ($product) {
             $data['product_name'] ??= $product->description;
             $data['brand_cigam_code'] ??= $product->brand_cigam_code;
-            $data['product_color'] ??= $product->color_cigam_code;
+            $data['brand_name'] ??= $product->brand?->name;
+            // product_color armazena NOME (não cigam_code) — UI mostra nome
+            $data['product_color'] ??= $product->color?->name;
         }
 
         return $data;

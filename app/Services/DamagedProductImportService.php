@@ -129,26 +129,23 @@ class DamagedProductImportService
             'product_reference' => $reference,
             'product_name' => $this->get($row, 'descricao') ?: null,
             'product_color' => $this->get($row, 'cor') ?: null,
-            'brand_cigam_code' => $this->get($row, 'marca') ?: null,
-            'product_size' => $this->get($row, 'tamanho') ?: null,
+            'brand_cigam_code' => $this->get($row, 'marca_codigo') ?: ($this->get($row, 'marca') ?: null),
+            'brand_name' => $this->get($row, 'marca_nome') ?: ($this->get($row, 'marca') ?: null),
             'is_mismatched' => $isMismatched,
             'is_damaged' => $isDamaged,
             'notes' => $this->get($row, 'notas') ?: null,
         ];
 
         if ($isMismatched) {
-            $foot = $this->parseFoot($this->get($row, 'pe_trocado'), single: true);
-            $actual = (string) $this->get($row, 'tamanho_real');
-            $expected = (string) $this->get($row, 'tamanho_esperado');
+            $leftSize = (string) $this->get($row, 'tamanho_esquerdo');
+            $rightSize = (string) $this->get($row, 'tamanho_direito');
 
-            if (! $foot) throw new \RuntimeException('pe_trocado inválido (esquerdo/direito).');
-            if ($actual === '') throw new \RuntimeException('tamanho_real obrigatório em par trocado.');
-            if ($expected === '') throw new \RuntimeException('tamanho_esperado obrigatório em par trocado.');
-            if ($actual === $expected) throw new \RuntimeException('tamanho_real deve diferir de tamanho_esperado.');
+            if ($leftSize === '') throw new \RuntimeException('tamanho_esquerdo obrigatório em par trocado.');
+            if ($rightSize === '') throw new \RuntimeException('tamanho_direito obrigatório em par trocado.');
+            if ($leftSize === $rightSize) throw new \RuntimeException('tamanho_esquerdo deve diferir de tamanho_direito.');
 
-            $payload['mismatched_foot'] = $foot;
-            $payload['mismatched_actual_size'] = $actual;
-            $payload['mismatched_expected_size'] = $expected;
+            $payload['mismatched_left_size'] = $leftSize;
+            $payload['mismatched_right_size'] = $rightSize;
         }
 
         if ($isDamaged) {
@@ -163,6 +160,7 @@ class DamagedProductImportService
 
             $payload['damage_type_id'] = $tipoId;
             $payload['damaged_foot'] = $foot;
+            $payload['damaged_size'] = $this->get($row, 'tamanho_avariado') ?: null;
             $payload['damage_description'] = $this->get($row, 'descricao_dano') ?: null;
         }
 

@@ -91,9 +91,8 @@ class DamagedProductControllerTest extends TestCase
             'store_id' => $this->storeAId,
             'product_reference' => 'CTRL-' . uniqid(),
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::LEFT->value,
-            'mismatched_actual_size' => '38',
-            'mismatched_expected_size' => '39',
+            'mismatched_left_size' => '38',
+            'mismatched_right_size' => '39',
         ], $this->adminUser);
     }
 
@@ -128,9 +127,8 @@ class DamagedProductControllerTest extends TestCase
             'store_id' => $this->storeBId,
             'product_reference' => 'CTRL-OTHER-' . uniqid(),
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::LEFT->value,
-            'mismatched_actual_size' => '38',
-            'mismatched_expected_size' => '39',
+            'mismatched_left_size' => '38',
+            'mismatched_right_size' => '39',
         ], $this->adminUser);
 
         // User é da loja Z421 e não tem MANAGE
@@ -158,9 +156,8 @@ class DamagedProductControllerTest extends TestCase
                 'store_id' => $this->storeAId,
                 'product_reference' => 'NEW-001',
                 'is_mismatched' => true,
-                'mismatched_foot' => FootSide::LEFT->value,
-                'mismatched_actual_size' => '38',
-                'mismatched_expected_size' => '39',
+                'mismatched_left_size' => '38',
+            'mismatched_right_size' => '39',
             ]);
 
         $response->assertRedirect(route('damaged-products.index'));
@@ -182,9 +179,8 @@ class DamagedProductControllerTest extends TestCase
                 'store_id' => $this->storeBId,
                 'product_reference' => 'BLOCKED',
                 'is_mismatched' => true,
-                'mismatched_foot' => FootSide::LEFT->value,
-                'mismatched_actual_size' => '38',
-                'mismatched_expected_size' => '39',
+                'mismatched_left_size' => '38',
+            'mismatched_right_size' => '39',
             ]);
 
         $response->assertStatus(403);
@@ -288,9 +284,8 @@ class DamagedProductControllerTest extends TestCase
             'store_id' => $this->storeBId,
             'product_reference' => $a->product_reference,
             'is_mismatched' => true,
-            'mismatched_foot' => FootSide::RIGHT->value,
-            'mismatched_actual_size' => '39',
-            'mismatched_expected_size' => '38',
+            'mismatched_left_size' => '39',  // espelho do A pra cruzar
+            'mismatched_right_size' => '38',
         ], $this->adminUser);
 
         $match = app(DamagedProductMatchingService::class)->findMatchesFor($a)->first();

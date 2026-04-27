@@ -72,27 +72,22 @@ export default function DamagedProductDetailModal({ show, onClose, ulid }) {
                             <StandardModal.Field label="Referência" value={item.product_reference} mono />
                             <StandardModal.Field label="Descrição" value={item.product_name || '—'} />
                             <StandardModal.Field label="Cor" value={item.product_color || '—'} />
-                            <StandardModal.Field label="Marca" value={item.brand_cigam_code || '—'} />
-                            <StandardModal.Field label="Tamanho" value={item.product_size || '—'} />
+                            <StandardModal.Field label="Marca" value={item.brand_name || item.brand_cigam_code || '—'} />
                             <StandardModal.Field label="Cadastrado por" value={item.created_by ?? '—'} />
                         </div>
                     </StandardModal.Section>
 
                     {item.is_mismatched && (
                         <StandardModal.Section title="Par trocado" headerClassName="bg-yellow-50">
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <StandardModal.Field
-                                    label="Pé com tamanho trocado"
-                                    value={item.mismatched_foot_label || '—'}
-                                />
-                                <StandardModal.Field
-                                    label="Tamanho real"
-                                    value={item.mismatched_actual_size}
+                                    label="Tamanho do pé esquerdo"
+                                    value={item.mismatched_left_size}
                                     mono
                                 />
                                 <StandardModal.Field
-                                    label="Tamanho esperado"
-                                    value={item.mismatched_expected_size}
+                                    label="Tamanho do pé direito"
+                                    value={item.mismatched_right_size}
                                     mono
                                 />
                             </div>
@@ -101,9 +96,10 @@ export default function DamagedProductDetailModal({ show, onClose, ulid }) {
 
                     {item.is_damaged && (
                         <StandardModal.Section title="Avaria" headerClassName="bg-red-50">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <StandardModal.Field label="Tipo" value={item.damage_type?.name || '—'} />
                                 <StandardModal.Field label="Pé(s) avariado(s)" value={item.damaged_foot_label || '—'} />
+                                <StandardModal.Field label="Tamanho avariado" value={item.damaged_size || '—'} mono />
                                 {item.is_repairable && (
                                     <>
                                         <StandardModal.Field
