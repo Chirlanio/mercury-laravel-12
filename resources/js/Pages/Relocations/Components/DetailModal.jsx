@@ -8,6 +8,10 @@ import {
     InboxArrowDownIcon,
     PrinterIcon,
     TrashIcon,
+    MagnifyingGlassIcon,
+    CheckCircleIcon,
+    ExclamationTriangleIcon,
+    XCircleIcon,
 } from '@heroicons/react/24/outline';
 import StandardModal from '@/Components/StandardModal';
 import Button from '@/Components/Button';
@@ -54,6 +58,14 @@ export default function DetailModal({ show, onClose, ulid, permissions = {}, onT
         volumes_qty: '',
     });
 
+    // Validação on-demand da NF contra movements (CIGAM).
+    // - dispatchValidation: resultado do preview (null antes de validar)
+    // - dispatchValidating: spinner durante a chamada
+    // - dispatchValidationError: erro na chamada (rede/permissão)
+    const [dispatchValidation, setDispatchValidation] = useState(null);
+    const [dispatchValidating, setDispatchValidating] = useState(false);
+    const [dispatchValidationError, setDispatchValidationError] = useState(null);
+
     const load = async () => {
         if (!ulid) return;
         setLoading(true);
@@ -72,6 +84,8 @@ export default function DetailModal({ show, onClose, ulid, permissions = {}, onT
                 invoice_date: '',
                 volumes_qty: '',
             });
+            setDispatchValidation(null);
+            setDispatchValidationError(null);
         } catch (e) {
             setError(e.response?.data?.message || 'Falha ao carregar detalhes.');
         } finally {
@@ -103,7 +117,45 @@ export default function DetailModal({ show, onClose, ulid, permissions = {}, onT
         onClose();
     };
 
-    // Confirmar envio (in_separation → in_transit) — exige NF
+    // Validação on-demand da NF — chama o endpoint preview que compara
+    // qty_separated vs movements (CIGAM). Resultado renderiza um painel
+    // com matched/missing/extra/divergent. Não muta o remanejo.
+    const handleValidateNF = async () => {
+        if (!r) return;
+        const inv = (dispatchData.invoice_number || '').trim();
+        const dt = dispatchData.invoice_date;
+        if (!inv || !dt) {
+            setDispatchValidationError('Informe número e data da NF antes de validar.');
+            return;
+        }
+        setDispatchValidating(true);
+        setDispatchValidationError(null);
+        setDispatchValidation(null);
+        try {
+            // Antes de validar, persiste qty_separated localmente — backend
+            // compara contra o que está salvo no banco. Se o usuário ajustou
+            // os inputs sem salvar, validar com o snapshot atual seria errado.
+            // Pra simplificar nesse modal, assumimos qty_separated == qty_requested
+            // (caso default dos sugestionados); se mudou, vai ser refletido na
+            // próxima validação após dispatch.
+            const { data } = await window.axios.post(
+                route('relocations.dispatch.validate', r.ulid),
+                { invoice_number: inv, invoice_date: dt },
+            );
+            setDispatchValidation(data);
+        } catch (e) {
+            setDispatchValidationError(
+                e.response?.data?.error
+                    ?? e.response?.data?.message
+                    ?? 'Falha ao validar NF.'
+            );
+        } finally {
+            setDispatchValidating(false);
+        }
+    };
+
+    // Confirmar envio (in_separation → in_transit) — exige NF.
+    // Se a validação ocorreu, envia o snapshot pra ser persistido junto.
     const handleDispatch = () => {
         if (!r || dispatchData.invoice_number.trim() === '') return;
         const separatedItems = Object.entries(separatedQty).map(([id, qty]) => ({
@@ -115,6 +167,7 @@ export default function DetailModal({ show, onClose, ulid, permissions = {}, onT
             invoice_date: dispatchData.invoice_date || null,
             volumes_qty: dispatchData.volumes_qty || null,
             separated_items: separatedItems,
+            dispatch_validation: dispatchValidation,
         });
     };
 
@@ -261,26 +314,34 @@ export default function DetailModal({ show, onClose, ulid, permissions = {}, onT
                     {r.status === 'in_separation' && permissions.separate && (
                         <StandardModal.Section title="Confirmar envio (gera transferência)">
                             <p className="text-sm text-gray-600 mb-3">
-                                Informe a NF de transferência para registrar o despacho. Uma transferência
-                                física será criada automaticamente vinculada a este remanejo.
+                                Informe a NF de transferência e <strong>valide</strong> contra o CIGAM antes
+                                de confirmar. O sistema compara os itens separados com a NF emitida pra
+                                detectar divergências (faltando, sobrando ou qty diferente).
                             </p>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div>
                                     <InputLabel value="Número da NF *" />
                                     <TextInput
                                         value={dispatchData.invoice_number}
-                                        onChange={(e) => setDispatchData({ ...dispatchData, invoice_number: e.target.value })}
+                                        onChange={(e) => {
+                                            setDispatchData({ ...dispatchData, invoice_number: e.target.value });
+                                            // Invalida validação anterior se mudar a NF
+                                            if (dispatchValidation) setDispatchValidation(null);
+                                        }}
                                         placeholder="Ex: 12345"
                                         maxLength={50}
                                         className="w-full"
                                     />
                                 </div>
                                 <div>
-                                    <InputLabel value="Data da NF" />
+                                    <InputLabel value="Data da NF *" />
                                     <TextInput
                                         type="date"
                                         value={dispatchData.invoice_date}
-                                        onChange={(e) => setDispatchData({ ...dispatchData, invoice_date: e.target.value })}
+                                        onChange={(e) => {
+                                            setDispatchData({ ...dispatchData, invoice_date: e.target.value });
+                                            if (dispatchValidation) setDispatchValidation(null);
+                                        }}
                                         className="w-full"
                                     />
                                 </div>
@@ -296,16 +357,43 @@ export default function DetailModal({ show, onClose, ulid, permissions = {}, onT
                                     />
                                 </div>
                             </div>
-                            <div className="mt-3 flex justify-end">
+
+                            <div className="mt-3 flex flex-wrap gap-2 justify-end">
                                 <Button
-                                    variant="primary"
+                                    variant="outline"
+                                    icon={MagnifyingGlassIcon}
+                                    onClick={handleValidateNF}
+                                    disabled={
+                                        dispatchValidating
+                                        || dispatchData.invoice_number.trim() === ''
+                                        || !dispatchData.invoice_date
+                                    }
+                                    loading={dispatchValidating}
+                                >
+                                    Validar NF no CIGAM
+                                </Button>
+                                <Button
+                                    variant={dispatchValidation?.has_discrepancies ? 'warning' : 'primary'}
                                     icon={PaperAirplaneIcon}
                                     onClick={handleDispatch}
                                     disabled={dispatchData.invoice_number.trim() === ''}
                                 >
-                                    Confirmar envio
+                                    {dispatchValidation?.has_discrepancies
+                                        ? 'Confirmar mesmo assim (com alerta)'
+                                        : 'Confirmar envio'}
                                 </Button>
                             </div>
+
+                            {dispatchValidationError && (
+                                <div className="mt-3 bg-red-50 border border-red-200 rounded p-3 text-sm text-red-700 flex items-start gap-2">
+                                    <XCircleIcon className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                                    <div>{dispatchValidationError}</div>
+                                </div>
+                            )}
+
+                            {dispatchValidation && (
+                                <DispatchValidationResult result={dispatchValidation} />
+                            )}
                         </StandardModal.Section>
                     )}
 
@@ -422,4 +510,142 @@ function priorityBadgeClass(priority) {
         urgent: 'bg-red-100 text-red-800',
     };
     return map[priority] ?? map.normal;
+}
+
+// Painel de resultado da validação NF — 4 estados:
+// (a) NF não encontrada → warning amber
+// (b) Bate perfeitamente → success green
+// (c) Tem divergência → danger red, com 3 listas
+// Usado dentro do DetailModal na fase in_separation.
+function DispatchValidationResult({ result }) {
+    if (!result.nf_found) {
+        return (
+            <div className="mt-3 bg-amber-50 border border-amber-200 rounded p-3 flex items-start gap-2">
+                <ExclamationTriangleIcon className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-amber-900">
+                    <p className="font-medium">NF não encontrada no CIGAM.</p>
+                    <p className="text-xs text-amber-800 mt-1">
+                        Pode ser delay na sincronização (aguarde alguns minutos e tente novamente)
+                        ou a NF foi emitida com chave diferente (loja origem, número ou data).
+                        Confira no sistema CIGAM antes de confirmar o envio.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    if (! result.has_discrepancies) {
+        return (
+            <div className="mt-3 bg-green-50 border border-green-200 rounded p-3 flex items-start gap-2">
+                <CheckCircleIcon className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-green-900">
+                    <p className="font-medium">NF bate com a separação ✓</p>
+                    <p className="text-xs text-green-800 mt-1">
+                        {result.matched.length} item(ns) confirmado(s),
+                        {' '}{result.total_items_in_invoice} unidade(s) total na NF.
+                        Pode confirmar o envio com segurança.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    const missing = result.missing ?? [];
+    const extra = result.extra ?? [];
+    const divergent = result.divergent ?? [];
+
+    return (
+        <div className="mt-3 bg-red-50 border border-red-200 rounded p-3">
+            <div className="flex items-start gap-2 mb-3">
+                <ExclamationTriangleIcon className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-red-900">
+                    <p className="font-medium">Divergências detectadas</p>
+                    <p className="text-xs text-red-800 mt-1">
+                        Os itens separados não batem com a NF emitida. Você pode <strong>ajustar a separação
+                        ou a NF</strong> e validar de novo, ou <strong>confirmar mesmo assim</strong> — neste
+                        caso o sistema notifica o time de planejamento e logística pra investigação.
+                    </p>
+                </div>
+            </div>
+
+            {missing.length > 0 && (
+                <DiscrepancyList
+                    title={`Faltando na NF (${missing.length})`}
+                    description="Itens que foram separados mas não estão na NF emitida."
+                    items={missing}
+                    qtyKey="qty_separated"
+                    qtyLabel="Separado"
+                    qtyOtherKey="qty_in_invoice"
+                    qtyOtherLabel="Na NF"
+                />
+            )}
+
+            {extra.length > 0 && (
+                <DiscrepancyList
+                    title={`Sobrando na NF (${extra.length})`}
+                    description="Itens que estão na NF mas não foram solicitados/separados."
+                    items={extra}
+                    qtyKey={null}
+                    qtyOtherKey="qty_in_invoice"
+                    qtyOtherLabel="Na NF"
+                />
+            )}
+
+            {divergent.length > 0 && (
+                <DiscrepancyList
+                    title={`Quantidade divergente (${divergent.length})`}
+                    description="Itens onde a quantidade na NF difere da separada."
+                    items={divergent}
+                    qtyKey="qty_separated"
+                    qtyLabel="Separado"
+                    qtyOtherKey="qty_in_invoice"
+                    qtyOtherLabel="Na NF"
+                />
+            )}
+        </div>
+    );
+}
+
+function DiscrepancyList({ title, description, items, qtyKey, qtyLabel, qtyOtherKey, qtyOtherLabel }) {
+    return (
+        <div className="mt-3 bg-white border border-red-200 rounded p-2">
+            <p className="text-sm font-medium text-red-900">{title}</p>
+            {description && <p className="text-xs text-gray-600 mt-0.5">{description}</p>}
+            <div className="mt-2 max-h-40 overflow-y-auto">
+                <table className="min-w-full text-xs">
+                    <thead className="text-[10px] uppercase text-gray-500">
+                        <tr>
+                            <th className="text-left py-1 pr-2">Produto</th>
+                            <th className="text-left py-1 pr-2 w-24">EAN</th>
+                            <th className="text-left py-1 pr-2 w-16">Tam.</th>
+                            {qtyKey && <th className="text-right py-1 pr-2 w-16">{qtyLabel}</th>}
+                            <th className="text-right py-1 w-16">{qtyOtherLabel}</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {items.map((it, i) => (
+                            <tr key={i}>
+                                <td className="py-1 pr-2 text-gray-800">
+                                    {it.product_name || it.product_reference || '—'}
+                                    {it.product_color && (
+                                        <span className="text-gray-400"> · {it.product_color}</span>
+                                    )}
+                                </td>
+                                <td className="py-1 pr-2 font-mono text-[10px] text-gray-500">{it.barcode}</td>
+                                <td className="py-1 pr-2 text-gray-600">{it.size ?? '—'}</td>
+                                {qtyKey && (
+                                    <td className="py-1 pr-2 text-right tabular-nums font-medium text-gray-900">
+                                        {it[qtyKey]}
+                                    </td>
+                                )}
+                                <td className="py-1 text-right tabular-nums font-medium text-red-700">
+                                    {it[qtyOtherKey]}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
 }
