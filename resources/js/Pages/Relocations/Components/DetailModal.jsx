@@ -242,7 +242,7 @@ export default function DetailModal({ show, onClose, ulid, permissions = {}, onT
                                 divergências (faltando, sobrando ou qty diferente). Depois confira
                                 a tabela abaixo e confirme o envio.
                             </p>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
                                 <div>
                                     <InputLabel value="Número da NF *" />
                                     <TextInput
@@ -280,22 +280,25 @@ export default function DetailModal({ show, onClose, ulid, permissions = {}, onT
                                         className="w-full"
                                     />
                                 </div>
+                                <div>
+                                    <Button
+                                        variant="outline"
+                                        icon={MagnifyingGlassIcon}
+                                        onClick={handleValidateNF}
+                                        disabled={
+                                            dispatchValidating
+                                            || dispatchData.invoice_number.trim() === ''
+                                            || !dispatchData.invoice_date
+                                        }
+                                        loading={dispatchValidating}
+                                        className="w-full justify-center"
+                                    >
+                                        Validar NF
+                                    </Button>
+                                </div>
                             </div>
 
-                            <div className="mt-3 flex flex-wrap gap-2 justify-end">
-                                <Button
-                                    variant="outline"
-                                    icon={MagnifyingGlassIcon}
-                                    onClick={handleValidateNF}
-                                    disabled={
-                                        dispatchValidating
-                                        || dispatchData.invoice_number.trim() === ''
-                                        || !dispatchData.invoice_date
-                                    }
-                                    loading={dispatchValidating}
-                                >
-                                    Validar NF no CIGAM
-                                </Button>
+                            <div className="mt-3 flex justify-end">
                                 <Button
                                     variant={dispatchValidation?.has_discrepancies ? 'warning' : 'primary'}
                                     icon={PaperAirplaneIcon}
