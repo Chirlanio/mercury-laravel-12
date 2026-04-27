@@ -168,6 +168,9 @@ class DamagedProductController extends Controller
             'store:id,code,name',
             'damageType:id,name',
             'photos',
+            'product:id,reference,image',
+            'product.variants:id,product_id,size_cigam_code,is_active',
+            'product.variants.size:cigam_code,name',
             'createdBy:id,name',
             'updatedBy:id,name',
             'cancelledBy:id,name',
@@ -636,6 +639,22 @@ class DamagedProductController extends Controller
             $base['cancelled_at'] = $p->cancelled_at?->toIso8601String();
             $base['resolved_at'] = $p->resolved_at?->toIso8601String();
             $base['expires_at'] = $p->expires_at?->toIso8601String();
+            $base['product_image_url'] = $p->relationLoaded('product') && $p->product?->image
+                ? asset('storage/'.$p->product->image)
+                : null;
+            // Tamanhos do catálogo (variants) — usados pra renderizar grids
+            // de tamanhos no modal de visualização (mesmo padrão do form).
+            $base['product_sizes'] = $p->relationLoaded('product') && $p->product
+                ? $p->product->variants
+                    ->where('is_active', true)
+                    ->map(fn ($v) => [
+                        'cigam_code' => $v->size_cigam_code,
+                        'name' => $v->size?->name ?? $v->size_cigam_code,
+                    ])
+                    ->unique('cigam_code')
+                    ->sortBy(fn ($s) => is_numeric($s['name']) ? (int) $s['name'] : $s['name'])
+                    ->values()
+                : [];
             $base['photos'] = $p->photos?->map(fn ($photo) => [
                 'id' => $photo->id,
                 'filename' => $photo->filename,
