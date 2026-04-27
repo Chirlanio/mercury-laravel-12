@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { router } from '@inertiajs/react';
 import { toast } from 'react-toastify';
 import {
     PlusIcon, RectangleStackIcon, SparklesIcon, TrashIcon,
-    CheckCircleIcon, ExclamationTriangleIcon, MagnifyingGlassIcon,
+    ExclamationTriangleIcon, MagnifyingGlassIcon, XCircleIcon,
 } from '@heroicons/react/24/outline';
 import StandardModal from '@/Components/StandardModal';
 import Button from '@/Components/Button';
@@ -20,14 +20,9 @@ const EMPTY_ITEM = {
     barcode: '',
     qty_requested: 1,
     observations: '',
-    // Estado interno do lookup AJAX (não vai pro backend)
-    _lookup_mode: null,         // 'barcode' | 'reference' | null
-    _lookup_status: null,       // 'idle' | 'loading' | 'ok' | 'notfound' | 'error'
-    _lookup_error: null,
-    _available_sizes: [],       // [{variant_id, barcode, size, size_cigam_code}]
+    _lookup_mode: null,
+    _lookup_status: null,
     _product_id: null,
-    // Hints de origem/saldo (preenchidos pelo SuggestionsModal ou pelo
-    // lookup-stock no submit). Nunca vão pro backend.
     _suggested_origin_id: null,
     _suggested_origin_code: null,
     _suggested_origin_name: null,
@@ -50,8 +45,7 @@ const fmtDeadline = (days) => {
     return `${days} dias`;
 };
 
-// Heurística pra decidir se input parece EAN/barcode ou referência.
-// EANs reais são 8/12/13/14 dígitos; refauxiliar pode ser 6+ dígitos.
+// Heurística pra decidir EAN vs referência no input combinado.
 const isLikelyBarcode = (q) => /^\d{6,14}$/.test((q ?? '').trim());
 
 // Lista campos internos que NÃO devem ir pro POST.
@@ -82,15 +76,13 @@ export default function CreateModal({
         title: '',
         observations: '',
         priority: 'normal',
-        items: [{ ...EMPTY_ITEM }],
+        items: [],
     });
     const [errors, setErrors] = useState({});
     const [processing, setProcessing] = useState(false);
     const [validating, setValidating] = useState(false);
     const [suggestionsOpen, setSuggestionsOpen] = useState(false);
     const [confirmState, setConfirmState] = useState(null);
-
-    const lookupTokensRef = useRef({});
 
     const updateField = (key, value) => {
         setForm((prev) => {
@@ -142,116 +134,37 @@ export default function CreateModal({
         return s ? `${s.code} — ${s.name}` : `#${storeId}`;
     };
 
-    const updateItem = (idx, key, value) => {
+    /**
+     * Adiciona um item à tabela. Recebe o objeto já completo (vindo do
+     * SearchPanel ou do SuggestionsModal). Faz dedup por barcode+origem
+     * pra evitar linha duplicada quando o usuário busca o mesmo EAN 2x.
+     */
+    const addItemToList = (newItem) => {
         setForm((prev) => {
-            const items = [...prev.items];
-            items[idx] = { ...items[idx], [key]: value };
-            return { ...prev, items };
+            const idx = prev.items.findIndex((it) => (
+                (it.barcode || '') === (newItem.barcode || '')
+                && (it._suggested_origin_id ?? null) === (newItem._suggested_origin_id ?? null)
+            ));
+            if (idx >= 0) {
+                // Já existe: soma a qty
+                const items = [...prev.items];
+                items[idx] = {
+                    ...items[idx],
+                    qty_requested: (parseInt(items[idx].qty_requested, 10) || 0) + (parseInt(newItem.qty_requested, 10) || 1),
+                };
+                return { ...prev, items };
+            }
+            return { ...prev, items: [...prev.items, newItem] };
         });
     };
-
-    const updateItemMany = (idx, patch) => {
-        setForm((prev) => {
-            const items = [...prev.items];
-            items[idx] = { ...items[idx], ...patch };
-            return { ...prev, items };
-        });
-    };
-
-    const addItem = () => setForm((prev) => ({ ...prev, items: [...prev.items, { ...EMPTY_ITEM }] }));
 
     const removeItem = (idx) => {
-        if (form.items.length === 1) return;
         setForm((prev) => ({ ...prev, items: prev.items.filter((_, i) => i !== idx) }));
-    };
-
-    // ------------------------------------------------------------------
-    // Lookup AJAX no catálogo (auto-fill da linha)
-    // ------------------------------------------------------------------
-    const performLookup = async (idx, params) => {
-        const token = Date.now() + Math.random();
-        lookupTokensRef.current[idx] = token;
-
-        updateItemMany(idx, { _lookup_status: 'loading', _lookup_error: null });
-
-        try {
-            const res = await window.axios.get(route('relocations.lookup-product'), { params });
-            if (lookupTokensRef.current[idx] !== token) return;
-
-            const d = res.data || {};
-            if (!d.found) {
-                updateItemMany(idx, {
-                    _lookup_status: 'notfound',
-                    _lookup_error: d.error || 'Produto não encontrado',
-                });
-                return;
-            }
-
-            if (d.mode === 'barcode') {
-                updateItemMany(idx, {
-                    product_reference: d.product_reference || '',
-                    product_name: d.product_name || '',
-                    product_color: d.product_color || '',
-                    barcode: d.barcode || '',
-                    size: d.size || '',
-                    _product_id: d.product_id,
-                    _lookup_mode: 'barcode',
-                    _lookup_status: 'ok',
-                    _lookup_error: null,
-                    _available_sizes: [],
-                });
-                return;
-            }
-
-            if (d.mode === 'reference') {
-                const sizes = d.variants || [];
-                updateItemMany(idx, {
-                    product_reference: d.product_reference || '',
-                    product_name: d.product_name || '',
-                    product_color: d.product_color || '',
-                    size: '',
-                    barcode: '',
-                    _product_id: d.product_id,
-                    _lookup_mode: 'reference',
-                    _lookup_status: 'ok',
-                    _lookup_error: null,
-                    _available_sizes: sizes,
-                });
-            }
-        } catch (e) {
-            if (lookupTokensRef.current[idx] !== token) return;
-            updateItemMany(idx, {
-                _lookup_status: 'error',
-                _lookup_error: e.response?.data?.error || 'Falha na consulta ao catálogo',
-            });
-        }
-    };
-
-    // Input combinado: detecta padrão e chama o endpoint correto.
-    const combinedLookup = (idx, value) => {
-        const v = (value ?? '').trim();
-        if (!v) return;
-        if (isLikelyBarcode(v)) {
-            performLookup(idx, { barcode: v });
-        } else {
-            performLookup(idx, { reference: v });
-        }
-    };
-
-    const handleSizeSelect = (idx, sizeValue) => {
-        const it = form.items[idx];
-        const variant = (it._available_sizes || []).find((v) => String(v.size) === String(sizeValue));
-        updateItemMany(idx, {
-            size: sizeValue,
-            barcode: variant?.barcode || '',
-        });
     };
 
     /**
      * Recebe items vindos do SuggestionsModal — pré-popula loja origem
-     * se houver consenso, anexa ou substitui items dependendo do estado.
-     * Preserva _suggested_origin_* (incluindo stock) pra UI da tabela
-     * e pra validação no submit.
+     * se houver consenso, anexa todos à tabela. Preserva _suggested_origin_*.
      */
     const applySuggestions = (suggestedItems) => {
         if (!suggestedItems?.length) return;
@@ -267,21 +180,13 @@ export default function CreateModal({
             }
         }
 
-        const cleaned = suggestedItems.map((item) => ({
-            ...EMPTY_ITEM,
-            ...item,
-            _lookup_mode: 'barcode',
-            _lookup_status: 'ok',
-        }));
-
-        setForm((prev) => {
-            const isEmpty = prev.items.length === 1
-                && (prev.items[0].product_reference || '').trim() === ''
-                && (prev.items[0].barcode || '').trim() === '';
-            return {
-                ...prev,
-                items: isEmpty ? cleaned : [...prev.items, ...cleaned],
-            };
+        suggestedItems.forEach((item) => {
+            addItemToList({
+                ...EMPTY_ITEM,
+                ...item,
+                _lookup_mode: 'barcode',
+                _lookup_status: 'ok',
+            });
         });
     };
 
@@ -293,11 +198,10 @@ export default function CreateModal({
             title: '',
             observations: '',
             priority: 'normal',
-            items: [{ ...EMPTY_ITEM }],
+            items: [],
         });
         setErrors({});
         setConfirmState(null);
-        lookupTokensRef.current = {};
     };
 
     const handleClose = () => {
@@ -307,15 +211,12 @@ export default function CreateModal({
     };
 
     // ------------------------------------------------------------------
-    // Submit em 2 fases: (1) lookup-stock + agrupa por origem;
-    // (2) se há multi-origem ou itens problemáticos, abre confirmação;
-    // senão, posta direto.
+    // Submit em 2 fases (lookup-stock → agrupa por origem → confirm).
     // ------------------------------------------------------------------
     const submit = async (e) => {
         e?.preventDefault();
         setErrors({});
 
-        // Tipo é sempre obrigatório, destino também.
         if (!form.relocation_type_id) {
             setErrors({ relocation_type_id: 'Selecione o tipo de remanejo.' });
             return;
@@ -325,31 +226,25 @@ export default function CreateModal({
             return;
         }
 
-        const validItems = form.items
-            .map((it, originalIdx) => ({ ...it, _originalIdx: originalIdx }))
-            .filter((it) => (it.product_reference || it.barcode || '').toString().trim() !== '');
-
-        if (validItems.length === 0) {
-            setErrors({ items: 'Adicione ao menos 1 item.' });
+        if (form.items.length === 0) {
+            setErrors({ items: 'Adicione ao menos 1 produto à lista.' });
             return;
         }
 
-        // Determina origem por item: prioriza _suggested_origin_id
-        // (sugestão); fallback pra origem do form (item manual).
+        const itemsWithIdx = form.items.map((it, originalIdx) => ({ ...it, _originalIdx: originalIdx }));
+
         const formOriginId = form.origin_store_id ? parseInt(form.origin_store_id, 10) : null;
-        const itemsWithOrigin = validItems.map((it) => ({
+        const itemsWithOrigin = itemsWithIdx.map((it) => ({
             ...it,
             _resolved_origin_id: it._suggested_origin_id ?? formOriginId,
         }));
 
-        // Item sem origem resolvida (manual + sem origin no form) é bloqueio.
         const orphans = itemsWithOrigin.filter((it) => !it._resolved_origin_id);
         if (orphans.length > 0) {
             setErrors({ origin_store_id: 'Selecione a loja origem ou aplique sugestões antes de criar.' });
             return;
         }
 
-        // Valida saldo via lookup-stock (1 chamada batch).
         setValidating(true);
         let stocks = {};
         let cigamAvailable = true;
@@ -367,12 +262,9 @@ export default function CreateModal({
             setValidating(false);
         }
 
-        // Anota saldo + flag de zera/excede.
         const annotated = itemsWithOrigin.map((it) => {
             const code = (it.barcode || it.product_reference || '').toString().trim();
             const key = `${it._resolved_origin_id}|${code}`;
-            // Sugestão já trouxe o saldo da consulta inicial — usa ele
-            // se existir; caso contrário, o que veio do lookup-stock.
             const stock = (it._suggested_origin_stock !== null && it._suggested_origin_stock !== undefined)
                 ? it._suggested_origin_stock
                 : (stocks[key] !== undefined ? stocks[key] : null);
@@ -384,7 +276,7 @@ export default function CreateModal({
             };
         });
 
-        // Atualiza form com saldo (UI mostra chip vermelho na linha).
+        // Atualiza form com saldo (chip vermelho na tabela).
         setForm((prev) => {
             const next = [...prev.items];
             annotated.forEach((it) => {
@@ -396,7 +288,6 @@ export default function CreateModal({
             return { ...prev, items: next };
         });
 
-        // Agrupa por origem.
         const groupsMap = new Map();
         annotated.forEach((it) => {
             const k = it._resolved_origin_id;
@@ -412,13 +303,7 @@ export default function CreateModal({
         const multiOrigin = groups.length > 1;
 
         if (multiOrigin || problems.length > 0 || !cigamAvailable) {
-            setConfirmState({
-                groups,
-                problems,
-                removeFlags: {},
-                cigamAvailable,
-                multiOrigin,
-            });
+            setConfirmState({ groups, problems, removeFlags: {}, cigamAvailable, multiOrigin });
             return;
         }
 
@@ -468,9 +353,7 @@ export default function CreateModal({
         const failCount = results.filter((r) => !r.ok).length;
 
         if (failCount === 0) {
-            toast.success(okCount === 1
-                ? 'Remanejo criado.'
-                : `${okCount} remanejos criados.`);
+            toast.success(okCount === 1 ? 'Remanejo criado.' : `${okCount} remanejos criados.`);
             reset();
             onClose();
             router.reload({ only: ['items', 'statistics'] });
@@ -507,13 +390,10 @@ export default function CreateModal({
             Object.entries(removeFlags).filter(([, v]) => v).map(([k]) => parseInt(k, 10))
         );
 
-        // Remove itens marcados do form (refletindo na UI antes de fechar).
         if (removedIdxs.size > 0) {
             setForm((prev) => ({
                 ...prev,
-                items: prev.items.length > removedIdxs.size
-                    ? prev.items.filter((_, idx) => !removedIdxs.has(idx))
-                    : prev.items, // se sobrar 0, mantém ao menos 1 vazio (segurança)
+                items: prev.items.filter((_, idx) => !removedIdxs.has(idx)),
             }));
         }
 
@@ -532,7 +412,6 @@ export default function CreateModal({
     };
 
     const currentDeadline = priorityDeadlines[form.priority] ?? 3;
-
     const submitLabel = validating ? 'Validando estoque...'
         : processing ? 'Criando...'
         : 'Criar remanejo';
@@ -668,69 +547,61 @@ export default function CreateModal({
                 </StandardModal.Section>
 
                 <StandardModal.Section
-                    title={`Produtos (${form.items.length})`}
+                    title="Buscar e adicionar produtos"
                     actions={
-                        <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                icon={SparklesIcon}
-                                onClick={() => {
-                                    if (!form.destination_store_id) {
-                                        toast.warning('Selecione a loja destino antes de gerar sugestões.');
-                                        return;
-                                    }
-                                    setSuggestionsOpen(true);
-                                }}
-                                type="button"
-                            >
-                                Gerar sugestões
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                icon={PlusIcon}
-                                onClick={addItem}
-                                type="button"
-                            >
-                                Adicionar item
-                            </Button>
-                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            icon={SparklesIcon}
+                            onClick={() => {
+                                if (!form.destination_store_id) {
+                                    toast.warning('Selecione a loja destino antes de gerar sugestões.');
+                                    return;
+                                }
+                                setSuggestionsOpen(true);
+                            }}
+                            type="button"
+                        >
+                            Gerar sugestões
+                        </Button>
                     }
                 >
-                    <p className="text-xs text-gray-600 mb-3">
-                        Digite ou bipe no campo <strong>Referência / EAN</strong> e pressione
-                        Enter — o sistema detecta automaticamente o tipo e busca no catálogo.
-                    </p>
-                    <div className="overflow-x-auto border border-gray-200 rounded-md">
-                        <table className="min-w-full">
-                            <thead className="bg-gray-50 text-[11px] uppercase text-gray-600">
-                                <tr>
-                                    <th className="px-2 py-2 text-left w-12">#</th>
-                                    <th className="px-2 py-2 text-left">Referência / EAN</th>
-                                    <th className="px-2 py-2 text-left">Descrição</th>
-                                    <th className="px-2 py-2 text-left w-28">Tamanho</th>
-                                    <th className="px-2 py-2 text-right w-20">Qtd</th>
-                                    <th className="px-2 py-2 text-left w-40">Origem (saldo)</th>
-                                    <th className="px-2 py-2 w-10"></th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 bg-white">
-                                {form.items.map((item, idx) => (
-                                    <ItemRow
-                                        key={idx}
-                                        idx={idx}
-                                        item={item}
-                                        canRemove={form.items.length > 1}
-                                        onChange={(key, value) => updateItem(idx, key, value)}
-                                        onRemove={() => removeItem(idx)}
-                                        onLookup={(value) => combinedLookup(idx, value)}
-                                        onSizeSelect={(v) => handleSizeSelect(idx, v)}
-                                    />
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <ProductSearchPanel onAdd={addItemToList} />
+                </StandardModal.Section>
+
+                <StandardModal.Section title={`Produtos adicionados (${form.items.length})`}>
+                    {form.items.length === 0 ? (
+                        <div className="border border-dashed border-gray-300 rounded p-6 text-center text-sm text-gray-500">
+                            Nenhum produto adicionado. Use o painel acima pra buscar e adicionar
+                            produtos, ou clique em <strong>Gerar sugestões</strong>.
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto border border-gray-200 rounded-md">
+                            <table className="min-w-full">
+                                <thead className="bg-gray-50 text-[11px] uppercase text-gray-600">
+                                    <tr>
+                                        <th className="px-2 py-2 text-left w-10">#</th>
+                                        <th className="px-2 py-2 text-left">Referência / EAN</th>
+                                        <th className="px-2 py-2 text-left">Descrição</th>
+                                        <th className="px-2 py-2 text-left w-24">Tamanho</th>
+                                        <th className="px-2 py-2 text-right w-16">Qtd</th>
+                                        <th className="px-2 py-2 text-left w-40">Origem (saldo)</th>
+                                        <th className="px-2 py-2 w-10"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200 bg-white">
+                                    {form.items.map((item, idx) => (
+                                        <ItemRowReadOnly
+                                            key={`${item.barcode || item.product_reference}-${idx}`}
+                                            idx={idx}
+                                            item={item}
+                                            onRemove={() => removeItem(idx)}
+                                        />
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                     <InputError message={errors.items} className="mt-2" />
                 </StandardModal.Section>
 
@@ -768,80 +639,217 @@ export default function CreateModal({
 }
 
 // ====================================================================
-// ItemRow — linha de tabela com lookup AJAX integrado
+// ProductSearchPanel — busca + adicionar à lista
 // ====================================================================
-function ItemRow({ idx, item, canRemove, onChange, onRemove, onLookup, onSizeSelect }) {
-    // Input local pra permitir digitar antes de disparar lookup (Enter ou blur).
-    const initial = item.barcode || item.product_reference || '';
-    const [tempInput, setTempInput] = useState(initial);
+function ProductSearchPanel({ onAdd }) {
+    const [input, setInput] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [lookup, setLookup] = useState(null); // payload do endpoint lookup-product
+    const [size, setSize] = useState('');
+    const [qty, setQty] = useState(1);
 
-    // Sincroniza quando item muda externamente (sugestão aplicada, lookup completou).
-    useEffect(() => {
-        const v = item.barcode || item.product_reference || '';
-        if (v !== tempInput) setTempInput(v);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [item.barcode, item.product_reference]);
+    const reset = () => {
+        setInput(''); setLookup(null); setSize(''); setQty(1); setError('');
+    };
 
-    const isLoading = item._lookup_status === 'loading';
-    const ok = item._lookup_status === 'ok';
-    const notFound = item._lookup_status === 'notfound';
-    const sizesFromCatalog = item._lookup_mode === 'reference' && (item._available_sizes?.length ?? 0) > 0;
+    const search = async () => {
+        const v = input.trim();
+        if (!v) return;
+        setLoading(true);
+        setError('');
+        setLookup(null);
+        setSize('');
+        try {
+            const params = isLikelyBarcode(v) ? { barcode: v } : { reference: v };
+            const { data } = await window.axios.get(route('relocations.lookup-product'), { params });
+            if (!data.found) {
+                setError(data.error || 'Produto não encontrado.');
+                return;
+            }
+            setLookup(data);
+            // Modo barcode já vem com tamanho definido; modo reference exige escolha.
+            setSize(data.mode === 'barcode' ? (data.size || '') : '');
+        } catch (e) {
+            setError(e.response?.data?.error || 'Falha na consulta ao catálogo.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
+    const handleKey = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            search();
+        }
+    };
+
+    const handleAdd = () => {
+        if (!lookup) return;
+        const isReference = lookup.mode === 'reference';
+        if (isReference && !size) {
+            setError('Selecione o tamanho.');
+            return;
+        }
+        const variant = isReference
+            ? (lookup.variants || []).find((v) => String(v.size) === String(size))
+            : null;
+        const qtyInt = parseInt(qty, 10);
+        if (!qtyInt || qtyInt < 1) {
+            setError('Informe uma quantidade válida.');
+            return;
+        }
+
+        onAdd({
+            ...EMPTY_ITEM,
+            product_reference: lookup.product_reference || '',
+            product_name: lookup.product_name || '',
+            product_color: lookup.product_color || '',
+            size: isReference ? size : (lookup.size || ''),
+            barcode: variant?.barcode || lookup.barcode || '',
+            qty_requested: qtyInt,
+            _product_id: lookup.product_id ?? null,
+            _lookup_mode: lookup.mode,
+            _lookup_status: 'ok',
+        });
+
+        reset();
+    };
+
+    const isReference = lookup?.mode === 'reference';
+
+    return (
+        <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
+            <p className="text-xs text-gray-600 mb-2">
+                Bipe o EAN ou digite a referência e pressione <strong>Enter</strong>.
+                O sistema detecta automaticamente o tipo e busca no catálogo.
+            </p>
+            <div className="flex items-stretch gap-2">
+                <div className="flex-1 flex items-stretch">
+                    <TextInput
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={handleKey}
+                        placeholder="Bipe EAN ou digite referência..."
+                        maxLength={100}
+                        disabled={loading}
+                        className="flex-1 min-w-0 text-sm font-mono rounded-r-none focus:z-10"
+                        autoFocus
+                    />
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="md"
+                        onClick={search}
+                        disabled={loading || !input.trim()}
+                        icon={MagnifyingGlassIcon}
+                        className="rounded-l-none"
+                    >
+                        Buscar
+                    </Button>
+                </div>
+            </div>
+
+            {error && (
+                <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
+                    <XCircleIcon className="h-4 w-4" />
+                    {error}
+                </p>
+            )}
+
+            {lookup && (
+                <div className="mt-3 bg-white border border-gray-200 rounded p-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                        <div className="sm:col-span-6">
+                            <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Produto</p>
+                            <p className="text-sm font-medium text-gray-900 mt-0.5">
+                                {lookup.product_name || '—'}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                                Ref: <span className="font-mono">{lookup.product_reference}</span>
+                                {lookup.product_color ? ` · ${lookup.product_color}` : ''}
+                                {lookup.mode === 'barcode' && lookup.barcode
+                                    ? ` · EAN ${lookup.barcode}` : ''}
+                            </p>
+                        </div>
+
+                        <div className="sm:col-span-2">
+                            <InputLabel value="Tamanho *" className="text-xs" />
+                            {isReference ? (
+                                <select
+                                    value={size}
+                                    onChange={(e) => setSize(e.target.value)}
+                                    className="block w-full rounded-md border-gray-300 shadow-sm text-sm"
+                                    autoFocus
+                                >
+                                    <option value="">Selecione...</option>
+                                    {(lookup.variants || []).map((v) => (
+                                        <option key={v.variant_id} value={v.size}>{v.size}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <TextInput
+                                    value={lookup.size || ''}
+                                    readOnly
+                                    className="w-full text-sm bg-gray-100 cursor-not-allowed"
+                                />
+                            )}
+                        </div>
+
+                        <div className="sm:col-span-2">
+                            <InputLabel value="Qtd *" className="text-xs" />
+                            <TextInput
+                                type="number"
+                                min="1"
+                                value={qty}
+                                onChange={(e) => setQty(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleAdd();
+                                    }
+                                }}
+                                className="w-full text-sm text-right tabular-nums"
+                            />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                            <Button
+                                type="button"
+                                variant="primary"
+                                onClick={handleAdd}
+                                icon={PlusIcon}
+                                className="w-full justify-center"
+                            >
+                                Adicionar
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ====================================================================
+// ItemRowReadOnly — linha somente-leitura da tabela de produtos adicionados
+// ====================================================================
+function ItemRowReadOnly({ idx, item, onRemove }) {
     const stock = item._suggested_origin_stock ?? item._resolved_stock ?? null;
     const qty = parseInt(item.qty_requested, 10) || 1;
     const exceedsStock = stock !== null && stock !== undefined && qty >= stock;
 
     return (
-        <tr className={notFound ? 'bg-amber-50/50' : ''}>
+        <tr>
             <td className="px-2 py-2 align-top">
-                <div className="flex items-center gap-1">
-                    <span className="text-xs text-gray-500 font-mono">{idx + 1}</span>
-                    {ok && <CheckCircleIcon className="h-4 w-4 text-green-600" title="Casado pelo catálogo" />}
-                    {notFound && <ExclamationTriangleIcon className="h-4 w-4 text-amber-500" title={item._lookup_error} />}
-                    {isLoading && (
-                        <span className="text-[10px] text-gray-400" title="Consultando...">···</span>
-                    )}
-                </div>
+                <span className="text-xs text-gray-500 font-mono">{idx + 1}</span>
             </td>
-            <td className="px-2 py-2 align-top">
-                <div className="flex items-stretch">
-                    <TextInput
-                        value={tempInput}
-                        onChange={(e) => setTempInput(e.target.value)}
-                        onBlur={() => {
-                            const v = tempInput.trim();
-                            if (v && v !== (item.barcode || item.product_reference || '')) {
-                                onLookup(v);
-                            }
-                        }}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                e.preventDefault();
-                                onLookup(tempInput.trim());
-                            }
-                        }}
-                        placeholder="Bipe ou digite"
-                        maxLength={100}
-                        disabled={isLoading}
-                        className="flex-1 min-w-0 text-sm font-mono rounded-r-none focus:z-10"
-                    />
-                    <button
-                        type="button"
-                        onClick={() => onLookup(tempInput.trim())}
-                        disabled={isLoading || !tempInput.trim()}
-                        className="shrink-0 px-2 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 hover:bg-gray-100 text-gray-600 hover:text-indigo-700 disabled:opacity-50"
-                        title="Consultar catálogo"
-                    >
-                        <MagnifyingGlassIcon className="h-4 w-4" />
-                    </button>
+            <td className="px-2 py-2 align-top text-sm">
+                <div className="font-mono text-gray-900">
+                    {item.product_reference || item.barcode || '—'}
                 </div>
-                {notFound && (
-                    <p className="text-[11px] text-amber-700 mt-1">{item._lookup_error}</p>
-                )}
-                {ok && item.product_reference && item.barcode && (
-                    <p className="text-[10px] text-gray-400 mt-0.5 font-mono">
-                        Ref: {item.product_reference} · EAN: {item.barcode}
-                    </p>
+                {item.barcode && item.barcode !== item.product_reference && (
+                    <div className="text-[10px] text-gray-400 font-mono">EAN {item.barcode}</div>
                 )}
             </td>
             <td className="px-2 py-2 align-top text-sm">
@@ -850,42 +858,11 @@ function ItemRow({ idx, item, canRemove, onChange, onRemove, onLookup, onSizeSel
                 </div>
                 {item.product_color && <div className="text-xs text-gray-500">{item.product_color}</div>}
             </td>
-            <td className="px-2 py-2 align-top">
-                {sizesFromCatalog ? (
-                    <select
-                        value={item.size || ''}
-                        onChange={(e) => onSizeSelect(e.target.value)}
-                        className="block w-full rounded-md border-gray-300 shadow-sm text-sm"
-                    >
-                        <option value="">—</option>
-                        {item._available_sizes.map((v) => (
-                            <option key={v.variant_id} value={v.size}>{v.size}</option>
-                        ))}
-                    </select>
-                ) : item._lookup_mode === 'barcode' ? (
-                    <TextInput
-                        value={item.size || ''}
-                        readOnly
-                        className="w-full text-sm bg-gray-100 cursor-not-allowed"
-                    />
-                ) : (
-                    <TextInput
-                        value={item.size || ''}
-                        onChange={(e) => onChange('size', e.target.value)}
-                        placeholder="—"
-                        maxLength={20}
-                        className="w-full text-sm"
-                    />
-                )}
+            <td className="px-2 py-2 align-top text-sm">
+                {item.size || <span className="text-gray-400">—</span>}
             </td>
-            <td className="px-2 py-2 align-top text-right">
-                <TextInput
-                    type="number"
-                    min="1"
-                    value={item.qty_requested}
-                    onChange={(e) => onChange('qty_requested', e.target.value)}
-                    className={`w-16 text-sm text-right tabular-nums ${exceedsStock ? 'border-red-400 text-red-700' : ''}`}
-                />
+            <td className={`px-2 py-2 align-top text-right text-sm tabular-nums font-medium ${exceedsStock ? 'text-red-700' : 'text-gray-900'}`}>
+                {qty}
             </td>
             <td className="px-2 py-2 align-top">
                 {item._suggested_origin_code ? (
@@ -911,25 +888,21 @@ function ItemRow({ idx, item, canRemove, onChange, onRemove, onLookup, onSizeSel
                 )}
             </td>
             <td className="px-2 py-2 align-top text-center">
-                {canRemove && (
-                    <button
-                        type="button"
-                        onClick={onRemove}
-                        title="Remover item"
-                        className="text-red-500 hover:text-red-700"
-                    >
-                        <TrashIcon className="h-4 w-4" />
-                    </button>
-                )}
+                <button
+                    type="button"
+                    onClick={onRemove}
+                    title="Remover item"
+                    className="text-red-500 hover:text-red-700"
+                >
+                    <TrashIcon className="h-4 w-4" />
+                </button>
             </td>
         </tr>
     );
 }
 
 // ====================================================================
-// ConfirmCreateModal — pré-validação antes de postar.
-// Mostrado quando: há multi-origem, há itens que zeram estoque, ou
-// CIGAM ofline (não conseguimos validar saldo).
+// ConfirmCreateModal — pré-validação antes de postar (mantido).
 // ====================================================================
 function ConfirmCreateModal({ state, getStoreLabel, onCancel, onConfirm, onToggleRemove, processing }) {
     const { groups, problems, removeFlags, multiOrigin, cigamAvailable } = state;
