@@ -407,6 +407,26 @@ class DamagedProductController extends Controller
         return response()->json($this->buildStatistics($scopedStoreId));
     }
 
+    /**
+     * Dashboard analítico — página separada com 4 gráficos recharts.
+     * Reusa buildStatistics() pra cards e adiciona buildAnalytics() pros
+     * gráficos. Sem entrada própria no menu central (acessado via action
+     * no PageHeader do Index — paridade com reversals.dashboard).
+     */
+    public function dashboard(Request $request): Response
+    {
+        $scopedStoreId = $this->resolveScopedStoreId($request->user());
+
+        return Inertia::render('DamagedProducts/Dashboard', [
+            'statistics' => $this->buildStatistics($scopedStoreId),
+            'analytics' => $this->buildAnalytics($scopedStoreId),
+            'isStoreScoped' => $scopedStoreId !== null,
+            'scopedStoreCode' => $scopedStoreId
+                ? Store::where('id', $scopedStoreId)->value('code')
+                : null,
+        ]);
+    }
+
     // ==================================================================
     // Export / Import
     // ==================================================================
@@ -595,6 +615,168 @@ class DamagedProductController extends Controller
             'cancelled' => (int) ($row->cancelled_count ?? 0),
             'resolution_rate' => $resolutionRate,
         ];
+    }
+
+    /**
+     * Agregações para os 4 gráficos do Dashboard:
+     * (1) por status (pizza) — cores do enum
+     * (2) por damage_type (pizza top 10) — insight operacional
+     * (3) por loja (barra horizontal top 10) — só quando admin (sem scoping)
+     * (4) últimos 12 meses (linha) — criados vs resolvidos
+     *
+     * Inclui também métricas de performance: tempo médio open→resolved,
+     * score médio dos matches aceitos, total de transferências geradas.
+     */
+    protected function buildAnalytics(?int $scopedStoreId): array
+    {
+        $baseQuery = fn () => $scopedStoreId
+            ? DamagedProduct::query()->where('store_id', $scopedStoreId)
+            : DamagedProduct::query();
+
+        // 1. Distribuição por status (pizza)
+        $byStatus = (clone $baseQuery())
+            ->selectRaw('status as status_value, COUNT(*) as count')
+            ->groupBy('status')
+            ->get()
+            ->map(function ($r) {
+                $raw = (string) $r->status_value;
+                $status = DamagedProductStatus::tryFrom($raw);
+                return [
+                    'status' => $raw,
+                    'label' => $status?->label() ?? $raw,
+                    'color' => $status?->color() ?? 'gray',
+                    'count' => (int) $r->count,
+                ];
+            })
+            ->values();
+
+        // 2. Distribuição por damage_type (top 10) — apenas registros com damage_type
+        $byDamageType = (clone $baseQuery())
+            ->leftJoin('damage_types', 'damage_types.id', '=', 'damaged_products.damage_type_id')
+            ->whereNotNull('damaged_products.damage_type_id')
+            ->selectRaw('damage_types.name as damage_type, COUNT(*) as count')
+            ->groupBy('damage_types.name')
+            ->orderByDesc('count')
+            ->limit(10)
+            ->get()
+            ->map(fn ($r) => [
+                'damage_type' => $r->damage_type ?: '(Sem tipo)',
+                'count' => (int) $r->count,
+            ])
+            ->values();
+
+        // 3. Top 10 lojas (barra horizontal) — só quando não há scoping
+        $byStore = $scopedStoreId
+            ? collect()
+            : DamagedProduct::query()
+                ->leftJoin('stores', 'stores.id', '=', 'damaged_products.store_id')
+                ->selectRaw('damaged_products.store_id, COALESCE(stores.code, ?) as store_code, COALESCE(stores.name, ?) as store_name, COUNT(*) as count', ['(?)', '(Sem loja)'])
+                ->groupBy('damaged_products.store_id', 'stores.code', 'stores.name')
+                ->orderByDesc('count')
+                ->limit(10)
+                ->get()
+                ->map(fn ($r) => [
+                    'store_code' => $r->store_code,
+                    'store_name' => $r->store_name,
+                    'count' => (int) $r->count,
+                ])
+                ->values();
+
+        // 4. Linha temporal — últimos 12 meses (criados vs resolvidos)
+        $twelveMonthsAgo = now()->subMonths(11)->startOfMonth();
+
+        $createdByMonth = (clone $baseQuery())
+            ->where('created_at', '>=', $twelveMonthsAgo)
+            ->selectRaw($this->monthSelect('created_at') . ' as month, COUNT(*) as count')
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get()
+            ->keyBy('month');
+
+        $resolvedByMonth = (clone $baseQuery())
+            ->where('resolved_at', '>=', $twelveMonthsAgo)
+            ->whereNotNull('resolved_at')
+            ->selectRaw($this->monthSelect('resolved_at') . ' as month, COUNT(*) as count')
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get()
+            ->keyBy('month');
+
+        $timelineFull = [];
+        for ($i = 11; $i >= 0; $i--) {
+            $month = now()->subMonths($i);
+            $key = $month->format('Y-m');
+            $timelineFull[] = [
+                'month' => $key,
+                'label' => $month->locale('pt_BR')->isoFormat('MMM/YY'),
+                'created' => (int) ($createdByMonth->get($key)?->count ?? 0),
+                'resolved' => (int) ($resolvedByMonth->get($key)?->count ?? 0),
+            ];
+        }
+
+        // 5. Métricas de performance
+        $avgHoursToResolve = (float) ((clone $baseQuery())
+            ->whereNotNull('resolved_at')
+            ->selectRaw($this->hoursDiffSelect('created_at', 'resolved_at') . ' as avg_hours')
+            ->value('avg_hours') ?? 0);
+
+        // Match score médio entre matches aceitos
+        $avgMatchScore = (float) (\App\Models\DamagedProductMatch::query()
+            ->where('status', \App\Enums\DamageMatchStatus::ACCEPTED->value)
+            ->when($scopedStoreId, function ($q) use ($scopedStoreId) {
+                $q->whereHas('productA', fn ($qa) => $qa->where('store_id', $scopedStoreId))
+                  ->orWhereHas('productB', fn ($qb) => $qb->where('store_id', $scopedStoreId));
+            })
+            ->avg('match_score') ?? 0);
+
+        // Transferências geradas pelo módulo (transfer_type='damage_match')
+        $transfersGenerated = \App\Models\Transfer::query()
+            ->where('transfer_type', 'damage_match')
+            ->when($scopedStoreId, function ($q) use ($scopedStoreId) {
+                $q->where(function ($qq) use ($scopedStoreId) {
+                    $qq->where('origin_store_id', $scopedStoreId)
+                       ->orWhere('destination_store_id', $scopedStoreId);
+                });
+            })
+            ->count();
+
+        return [
+            'by_status' => $byStatus,
+            'by_damage_type' => $byDamageType,
+            'by_store' => $byStore,
+            'timeline' => $timelineFull,
+            'performance' => [
+                'avg_hours_to_resolve' => round($avgHoursToResolve, 1),
+                'avg_days_to_resolve' => round($avgHoursToResolve / 24, 1),
+                'avg_match_score' => round($avgMatchScore, 1),
+                'transfers_generated' => $transfersGenerated,
+            ],
+        ];
+    }
+
+    /**
+     * Helper: agrupamento por mês cross-DB. SQLite usa strftime; MySQL usa
+     * DATE_FORMAT. Necessário pra o Dashboard funcionar nos testes (SQLite
+     * in-memory) e em produção (MySQL).
+     */
+    protected function monthSelect(string $column): string
+    {
+        $driver = DB::connection()->getDriverName();
+        return $driver === 'sqlite'
+            ? "strftime('%Y-%m', {$column})"
+            : "DATE_FORMAT({$column}, '%Y-%m')";
+    }
+
+    /**
+     * Helper: diferença em horas entre duas colunas, cross-DB. SQLite usa
+     * julianday * 24; MySQL usa TIMESTAMPDIFF.
+     */
+    protected function hoursDiffSelect(string $start, string $end): string
+    {
+        $driver = DB::connection()->getDriverName();
+        return $driver === 'sqlite'
+            ? "AVG((julianday({$end}) - julianday({$start})) * 24)"
+            : "AVG(TIMESTAMPDIFF(HOUR, {$start}, {$end}))";
     }
 
     protected function permissionsPayload(?User $user): array

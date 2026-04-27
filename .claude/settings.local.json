@@ -152,7 +152,10 @@
       "Bash(C:\\\\Users\\\\MSDEV\\\\php84\\\\php.exe artisan *)",
       "Bash('C:\\\\Users\\\\MSDEV\\\\php84\\\\php.exe' artisan *)",
       "Bash('C:\\\\Users\\\\MSDEV\\\\php84\\\\php.exe' -r ' *)",
-      "Bash(wait)"
+      "Bash(wait)",
+      "Bash(C:/wamp64/bin/php/php8.4.0/php.exe *)",
+      "Bash(PHP_INI_SCAN_DIR= \"C:/Users/MSDEV/php84/php.exe\" -d memory_limit=1024M vendor/phpunit/phpunit/phpunit --testsuite=Feature --testdox --stop-on-failure --filter='^\\(?!.*DamagedProducts\\)')",
+      "Bash(xargs -I {} git show {} --stat)"
     ],
     "deny": [],
     "ask": []

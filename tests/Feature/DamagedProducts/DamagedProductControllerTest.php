@@ -273,6 +273,58 @@ class DamagedProductControllerTest extends TestCase
     }
 
     // ==================================================================
+    // Dashboard
+    // ==================================================================
+
+    public function test_dashboard_renders_with_analytics(): void
+    {
+        $this->makeProduct();
+
+        $response = $this->actingAs($this->adminUser)
+            ->get(route('damaged-products.dashboard'));
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn ($page) => $page
+            ->component('DamagedProducts/Dashboard')
+            ->has('statistics')
+            ->has('analytics.by_status')
+            ->has('analytics.by_damage_type')
+            ->has('analytics.by_store')
+            ->has('analytics.timeline', 12)
+            ->has('analytics.performance.avg_hours_to_resolve')
+            ->has('analytics.performance.avg_days_to_resolve')
+            ->has('analytics.performance.avg_match_score')
+            ->has('analytics.performance.transfers_generated')
+            ->where('isStoreScoped', false)
+        );
+    }
+
+    public function test_dashboard_scopes_by_store_when_no_manage(): void
+    {
+        $this->makeProduct();
+        app(DamagedProductService::class)->create([
+            'store_id' => $this->storeBId,
+            'product_reference' => 'CTRL-OTHER-' . uniqid(),
+            'is_mismatched' => true,
+            'mismatched_left_size' => '38',
+            'mismatched_right_size' => '39',
+        ], $this->adminUser);
+
+        $this->regularUser->update(['store_id' => 'Z421']);
+
+        $response = $this->actingAs($this->regularUser)
+            ->get(route('damaged-products.dashboard'));
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn ($page) => $page
+            ->where('isStoreScoped', true)
+            ->where('scopedStoreCode', 'Z421')
+            ->where('analytics.by_store', [])
+            ->where('statistics.total', 1)
+        );
+    }
+
+    // ==================================================================
     // Match accept (cria Transfer com damage_match)
     // ==================================================================
 

@@ -1,5 +1,6 @@
 import { Head, router } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'react-toastify';
 import {
     ExclamationTriangleIcon,
     LinkIcon,
@@ -100,6 +101,75 @@ export default function Index({
         setFilterState(next);
         applyFilters(next);
     };
+
+    // ------------------------------------------------------------------
+    // Reverb realtime — subscribe no canal privado da loja escopada.
+    // Vendedor/gerente (sem MANAGE) ouve só a própria loja. Admin com
+    // visão global não subscribe (usaria refresh manual). Padrão paridade
+    // Helpdesk: try/catch silencioso se Echo offline + debounce 500ms pra
+    // coalescer bursts de eventos.
+    // ------------------------------------------------------------------
+    const reloadTimerRef = useRef(null);
+    useEffect(() => {
+        if (!scopedStoreId || typeof window === 'undefined' || !window.Echo) {
+            return;
+        }
+
+        const scheduleReload = () => {
+            if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+            reloadTimerRef.current = setTimeout(() => {
+                router.reload({ only: ['items', 'statistics'] });
+            }, 500);
+        };
+
+        const channelName = `damaged-products.store.${scopedStoreId}`;
+        let channel;
+
+        try {
+            channel = window.Echo.private(channelName);
+
+            channel
+                .listen('.damaged-match.found', (payload) => {
+                    const ref = payload?.product_reference ?? '';
+                    const dest = payload?.destination_store_name ?? payload?.destination_store_code ?? '';
+                    toast.info(
+                        `Novo match sugerido${ref ? ` para ${ref}` : ''}${dest ? ` (destino: ${dest})` : ''}`,
+                        { autoClose: 4000 }
+                    );
+                    scheduleReload();
+                })
+                .listen('.damaged-match.accepted', (payload) => {
+                    toast.success(
+                        `Match aceito${payload?.actor_name ? ` por ${payload.actor_name}` : ''} — transferência criada.`,
+                        { autoClose: 4000 }
+                    );
+                    scheduleReload();
+                })
+                .listen('.damaged-match.rejected', (payload) => {
+                    toast.warn(
+                        `Match rejeitado${payload?.actor_name ? ` por ${payload.actor_name}` : ''}.`,
+                        { autoClose: 4000 }
+                    );
+                    scheduleReload();
+                });
+        } catch (e) {
+            // Echo não configurado ou auth falhou — silent no-op.
+        }
+
+        return () => {
+            if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+            try {
+                if (channel) {
+                    channel.stopListening('.damaged-match.found');
+                    channel.stopListening('.damaged-match.accepted');
+                    channel.stopListening('.damaged-match.rejected');
+                }
+                window.Echo.leave(`private-${channelName}`);
+            } catch (e) {
+                // noop
+            }
+        };
+    }, [scopedStoreId]);
 
     // ------------------------------------------------------------------
     // Run matching manual (POST + reload)
@@ -324,6 +394,10 @@ export default function Index({
                         icon={ExclamationTriangleIcon}
                         scopeBadge={isStoreScoped && scopedStoreCode ? `escopo: loja ${scopedStoreCode}` : null}
                         actions={[
+                            {
+                                type: 'dashboard',
+                                href: route('damaged-products.dashboard'),
+                            },
                             {
                                 type: 'sync',
                                 label: 'Rodar matching',

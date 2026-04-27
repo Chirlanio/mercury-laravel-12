@@ -69,3 +69,21 @@ Broadcast::channel('hd-department.{departmentId}', function ($user, $departmentI
         ->where('department_id', $departmentId)
         ->exists();
 });
+
+// Private channel per-store for damaged-products module (match found/accepted/rejected).
+// Authorization: usuário com MANAGE_DAMAGED_PRODUCTS bypassa scoping (ouve qualquer
+// loja). Demais só ouvem a própria loja — users.store_id é code (Z441), o canal
+// usa stores.id (numérico), então fazemos lookup code→id.
+Broadcast::channel('damaged-products.store.{storeId}', function ($user, $storeId) {
+    if ($user->hasPermissionTo(\App\Enums\Permission::MANAGE_DAMAGED_PRODUCTS->value)) {
+        return true;
+    }
+
+    if (! $user->store_id) {
+        return false;
+    }
+
+    $userStoreId = \App\Models\Store::where('code', $user->store_id)->value('id');
+
+    return $userStoreId !== null && (int) $userStoreId === (int) $storeId;
+});
