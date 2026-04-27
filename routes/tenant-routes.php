@@ -1115,6 +1115,7 @@ Route::middleware(['auth'])->group(function () {
         // Transição genérica — perm específica por transição validada no
         // RelocationTransitionService (não filtra aqui).
         Route::post('/relocations/{relocation}/transition', [\App\Http\Controllers\RelocationController::class, 'transition'])->name('relocations.transition');
+        Route::post('/relocations/{relocation}/dispatch/validate', [\App\Http\Controllers\RelocationController::class, 'dispatchValidate'])->name('relocations.dispatch.validate');
 
         Route::middleware('permission:'.Permission::DELETE_RELOCATIONS->value)->group(function () {
             Route::delete('/relocations/{relocation}', [\App\Http\Controllers\RelocationController::class, 'destroy'])->name('relocations.destroy');

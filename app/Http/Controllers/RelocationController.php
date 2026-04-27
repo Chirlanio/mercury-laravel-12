@@ -16,6 +16,7 @@ use App\Models\Store;
 use App\Models\User;
 use App\Services\CigamStockService;
 use App\Services\RelocationCommittedStockService;
+use App\Services\RelocationDispatchValidationService;
 use App\Services\RelocationExportService;
 use App\Services\RelocationImportService;
 use App\Services\RelocationService;
@@ -223,6 +224,44 @@ class RelocationController extends Controller
         }
 
         return redirect()->back()->with('success', 'Status do remanejo atualizado.');
+    }
+
+    /**
+     * Preview da validação de NF — compara items separados do remanejo
+     * contra os items registrados em movements (CIGAM) pra a chave
+     * (loja origem + invoice_number + movement_date). Não muta nada;
+     * só devolve o diagnóstico pra UI exibir antes do usuário confirmar
+     * a transição IN_SEPARATION → IN_TRANSIT.
+     */
+    public function dispatchValidate(
+        Relocation $relocation,
+        Request $request,
+        RelocationDispatchValidationService $service,
+    ): JsonResponse {
+        $this->ensureCanView($request->user(), $relocation);
+
+        if (! $request->user()->hasPermissionTo(Permission::SEPARATE_RELOCATIONS->value)) {
+            abort(403, 'Sem permissão pra validar despacho.');
+        }
+
+        if ($relocation->status !== RelocationStatus::IN_SEPARATION) {
+            return response()->json([
+                'error' => 'Validação de NF só está disponível enquanto o remanejo está em separação.',
+            ], 422);
+        }
+
+        $data = $request->validate([
+            'invoice_number' => 'required|string|max:50',
+            'invoice_date' => 'required|date',
+        ]);
+
+        $result = $service->validate(
+            $relocation,
+            trim($data['invoice_number']),
+            $data['invoice_date'],
+        );
+
+        return response()->json($result);
     }
 
     public function statistics(Request $request): JsonResponse
