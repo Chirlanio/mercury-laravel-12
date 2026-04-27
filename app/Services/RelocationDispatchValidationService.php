@@ -90,15 +90,24 @@ class RelocationDispatchValidationService
             }
         }
 
-        // Itens na NF que não estão no remanejo (sobrando)
+        // Itens na NF que não estão no remanejo (sobrando). Faz lookup
+        // no catálogo pra identificar product_name/reference/cor/tamanho —
+        // só ter o barcode dificulta o usuário entender o que sobrou.
+        $extraBarcodes = array_diff(array_keys($invoiceByBarcode), array_keys($separatedByBarcode));
+        $catalogByBarcode = $this->lookupCatalog($extraBarcodes);
+
         $extra = [];
-        foreach ($invoiceByBarcode as $barcode => $qtyInv) {
-            if (! isset($separatedByBarcode[$barcode])) {
-                $extra[] = [
-                    'barcode' => $barcode,
-                    'qty_in_invoice' => $qtyInv,
-                ];
-            }
+        foreach ($extraBarcodes as $barcode) {
+            $meta = $catalogByBarcode[$barcode] ?? [
+                'product_name' => null,
+                'product_reference' => null,
+                'size' => null,
+                'product_color' => null,
+            ];
+            $extra[] = array_merge($meta, [
+                'barcode' => $barcode,
+                'qty_in_invoice' => $invoiceByBarcode[$barcode],
+            ]);
         }
 
         $hasDiscrepancies = ! empty($missing) || ! empty($extra) || ! empty($divergent);
@@ -152,6 +161,59 @@ class RelocationDispatchValidationService
             $out[$it->barcode] = ($out[$it->barcode] ?? 0) + (int) $it->qty_separated;
         }
         return $out;
+    }
+
+    /**
+     * Busca metadata (descrição, ref, cor, tamanho) no catálogo por
+     * lista de barcodes. Usado pra identificar items "extra" da NF que
+     * não estão no remanejo — sem isso, a UI mostraria só o EAN bruto.
+     *
+     * Mesmo padrão do RelocationSuggestionService::lookupProducts:
+     * JOIN via product_variants (não products.reference, que é SKU pai),
+     * + product_sizes pra traduzir size_cigam_code em label legível.
+     *
+     * @param  array<int, string>  $barcodes
+     * @return array<string, array{product_name: ?string, product_reference: ?string, size: ?string, product_color: ?string}>
+     */
+    protected function lookupCatalog(array $barcodes): array
+    {
+        $barcodes = array_values(array_filter($barcodes));
+        if (empty($barcodes)) {
+            return [];
+        }
+
+        $rows = DB::table('product_variants as pv')
+            ->join('products as p', 'p.id', '=', 'pv.product_id')
+            ->leftJoin('product_colors as pc', 'pc.cigam_code', '=', 'p.color_cigam_code')
+            ->leftJoin('product_sizes as ps', 'ps.cigam_code', '=', 'pv.size_cigam_code')
+            ->where(function ($q) use ($barcodes) {
+                $q->whereIn('pv.barcode', $barcodes)
+                    ->orWhereIn('pv.aux_reference', $barcodes);
+            })
+            ->select([
+                'pv.barcode',
+                'pv.aux_reference',
+                'pv.size_cigam_code',
+                'p.reference',
+                'p.description',
+                'pc.name as color_name',
+                'ps.name as size_label',
+            ])
+            ->get();
+
+        $byKey = [];
+        foreach ($rows as $r) {
+            $entry = [
+                'product_name' => $r->description,
+                'product_reference' => $r->reference,
+                'size' => $r->size_label ?? $r->size_cigam_code,
+                'product_color' => $r->color_name,
+            ];
+            if ($r->barcode) $byKey[$r->barcode] = $entry;
+            if ($r->aux_reference) $byKey[$r->aux_reference] = $entry;
+        }
+
+        return $byKey;
     }
 
     /**

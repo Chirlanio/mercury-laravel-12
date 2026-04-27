@@ -111,6 +111,59 @@ class RelocationDispatchValidationServiceTest extends TestCase
         $this->assertSame(5, $result['extra'][0]['qty_in_invoice']);
     }
 
+    public function test_extra_items_include_product_metadata_from_catalog(): void
+    {
+        // Cria produto + variant pra que o lookup encontre
+        $product = \App\Models\Product::create([
+            'reference' => 'REF-EXTRA',
+            'description' => 'BOLSA TESTE EXTRA',
+        ]);
+        $size = \App\Models\ProductSize::firstOrCreate(
+            ['cigam_code' => 'U35'],
+            ['name' => '35'],
+        );
+        \App\Models\ProductVariant::create([
+            'product_id' => $product->id,
+            'barcode' => 'EAN-EXTRA',
+            'size_cigam_code' => $size->cigam_code,
+            'is_active' => true,
+        ]);
+
+        $reloc = $this->createRelocationInSeparation([
+            ['barcode' => 'EAN-A', 'qty_separated' => 1],
+        ]);
+
+        $this->insertMovement('Z424', 'NF-EXTRA-META', '2026-04-27', 'EAN-A', 1);
+        $this->insertMovement('Z424', 'NF-EXTRA-META', '2026-04-27', 'EAN-EXTRA', 2);
+
+        $result = $this->service->validate($reloc, 'NF-EXTRA-META', '2026-04-27');
+
+        $this->assertCount(1, $result['extra']);
+        $extraItem = $result['extra'][0];
+        $this->assertSame('EAN-EXTRA', $extraItem['barcode']);
+        $this->assertSame(2, $extraItem['qty_in_invoice']);
+        $this->assertSame('BOLSA TESTE EXTRA', $extraItem['product_name']);
+        $this->assertSame('REF-EXTRA', $extraItem['product_reference']);
+        $this->assertSame('35', $extraItem['size']);
+    }
+
+    public function test_extra_items_fallback_when_barcode_not_in_catalog(): void
+    {
+        $reloc = $this->createRelocationInSeparation([
+            ['barcode' => 'EAN-A', 'qty_separated' => 1],
+        ]);
+
+        $this->insertMovement('Z424', 'NF-NO-CATALOG', '2026-04-27', 'EAN-A', 1);
+        $this->insertMovement('Z424', 'NF-NO-CATALOG', '2026-04-27', 'EAN-UNKNOWN', 3);
+
+        $result = $this->service->validate($reloc, 'NF-NO-CATALOG', '2026-04-27');
+
+        $this->assertCount(1, $result['extra']);
+        $this->assertSame('EAN-UNKNOWN', $result['extra'][0]['barcode']);
+        $this->assertNull($result['extra'][0]['product_name']);
+        $this->assertNull($result['extra'][0]['product_reference']);
+    }
+
     public function test_detects_divergent_quantity(): void
     {
         $reloc = $this->createRelocationInSeparation([
