@@ -20,6 +20,7 @@ use App\Services\RelocationService;
 use App\Services\RelocationSuggestionService;
 use App\Services\RelocationTransitionService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -119,6 +120,7 @@ class RelocationController extends Controller
 
         try {
             $this->service->create($data, $user);
+            $this->bumpCacheVersion();
         } catch (ValidationException $e) {
             return redirect()->back()->withErrors($e->errors())->withInput();
         }
@@ -173,6 +175,7 @@ class RelocationController extends Controller
 
         try {
             $this->service->softDelete($relocation, $request->user(), $data['reason']);
+            $this->bumpCacheVersion();
         } catch (ValidationException $e) {
             return redirect()->back()->withErrors($e->errors());
         }
@@ -210,6 +213,7 @@ class RelocationController extends Controller
                     'received_items' => $data['received_items'] ?? [],
                 ]
             );
+            $this->bumpCacheVersion();
         } catch (ValidationException $e) {
             return redirect()->back()->withErrors($e->errors());
         }
@@ -699,6 +703,39 @@ class RelocationController extends Controller
 
     protected function buildStatistics(?int $scopedStoreId, ?string $dateFrom = null, ?string $dateTo = null): array
     {
+        // Cache file 60s — agregações + scope `overdue` são caras em prod
+        // com volume. Versionamento pra invalidação ativa em mutações
+        // (store/transition/destroy chamam bumpCacheVersion).
+        $version = $this->cacheVersion();
+        $cacheKey = "relocations:stats:v{$version}:".md5(json_encode([
+            'store' => $scopedStoreId,
+            'from' => $dateFrom,
+            'to' => $dateTo,
+        ]));
+
+        return Cache::store('file')->remember($cacheKey, 60, function () use ($scopedStoreId, $dateFrom, $dateTo) {
+            return $this->computeStatistics($scopedStoreId, $dateFrom, $dateTo);
+        });
+    }
+
+    /**
+     * Versão do cache de agregações. Incrementada por bumpCacheVersion()
+     * após mutação (create/transition/destroy) — força miss na próxima
+     * leitura sem precisar enumerar chaves (file driver não suporta tags).
+     */
+    protected function cacheVersion(): int
+    {
+        return (int) Cache::store('file')->get('relocations:cache_version', 1);
+    }
+
+    protected function bumpCacheVersion(): void
+    {
+        $next = $this->cacheVersion() + 1;
+        Cache::store('file')->forever('relocations:cache_version', $next);
+    }
+
+    protected function computeStatistics(?int $scopedStoreId, ?string $dateFrom, ?string $dateTo): array
+    {
         $base = Relocation::notDeleted();
         if ($scopedStoreId) {
             $base->forStore($scopedStoreId);
@@ -737,11 +774,30 @@ class RelocationController extends Controller
      * batch (timeline, status, origem c/ aderência, destino, tipo, top
      * produtos, métricas de trânsito).
      *
+     * Cache file 5min — analytics agregadas mudam pouco e são caras em
+     * prod (especialmente top_products e by_origin que fazem JOIN com
+     * relocation_items). TTL maior do que statistics porque o Dashboard
+     * é leitura, não fluxo operacional.
+     *
      * @param  string|null $dateFrom  YYYY-MM-DD inclusivo
      * @param  string|null $dateTo    YYYY-MM-DD inclusivo
      * @return array<string, mixed>
      */
     protected function buildAnalytics(?int $scopedStoreId, ?string $dateFrom = null, ?string $dateTo = null): array
+    {
+        $version = $this->cacheVersion();
+        $cacheKey = "relocations:analytics:v{$version}:".md5(json_encode([
+            'store' => $scopedStoreId,
+            'from' => $dateFrom,
+            'to' => $dateTo,
+        ]));
+
+        return Cache::store('file')->remember($cacheKey, 300, function () use ($scopedStoreId, $dateFrom, $dateTo) {
+            return $this->computeAnalytics($scopedStoreId, $dateFrom, $dateTo);
+        });
+    }
+
+    protected function computeAnalytics(?int $scopedStoreId, ?string $dateFrom, ?string $dateTo): array
     {
         $baseQuery = function () use ($scopedStoreId, $dateFrom, $dateTo) {
             $q = Relocation::query()->notDeleted();

@@ -246,9 +246,16 @@ class Relocation extends Model
      * Remanejos atrasados pela deadline (deadline_days a partir de
      * approved_at). Usado pelo command relocations:overdue-alert.
      *
+     * Otimização: invertendo a aritmética pra `approved_at < now() -
+     * INTERVAL deadline_days DAY`. Isso ainda invalida o índice de
+     * approved_at por causa do `deadline_days` na expressão, mas como
+     * filtramos primeiro por `status IN (...)` (que tem índice de status)
+     * o set já é pequeno antes do whereRaw. Em datasets grandes ainda
+     * vale considerar coluna `deadline_at` materializada (backlog).
+     *
      * Sintaxe da soma de dias varia por driver:
-     *   - MySQL:  DATE_ADD(approved_at, INTERVAL deadline_days DAY)
-     *   - SQLite: datetime(approved_at, '+' || deadline_days || ' days')
+     *   - MySQL:  DATE_SUB(NOW(), INTERVAL deadline_days DAY)
+     *   - SQLite: datetime('now', '-' || deadline_days || ' days')
      */
     public function scopeOverdue(Builder $query): Builder
     {
@@ -264,12 +271,13 @@ class Relocation extends Model
 
         if ($driver === 'sqlite') {
             return $query->whereRaw(
-                "datetime(approved_at, '+' || deadline_days || ' days') < datetime('now')"
+                "approved_at < datetime('now', '-' || deadline_days || ' days')"
             );
         }
 
-        // Default MySQL/MariaDB
-        return $query->whereRaw('DATE_ADD(approved_at, INTERVAL deadline_days DAY) < NOW()');
+        // MySQL/MariaDB — comparação direta com approved_at usa o índice
+        // (status, approved_at) quando existir.
+        return $query->whereRaw('approved_at < DATE_SUB(NOW(), INTERVAL deadline_days DAY)');
     }
 
     // ------------------------------------------------------------------
