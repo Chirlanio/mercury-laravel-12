@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
 
 class DamagedProductPhoto extends Model
 {
@@ -39,12 +38,30 @@ class DamagedProductPhoto extends Model
         return $this->belongsTo(User::class, 'uploaded_by_user_id');
     }
 
+    /**
+     * URL pública da foto.
+     *
+     * Usa tenant_asset() (não asset('storage/...')) porque as fotos são
+     * salvas no disk='public' DENTRO do contexto tenant — ou seja, em
+     * storage/tenant{id}/app/public/damaged-products/... (não no central
+     * storage/app/public/avatars/...).
+     *
+     * O asset_helper_tenancy: true da config tenancy reescreve
+     *   asset('storage/foo') → /tenancy/assets/storage/foo  (404 — path
+     *   literal "storage/foo" não existe no tenant disk)
+     * já o tenant_asset($path) gera o path direto:
+     *   tenant_asset('foo') → /tenancy/assets/foo (resolve correto)
+     *
+     * User::$avatar_url etc usam asset('storage/avatars/...') porque
+     * avatars são salvos no central (storage/app/public/avatars/) via
+     * symlink public/storage — esse caso não passa pelo TenantAssetsController.
+     */
     public function getUrlAttribute(): ?string
     {
         if (! $this->file_path) {
             return null;
         }
 
-        return Storage::disk('public')->url($this->file_path);
+        return tenant_asset($this->file_path);
     }
 }

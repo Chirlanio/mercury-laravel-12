@@ -411,6 +411,8 @@ class DamagedProductMatchingService
                 'origin_store_id' => $match->suggested_origin_store_id,
                 'destination_store_id' => $match->suggested_destination_store_id,
                 'invoice_number' => $invoiceNumber,
+                'volumes_qty' => 1,
+                'products_qty' => 1,
                 'transfer_type' => 'damage_match',
                 'status' => 'pending',
                 'observations' => $this->buildTransferObservations($match),

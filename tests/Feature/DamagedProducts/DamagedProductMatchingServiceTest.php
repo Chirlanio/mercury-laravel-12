@@ -422,6 +422,9 @@ class DamagedProductMatchingServiceTest extends TestCase
         $this->assertSame('damage_match', $transfer->transfer_type);
         $this->assertSame('pending', $transfer->status);
         $this->assertSame('NF-12345', $transfer->invoice_number);
+        // Match damage gera 1 par/volume — sempre 1+1
+        $this->assertSame(1, $transfer->volumes_qty);
+        $this->assertSame(1, $transfer->products_qty);
 
         // Ambos os produtos transicionaram pra transfer_requested
         $a->refresh();

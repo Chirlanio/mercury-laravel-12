@@ -253,6 +253,16 @@ class DamagedProductController extends Controller
     {
         $this->ensureCanView($request->user(), $damagedProduct);
 
+        // Eager-load das variants + size do produto do contexto pra resolver
+        // nomes de tamanho na resposta (cigam_code → name). Como produto é
+        // o mesmo dos partners (matches casam por product_reference), o mapa
+        // do contexto serve pra ambos os lados.
+        $damagedProduct->loadMissing([
+            'product:id,reference',
+            'product.variants:id,product_id,size_cigam_code,is_active',
+            'product.variants.size:cigam_code,name',
+        ]);
+
         $matches = DamagedProductMatch::with([
             'productA.store:id,code,name',
             'productB.store:id,code,name',
@@ -265,8 +275,14 @@ class DamagedProductController extends Controller
             ->latest('id')
             ->get();
 
+        // Mapa cigam_code → name (ex: '5' → '38')
+        $sizeMap = $damagedProduct->product?->variants
+            ->pluck('size.name', 'size_cigam_code')
+            ->filter()
+            ->toArray() ?? [];
+
         return response()->json([
-            'matches' => $matches->map(fn ($m) => $this->formatMatch($m, $damagedProduct)),
+            'matches' => $matches->map(fn ($m) => $this->formatMatch($m, $damagedProduct, $sizeMap)),
         ]);
     }
 
@@ -667,9 +683,15 @@ class DamagedProductController extends Controller
         return $base;
     }
 
-    protected function formatMatch(DamagedProductMatch $m, DamagedProduct $context): array
+    /**
+     * @param  array<string,string>  $sizeMap  cigam_code → name (vindo de
+     *   loadMatches() que pré-carrega variants do produto do contexto). Usado
+     *   pra retornar `_label` resolvido (ex: '5' → '38') ao lado dos cigam_codes.
+     */
+    protected function formatMatch(DamagedProductMatch $m, DamagedProduct $context, array $sizeMap = []): array
     {
         $partner = $m->partnerOf($context);
+        $resolveSize = fn ($code) => $code !== null && isset($sizeMap[$code]) ? $sizeMap[$code] : $code;
 
         return [
             'id' => $m->id,
@@ -686,10 +708,17 @@ class DamagedProductController extends Controller
                 'product_name' => $partner->product_name,
                 'store' => $partner->store ? ['code' => $partner->store->code, 'name' => $partner->store->name] : null,
                 'mismatched_left_size' => $partner->mismatched_left_size,
+                'mismatched_left_size_label' => $resolveSize($partner->mismatched_left_size),
                 'mismatched_right_size' => $partner->mismatched_right_size,
+                'mismatched_right_size_label' => $resolveSize($partner->mismatched_right_size),
                 'damaged_foot' => $partner->damaged_foot?->value,
                 'damaged_size' => $partner->damaged_size,
+                'damaged_size_label' => $resolveSize($partner->damaged_size),
             ] : null,
+            // Tamanhos resolvidos do CONTEXTO (Este produto na tabela)
+            'context_left_size_label' => $resolveSize($context->mismatched_left_size),
+            'context_right_size_label' => $resolveSize($context->mismatched_right_size),
+            'context_damaged_size_label' => $resolveSize($context->damaged_size),
             'suggested_origin' => $m->suggestedOriginStore ? ['code' => $m->suggestedOriginStore->code, 'name' => $m->suggestedOriginStore->name] : null,
             'suggested_destination' => $m->suggestedDestinationStore ? ['code' => $m->suggestedDestinationStore->code, 'name' => $m->suggestedDestinationStore->name] : null,
             'transfer' => $m->transfer ? [

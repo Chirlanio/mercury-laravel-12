@@ -375,6 +375,14 @@ class DamagedProductService
         $directory = "damaged-products/{$product->ulid}";
         $created = collect();
 
+        // O ImageUploadService tem limite default de 2MB (do PHP config) que
+        // não bate com o nosso 5MB validado nas FormRequests. Setar config
+        // local pra alinhar — mantém aceito JPG/PNG/WebP (sem GIF).
+        $this->imageUploadService->setConfig([
+            'max_file_size' => 5 * 1024 * 1024,
+            'allowed_mime_types' => ['image/jpeg', 'image/png', 'image/webp'],
+        ]);
+
         foreach ($photos as $file) {
             if (! $file instanceof UploadedFile) {
                 continue;

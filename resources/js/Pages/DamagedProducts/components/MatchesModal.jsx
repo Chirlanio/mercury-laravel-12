@@ -105,7 +105,7 @@ export default function MatchesModal({
             subtitle={item ? `${item.store?.code ?? ''} · ${item.store?.name ?? ''}` : null}
             headerColor="bg-purple-600"
             headerIcon={<LinkIcon className="h-5 w-5" />}
-            maxWidth="3xl"
+            maxWidth="5xl"
             loading={loading}
         >
             {!loading && matches.length === 0 && (
@@ -155,14 +155,25 @@ export default function MatchesModal({
 
                             <div>
                                 <div className="text-xs font-medium text-gray-500">Direção sugerida</div>
-                                <div className="text-sm flex items-center gap-2 mt-1">
-                                    <span className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">
-                                        {m.suggested_origin?.code}
-                                    </span>
-                                    <ArrowsRightLeftIcon className="h-4 w-4 text-gray-400" />
-                                    <span className="px-2 py-1 bg-indigo-100 rounded text-xs font-mono text-indigo-700">
-                                        {m.suggested_destination?.code}
-                                    </span>
+                                <div className="text-sm mt-1 space-y-1">
+                                    <div className="flex items-start gap-2">
+                                        <span className="text-xs text-gray-500 shrink-0 mt-0.5">Origem:</span>
+                                        <span className="px-2 py-0.5 bg-gray-100 rounded text-xs">
+                                            <span className="font-mono">{m.suggested_origin?.code}</span>
+                                            {m.suggested_origin?.name && (
+                                                <span className="ml-1 text-gray-700">— {m.suggested_origin.name}</span>
+                                            )}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-start gap-2">
+                                        <span className="text-xs text-gray-500 shrink-0 mt-0.5">Destino:</span>
+                                        <span className="px-2 py-0.5 bg-indigo-100 rounded text-xs">
+                                            <span className="font-mono text-indigo-700">{m.suggested_destination?.code}</span>
+                                            {m.suggested_destination?.name && (
+                                                <span className="ml-1 text-indigo-700">— {m.suggested_destination.name}</span>
+                                            )}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -181,13 +192,13 @@ export default function MatchesModal({
                                     <tbody>
                                         <tr>
                                             <td className="border px-2 py-1 font-mono">Este (#{item?.id})</td>
-                                            <td className="border px-2 py-1 text-center font-mono">{item?.mismatched_left_size}</td>
-                                            <td className="border px-2 py-1 text-center font-mono">{item?.mismatched_right_size}</td>
+                                            <td className="border px-2 py-1 text-center font-mono">{m.context_left_size_label ?? item?.mismatched_left_size}</td>
+                                            <td className="border px-2 py-1 text-center font-mono">{m.context_right_size_label ?? item?.mismatched_right_size}</td>
                                         </tr>
                                         <tr>
                                             <td className="border px-2 py-1 font-mono">Parceiro (#{m.partner?.id})</td>
-                                            <td className="border px-2 py-1 text-center font-mono">{m.partner?.mismatched_left_size}</td>
-                                            <td className="border px-2 py-1 text-center font-mono">{m.partner?.mismatched_right_size}</td>
+                                            <td className="border px-2 py-1 text-center font-mono">{m.partner?.mismatched_left_size_label ?? m.partner?.mismatched_left_size}</td>
+                                            <td className="border px-2 py-1 text-center font-mono">{m.partner?.mismatched_right_size_label ?? m.partner?.mismatched_right_size}</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -201,12 +212,12 @@ export default function MatchesModal({
                             <div className="px-4 pb-3 text-xs text-gray-600">
                                 Este produto: avaria no <strong>
                                     {item?.damaged_foot === 'left' ? 'pé esquerdo' : item?.damaged_foot === 'right' ? 'pé direito' : '—'}
-                                </strong> tamanho <strong className="font-mono">{item?.damaged_size}</strong>
+                                </strong> tamanho <strong className="font-mono">{m.context_damaged_size_label ?? item?.damaged_size}</strong>
                                 {' · '}
                                 Parceiro: avaria no <strong>
                                     {m.partner?.damaged_foot === 'left' ? 'pé esquerdo' : m.partner?.damaged_foot === 'right' ? 'pé direito' : '—'}
-                                </strong> tamanho <strong className="font-mono">{m.partner?.damaged_size}</strong>
-                                . Combinando os pés bons forma 1 par íntegro tamanho <strong className="font-mono">{item?.damaged_size}</strong>.
+                                </strong> tamanho <strong className="font-mono">{m.partner?.damaged_size_label ?? m.partner?.damaged_size}</strong>
+                                . Combinando os pés bons forma 1 par íntegro tamanho <strong className="font-mono">{m.context_damaged_size_label ?? item?.damaged_size}</strong>.
                             </div>
                         )}
 
