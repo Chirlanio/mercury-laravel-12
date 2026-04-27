@@ -100,10 +100,14 @@ export default function Index({
         const params = Object.fromEntries(
             Object.entries(merged).filter(([, v]) => v !== '' && v !== null && v !== undefined && v !== false)
         );
+        // partial reload: re-renderiza só a tabela + cards + filtros, preserva
+        // statusOptions, permissions, selects e demais props estáveis (evita
+        // o flash visual de re-mount completo da página).
         router.get(route('relocations.index'), params, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
+            only: ['relocations', 'statistics', 'filters'],
         });
     };
 
@@ -148,6 +152,7 @@ export default function Index({
             preserveState: true,
             preserveScroll: true,
             replace: true,
+            only: ['relocations', 'statistics', 'filters'],
         });
     };
 

@@ -356,7 +356,7 @@ export default function CreateModal({
             toast.success(okCount === 1 ? 'Remanejo criado.' : `${okCount} remanejos criados.`);
             reset();
             onClose();
-            router.reload({ only: ['items', 'statistics'] });
+            router.reload({ only: ['relocations', 'statistics'] });
             return;
         }
 
@@ -367,7 +367,7 @@ export default function CreateModal({
 
         if (okCount > 0) {
             toast.warning(`${okCount} criado(s), ${failCount} falhou(aram). ${failedLabels}`, { autoClose: 8000 });
-            router.reload({ only: ['items', 'statistics'] });
+            router.reload({ only: ['relocations', 'statistics'] });
         } else {
             toast.error(`Falha ao criar: ${failedLabels}`, { autoClose: 8000 });
         }
