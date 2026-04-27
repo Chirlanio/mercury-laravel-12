@@ -117,6 +117,9 @@ class DamagedProductController extends Controller
             'statusOptions' => DamagedProductStatus::options(),
             'isStoreScoped' => $scopedStoreId !== null,
             'scopedStoreId' => $scopedStoreId,
+            'scopedStoreCode' => $scopedStoreId
+                ? Store::where('id', $scopedStoreId)->value('code')
+                : null,
             'permissions' => $this->permissionsPayload($user),
             'selects' => [
                 'stores' => $scopedStoreId

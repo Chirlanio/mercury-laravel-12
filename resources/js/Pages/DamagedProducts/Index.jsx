@@ -1,15 +1,13 @@
 import { Head, router } from '@inertiajs/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     ExclamationTriangleIcon,
     LinkIcon,
     CheckCircleIcon,
     ClockIcon,
-    EyeIcon,
-    PencilSquareIcon,
     TrashIcon,
+    XMarkIcon,
 } from '@heroicons/react/24/outline';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { usePermissions, PERMISSIONS } from '@/Hooks/usePermissions';
 import useModalManager from '@/Hooks/useModalManager';
 import PageHeader from '@/Components/Shared/PageHeader';
@@ -40,6 +38,7 @@ export default function Index({
     statusOptions = {},
     isStoreScoped = false,
     scopedStoreId = null,
+    scopedStoreCode = null,
     permissions: pagePermissions = {},
     selects = {},
 }) {
@@ -120,19 +119,93 @@ export default function Index({
     };
 
     // ------------------------------------------------------------------
-    // Statistics cards
+    // Detecta se há filtros ativos (controla "Limpar filtros" + emptyMessage)
     // ------------------------------------------------------------------
+    const hasActiveFilters = useMemo(() => {
+        return Object.entries(filters).some(([k, v]) => {
+            if (k === 'include_terminal') return v === true;
+            return v !== '' && v !== null && v !== undefined;
+        });
+    }, [filters]);
+
+    const clearFilters = () => {
+        const reset = {
+            store_id: '',
+            status: '',
+            issue_type: '',
+            damage_type_id: '',
+            search: '',
+            date_from: '',
+            date_to: '',
+            include_terminal: false,
+        };
+        setFilterState(reset);
+        router.get(route('damaged-products.index'), {}, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        });
+    };
+
+    // ------------------------------------------------------------------
+    // Statistics cards (clicáveis — filtram por status quando aplicável)
+    // ------------------------------------------------------------------
+    const setStatusFilter = (status) => {
+        const next = { ...filterState, status, include_terminal: status ? false : filterState.include_terminal };
+        setFilterState(next);
+        applyFilters(next);
+    };
+
     const statisticsCards = [
-        { label: 'Total', value: statistics.total ?? 0, icon: ExclamationTriangleIcon, color: 'gray' },
-        { label: 'Em aberto', value: statistics.open ?? 0, icon: ClockIcon, color: 'gray' },
-        { label: 'Match encontrado', value: statistics.matched ?? 0, icon: LinkIcon, color: 'blue' },
-        { label: 'Aguardando transferência', value: statistics.transfer_requested ?? 0, icon: ClockIcon, color: 'amber' },
+        {
+            label: 'Total',
+            value: statistics.total ?? 0,
+            format: 'number',
+            icon: ExclamationTriangleIcon,
+            color: 'gray',
+            onClick: () => setStatusFilter(''),
+            active: !filterState.status,
+        },
+        {
+            label: 'Em aberto',
+            value: statistics.open ?? 0,
+            format: 'number',
+            icon: ClockIcon,
+            color: 'gray',
+            onClick: () => setStatusFilter('open'),
+            active: filterState.status === 'open',
+        },
+        {
+            label: 'Match encontrado',
+            value: statistics.matched ?? 0,
+            format: 'number',
+            icon: LinkIcon,
+            color: 'blue',
+            onClick: () => setStatusFilter('matched'),
+            active: filterState.status === 'matched',
+        },
+        {
+            label: 'Aguardando transferência',
+            value: statistics.transfer_requested ?? 0,
+            format: 'number',
+            icon: ClockIcon,
+            color: 'amber',
+            onClick: () => setStatusFilter('transfer_requested'),
+            active: filterState.status === 'transfer_requested',
+        },
         {
             label: 'Resolvidos',
             value: statistics.resolved ?? 0,
+            format: 'number',
             sub: `Taxa: ${statistics.resolution_rate ?? 0}%`,
             icon: CheckCircleIcon,
             color: 'green',
+            onClick: () => {
+                const next = { ...filterState, status: 'resolved', include_terminal: true };
+                setFilterState(next);
+                applyFilters(next);
+            },
+            active: filterState.status === 'resolved',
         },
     ];
 
@@ -243,13 +316,13 @@ export default function Index({
         <>
             <Head title="Produtos Avariados" />
 
-            <div className="py-6">
+            <div className="py-12">
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
                     <PageHeader
                         title="Produtos Avariados"
                         subtitle="Pares trocados e avarias entre lojas com matching automático"
                         icon={ExclamationTriangleIcon}
-                        scopeBadge={isStoreScoped ? 'escopo: sua loja' : null}
+                        scopeBadge={isStoreScoped && scopedStoreCode ? `escopo: loja ${scopedStoreCode}` : null}
                         actions={[
                             {
                                 type: 'sync',
@@ -257,6 +330,11 @@ export default function Index({
                                 onClick: runMatching,
                                 visible: canRunMatching,
                                 loading: runningMatching,
+                            },
+                            {
+                                type: 'download',
+                                download: route('damaged-products.export', filters),
+                                visible: canExport,
                             },
                             {
                                 type: 'create',
@@ -371,6 +449,19 @@ export default function Index({
                                 </label>
                             </div>
                         </div>
+
+                        {hasActiveFilters && (
+                            <div className="mt-3 flex justify-end">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    icon={XMarkIcon}
+                                    onClick={clearFilters}
+                                >
+                                    Limpar filtros
+                                </Button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Tabela */}
@@ -378,7 +469,11 @@ export default function Index({
                         data={items}
                         columns={columns}
                         searchable={false}
-                        emptyMessage="Nenhum produto avariado cadastrado com os filtros atuais."
+                        emptyMessage={
+                            hasActiveFilters
+                                ? 'Nenhum produto avariado encontrado com os filtros atuais.'
+                                : 'Nenhum produto avariado cadastrado ainda.'
+                        }
                     />
                 </div>
             </div>
