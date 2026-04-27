@@ -23,6 +23,11 @@ use Illuminate\Validation\ValidationException;
  */
 class RelocationService
 {
+    public function __construct(
+        protected CigamStockService $cigam,
+        protected RelocationCommittedStockService $committed,
+    ) {}
+
     /**
      * Cria um remanejo em estado draft com itens iniciais opcionais.
      *
@@ -42,6 +47,11 @@ class RelocationService
     public function create(array $data, User $actor): Relocation
     {
         $this->validateStores($data['origin_store_id'] ?? null, $data['destination_store_id'] ?? null);
+
+        $this->validateStockAvailability(
+            (int) $data['origin_store_id'],
+            $data['items'] ?? [],
+        );
 
         $priority = isset($data['priority'])
             ? RelocationPriority::from($data['priority'])
@@ -286,6 +296,81 @@ class RelocationService
             throw ValidationException::withMessages([
                 'destination_store_id' => 'Lojas devem ser da mesma rede comercial. '.
                     "Origem ({$origin->code}) e destino ({$destination->code}) estão em redes diferentes.",
+            ]);
+        }
+    }
+
+    /**
+     * Valida que a soma das qty_requested por barcode não excede o saldo
+     * efetivo da loja origem (CIGAM - já comprometido em outros remanejos
+     * abertos). Se CIGAM offline, pula silenciosamente — sem dados pra
+     * validar, melhor permitir do que bloquear arbitrariamente.
+     *
+     * @param  array<int, array{barcode?: string|null, qty_requested?: int|string}>  $items
+     * @throws ValidationException
+     */
+    protected function validateStockAvailability(int $originStoreId, array $items, ?int $excludeRelocationId = null): void
+    {
+        if (empty($items) || ! $this->cigam->isAvailable()) {
+            return;
+        }
+
+        $originCode = Store::where('id', $originStoreId)->value('code');
+        if (! $originCode) {
+            return;
+        }
+
+        // Soma qty_requested por barcode (caso o usuário tenha colocado o
+        // mesmo produto em 2 linhas — raro, mas suportado).
+        $byBarcode = [];
+        foreach ($items as $it) {
+            $bc = trim((string) ($it['barcode'] ?? ''));
+            if ($bc === '') continue;
+            $byBarcode[$bc] = ($byBarcode[$bc] ?? 0) + (int) ($it['qty_requested'] ?? 0);
+        }
+        if (empty($byBarcode)) {
+            return;
+        }
+
+        $barcodes = array_keys($byBarcode);
+
+        // Saldo CIGAM (já indexado por barcode + refauxiliar).
+        $stockRows = $this->cigam->availableForBarcodes(
+            $barcodes,
+            onlyStoreCodes: [$originCode],
+        );
+        $cigamByBarcode = [];
+        foreach ($stockRows as $row) {
+            $cigamByBarcode[$row->cod_barra] = ($cigamByBarcode[$row->cod_barra] ?? 0) + (int) $row->saldo;
+            if (! empty($row->refauxiliar) && $row->refauxiliar !== $row->cod_barra) {
+                $cigamByBarcode[$row->refauxiliar] = ($cigamByBarcode[$row->refauxiliar] ?? 0) + (int) $row->saldo;
+            }
+        }
+
+        $committedByBarcode = $this->committed->committedByBarcode(
+            $originStoreId,
+            $barcodes,
+            $excludeRelocationId,
+        );
+
+        $errors = [];
+        foreach ($byBarcode as $bc => $req) {
+            $cigamQty = $cigamByBarcode[$bc] ?? 0;
+            $reservedQty = $committedByBarcode[$bc] ?? 0;
+            $effective = max(0, $cigamQty - $reservedQty);
+            if ($req > $effective) {
+                if ($reservedQty > 0) {
+                    $errors[] = "Produto {$bc}: solicitado {$req} unidades, mas saldo efetivo é {$effective} "
+                        ."(CIGAM tem {$cigamQty}, sendo {$reservedQty} já reservado(s) em outro(s) remanejo(s) aberto(s) da mesma loja).";
+                } else {
+                    $errors[] = "Produto {$bc}: solicitado {$req} unidades, mas saldo CIGAM é {$cigamQty}.";
+                }
+            }
+        }
+
+        if (! empty($errors)) {
+            throw ValidationException::withMessages([
+                'items' => $errors,
             ]);
         }
     }

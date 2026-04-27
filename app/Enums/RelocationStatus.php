@@ -160,6 +160,27 @@ enum RelocationStatus: string
     }
 
     /**
+     * Status que ainda comprometem saldo da loja origem — ou seja, a NF de
+     * saída ainda não foi emitida e o CIGAM não baixou esses itens. Usado
+     * pra detectar overcommit do mesmo produto em múltiplos remanejos.
+     *
+     * IN_TRANSIT é deliberadamente excluído: nesse estágio a NF já foi
+     * emitida e o CIGAM já refletiu a baixa — incluir geraria desconto
+     * duplo do saldo apresentado.
+     *
+     * @return array<int, self>
+     */
+    public static function committingStock(): array
+    {
+        return [
+            self::DRAFT,
+            self::REQUESTED,
+            self::APPROVED,
+            self::IN_SEPARATION,
+        ];
+    }
+
+    /**
      * @return array<string, string>
      */
     public static function labels(): array

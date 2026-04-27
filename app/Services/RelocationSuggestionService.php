@@ -55,6 +55,7 @@ class RelocationSuggestionService
 
     public function __construct(
         protected CigamStockService $stock,
+        protected RelocationCommittedStockService $committedStock,
     ) {}
 
     /**
@@ -143,6 +144,28 @@ class RelocationSuggestionService
             excludeStoreCode: $destStore->code,
             onlyStoreCodes: $networkStoreCodes,
         );
+
+        // Desconta saldo já comprometido em outros remanejos abertos da mesma
+        // origem — sem isso, o mesmo barcode poderia ser sugerido pra N
+        // destinos diferentes a partir da mesma loja, ultrapassando o saldo
+        // físico. Lojas com saldo efetivo <= 0 são descartadas.
+        $networkStoresIndex = Store::whereIn('code', $networkStoreCodes)
+            ->get(['id', 'code'])
+            ->keyBy('code');
+        $networkStoreIds = $networkStoresIndex->pluck('id')->all();
+        $committed = $this->committedStock->committedByStoreAndBarcode($networkStoreIds, $barcodes);
+
+        $stocks = $stocks->map(function ($s) use ($committed, $networkStoresIndex) {
+            $store = $networkStoresIndex->get($s->store_code);
+            if (! $store) return $s;
+            $clone = clone $s;
+            $committedQty = $committed[$store->id.'|'.$clone->cod_barra] ?? 0;
+            if (! empty($clone->refauxiliar) && $clone->refauxiliar !== $clone->cod_barra) {
+                $committedQty += $committed[$store->id.'|'.$clone->refauxiliar] ?? 0;
+            }
+            $clone->saldo = max(0, (int) $clone->saldo - $committedQty);
+            return $clone;
+        })->filter(fn ($s) => (int) $s->saldo > 0)->values();
 
         // Index de lojas (id, name) por code — pra enriquecer o output
         $storesByCode = Store::whereIn('code', $stocks->pluck('store_code')->unique()->all())

@@ -15,6 +15,7 @@ use App\Models\RelocationType;
 use App\Models\Store;
 use App\Models\User;
 use App\Services\CigamStockService;
+use App\Services\RelocationCommittedStockService;
 use App\Services\RelocationExportService;
 use App\Services\RelocationImportService;
 use App\Services\RelocationService;
@@ -40,6 +41,7 @@ class RelocationController extends Controller
         private RelocationExportService $exportService,
         private RelocationImportService $importService,
         private CigamStockService $stockService,
+        private RelocationCommittedStockService $committedStockService,
     ) {}
 
     public function index(Request $request): Response
@@ -596,6 +598,19 @@ class RelocationController extends Controller
                     $auxKey = $store->id.'|'.$row->refauxiliar;
                     $stocks[$auxKey] = ($stocks[$auxKey] ?? 0) + (int) $row->saldo;
                 }
+            }
+        }
+
+        // Desconta saldo já comprometido em outros remanejos abertos da
+        // mesma origem — UI mostra saldo "efetivo" (CIGAM - reservado).
+        $allBarcodes = array_values(array_unique(array_column($items, 'barcode')));
+        $committed = $this->committedStockService->committedByStoreAndBarcode(
+            $storeIds,
+            $allBarcodes,
+        );
+        foreach ($committed as $key => $committedQty) {
+            if (isset($stocks[$key])) {
+                $stocks[$key] = max(0, $stocks[$key] - $committedQty);
             }
         }
 
