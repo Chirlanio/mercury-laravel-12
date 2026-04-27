@@ -34,8 +34,9 @@ class RelocationTransitionTest extends TestCase
         parent::setUp();
         $this->setUpTestData();
 
-        $this->origin = Store::factory()->create(['code' => 'Z424', 'name' => 'Origem']);
-        $this->destination = Store::factory()->create(['code' => 'Z423', 'name' => 'Destino']);
+        // Mesma rede — validação cross-network adicionada na Fase 8.6
+        $this->origin = Store::factory()->create(['code' => 'Z424', 'name' => 'Origem', 'network_id' => 1]);
+        $this->destination = Store::factory()->create(['code' => 'Z423', 'name' => 'Destino', 'network_id' => 1]);
         $this->type = RelocationType::firstOrCreate(
             ['code' => 'PLANEJAMENTO'],
             ['name' => 'Planejamento', 'is_active' => true, 'sort_order' => 10]

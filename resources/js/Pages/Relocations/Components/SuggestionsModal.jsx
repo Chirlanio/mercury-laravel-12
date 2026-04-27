@@ -161,9 +161,29 @@ export default function SuggestionsModal({
                 </div>
             </StandardModal.Section>
 
+            {data && data.cigam_available === false && (
+                <StandardModal.Highlight>
+                    <strong>CIGAM indisponível.</strong> Sem acesso ao saldo real,
+                    nenhuma sugestão de origem viável pode ser calculada
+                    {data.cigam_unavailable_reason ? ` (${data.cigam_unavailable_reason})` : ''}.
+                    As sugestões abaixo (se houver) não terão origem confirmada.
+                </StandardModal.Highlight>
+            )}
+
+            {data?.destination_store?.network_name && (
+                <p className="text-xs text-gray-600 mb-3">
+                    Origens filtradas: apenas lojas da rede{' '}
+                    <strong>{data.destination_store.network_name}</strong> com{' '}
+                    <strong>saldo &gt; 0</strong> em estoque (CIGAM).
+                </p>
+            )}
+
             {data && data.suggestions?.length === 0 && (
                 <StandardModal.Highlight>
-                    Nenhuma venda registrada no período para a loja destino.
+                    Nenhum produto vendido no período tem estoque na rede da loja destino
+                    {(data.suppressed_no_stock ?? 0) > 0
+                        ? ` — ${data.suppressed_no_stock} produto(s) suprimido(s) por falta de saldo na rede`
+                        : ''}.
                     Tente uma janela maior ou cadastre os produtos manualmente.
                 </StandardModal.Highlight>
             )}
@@ -236,8 +256,8 @@ export default function SuggestionsModal({
                                                 {s.suggested_origin ? (
                                                     <div>
                                                         <div className="font-mono text-xs">{s.suggested_origin.code}</div>
-                                                        <div className="text-xs text-gray-500">
-                                                            saldo ~{s.suggested_origin.estimated_balance}
+                                                        <div className="text-xs text-emerald-700 font-semibold">
+                                                            saldo {s.suggested_origin.stock} un
                                                         </div>
                                                         {s.other_origins?.length > 0 && (
                                                             <div className="text-xs text-gray-400 mt-0.5">

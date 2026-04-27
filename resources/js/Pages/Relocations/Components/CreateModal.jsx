@@ -63,7 +63,58 @@ export default function CreateModal({
     // Tokens evitam race entre lookups concorrentes (onBlur + Enter)
     const lookupTokensRef = useRef({});
 
-    const updateField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
+    const updateField = (key, value) => {
+        setForm((prev) => {
+            const next = { ...prev, [key]: value };
+            // Quando troca origem, valida que destino selecionado ainda
+            // está na mesma rede; se não, limpa.
+            if (key === 'origin_store_id') {
+                const newOrigin = (selects.stores || []).find((s) => String(s.id) === String(value));
+                const dest = (selects.stores || []).find((s) => String(s.id) === String(prev.destination_store_id));
+                if (newOrigin && dest && newOrigin.network_id !== dest.network_id) {
+                    next.destination_store_id = '';
+                }
+            }
+            // Espelho: troca destino força reset da origem se redes divergentes
+            if (key === 'destination_store_id') {
+                const newDest = (selects.stores || []).find((s) => String(s.id) === String(value));
+                const origin = (selects.stores || []).find((s) => String(s.id) === String(prev.origin_store_id));
+                if (newDest && origin && newDest.network_id !== origin.network_id) {
+                    next.origin_store_id = isStoreScoped ? prev.origin_store_id : '';
+                }
+            }
+            return next;
+        });
+    };
+
+    /**
+     * Filtra lojas por rede da contraparte. Origem filtra pelo network do
+     * destino selecionado (se houver), e vice-versa. Sem contraparte
+     * selecionada, mostra tudo.
+     */
+    const storesForOrigin = () => {
+        const stores = selects.stores || [];
+        const dest = stores.find((s) => String(s.id) === String(form.destination_store_id));
+        if (!dest) return stores;
+        return stores.filter((s) => s.network_id === dest.network_id);
+    };
+
+    const storesForDestination = () => {
+        const stores = selects.stores || [];
+        const origin = stores.find((s) => String(s.id) === String(form.origin_store_id));
+        if (!origin) return stores.filter((s) => String(s.id) !== String(form.origin_store_id));
+        return stores.filter(
+            (s) => s.network_id === origin.network_id && String(s.id) !== String(origin.id)
+        );
+    };
+
+    const networkHint = () => {
+        const stores = selects.stores || [];
+        const origin = stores.find((s) => String(s.id) === String(form.origin_store_id));
+        const dest = stores.find((s) => String(s.id) === String(form.destination_store_id));
+        const network = origin || dest;
+        return network?.network_name ?? null;
+    };
 
     const updateItem = (idx, key, value) => {
         setForm((prev) => {
@@ -312,8 +363,11 @@ export default function CreateModal({
                             className="block w-full rounded-md border-gray-300 shadow-sm sm:text-sm disabled:bg-gray-100"
                         >
                             <option value="">Selecione...</option>
-                            {selects.stores?.map((s) => (
-                                <option key={s.id} value={s.id}>{s.code} — {s.name}</option>
+                            {storesForOrigin().map((s) => (
+                                <option key={s.id} value={s.id}>
+                                    {s.code} — {s.name}
+                                    {s.network_name ? ` · ${s.network_name}` : ''}
+                                </option>
                             ))}
                         </select>
                         <InputError message={errors.origin_store_id} className="mt-1" />
@@ -328,12 +382,18 @@ export default function CreateModal({
                             className="block w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
                         >
                             <option value="">Selecione...</option>
-                            {selects.stores
-                                ?.filter((s) => String(s.id) !== String(form.origin_store_id))
-                                .map((s) => (
-                                    <option key={s.id} value={s.id}>{s.code} — {s.name}</option>
-                                ))}
+                            {storesForDestination().map((s) => (
+                                <option key={s.id} value={s.id}>
+                                    {s.code} — {s.name}
+                                    {s.network_name ? ` · ${s.network_name}` : ''}
+                                </option>
+                            ))}
                         </select>
+                        {networkHint() && (
+                            <p className="text-xs text-gray-500 mt-1">
+                                Apenas lojas da rede <strong>{networkHint()}</strong> (regra de negócio).
+                            </p>
+                        )}
                         <InputError message={errors.destination_store_id} className="mt-1" />
                     </div>
 

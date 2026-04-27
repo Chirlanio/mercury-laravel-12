@@ -24,8 +24,8 @@ class RelocationControllerTest extends TestCase
         parent::setUp();
         $this->setUpTestData();
 
-        $this->origin = Store::factory()->create(['code' => 'Z424']);
-        $this->destination = Store::factory()->create(['code' => 'Z423']);
+        $this->origin = Store::factory()->create(['code' => 'Z424', 'network_id' => 1]);
+        $this->destination = Store::factory()->create(['code' => 'Z423', 'network_id' => 1]);
         $this->type = RelocationType::firstOrCreate(['code' => 'PLAN'], ['name' => 'P', 'is_active' => true, 'sort_order' => 1]);
     }
 

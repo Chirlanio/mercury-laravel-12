@@ -267,10 +267,25 @@ class RelocationService
             ]);
         }
 
-        $exists = Store::whereIn('id', [$originId, $destinationId])->count();
-        if ($exists < 2) {
+        $stores = Store::whereIn('id', [$originId, $destinationId])
+            ->get(['id', 'code', 'network_id'])
+            ->keyBy('id');
+
+        if ($stores->count() < 2) {
             throw ValidationException::withMessages([
                 'origin_store_id' => 'Loja origem ou destino não encontrada.',
+            ]);
+        }
+
+        $origin = $stores->get($originId);
+        $destination = $stores->get($destinationId);
+
+        // Regra de negócio: lojas só transferem dentro da mesma rede
+        // comercial (Arezzo→Arezzo, Schutz→Schutz, etc).
+        if ($origin->network_id !== $destination->network_id) {
+            throw ValidationException::withMessages([
+                'destination_store_id' => 'Lojas devem ser da mesma rede comercial. '.
+                    "Origem ({$origin->code}) e destino ({$destination->code}) estão em redes diferentes.",
             ]);
         }
     }

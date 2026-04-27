@@ -28,8 +28,8 @@ class RelocationCigamMatcherTest extends TestCase
         parent::setUp();
         $this->setUpTestData();
 
-        $this->origin = Store::factory()->create(['code' => 'ZORI']);
-        $this->destination = Store::factory()->create(['code' => 'ZDST']);
+        $this->origin = Store::factory()->create(['code' => 'ZORI', 'network_id' => 1]);
+        $this->destination = Store::factory()->create(['code' => 'ZDST', 'network_id' => 1]);
         $this->type = RelocationType::firstOrCreate(['code' => 'PLAN'], ['name' => 'P', 'is_active' => true, 'sort_order' => 1]);
         $this->matcher = app(RelocationCigamMatcherService::class);
     }

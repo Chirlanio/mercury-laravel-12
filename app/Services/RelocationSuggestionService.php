@@ -9,51 +9,44 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Sugestão de itens para um remanejo, baseada em vendas recentes da loja
- * destino.
+ * destino + estoque REAL (CIGAM `msl_festoqueatual_`) nas lojas da MESMA REDE.
  *
- * Algoritmo (versão simples — Fase 3):
+ * Algoritmo:
  *  1. Top N produtos vendidos na loja destino nos últimos `days` dias
  *     (movements code=2, agregado por barcode + ref_size).
- *  2. Para cada produto, sugere a loja origem com maior saldo aproximado
- *     baseado em entradas recentes (code=1 + code=5+E + code=6+E menos
- *     code=2 + code=5+S nos últimos 90d, exceto a loja destino).
- *  3. qty_suggested = ceil( (vendas_no_periodo / days) * coverage_days )
- *     Default coverage_days = 14 (cobertura de 2 semanas no ritmo atual).
+ *  2. Para cada produto, busca origens com `saldo > 0` em `msl_festoqueatual_`,
+ *     restritas às lojas da MESMA REDE da loja destino. Loja destino é
+ *     excluída.
+ *  3. Sugestão da loja origem = a com MAIOR saldo entre os candidatos.
+ *  4. qty_suggested = MIN( ceil(daily_avg * COVERAGE_DAYS), saldo_origem )
+ *     — nunca sugere mais do que a origem tem.
  *
- * Refinamentos futuros (Fase 9 backlog): curva ABC, sazonalidade, sub-
- * stituição por produto similar (mesma coleção/categoria).
+ * Mudança vs versão anterior (saldo-proxy via movements 90d):
+ *  - Saldo agora é real (CIGAM authoritative), não estimativa
+ *  - Lojas filtradas por `network_id == destination.network_id`
+ *  - Produtos sem nenhuma origem com saldo são SUPRIMIDOS da lista
+ *    (não faz sentido sugerir o que ninguém tem)
  *
- * Performance: queries pesadas em `movements` (5M+ rows) — usa índices
- * existentes em (store_code, movement_code, movement_date) e barcode.
- * Em produção, considerar cache por destino + janela de 1h.
+ * Fallback se CIGAM offline: `CigamStockService` retorna vazio → todas
+ * sugestões caem como "Sem origem viável" e a UI deixa o user ciente.
  */
 class RelocationSuggestionService
 {
-    /**
-     * Constantes da heurística — ajustar se a régua mudar.
-     */
-    private const COVERAGE_DAYS = 14;          // Cobertura desejada na sugestão
-    private const ORIGIN_LOOKBACK_DAYS = 90;   // Janela para estimar saldo na origem
-    private const MAX_TOP = 50;                // Limite máximo absoluto
+    private const COVERAGE_DAYS = 14;          // Cobertura desejada
+    private const MAX_TOP = 50;
+
+    public function __construct(
+        protected CigamStockService $stock,
+    ) {}
 
     /**
      * @return array{
-     *   destination_store: array{id:int, code:string, name:string},
+     *   destination_store: array{id:int, code:string, name:string, network_id:?int, network_name:?string}|null,
      *   period: array{days:int, from:string, to:string, coverage_days:int},
-     *   suggestions: array<int, array{
-     *     barcode: string,
-     *     ref_size: string|null,
-     *     product_reference: string|null,
-     *     product_name: string|null,
-     *     product_color: string|null,
-     *     size: string|null,
-     *     sales_qty: float,
-     *     sales_count: int,
-     *     daily_average: float,
-     *     qty_suggested: int,
-     *     suggested_origin: array{id:int, code:string, name:string, estimated_balance:float}|null,
-     *     other_origins: array<int, array{id:int, code:string, name:string, estimated_balance:float}>,
-     *   }>
+     *   cigam_available: bool,
+     *   cigam_unavailable_reason: ?string,
+     *   suggestions: array<int, array<string, mixed>>,
+     *   suppressed_no_stock: int,
      * }
      */
     public function suggestForStore(int $destinationStoreId, int $days = 30, int $top = 20): array
@@ -62,46 +55,67 @@ class RelocationSuggestionService
         $days = max(7, $days);
 
         $destStore = Store::query()
-            ->whereKey($destinationStoreId)
-            ->first(['id', 'code', 'name']);
+            ->leftJoin('networks as n', 'n.id', '=', 'stores.network_id')
+            ->where('stores.id', $destinationStoreId)
+            ->select('stores.id', 'stores.code', 'stores.name', 'stores.network_id', 'n.nome as network_name')
+            ->first();
 
         if (! $destStore) {
-            return [
-                'destination_store' => null,
-                'period' => $this->periodMeta($days),
-                'suggestions' => [],
-            ];
+            return $this->emptyResult($days);
         }
+
+        // Lojas da mesma rede (excluindo a destino) — pool de origens válidas
+        $networkStoreCodes = Store::query()
+            ->where('network_id', $destStore->network_id)
+            ->where('id', '!=', $destStore->id)
+            ->pluck('code')
+            ->toArray();
 
         $sales = $this->topSellingItems($destStore->code, $days, $top);
 
         if ($sales->isEmpty()) {
             return [
-                'destination_store' => $destStore->only(['id', 'code', 'name']),
+                'destination_store' => $this->formatStore($destStore),
                 'period' => $this->periodMeta($days),
+                'cigam_available' => $this->stock->isAvailable(),
+                'cigam_unavailable_reason' => $this->stock->getUnavailableReason(),
                 'suggestions' => [],
+                'suppressed_no_stock' => 0,
             ];
         }
 
         $barcodes = $sales->pluck('barcode')->filter()->unique()->values()->all();
-        $balances = $this->estimateOriginBalances($barcodes, $destStore->code);
-        $stores = Store::whereIn('code', $balances->pluck('store_code')->unique()->values())
+
+        // Estoque real CIGAM, filtrado pela rede do destino
+        $stocks = $this->stock->availableForBarcodes(
+            $barcodes,
+            excludeStoreCode: $destStore->code,
+            onlyStoreCodes: $networkStoreCodes,
+        );
+
+        // Index de lojas (id, name) por code — pra enriquecer o output
+        $storesByCode = Store::whereIn('code', $stocks->pluck('store_code')->unique()->all())
             ->get(['id', 'code', 'name'])
             ->keyBy('code');
 
-        // Index produtos por barcode pra enriquecer
         $products = $this->lookupProducts($barcodes);
 
-        $suggestions = $sales->map(function ($row) use ($balances, $stores, $days, $products) {
-            $key = $row->barcode . '|' . ($row->ref_size ?? '');
+        $suggestions = [];
+        $suppressed = 0;
 
-            // Filtra balances pelo barcode + ref_size
-            $candidates = $balances
-                ->where('barcode', $row->barcode)
-                ->where('ref_size', $row->ref_size)
-                ->where('estimated_balance', '>', 0)
-                ->sortByDesc('estimated_balance')
+        foreach ($sales as $row) {
+            // Stocks deste barcode (ou seu refauxiliar associado)
+            $candidates = $stocks
+                ->where('cod_barra', $row->barcode)
+                ->merge($stocks->where('refauxiliar', $row->barcode))
+                ->unique(fn ($s) => $s->store_code)
+                ->sortByDesc('saldo')
                 ->values();
+
+            if ($candidates->isEmpty()) {
+                $suppressed++;
+                continue; // Nenhuma loja da rede tem saldo — pula
+            }
 
             $primary = $candidates->first();
             $others = $candidates->slice(1, 3)->values();
@@ -109,9 +123,11 @@ class RelocationSuggestionService
             $product = $this->matchProduct($products, $row);
 
             $dailyAvg = (float) $row->sales_qty / $days;
-            $qtySuggested = max(1, (int) ceil($dailyAvg * self::COVERAGE_DAYS));
+            $idealQty = max(1, (int) ceil($dailyAvg * self::COVERAGE_DAYS));
+            // Nunca sugerir mais do que a origem tem
+            $qtySuggested = min($idealQty, (int) $primary->saldo);
 
-            return [
+            $suggestions[] = [
                 'barcode' => $row->barcode,
                 'ref_size' => $row->ref_size,
                 'product_reference' => $product['reference'] ?? null,
@@ -122,30 +138,41 @@ class RelocationSuggestionService
                 'sales_count' => (int) $row->sales_count,
                 'daily_average' => round($dailyAvg, 2),
                 'qty_suggested' => $qtySuggested,
-                'suggested_origin' => $primary
-                    ? $this->formatStoreBalance($primary, $stores)
-                    : null,
-                'other_origins' => $others->map(fn ($c) => $this->formatStoreBalance($c, $stores))
+                'suggested_origin' => $this->formatOrigin($primary, $storesByCode),
+                'other_origins' => $others
+                    ->map(fn ($c) => $this->formatOrigin($c, $storesByCode))
                     ->filter()
                     ->values()
                     ->all(),
             ];
-        })->values()->all();
+        }
 
         return [
-            'destination_store' => $destStore->only(['id', 'code', 'name']),
+            'destination_store' => $this->formatStore($destStore),
             'period' => $this->periodMeta($days),
+            'cigam_available' => $this->stock->isAvailable(),
+            'cigam_unavailable_reason' => $this->stock->getUnavailableReason(),
             'suggestions' => $suggestions,
+            'suppressed_no_stock' => $suppressed,
         ];
     }
 
     // ------------------------------------------------------------------
-    // Helpers privados
+    // Helpers
     // ------------------------------------------------------------------
 
-    /**
-     * Top N barcodes vendidos na loja destino agregados por barcode + ref_size.
-     */
+    protected function emptyResult(int $days): array
+    {
+        return [
+            'destination_store' => null,
+            'period' => $this->periodMeta($days),
+            'cigam_available' => $this->stock->isAvailable(),
+            'cigam_unavailable_reason' => $this->stock->getUnavailableReason(),
+            'suggestions' => [],
+            'suppressed_no_stock' => 0,
+        ];
+    }
+
     protected function topSellingItems(string $storeCode, int $days, int $top): Collection
     {
         $from = now()->subDays($days)->toDateString();
@@ -164,64 +191,12 @@ class RelocationSuggestionService
     }
 
     /**
-     * Estima saldo aproximado por (loja, barcode, ref_size) considerando
-     * movimentos de entrada/saída nos últimos 90 dias. Não é estoque
-     * absoluto — é uma proxy útil pra rankear "quem provavelmente tem".
-     *
-     * Códigos aplicados:
-     *   +1 (compra), +5+E (transfer in), +6+E (devolução do cliente),
-     *   -2 (venda), -5+S (transfer out)
-     *
-     * Loja destino é EXCLUÍDA pra não sugerir-se a si mesma.
-     */
-    protected function estimateOriginBalances(array $barcodes, string $excludeStoreCode): Collection
-    {
-        if (empty($barcodes)) {
-            return collect();
-        }
-
-        $from = now()->subDays(self::ORIGIN_LOOKBACK_DAYS)->toDateString();
-        $to = now()->toDateString();
-
-        return DB::table('movements')
-            ->whereIn('barcode', $barcodes)
-            ->whereBetween('movement_date', [$from, $to])
-            ->where('store_code', '!=', $excludeStoreCode)
-            ->selectRaw("
-                store_code,
-                barcode,
-                ref_size,
-                SUM(CASE
-                    WHEN movement_code = 1 THEN quantity
-                    WHEN movement_code = 5 AND entry_exit = 'E' THEN quantity
-                    WHEN movement_code = 6 AND entry_exit = 'E' THEN quantity
-                    WHEN movement_code = 2 THEN -quantity
-                    WHEN movement_code = 5 AND entry_exit = 'S' THEN -quantity
-                    ELSE 0
-                END) as estimated_balance
-            ")
-            ->groupBy('store_code', 'barcode', 'ref_size')
-            ->get();
-    }
-
-    /**
-     * Busca produtos pelo barcode/reference. Como `products` não tem coluna
-     * barcode direto (só reference), tentamos casar pelo prefixo da
-     * reference quando o barcode aparenta ser uma reference válida.
-     *
-     * Se não encontrar, retorna array vazio — UI usa o barcode como
-     * fallback de exibição.
-     *
      * @return array<string, array{reference: string, description: string|null, color_name: string|null}>
      */
     protected function lookupProducts(array $barcodes): array
     {
-        if (empty($barcodes)) {
-            return [];
-        }
+        if (empty($barcodes)) return [];
 
-        // products.reference geralmente tem o mesmo padrão de barcode em
-        // alguns casos, ou pode ser prefixo. Tentamos match exato primeiro.
         $rows = Product::query()
             ->leftJoin('product_colors', 'product_colors.cigam_code', '=', 'products.color_cigam_code')
             ->whereIn('products.reference', $barcodes)
@@ -235,42 +210,37 @@ class RelocationSuggestionService
                 'color_name' => $r->color_name,
             ];
         }
-
         return $byRef;
     }
 
-    /**
-     * Tenta casar uma linha de venda com o catálogo de produtos. Primeiro
-     * tenta barcode exato; depois tenta barcode reduzido (prefixo).
-     */
     protected function matchProduct(array $products, $salesRow): array
     {
-        if (isset($products[$salesRow->barcode])) {
-            return $products[$salesRow->barcode];
-        }
-        if ($salesRow->ref_size && isset($products[$salesRow->ref_size])) {
-            return $products[$salesRow->ref_size];
-        }
-
-        return [
-            'reference' => $salesRow->barcode,
-            'description' => null,
-            'color_name' => null,
-        ];
+        if (isset($products[$salesRow->barcode])) return $products[$salesRow->barcode];
+        if ($salesRow->ref_size && isset($products[$salesRow->ref_size])) return $products[$salesRow->ref_size];
+        return ['reference' => $salesRow->barcode, 'description' => null, 'color_name' => null];
     }
 
-    protected function formatStoreBalance(object $row, Collection $stores): ?array
+    protected function formatOrigin(object $row, Collection $storesByCode): ?array
     {
-        $store = $stores->get($row->store_code);
-        if (! $store) {
-            return null;
-        }
+        $store = $storesByCode->get($row->store_code);
+        if (! $store) return null;
 
         return [
             'id' => $store->id,
             'code' => $store->code,
             'name' => $store->name,
-            'estimated_balance' => round((float) $row->estimated_balance, 2),
+            'stock' => (int) $row->saldo,
+        ];
+    }
+
+    protected function formatStore(object $row): array
+    {
+        return [
+            'id' => $row->id,
+            'code' => $row->code,
+            'name' => $row->name,
+            'network_id' => $row->network_id,
+            'network_name' => $row->network_name,
         ];
     }
 

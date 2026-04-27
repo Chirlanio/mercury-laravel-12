@@ -26,8 +26,10 @@ class RelocationServiceTest extends TestCase
         parent::setUp();
         $this->setUpTestData();
 
-        $this->origin = Store::factory()->create(['code' => 'Z424']);
-        $this->destination = Store::factory()->create(['code' => 'Z423']);
+        // Garantir mesma rede pra tests existentes não falharem por causa
+        // da validação cross-network adicionada na Fase 8.6
+        $this->origin = Store::factory()->create(['code' => 'Z424', 'network_id' => 1]);
+        $this->destination = Store::factory()->create(['code' => 'Z423', 'network_id' => 1]);
         $this->type = RelocationType::firstOrCreate(
             ['code' => 'PLANEJAMENTO'],
             ['name' => 'Planejamento', 'is_active' => true, 'sort_order' => 10]
@@ -69,6 +71,45 @@ class RelocationServiceTest extends TestCase
             'destination_store_id' => $this->origin->id,
             'items' => [['product_reference' => 'A', 'qty_requested' => 1]],
         ], $this->adminUser);
+    }
+
+    public function test_create_rejeita_redes_diferentes(): void
+    {
+        // Cria stores com redes distintas
+        $arezzo = Store::factory()->create(['code' => 'ZAREZ', 'network_id' => 1]);
+        $schutz = Store::factory()->create(['code' => 'ZSCHU', 'network_id' => 4]);
+
+        $this->expectException(ValidationException::class);
+        try {
+            $this->service->create([
+                'relocation_type_id' => $this->type->id,
+                'origin_store_id' => $arezzo->id,
+                'destination_store_id' => $schutz->id,
+                'items' => [['product_reference' => 'A', 'qty_requested' => 1]],
+            ], $this->adminUser);
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('destination_store_id', $e->errors());
+            $this->assertStringContainsString('mesma rede', $e->errors()['destination_store_id'][0]);
+            throw $e;
+        }
+    }
+
+    public function test_create_aceita_mesma_rede(): void
+    {
+        // Setup explícito: ambas na rede 1
+        $arezzo1 = Store::factory()->create(['code' => 'ZA1', 'network_id' => 1]);
+        $arezzo2 = Store::factory()->create(['code' => 'ZA2', 'network_id' => 1]);
+
+        $r = $this->service->create([
+            'relocation_type_id' => $this->type->id,
+            'origin_store_id' => $arezzo1->id,
+            'destination_store_id' => $arezzo2->id,
+            'items' => [['product_reference' => 'X', 'qty_requested' => 2]],
+        ], $this->adminUser);
+
+        $this->assertNotNull($r->id);
+        $this->assertEquals($arezzo1->id, $r->origin_store_id);
+        $this->assertEquals($arezzo2->id, $r->destination_store_id);
     }
 
     public function test_create_rejeita_qty_zero(): void

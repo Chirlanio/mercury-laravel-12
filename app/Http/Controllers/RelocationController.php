@@ -87,7 +87,13 @@ class RelocationController extends Controller
                 'import' => $user->hasPermissionTo(Permission::IMPORT_RELOCATIONS->value),
             ],
             'selects' => [
-                'stores' => Store::orderBy('name')->get(['id', 'code', 'name']),
+                'stores' => Store::query()
+                    ->leftJoin('networks as n', 'n.id', '=', 'stores.network_id')
+                    ->orderBy('stores.name')
+                    ->get([
+                        'stores.id', 'stores.code', 'stores.name',
+                        'stores.network_id', 'n.nome as network_name',
+                    ]),
                 'types' => RelocationType::active()->orderBy('sort_order')->get(['id', 'code', 'name']),
             ],
         ]);
