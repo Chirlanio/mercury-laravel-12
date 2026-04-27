@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { router } from '@inertiajs/react';
-import { PlusIcon, RectangleStackIcon, SparklesIcon, TrashIcon } from '@heroicons/react/24/outline';
+import {
+    PlusIcon, RectangleStackIcon, SparklesIcon, TrashIcon,
+    CheckCircleIcon, ExclamationTriangleIcon, MagnifyingGlassIcon,
+} from '@heroicons/react/24/outline';
 import StandardModal from '@/Components/StandardModal';
 import Button from '@/Components/Button';
 import InputLabel from '@/Components/InputLabel';
@@ -16,6 +19,12 @@ const EMPTY_ITEM = {
     barcode: '',
     qty_requested: 1,
     observations: '',
+    // Estado interno do lookup AJAX (não vai pro backend)
+    _lookup_mode: null,         // 'barcode' | 'reference' | null
+    _lookup_status: null,       // 'idle' | 'loading' | 'ok' | 'notfound' | 'error'
+    _lookup_error: null,
+    _available_sizes: [],       // [{variant_id, barcode, size, size_cigam_code}]
+    _product_id: null,
 };
 
 const PRIORITY_OPTIONS = [
@@ -25,7 +34,19 @@ const PRIORITY_OPTIONS = [
     { value: 'urgent', label: 'Urgente' },
 ];
 
-export default function CreateModal({ show, onClose, selects = {}, isStoreScoped = false, scopedStoreId = null }) {
+const DEADLINE_DEFAULTS = { urgent: 0, high: 1, normal: 3, low: 4 };
+
+const fmtDeadline = (days) => {
+    if (days === 0) return 'mesmo dia';
+    if (days === 1) return '1 dia';
+    return `${days} dias`;
+};
+
+export default function CreateModal({
+    show, onClose, selects = {},
+    isStoreScoped = false, scopedStoreId = null,
+    priorityDeadlines = DEADLINE_DEFAULTS,
+}) {
     const [form, setForm] = useState({
         relocation_type_id: '',
         origin_store_id: isStoreScoped ? (scopedStoreId ?? '') : '',
@@ -33,12 +54,14 @@ export default function CreateModal({ show, onClose, selects = {}, isStoreScoped
         title: '',
         observations: '',
         priority: 'normal',
-        deadline_days: '',
         items: [{ ...EMPTY_ITEM }],
     });
     const [errors, setErrors] = useState({});
     const [processing, setProcessing] = useState(false);
     const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+
+    // Tokens evitam race entre lookups concorrentes (onBlur + Enter)
+    const lookupTokensRef = useRef({});
 
     const updateField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -50,6 +73,14 @@ export default function CreateModal({ show, onClose, selects = {}, isStoreScoped
         });
     };
 
+    const updateItemMany = (idx, patch) => {
+        setForm((prev) => {
+            const items = [...prev.items];
+            items[idx] = { ...items[idx], ...patch };
+            return { ...prev, items };
+        });
+    };
+
     const addItem = () => setForm((prev) => ({ ...prev, items: [...prev.items, { ...EMPTY_ITEM }] }));
 
     const removeItem = (idx) => {
@@ -57,17 +88,100 @@ export default function CreateModal({ show, onClose, selects = {}, isStoreScoped
         setForm((prev) => ({ ...prev, items: prev.items.filter((_, i) => i !== idx) }));
     };
 
+    // ------------------------------------------------------------------
+    // Lookup AJAX no catálogo (auto-fill da linha)
+    // ------------------------------------------------------------------
+    const performLookup = async (idx, params) => {
+        const token = Date.now() + Math.random();
+        lookupTokensRef.current[idx] = token;
+
+        updateItemMany(idx, { _lookup_status: 'loading', _lookup_error: null });
+
+        try {
+            const res = await window.axios.get(route('relocations.lookup-product'), { params });
+            // Race protection
+            if (lookupTokensRef.current[idx] !== token) return;
+
+            const d = res.data || {};
+            if (!d.found) {
+                updateItemMany(idx, {
+                    _lookup_status: 'notfound',
+                    _lookup_error: d.error || 'Produto não encontrado',
+                });
+                return;
+            }
+
+            // Modo barcode — tudo preenchido + size readonly
+            if (d.mode === 'barcode') {
+                updateItemMany(idx, {
+                    product_reference: d.product_reference || '',
+                    product_name: d.product_name || '',
+                    product_color: d.product_color || '',
+                    barcode: d.barcode || '',
+                    size: d.size || '',
+                    _product_id: d.product_id,
+                    _lookup_mode: 'barcode',
+                    _lookup_status: 'ok',
+                    _lookup_error: null,
+                    _available_sizes: [],
+                });
+                return;
+            }
+
+            // Modo reference — nome/cor preenchidos, size vira select dos variants
+            if (d.mode === 'reference') {
+                const sizes = d.variants || [];
+                updateItemMany(idx, {
+                    product_reference: d.product_reference || '',
+                    product_name: d.product_name || '',
+                    product_color: d.product_color || '',
+                    size: '',
+                    barcode: '',
+                    _product_id: d.product_id,
+                    _lookup_mode: 'reference',
+                    _lookup_status: 'ok',
+                    _lookup_error: null,
+                    _available_sizes: sizes,
+                });
+            }
+        } catch (e) {
+            if (lookupTokensRef.current[idx] !== token) return;
+            updateItemMany(idx, {
+                _lookup_status: 'error',
+                _lookup_error: e.response?.data?.error || 'Falha na consulta ao catálogo',
+            });
+        }
+    };
+
+    const lookupByBarcode = (idx) => {
+        const it = form.items[idx];
+        if (!it.barcode || it.barcode.trim() === '') return;
+        performLookup(idx, { barcode: it.barcode.trim() });
+    };
+
+    const lookupByReference = (idx) => {
+        const it = form.items[idx];
+        if (!it.product_reference || it.product_reference.trim() === '') return;
+        performLookup(idx, { reference: it.product_reference.trim() });
+    };
+
+    // No modo reference, ao escolher um tamanho preenche o barcode da variant
+    const handleSizeSelect = (idx, sizeValue) => {
+        const it = form.items[idx];
+        const variant = (it._available_sizes || []).find((v) => String(v.size) === String(sizeValue));
+        updateItemMany(idx, {
+            size: sizeValue,
+            barcode: variant?.barcode || '',
+        });
+    };
+
     /**
-     * Recebe items vindos do SuggestionsModal. Comportamento:
-     *  - Se o form ainda tem só o item vazio default, substitui.
-     *  - Caso contrário, anexa ao final.
-     *  - Se a loja origem ainda não foi selecionada e todas as sugestões
-     *    apontam pra mesma origem, pré-popula automaticamente.
+     * Recebe items vindos do SuggestionsModal — pré-popula loja origem
+     * se houver consenso, anexa ou substitui items dependendo do estado.
      */
     const applySuggestions = (suggestedItems) => {
         if (!suggestedItems?.length) return;
 
-        // Pré-popula loja origem se ainda vazia e há consenso entre sugestões
         if (!form.origin_store_id) {
             const distinctOrigins = [...new Set(
                 suggestedItems
@@ -79,12 +193,17 @@ export default function CreateModal({ show, onClose, selects = {}, isStoreScoped
             }
         }
 
-        // Limpa props internas (_suggested_*) antes de injetar nos items
-        const cleaned = suggestedItems.map(({ _suggested_origin_id, _suggested_origin_code, ...rest }) => rest);
+        const cleaned = suggestedItems.map(({ _suggested_origin_id, _suggested_origin_code, ...rest }) => ({
+            ...EMPTY_ITEM,
+            ...rest,
+            _lookup_mode: 'barcode',
+            _lookup_status: 'ok',
+        }));
 
         setForm((prev) => {
             const isEmpty = prev.items.length === 1
-                && (prev.items[0].product_reference || '').trim() === '';
+                && (prev.items[0].product_reference || '').trim() === ''
+                && (prev.items[0].barcode || '').trim() === '';
             return {
                 ...prev,
                 items: isEmpty ? cleaned : [...prev.items, ...cleaned],
@@ -100,10 +219,10 @@ export default function CreateModal({ show, onClose, selects = {}, isStoreScoped
             title: '',
             observations: '',
             priority: 'normal',
-            deadline_days: '',
             items: [{ ...EMPTY_ITEM }],
         });
         setErrors({});
+        lookupTokensRef.current = {};
     };
 
     const handleClose = () => {
@@ -116,12 +235,13 @@ export default function CreateModal({ show, onClose, selects = {}, isStoreScoped
         setProcessing(true);
         setErrors({});
 
-        // Limpa items vazios e converte qty
+        // Limpa items vazios e remove campos internos
         const items = form.items
-            .filter((it) => (it.product_reference || '').trim() !== '')
-            .map((it) => ({
-                ...it,
-                qty_requested: parseInt(it.qty_requested, 10) || 1,
+            .filter((it) => (it.product_reference || it.barcode || '').toString().trim() !== '')
+            .map(({ _lookup_mode, _lookup_status, _lookup_error, _available_sizes, _product_id, ...rest }) => ({
+                ...rest,
+                product_id: _product_id ?? null,
+                qty_requested: parseInt(rest.qty_requested, 10) || 1,
             }));
 
         router.post(route('relocations.store'), {
@@ -131,7 +251,6 @@ export default function CreateModal({ show, onClose, selects = {}, isStoreScoped
             title: form.title || null,
             observations: form.observations || null,
             priority: form.priority,
-            deadline_days: form.deadline_days || null,
             items,
         }, {
             preserveScroll: true,
@@ -143,6 +262,8 @@ export default function CreateModal({ show, onClose, selects = {}, isStoreScoped
             onFinish: () => setProcessing(false),
         });
     };
+
+    const currentDeadline = priorityDeadlines[form.priority] ?? 3;
 
     return (
         <StandardModal
@@ -228,24 +349,12 @@ export default function CreateModal({ show, onClose, selects = {}, isStoreScoped
                                 <option key={p.value} value={p.value}>{p.label}</option>
                             ))}
                         </select>
+                        <p className="text-xs text-indigo-700 mt-1 font-medium">
+                            Prazo: {fmtDeadline(currentDeadline)}
+                        </p>
                     </div>
 
-                    <div>
-                        <InputLabel htmlFor="deadline_days" value="Prazo (dias)" />
-                        <TextInput
-                            id="deadline_days"
-                            type="number"
-                            min="1"
-                            max="365"
-                            value={form.deadline_days}
-                            onChange={(e) => updateField('deadline_days', e.target.value)}
-                            placeholder="Ex: 7"
-                            className="w-full"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">Contado a partir da aprovação</p>
-                    </div>
-
-                    <div className="sm:col-span-2 lg:col-span-3">
+                    <div className="sm:col-span-2">
                         <InputLabel htmlFor="title" value="Título / descrição curta" />
                         <TextInput
                             id="title"
@@ -303,92 +412,24 @@ export default function CreateModal({ show, onClose, selects = {}, isStoreScoped
                     </div>
                 }
             >
+                <p className="text-xs text-gray-600 mb-3">
+                    Digite ou bipe o <strong>código de barras / EAN</strong> e tudo é preenchido
+                    automaticamente. Se preferir, digite a <strong>referência</strong> e selecione
+                    o tamanho — a descrição e a cor virão do catálogo.
+                </p>
                 <div className="space-y-3">
                     {form.items.map((item, idx) => (
-                        <div key={idx} className="bg-gray-50 rounded-md border border-gray-200 p-3">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-medium text-gray-700">Item {idx + 1}</span>
-                                {form.items.length > 1 && (
-                                    <Button
-                                        variant="outline"
-                                        size="xs"
-                                        icon={TrashIcon}
-                                        onClick={() => removeItem(idx)}
-                                        type="button"
-                                        iconOnly
-                                        title="Remover item"
-                                    />
-                                )}
-                            </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
-                                <div className="sm:col-span-2">
-                                    <InputLabel value="Referência *" className="text-xs" />
-                                    <TextInput
-                                        value={item.product_reference}
-                                        onChange={(e) => updateItem(idx, 'product_reference', e.target.value)}
-                                        placeholder="SKU"
-                                        maxLength={100}
-                                        className="w-full text-sm"
-                                    />
-                                </div>
-                                <div className="sm:col-span-2">
-                                    <InputLabel value="Descrição" className="text-xs" />
-                                    <TextInput
-                                        value={item.product_name}
-                                        onChange={(e) => updateItem(idx, 'product_name', e.target.value)}
-                                        placeholder="Nome do produto"
-                                        maxLength={255}
-                                        className="w-full text-sm"
-                                    />
-                                </div>
-                                <div>
-                                    <InputLabel value="Cor" className="text-xs" />
-                                    <TextInput
-                                        value={item.product_color}
-                                        onChange={(e) => updateItem(idx, 'product_color', e.target.value)}
-                                        maxLength={80}
-                                        className="w-full text-sm"
-                                    />
-                                </div>
-                                <div>
-                                    <InputLabel value="Tamanho" className="text-xs" />
-                                    <TextInput
-                                        value={item.size}
-                                        onChange={(e) => updateItem(idx, 'size', e.target.value)}
-                                        maxLength={20}
-                                        className="w-full text-sm"
-                                    />
-                                </div>
-                                <div className="sm:col-span-2">
-                                    <InputLabel value="Código de barras" className="text-xs" />
-                                    <TextInput
-                                        value={item.barcode}
-                                        onChange={(e) => updateItem(idx, 'barcode', e.target.value)}
-                                        maxLength={50}
-                                        className="w-full text-sm font-mono"
-                                    />
-                                </div>
-                                <div className="sm:col-span-2">
-                                    <InputLabel value="Qtd. solicitada *" className="text-xs" />
-                                    <TextInput
-                                        type="number"
-                                        min="1"
-                                        value={item.qty_requested}
-                                        onChange={(e) => updateItem(idx, 'qty_requested', e.target.value)}
-                                        className="w-full text-sm"
-                                    />
-                                </div>
-                                <div className="sm:col-span-2">
-                                    <InputLabel value="Obs. do item" className="text-xs" />
-                                    <TextInput
-                                        value={item.observations}
-                                        onChange={(e) => updateItem(idx, 'observations', e.target.value)}
-                                        maxLength={500}
-                                        className="w-full text-sm"
-                                    />
-                                </div>
-                            </div>
-                        </div>
+                        <ItemCard
+                            key={idx}
+                            idx={idx}
+                            item={item}
+                            canRemove={form.items.length > 1}
+                            onChange={(key, value) => updateItem(idx, key, value)}
+                            onRemove={() => removeItem(idx)}
+                            onLookupBarcode={() => lookupByBarcode(idx)}
+                            onLookupReference={() => lookupByReference(idx)}
+                            onSizeSelect={(v) => handleSizeSelect(idx, v)}
+                        />
                     ))}
                 </div>
                 <InputError message={errors.items} className="mt-2" />
@@ -406,5 +447,192 @@ export default function CreateModal({ show, onClose, selects = {}, isStoreScoped
                 onApply={applySuggestions}
             />
         </StandardModal>
+    );
+}
+
+// ====================================================================
+// ItemCard — linha de produto com lookup AJAX integrado
+// ====================================================================
+function ItemCard({ idx, item, canRemove, onChange, onRemove, onLookupBarcode, onLookupReference, onSizeSelect }) {
+    const isLoading = item._lookup_status === 'loading';
+    const productInfoFromCatalog = item._lookup_status === 'ok';
+    const sizesFromCatalog = item._lookup_mode === 'reference' && (item._available_sizes?.length ?? 0) > 0;
+
+    return (
+        <div className="bg-gray-50 rounded-md border border-gray-200 p-3">
+            <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-gray-700">
+                    Item {idx + 1}
+                    {item._lookup_status === 'ok' && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-green-700">
+                            <CheckCircleIcon className="h-3.5 w-3.5" />
+                            <span className="text-[11px]">
+                                {item._lookup_mode === 'barcode' ? 'Casado por código de barras' : 'Casado por referência'}
+                            </span>
+                        </span>
+                    )}
+                    {item._lookup_status === 'notfound' && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-amber-700">
+                            <ExclamationTriangleIcon className="h-3.5 w-3.5" />
+                            <span className="text-[11px]">{item._lookup_error}</span>
+                        </span>
+                    )}
+                    {isLoading && (
+                        <span className="ml-2 text-[11px] text-gray-500">Consultando catálogo...</span>
+                    )}
+                </span>
+                {canRemove && (
+                    <Button
+                        variant="outline"
+                        size="xs"
+                        icon={TrashIcon}
+                        onClick={onRemove}
+                        type="button"
+                        iconOnly
+                        title="Remover item"
+                    />
+                )}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+                {/* Código de barras (input principal — match exato) */}
+                <div className="sm:col-span-3">
+                    <InputLabel value="Código de barras / EAN" className="text-xs" />
+                    <div className="relative">
+                        <TextInput
+                            value={item.barcode}
+                            onChange={(e) => onChange('barcode', e.target.value)}
+                            onBlur={() => item.barcode?.trim() && onLookupBarcode()}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    onLookupBarcode();
+                                }
+                            }}
+                            placeholder="Bipe ou digite e pressione Enter"
+                            maxLength={50}
+                            disabled={isLoading}
+                            className="w-full text-sm font-mono pr-9"
+                        />
+                        <button
+                            type="button"
+                            onClick={onLookupBarcode}
+                            className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 text-gray-500 hover:text-indigo-700"
+                            title="Consultar catálogo"
+                        >
+                            <MagnifyingGlassIcon className="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Referência (alternativa — exige depois escolher tamanho) */}
+                <div className="sm:col-span-3">
+                    <InputLabel value="Referência (alternativa ao EAN)" className="text-xs" />
+                    <div className="relative">
+                        <TextInput
+                            value={item.product_reference}
+                            onChange={(e) => onChange('product_reference', e.target.value)}
+                            onBlur={() => {
+                                if (item.product_reference?.trim() && !item.barcode?.trim()) {
+                                    onLookupReference();
+                                }
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    onLookupReference();
+                                }
+                            }}
+                            placeholder="SKU do produto"
+                            maxLength={100}
+                            disabled={isLoading}
+                            className="w-full text-sm pr-9"
+                        />
+                        <button
+                            type="button"
+                            onClick={onLookupReference}
+                            className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 text-gray-500 hover:text-indigo-700"
+                            title="Consultar catálogo"
+                        >
+                            <MagnifyingGlassIcon className="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Descrição — sempre readonly (do catálogo) */}
+                <div className="sm:col-span-3">
+                    <InputLabel value="Descrição (catálogo)" className="text-xs" />
+                    <TextInput
+                        value={item.product_name || ''}
+                        readOnly
+                        placeholder={productInfoFromCatalog ? '' : '— preencha referência ou EAN —'}
+                        className="w-full text-sm bg-gray-100 cursor-not-allowed"
+                    />
+                </div>
+
+                {/* Cor — sempre readonly (do catálogo) */}
+                <div>
+                    <InputLabel value="Cor (catálogo)" className="text-xs" />
+                    <TextInput
+                        value={item.product_color || ''}
+                        readOnly
+                        placeholder={productInfoFromCatalog ? '' : '—'}
+                        className="w-full text-sm bg-gray-100 cursor-not-allowed"
+                    />
+                </div>
+
+                {/* Tamanho — select se modo reference, readonly se barcode, livre se ainda nada */}
+                <div>
+                    <InputLabel value="Tamanho *" className="text-xs" />
+                    {sizesFromCatalog ? (
+                        <select
+                            value={item.size || ''}
+                            onChange={(e) => onSizeSelect(e.target.value)}
+                            className="block w-full rounded-md border-gray-300 shadow-sm text-sm"
+                        >
+                            <option value="">Selecione...</option>
+                            {item._available_sizes.map((v) => (
+                                <option key={v.variant_id} value={v.size}>{v.size}</option>
+                            ))}
+                        </select>
+                    ) : item._lookup_mode === 'barcode' ? (
+                        <TextInput
+                            value={item.size || ''}
+                            readOnly
+                            className="w-full text-sm bg-gray-100 cursor-not-allowed"
+                        />
+                    ) : (
+                        <TextInput
+                            value={item.size || ''}
+                            onChange={(e) => onChange('size', e.target.value)}
+                            placeholder="—"
+                            maxLength={20}
+                            className="w-full text-sm"
+                        />
+                    )}
+                </div>
+
+                <div>
+                    <InputLabel value="Qtd. solicitada *" className="text-xs" />
+                    <TextInput
+                        type="number"
+                        min="1"
+                        value={item.qty_requested}
+                        onChange={(e) => onChange('qty_requested', e.target.value)}
+                        className="w-full text-sm"
+                    />
+                </div>
+
+                <div className="sm:col-span-3">
+                    <InputLabel value="Obs. do item" className="text-xs" />
+                    <TextInput
+                        value={item.observations}
+                        onChange={(e) => onChange('observations', e.target.value)}
+                        maxLength={500}
+                        className="w-full text-sm"
+                    />
+                </div>
+            </div>
+        </div>
     );
 }

@@ -71,6 +71,7 @@ class RelocationController extends Controller
             'statusColors' => RelocationStatus::colors(),
             'statusTransitions' => RelocationStatus::transitionMap(),
             'priorityOptions' => RelocationPriority::labels(),
+            'priorityDeadlines' => RelocationPriority::deadlineMap(),
             'reasonOptions' => RelocationItemReason::labels(),
             'isStoreScoped' => $scopedStoreId !== null,
             'scopedStoreId' => $scopedStoreId,
@@ -384,6 +385,132 @@ class RelocationController extends Controller
                 $result['created'],
                 $result['items_created'],
             ));
+    }
+
+    /**
+     * Lookup de produto para auto-fill no CreateModal. 2 modos:
+     *
+     *  - ?barcode=X — busca em product_variants (barcode OU aux_reference)
+     *    Retorna 1 variante completa. Tamanho fica DEFINIDO (não selecionável).
+     *
+     *  - ?reference=X — busca em products + lista variants disponíveis
+     *    Retorna nome/cor + array de tamanhos. Usuário escolhe o tamanho.
+     *
+     * Não exige permissão extra além de VIEW_RELOCATIONS (já está no group).
+     */
+    public function lookupProduct(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'barcode' => 'nullable|string|max:50',
+            'reference' => 'nullable|string|max:100',
+        ]);
+
+        $barcode = trim((string) ($data['barcode'] ?? ''));
+        $reference = trim((string) ($data['reference'] ?? ''));
+
+        if ($barcode === '' && $reference === '') {
+            return response()->json([
+                'found' => false,
+                'mode' => null,
+                'error' => 'Informe barcode ou reference.',
+            ]);
+        }
+
+        // Modo barcode tem prioridade — match exato
+        if ($barcode !== '') {
+            $variant = DB::table('product_variants as pv')
+                ->join('products as p', 'p.id', '=', 'pv.product_id')
+                ->leftJoin('product_colors as pc', 'pc.cigam_code', '=', 'p.color_cigam_code')
+                ->leftJoin('product_sizes as ps', 'ps.cigam_code', '=', 'pv.size_cigam_code')
+                ->where(function ($q) use ($barcode) {
+                    $q->where('pv.barcode', $barcode)
+                        ->orWhere('pv.aux_reference', $barcode);
+                })
+                ->where('pv.is_active', 1)
+                ->select(
+                    'pv.id as variant_id',
+                    'pv.product_id',
+                    'pv.barcode',
+                    'pv.aux_reference',
+                    'pv.size_cigam_code',
+                    'p.reference',
+                    'p.description',
+                    'pc.name as color_name',
+                    'ps.name as size_label',
+                )
+                ->first();
+
+            if (! $variant) {
+                return response()->json([
+                    'found' => false,
+                    'mode' => 'barcode',
+                    'query' => $barcode,
+                    'error' => 'Código de barras não encontrado no catálogo.',
+                ]);
+            }
+
+            return response()->json([
+                'found' => true,
+                'mode' => 'barcode',
+                'query' => $barcode,
+                'product_id' => $variant->product_id,
+                'product_reference' => $variant->reference,
+                'product_name' => $variant->description,
+                'product_color' => $variant->color_name,
+                'barcode' => $variant->barcode,
+                'aux_reference' => $variant->aux_reference,
+                'size' => $variant->size_label ?? $variant->size_cigam_code,
+                'size_cigam_code' => $variant->size_cigam_code,
+            ]);
+        }
+
+        // Modo reference — devolve produto + array de tamanhos disponíveis
+        $product = DB::table('products as p')
+            ->leftJoin('product_colors as pc', 'pc.cigam_code', '=', 'p.color_cigam_code')
+            ->where('p.reference', $reference)
+            ->select('p.id', 'p.reference', 'p.description', 'pc.name as color_name')
+            ->first();
+
+        if (! $product) {
+            return response()->json([
+                'found' => false,
+                'mode' => 'reference',
+                'query' => $reference,
+                'error' => 'Referência não encontrada no catálogo.',
+            ]);
+        }
+
+        $variants = DB::table('product_variants as pv')
+            ->leftJoin('product_sizes as ps', 'ps.cigam_code', '=', 'pv.size_cigam_code')
+            ->where('pv.product_id', $product->id)
+            ->where('pv.is_active', 1)
+            ->select(
+                'pv.id as variant_id',
+                'pv.barcode',
+                'pv.aux_reference',
+                'pv.size_cigam_code',
+                'ps.name as size_label',
+            )
+            ->orderBy('ps.name')
+            ->get()
+            ->map(fn ($v) => [
+                'variant_id' => $v->variant_id,
+                'barcode' => $v->barcode,
+                'aux_reference' => $v->aux_reference,
+                'size' => $v->size_label ?? $v->size_cigam_code,
+                'size_cigam_code' => $v->size_cigam_code,
+            ]);
+
+        return response()->json([
+            'found' => true,
+            'mode' => 'reference',
+            'query' => $reference,
+            'product_id' => $product->id,
+            'product_reference' => $product->reference,
+            'product_name' => $product->description,
+            'product_color' => $product->color_name,
+            'variants' => $variants->values(),
+        ]);
     }
 
     /**

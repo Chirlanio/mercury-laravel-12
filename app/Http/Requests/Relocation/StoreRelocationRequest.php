@@ -24,7 +24,8 @@ class StoreRelocationRequest extends FormRequest
             'title' => 'nullable|string|max:200',
             'observations' => 'nullable|string|max:2000',
             'priority' => ['nullable', Rule::in($priorities)],
-            'deadline_days' => 'nullable|integer|min:1|max:365',
+            // deadline_days é DERIVADO da prioridade no Service — nunca
+            // aceita input manual. Não declarado aqui de propósito.
 
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'nullable|integer|exists:products,id',

@@ -52,6 +52,47 @@ enum RelocationPriority: string
     }
 
     /**
+     * Prazo automático para realização do remanejo (em dias, contados a
+     * partir da aprovação). Regra de negócio:
+     *
+     *   Urgente = 0 (mesmo dia)
+     *   Alta    = 1
+     *   Normal  = 3
+     *   Baixa   = 4
+     *
+     * Aplicado em `RelocationService` na criação/atualização — não há
+     * input manual no formulário. Mudou a prioridade, o deadline ajusta.
+     */
+    public function deadlineDays(): int
+    {
+        return match ($this) {
+            self::URGENT => 0,
+            self::HIGH => 1,
+            self::NORMAL => 3,
+            self::LOW => 4,
+        };
+    }
+
+    /**
+     * Texto humano do prazo, pra exibição na UI ao lado do select.
+     */
+    public function deadlineLabel(): string
+    {
+        $days = $this->deadlineDays();
+        return $days === 0 ? 'mesmo dia' : ($days === 1 ? '1 dia' : "{$days} dias");
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    public static function deadlineMap(): array
+    {
+        return collect(self::cases())
+            ->mapWithKeys(fn (self $c) => [$c->value => $c->deadlineDays()])
+            ->all();
+    }
+
+    /**
      * @return array<string, string>
      */
     public static function labels(): array

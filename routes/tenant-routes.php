@@ -1083,6 +1083,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/relocations/dashboard', [\App\Http\Controllers\RelocationController::class, 'dashboard'])->name('relocations.dashboard');
         Route::get('/relocations/statistics', [\App\Http\Controllers\RelocationController::class, 'statistics'])->name('relocations.statistics');
         Route::get('/relocations/suggestions', [\App\Http\Controllers\RelocationController::class, 'suggestions'])->name('relocations.suggestions');
+        Route::get('/relocations/lookup-product', [\App\Http\Controllers\RelocationController::class, 'lookupProduct'])->name('relocations.lookup-product');
 
         // Export — rotas sem {relocation} antes para não colidir com pattern ULID
         Route::middleware('permission:'.Permission::EXPORT_RELOCATIONS->value)->group(function () {

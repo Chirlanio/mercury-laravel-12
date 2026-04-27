@@ -55,6 +55,7 @@ export default function Index({
     statistics = {},
     statusOptions = {},
     priorityOptions = {},
+    priorityDeadlines = {},
     reasonOptions = {},
     isStoreScoped = false,
     scopedStoreId = null,
@@ -611,6 +612,7 @@ export default function Index({
                 selects={selects}
                 isStoreScoped={isStoreScoped}
                 scopedStoreId={scopedStoreId}
+                priorityDeadlines={priorityDeadlines}
             />
 
             <DetailModal

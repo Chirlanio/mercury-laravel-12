@@ -47,7 +47,11 @@ class RelocationService
             ? RelocationPriority::from($data['priority'])
             : RelocationPriority::NORMAL;
 
-        return DB::transaction(function () use ($data, $priority, $actor) {
+        // deadline_days é DERIVADO da prioridade (regra de negócio fixa).
+        // Ignora qualquer valor manual no payload.
+        $deadlineDays = $priority->deadlineDays();
+
+        return DB::transaction(function () use ($data, $priority, $deadlineDays, $actor) {
             $relocation = Relocation::create([
                 'ulid' => (string) Str::ulid(),
                 'relocation_type_id' => $data['relocation_type_id'],
@@ -56,7 +60,7 @@ class RelocationService
                 'title' => $data['title'] ?? null,
                 'observations' => $data['observations'] ?? null,
                 'priority' => $priority->value,
-                'deadline_days' => $data['deadline_days'] ?? null,
+                'deadline_days' => $deadlineDays,
                 'status' => RelocationStatus::DRAFT->value,
                 'created_by_user_id' => $actor->id,
                 'updated_by_user_id' => $actor->id,
@@ -140,6 +144,16 @@ class RelocationService
                 $data['origin_store_id'] ?? $relocation->origin_store_id,
                 $data['destination_store_id'] ?? $relocation->destination_store_id
             );
+        }
+
+        // Se priority mudou, deadline_days é re-derivado automaticamente
+        if (isset($data['priority'])) {
+            $newPriority = RelocationPriority::from($data['priority']);
+            $data['deadline_days'] = $newPriority->deadlineDays();
+        } else {
+            // Em update sem priority no payload, ignora qualquer deadline_days
+            // manual — só priority muda o prazo.
+            unset($data['deadline_days']);
         }
 
         $relocation->fill($data);
