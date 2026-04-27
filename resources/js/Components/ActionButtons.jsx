@@ -54,15 +54,41 @@ export default function ActionButtons({ onView, onEdit, onDelete, children, size
     );
 }
 
-ActionButtons.Custom = function CustomAction({ variant, icon, title, onClick, size = 'sm', ...props }) {
+// Mapa de cores legadas (color="green"/"red"/...) pra variants do Button.
+// Mantém compatibilidade com call sites antigos que usavam essa nomenclatura.
+const COLOR_TO_VARIANT = {
+    green: 'success',
+    red: 'danger',
+    amber: 'warning',
+    yellow: 'warning',
+    blue: 'info',
+    purple: 'info',
+    indigo: 'primary',
+    gray: 'secondary',
+};
+
+/**
+ * API canônica: <ActionButtons.Custom variant="success" title="Aprovar" icon={...} onClick={...} />
+ *
+ * Aliases legados aceitos:
+ *  - color="green|red|amber|..." → mapeado pra variant
+ *  - label="..." → mapeado pra title (tooltip)
+ */
+ActionButtons.Custom = function CustomAction({
+    variant, color,
+    title, label,
+    icon, onClick, size = 'sm', ...props
+}) {
+    const resolvedVariant = variant ?? (color ? (COLOR_TO_VARIANT[color] ?? 'primary') : 'primary');
+    const resolvedTitle = title ?? label;
     return (
         <Button
             onClick={(e) => { e.stopPropagation(); onClick(); }}
-            variant={variant}
+            variant={resolvedVariant}
             size={size}
             iconOnly={true}
             icon={icon}
-            title={title}
+            title={resolvedTitle}
             {...props}
         />
     );

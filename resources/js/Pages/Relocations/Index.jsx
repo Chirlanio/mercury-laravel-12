@@ -378,14 +378,14 @@ export default function Index({
                         <>
                             <ActionButtons.Custom
                                 icon={HandThumbUpIcon}
-                                label="Aprovar"
-                                color="green"
+                                title="Aprovar"
+                                variant="success"
                                 onClick={() => transitionTo(row, 'approved')}
                             />
                             <ActionButtons.Custom
                                 icon={HandThumbDownIcon}
-                                label="Rejeitar"
-                                color="red"
+                                title="Rejeitar"
+                                variant="danger"
                                 onClick={() => openModal('reject', row)}
                             />
                         </>
@@ -395,8 +395,8 @@ export default function Index({
                     {row.status === 'draft' && canEdit && (
                         <ActionButtons.Custom
                             icon={PaperAirplaneIcon}
-                            label="Solicitar"
-                            color="amber"
+                            title="Solicitar"
+                            variant="warning"
                             onClick={() => transitionTo(row, 'requested')}
                         />
                     )}
@@ -405,8 +405,8 @@ export default function Index({
                     {row.status === 'approved' && canSeparate && (
                         <ActionButtons.Custom
                             icon={PlayIcon}
-                            label="Iniciar separação"
-                            color="purple"
+                            title="Iniciar separação"
+                            variant="info"
                             onClick={() => transitionTo(row, 'in_separation')}
                         />
                     )}
@@ -415,8 +415,8 @@ export default function Index({
                     {row.status === 'in_transit' && canReceive && (
                         <ActionButtons.Custom
                             icon={InboxArrowDownIcon}
-                            label="Receber"
-                            color="green"
+                            title="Receber"
+                            variant="success"
                             onClick={() => openModal('receive', row)}
                         />
                     )}
