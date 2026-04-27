@@ -216,6 +216,7 @@ class RelocationController extends Controller
                     'volumes_qty' => $data['volumes_qty'] ?? null,
                     'receiver_name' => $data['receiver_name'] ?? null,
                     'received_items' => $data['received_items'] ?? [],
+                    'dispatch_validation' => $data['dispatch_validation'] ?? null,
                 ]
             );
             $this->bumpCacheVersion();

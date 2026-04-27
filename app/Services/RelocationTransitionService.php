@@ -306,6 +306,16 @@ class RelocationTransitionService
                 $update['in_transit_at'] = $now;
                 $update['invoice_number'] = $payload['invoice_number'] ?? $relocation->invoice_number;
                 $update['invoice_date'] = $payload['invoice_date'] ?? $now->toDateString();
+                // Snapshot da validação de NF — frontend envia o resultado
+                // do preview (RelocationDispatchValidationService) junto com
+                // a confirmação. Persistido pra timeline e auditoria; quando
+                // tem discrepâncias, listener dispara alerta pra logística.
+                if (array_key_exists('dispatch_validation', $payload) && is_array($payload['dispatch_validation'])) {
+                    $v = $payload['dispatch_validation'];
+                    $update['dispatch_has_discrepancies'] = (bool) ($v['has_discrepancies'] ?? false);
+                    $update['dispatch_discrepancies_json'] = $v;
+                    $update['dispatch_validated_at'] = $now;
+                }
                 break;
 
             case RelocationStatus::COMPLETED:

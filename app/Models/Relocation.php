@@ -50,6 +50,9 @@ class Relocation extends Model
         'transfer_id',
         'cigam_dispatched_at',
         'cigam_received_at',
+        'dispatch_has_discrepancies',
+        'dispatch_discrepancies_json',
+        'dispatch_validated_at',
         'helpdesk_ticket_id',
         'created_by_user_id',
         'approved_by_user_id',
@@ -75,6 +78,9 @@ class Relocation extends Model
         'invoice_date' => 'date',
         'cigam_dispatched_at' => 'datetime',
         'cigam_received_at' => 'datetime',
+        'dispatch_has_discrepancies' => 'boolean',
+        'dispatch_discrepancies_json' => 'array',
+        'dispatch_validated_at' => 'datetime',
         'deleted_at' => 'datetime',
     ];
 

@@ -39,6 +39,11 @@ class TransitionRelocationRequest extends FormRequest
             'invoice_number' => 'nullable|string|max:50',
             'invoice_date' => 'nullable|date',
             'volumes_qty' => 'nullable|integer|min:1|max:9999',
+            // Snapshot da validação de NF feita pelo frontend antes da
+            // confirmação. Quando presente, é persistido em
+            // dispatch_discrepancies_json + dispatch_has_discrepancies.
+            // Estrutura validada no service (não aqui — é nested complexo).
+            'dispatch_validation' => 'nullable|array',
 
             // Payload pra in_transit → completed/partial
             'receiver_name' => 'nullable|string|max:150',
