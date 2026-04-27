@@ -331,6 +331,17 @@ enum Role: string
                 Permission::RUN_DAMAGED_PRODUCT_MATCHING->value,
                 Permission::APPROVE_DAMAGED_PRODUCT_MATCHES->value,
                 Permission::EXPORT_DAMAGED_PRODUCTS->value,
+                // Remanejos (todas)
+                Permission::VIEW_RELOCATIONS->value,
+                Permission::CREATE_RELOCATIONS->value,
+                Permission::EDIT_RELOCATIONS->value,
+                Permission::DELETE_RELOCATIONS->value,
+                Permission::APPROVE_RELOCATIONS->value,
+                Permission::SEPARATE_RELOCATIONS->value,
+                Permission::RECEIVE_RELOCATIONS->value,
+                Permission::MANAGE_RELOCATIONS->value,
+                Permission::IMPORT_RELOCATIONS->value,
+                Permission::EXPORT_RELOCATIONS->value,
             ],
             self::ADMIN => [
                 // Gerenciamento limitado de usuários
@@ -600,6 +611,17 @@ enum Role: string
                 Permission::RUN_DAMAGED_PRODUCT_MATCHING->value,
                 Permission::APPROVE_DAMAGED_PRODUCT_MATCHES->value,
                 Permission::EXPORT_DAMAGED_PRODUCTS->value,
+                // Remanejos (todas)
+                Permission::VIEW_RELOCATIONS->value,
+                Permission::CREATE_RELOCATIONS->value,
+                Permission::EDIT_RELOCATIONS->value,
+                Permission::DELETE_RELOCATIONS->value,
+                Permission::APPROVE_RELOCATIONS->value,
+                Permission::SEPARATE_RELOCATIONS->value,
+                Permission::RECEIVE_RELOCATIONS->value,
+                Permission::MANAGE_RELOCATIONS->value,
+                Permission::IMPORT_RELOCATIONS->value,
+                Permission::EXPORT_RELOCATIONS->value,
             ],
             self::SUPPORT => [
                 // Apenas visualização de usuários
@@ -767,6 +789,11 @@ enum Role: string
                 Permission::MANAGE_DAMAGED_PRODUCTS->value,
                 Permission::APPROVE_DAMAGED_PRODUCT_MATCHES->value,
                 Permission::EXPORT_DAMAGED_PRODUCTS->value,
+                // Remanejos — suporte enxerga todas as lojas (hierarquia >= 2)
+                // pra ajudar diagnóstico. Aprovação e separação ficam com
+                // planejamento/loja origem; suporte só visualiza e exporta.
+                Permission::VIEW_RELOCATIONS->value,
+                Permission::EXPORT_RELOCATIONS->value,
             ],
             self::FINANCE => [
                 // Financeira — contas a pagar, orçamentos, imports de realizado DRE.
@@ -1027,6 +1054,15 @@ enum Role: string
                 Permission::VIEW_DAMAGED_PRODUCTS->value,
                 Permission::CREATE_DAMAGED_PRODUCTS->value,
                 Permission::EDIT_DAMAGED_PRODUCTS->value,
+                // Remanejos — vendedora opera na própria loja (sem MANAGE,
+                // scoping por user.store_id no controller). Pode pedir
+                // (CREATE), separar/despachar (SEPARATE) e receber (RECEIVE).
+                // Aprovação e exclusão ficam com planejamento/admin.
+                Permission::VIEW_RELOCATIONS->value,
+                Permission::CREATE_RELOCATIONS->value,
+                Permission::EDIT_RELOCATIONS->value,
+                Permission::SEPARATE_RELOCATIONS->value,
+                Permission::RECEIVE_RELOCATIONS->value,
             ],
             self::DRIVER => [
                 // Perfil próprio

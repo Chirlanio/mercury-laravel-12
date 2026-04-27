@@ -339,6 +339,18 @@ enum Permission: string
     case APPROVE_DAMAGED_PRODUCT_MATCHES = 'damaged_products.approve_matches';
     case EXPORT_DAMAGED_PRODUCTS = 'damaged_products.export';
 
+    // Remanejos (Relocations — solicitações de transferência entre lojas)
+    case VIEW_RELOCATIONS = 'relocations.view';
+    case CREATE_RELOCATIONS = 'relocations.create';
+    case EDIT_RELOCATIONS = 'relocations.edit';
+    case DELETE_RELOCATIONS = 'relocations.delete';
+    case APPROVE_RELOCATIONS = 'relocations.approve';
+    case SEPARATE_RELOCATIONS = 'relocations.separate';
+    case RECEIVE_RELOCATIONS = 'relocations.receive';
+    case MANAGE_RELOCATIONS = 'relocations.manage';
+    case IMPORT_RELOCATIONS = 'relocations.import';
+    case EXPORT_RELOCATIONS = 'relocations.export';
+
     public function label(): string
     {
         return match ($this) {
@@ -625,6 +637,18 @@ enum Permission: string
             self::RUN_DAMAGED_PRODUCT_MATCHING => 'Disparar matching manual de produtos avariados',
             self::APPROVE_DAMAGED_PRODUCT_MATCHES => 'Aceitar/rejeitar matches sugeridos',
             self::EXPORT_DAMAGED_PRODUCTS => 'Exportar produtos avariados (XLSX/PDF)',
+
+            // Remanejos
+            self::VIEW_RELOCATIONS => 'Visualizar remanejos',
+            self::CREATE_RELOCATIONS => 'Criar solicitações de remanejo',
+            self::EDIT_RELOCATIONS => 'Editar remanejos',
+            self::DELETE_RELOCATIONS => 'Excluir remanejos',
+            self::APPROVE_RELOCATIONS => 'Aprovar / rejeitar remanejos (planejamento)',
+            self::SEPARATE_RELOCATIONS => 'Separar e despachar (registrar NF)',
+            self::RECEIVE_RELOCATIONS => 'Confirmar recebimento (loja destino)',
+            self::MANAGE_RELOCATIONS => 'Gerenciar remanejos (todas as lojas)',
+            self::IMPORT_RELOCATIONS => 'Importar remanejos (planilha)',
+            self::EXPORT_RELOCATIONS => 'Exportar remanejos (XLSX/PDF)',
         };
     }
 
@@ -914,6 +938,18 @@ enum Permission: string
             self::RUN_DAMAGED_PRODUCT_MATCHING => 'Permite disparar a engine completa de matching manualmente, fora do schedule diário (06:00). Útil após mudança de regras de marca/rede',
             self::APPROVE_DAMAGED_PRODUCT_MATCHES => 'Permite aceitar matches sugeridos (gera Transfer entre lojas com transfer_type=damage_match) ou rejeitar com motivo. Sem MANAGE só matches da própria loja',
             self::EXPORT_DAMAGED_PRODUCTS => 'Permite exportar produtos avariados para Excel (listagem 2 abas: registros + matches) ou PDF (laudo individual com fotos)',
+
+            // Remanejos
+            self::VIEW_RELOCATIONS => 'Permite visualizar remanejos. Sem MANAGE_RELOCATIONS, só vê remanejos da própria loja (origem ou destino)',
+            self::CREATE_RELOCATIONS => 'Permite criar solicitações de remanejo. Tipicamente concedida ao time de planejamento e logística e gerentes de loja para solicitar reposição',
+            self::EDIT_RELOCATIONS => 'Permite editar remanejos enquanto estiverem em estados pré-aprovação (draft, requested). Após approved, edição limitada a campos não-críticos',
+            self::DELETE_RELOCATIONS => 'Permite excluir remanejos (soft delete). Bloqueado após in_transit (já tem Transfer atrelado)',
+            self::APPROVE_RELOCATIONS => 'Permite aprovar (requested → approved) ou rejeitar (requested → rejected) remanejos. Concedida ao planejamento e admins',
+            self::SEPARATE_RELOCATIONS => 'Permite a loja origem confirmar separação e registrar a NF de transferência (in_separation → in_transit). Cria automaticamente um Transfer físico vinculado',
+            self::RECEIVE_RELOCATIONS => 'Permite a loja destino confirmar recebimento (in_transit → completed ou partial), registrando qty_received por item e motivo de divergência quando parcial',
+            self::MANAGE_RELOCATIONS => 'Permite gerenciar remanejos de todas as lojas (sem filtro de scoping). Inclui edição em qualquer estado e cancelamento forçado',
+            self::IMPORT_RELOCATIONS => 'Permite importar remanejos via planilha XLSX (upsert). Útil para migração de dados históricos da v1 e cargas em lote',
+            self::EXPORT_RELOCATIONS => 'Permite exportar remanejos para Excel (lista + itens em 2 abas) ou PDF (Romaneio de Separação para origem, Lista de Picking)',
         };
     }
 

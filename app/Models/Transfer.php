@@ -11,6 +11,7 @@ class Transfer extends Model
     use Auditable;
 
     protected $fillable = [
+        'relocation_id',
         'origin_store_id',
         'destination_store_id',
         'invoice_number',
@@ -51,6 +52,11 @@ class Transfer extends Model
         'exchange' => 'Troca',
         'damage_match' => 'Match de Avaria',
     ];
+
+    public function relocation(): BelongsTo
+    {
+        return $this->belongsTo(Relocation::class);
+    }
 
     public function originStore(): BelongsTo
     {

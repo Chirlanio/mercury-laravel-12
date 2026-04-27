@@ -81,6 +81,14 @@ Schedule::command('reversals:stale-alert')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/reversals-stale.log'));
 
+// Relocations — CIGAM matcher: every 15 min, depois do movements:sync.
+// Casa NF de remanejos in_transit com movements code=5+E na loja destino,
+// agrega matched_quantity por barcode. Idempotente.
+Schedule::command('relocations:cigam-match')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/relocations-cigam.log'));
+
 // Returns — alerta diário de devoluções em awaiting_product (aguardando
 // o cliente postar o produto) há mais de 7 dias. Consolidado por
 // processador/loja para evitar flood.

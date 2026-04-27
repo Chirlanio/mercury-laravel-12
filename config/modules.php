@@ -330,4 +330,11 @@ return [
         'icon' => 'ExclamationTriangleIcon',
         'dependencies' => ['products', 'stores', 'transfers'],
     ],
+    'relocations' => [
+        'name' => 'Remanejos',
+        'description' => 'Solicitações de transferência de produtos entre lojas, feitas pela equipe de planejamento e logística com base em ruptura, vendas e estoque. Workflow de 9 estados (draft → requested → approved → in_separation → in_transit → completed/partial), itens granulares com qty solicitada/separada/recebida, sugestões automáticas via vendas (movements code=2), reconciliação com CIGAM (movement_code=5 + entry_exit), geração automática de Transfer ao confirmar envio (com NF obrigatória) e PDFs de romaneio/picking.',
+        'routes' => ['relocations.*'],
+        'icon' => 'RectangleStackIcon',
+        'dependencies' => ['products', 'stores', 'transfers', 'movements'],
+    ],
 ];

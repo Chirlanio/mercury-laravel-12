@@ -82,6 +82,7 @@ use App\Http\Controllers\OvertimeRecordController;
 use App\Http\Controllers\PersonnelMovementController;
 use App\Http\Controllers\VacancyController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductImageBulkController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\StockAdjustmentController;
@@ -535,6 +536,10 @@ Route::middleware(['auth', 'tenant.module:products', 'permission:'.Permission::V
         ->middleware('permission:'.Permission::EDIT_PRODUCTS->value)->name('products.import-prices');
     Route::get('/products/import-prices/rejected/{filename}', [ProductController::class, 'downloadRejected'])
         ->middleware('permission:'.Permission::EDIT_PRODUCTS->value)->name('products.import-prices.rejected');
+    Route::post('/products/images/preview', [ProductImageBulkController::class, 'preview'])
+        ->middleware('permission:'.Permission::EDIT_PRODUCTS->value)->name('products.images.preview');
+    Route::post('/products/images/upload-batch', [ProductImageBulkController::class, 'uploadBatch'])
+        ->middleware('permission:'.Permission::EDIT_PRODUCTS->value)->name('products.images.upload-batch');
     Route::post('/products/print-labels', [ProductController::class, 'printLabels'])->name('products.print-labels');
     Route::get('/products', [ProductController::class, 'index'])->name('products.index');
     Route::get('/products/{product}', [ProductController::class, 'show'])->name('products.show');
@@ -1067,6 +1072,47 @@ Route::middleware(['auth'])->group(function () {
 
         Route::middleware('permission:'.Permission::DELETE_REVERSALS->value)->group(function () {
             Route::delete('/reversals/{reversal}', [\App\Http\Controllers\ReversalController::class, 'destroy'])->whereNumber('reversal')->name('reversals.destroy');
+        });
+    });
+
+    // ==========================================
+    // Relocations (Remanejos — solicitações de transferência entre lojas)
+    // ==========================================
+    Route::middleware(['tenant.module:relocations', 'permission:'.Permission::VIEW_RELOCATIONS->value])->group(function () {
+        Route::get('/relocations', [\App\Http\Controllers\RelocationController::class, 'index'])->name('relocations.index');
+        Route::get('/relocations/statistics', [\App\Http\Controllers\RelocationController::class, 'statistics'])->name('relocations.statistics');
+        Route::get('/relocations/suggestions', [\App\Http\Controllers\RelocationController::class, 'suggestions'])->name('relocations.suggestions');
+
+        // Export — rotas sem {relocation} antes para não colidir com pattern ULID
+        Route::middleware('permission:'.Permission::EXPORT_RELOCATIONS->value)->group(function () {
+            Route::get('/relocations/export', [\App\Http\Controllers\RelocationController::class, 'export'])->name('relocations.export');
+            Route::get('/relocations/{relocation}/romaneio', [\App\Http\Controllers\RelocationController::class, 'exportRomaneio'])->name('relocations.romaneio');
+        });
+
+        // Import — template + preview + persist
+        Route::middleware('permission:'.Permission::IMPORT_RELOCATIONS->value)->group(function () {
+            Route::get('/relocations/import/template', [\App\Http\Controllers\RelocationController::class, 'importTemplate'])->name('relocations.import.template');
+            Route::post('/relocations/import/preview', [\App\Http\Controllers\RelocationController::class, 'importPreview'])->name('relocations.import.preview');
+            Route::post('/relocations/import', [\App\Http\Controllers\RelocationController::class, 'importStore'])->name('relocations.import.store');
+        });
+
+        // {relocation} resolve por ULID (Relocation::getRouteKeyName)
+        Route::get('/relocations/{relocation}', [\App\Http\Controllers\RelocationController::class, 'show'])->name('relocations.show');
+
+        Route::middleware('permission:'.Permission::CREATE_RELOCATIONS->value)->group(function () {
+            Route::post('/relocations', [\App\Http\Controllers\RelocationController::class, 'store'])->name('relocations.store');
+        });
+
+        Route::middleware('permission:'.Permission::EDIT_RELOCATIONS->value)->group(function () {
+            Route::put('/relocations/{relocation}', [\App\Http\Controllers\RelocationController::class, 'update'])->name('relocations.update');
+        });
+
+        // Transição genérica — perm específica por transição validada no
+        // RelocationTransitionService (não filtra aqui).
+        Route::post('/relocations/{relocation}/transition', [\App\Http\Controllers\RelocationController::class, 'transition'])->name('relocations.transition');
+
+        Route::middleware('permission:'.Permission::DELETE_RELOCATIONS->value)->group(function () {
+            Route::delete('/relocations/{relocation}', [\App\Http\Controllers\RelocationController::class, 'destroy'])->name('relocations.destroy');
         });
     });
 
@@ -1937,6 +1983,7 @@ Route::middleware(['auth'])->group(function () {
         ->group(function () {
             // Listing + visualização (escopo por loja sem MANAGE — controller valida)
             Route::get('/', [\App\Http\Controllers\DamagedProductController::class, 'index'])->name('index');
+            Route::get('/dashboard', [\App\Http\Controllers\DamagedProductController::class, 'dashboard'])->name('dashboard');
             Route::get('/statistics', [\App\Http\Controllers\DamagedProductController::class, 'statistics'])->name('statistics');
             Route::get('/lookup/products', [\App\Http\Controllers\DamagedProductController::class, 'searchProducts'])->name('lookup.products');
             Route::get('/lookup/product-sizes/{product}', [\App\Http\Controllers\DamagedProductController::class, 'productSizes'])->name('lookup.product-sizes');
