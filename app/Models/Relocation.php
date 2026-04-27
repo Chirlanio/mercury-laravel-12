@@ -54,6 +54,7 @@ class Relocation extends Model
         'dispatch_discrepancies_json',
         'dispatch_validated_at',
         'helpdesk_ticket_id',
+        'dispatch_helpdesk_ticket_id',
         'created_by_user_id',
         'approved_by_user_id',
         'separated_by_user_id',
