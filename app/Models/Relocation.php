@@ -245,17 +245,31 @@ class Relocation extends Model
     /**
      * Remanejos atrasados pela deadline (deadline_days a partir de
      * approved_at). Usado pelo command relocations:overdue-alert.
+     *
+     * Sintaxe da soma de dias varia por driver:
+     *   - MySQL:  DATE_ADD(approved_at, INTERVAL deadline_days DAY)
+     *   - SQLite: datetime(approved_at, '+' || deadline_days || ' days')
      */
     public function scopeOverdue(Builder $query): Builder
     {
-        return $query->whereIn('status', [
+        $query->whereIn('status', [
             RelocationStatus::APPROVED->value,
             RelocationStatus::IN_SEPARATION->value,
             RelocationStatus::IN_TRANSIT->value,
         ])
             ->whereNotNull('approved_at')
-            ->whereNotNull('deadline_days')
-            ->whereRaw('DATE_ADD(approved_at, INTERVAL deadline_days DAY) < NOW()');
+            ->whereNotNull('deadline_days');
+
+        $driver = $query->getConnection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            return $query->whereRaw(
+                "datetime(approved_at, '+' || deadline_days || ' days') < datetime('now')"
+            );
+        }
+
+        // Default MySQL/MariaDB
+        return $query->whereRaw('DATE_ADD(approved_at, INTERVAL deadline_days DAY) < NOW()');
     }
 
     // ------------------------------------------------------------------

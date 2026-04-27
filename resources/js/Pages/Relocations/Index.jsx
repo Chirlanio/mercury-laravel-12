@@ -432,6 +432,10 @@ export default function Index({
                         scopeBadge={isStoreScoped ? 'escopo: sua loja (origem ou destino)' : null}
                         actions={[
                             {
+                                type: 'dashboard',
+                                href: route('relocations.dashboard'),
+                            },
+                            {
                                 type: 'download',
                                 download: route('relocations.export', filters),
                                 visible: canExport,

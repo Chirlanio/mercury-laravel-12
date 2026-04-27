@@ -1080,6 +1080,7 @@ Route::middleware(['auth'])->group(function () {
     // ==========================================
     Route::middleware(['tenant.module:relocations', 'permission:'.Permission::VIEW_RELOCATIONS->value])->group(function () {
         Route::get('/relocations', [\App\Http\Controllers\RelocationController::class, 'index'])->name('relocations.index');
+        Route::get('/relocations/dashboard', [\App\Http\Controllers\RelocationController::class, 'dashboard'])->name('relocations.dashboard');
         Route::get('/relocations/statistics', [\App\Http\Controllers\RelocationController::class, 'statistics'])->name('relocations.statistics');
         Route::get('/relocations/suggestions', [\App\Http\Controllers\RelocationController::class, 'suggestions'])->name('relocations.suggestions');
 

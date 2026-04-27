@@ -20,6 +20,7 @@ use App\Services\RelocationService;
 use App\Services\RelocationSuggestionService;
 use App\Services\RelocationTransitionService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -214,6 +215,24 @@ class RelocationController extends Controller
         $scopedStoreId = $this->resolveScopedStoreId($request->user());
 
         return response()->json($this->buildStatistics($scopedStoreId));
+    }
+
+    /**
+     * Página de dashboard com analytics agregadas pra recharts.
+     * Métricas chave: aderência por origem (dispatched/requested via CIGAM),
+     * tempo de trânsito CIGAM (received - dispatched), top produtos
+     * remanejados, distribuição por status/tipo/loja, timeline 12 meses.
+     */
+    public function dashboard(Request $request): Response
+    {
+        $scopedStoreId = $this->resolveScopedStoreId($request->user());
+
+        return Inertia::render('Relocations/Dashboard', [
+            'statistics' => $this->buildStatistics($scopedStoreId),
+            'analytics' => $this->buildAnalytics($scopedStoreId),
+            'isStoreScoped' => $scopedStoreId !== null,
+            'scopedStoreId' => $scopedStoreId,
+        ]);
     }
 
     // ------------------------------------------------------------------
@@ -558,6 +577,210 @@ class RelocationController extends Controller
             'completed' => $byStatus->get(RelocationStatus::COMPLETED->value)?->count ?? 0,
             'partial' => $byStatus->get(RelocationStatus::PARTIAL->value)?->count ?? 0,
             'overdue' => (clone $base)->overdue()->count(),
+        ];
+    }
+
+    /**
+     * Agregações para os gráficos do Dashboard. Performance: 5 queries
+     * batch (timeline, status, origem c/ aderência, destino, tipo, top
+     * produtos, métricas de trânsito).
+     *
+     * @return array<string, mixed>
+     */
+    protected function buildAnalytics(?int $scopedStoreId): array
+    {
+        $baseQuery = function () use ($scopedStoreId) {
+            $q = Relocation::query()->notDeleted();
+            if ($scopedStoreId) $q->forStore($scopedStoreId);
+            return $q;
+        };
+
+        // 1. Timeline — últimos 12 meses
+        // DATE_FORMAT é MySQL only; SQLite usa strftime.
+        $twelveMonthsAgo = now()->subMonths(11)->startOfMonth();
+        $driver = \DB::connection()->getDriverName();
+        $monthExpr = $driver === 'sqlite'
+            ? "strftime('%Y-%m', created_at)"
+            : "DATE_FORMAT(created_at, '%Y-%m')";
+
+        $timeline = $baseQuery()
+            ->where('created_at', '>=', $twelveMonthsAgo)
+            ->selectRaw("$monthExpr as month, COUNT(*) as count")
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get()
+            ->keyBy('month');
+
+        $timelineFull = [];
+        for ($i = 11; $i >= 0; $i--) {
+            $month = now()->subMonths($i);
+            $key = $month->format('Y-m');
+            $timelineFull[] = [
+                'month' => $key,
+                'label' => $month->locale('pt_BR')->isoFormat('MMM/YY'),
+                'count' => (int) ($timeline->get($key)?->count ?? 0),
+            ];
+        }
+
+        // 2. Distribuição por status
+        $byStatus = $baseQuery()
+            ->selectRaw('status as status_value, COUNT(*) as count')
+            ->groupBy('status')
+            ->get()
+            ->map(function ($r) {
+                $raw = is_string($r->status_value) ? $r->status_value : ($r->status_value?->value ?? (string) $r->status_value);
+                $s = RelocationStatus::tryFrom($raw);
+                return [
+                    'status' => $raw,
+                    'label' => $s?->label() ?? $raw,
+                    'color' => $s?->color() ?? 'gray',
+                    'count' => (int) $r->count,
+                ];
+            })
+            ->values();
+
+        // 3. Top 10 lojas ORIGEM com aderência (dispatched / requested)
+        // Agrega via JOIN nos itens — evita carregar tudo em memória.
+        $byOrigin = DB::table('relocations as r')
+            ->join('stores as s', 's.id', '=', 'r.origin_store_id')
+            ->leftJoin('relocation_items as ri', 'ri.relocation_id', '=', 'r.id')
+            ->whereNull('r.deleted_at')
+            ->when($scopedStoreId, fn ($q) => $q->where(function ($q2) use ($scopedStoreId) {
+                $q2->where('r.origin_store_id', $scopedStoreId)
+                    ->orWhere('r.destination_store_id', $scopedStoreId);
+            }))
+            ->selectRaw('s.code as store_code, s.name as store_name,
+                COUNT(DISTINCT r.id) as relocations_count,
+                COALESCE(SUM(ri.qty_requested), 0) as total_requested,
+                COALESCE(SUM(ri.dispatched_quantity), 0) as total_dispatched')
+            ->groupBy('s.code', 's.name')
+            ->orderByDesc('relocations_count')
+            ->limit(10)
+            ->get()
+            ->map(fn ($r) => [
+                'store_code' => $r->store_code,
+                'store_name' => $r->store_name,
+                'relocations_count' => (int) $r->relocations_count,
+                'total_requested' => (int) $r->total_requested,
+                'total_dispatched' => (int) $r->total_dispatched,
+                'adherence' => $r->total_requested > 0
+                    ? round(($r->total_dispatched / $r->total_requested) * 100, 1)
+                    : 0.0,
+            ])
+            ->values();
+
+        // 4. Top 10 lojas DESTINO
+        $byDestination = DB::table('relocations as r')
+            ->join('stores as s', 's.id', '=', 'r.destination_store_id')
+            ->whereNull('r.deleted_at')
+            ->when($scopedStoreId, fn ($q) => $q->where(function ($q2) use ($scopedStoreId) {
+                $q2->where('r.origin_store_id', $scopedStoreId)
+                    ->orWhere('r.destination_store_id', $scopedStoreId);
+            }))
+            ->selectRaw('s.code as store_code, s.name as store_name, COUNT(*) as count')
+            ->groupBy('s.code', 's.name')
+            ->orderByDesc('count')
+            ->limit(10)
+            ->get()
+            ->map(fn ($r) => [
+                'store_code' => $r->store_code,
+                'store_name' => $r->store_name,
+                'count' => (int) $r->count,
+            ])
+            ->values();
+
+        // 5. Distribuição por tipo
+        $byType = DB::table('relocations as r')
+            ->leftJoin('relocation_types as rt', 'rt.id', '=', 'r.relocation_type_id')
+            ->whereNull('r.deleted_at')
+            ->when($scopedStoreId, fn ($q) => $q->where(function ($q2) use ($scopedStoreId) {
+                $q2->where('r.origin_store_id', $scopedStoreId)
+                    ->orWhere('r.destination_store_id', $scopedStoreId);
+            }))
+            ->selectRaw('COALESCE(rt.name, ?) as type_name, COUNT(*) as count', ['(Sem tipo)'])
+            ->groupBy('type_name')
+            ->orderByDesc('count')
+            ->get()
+            ->map(fn ($r) => [
+                'type_name' => $r->type_name,
+                'count' => (int) $r->count,
+            ])
+            ->values();
+
+        // 6. Top 10 produtos mais remanejados (por qty_requested agregada)
+        $topProducts = DB::table('relocation_items as ri')
+            ->join('relocations as r', 'r.id', '=', 'ri.relocation_id')
+            ->whereNull('r.deleted_at')
+            ->when($scopedStoreId, fn ($q) => $q->where(function ($q2) use ($scopedStoreId) {
+                $q2->where('r.origin_store_id', $scopedStoreId)
+                    ->orWhere('r.destination_store_id', $scopedStoreId);
+            }))
+            ->selectRaw('ri.product_reference,
+                MAX(ri.product_name) as product_name,
+                SUM(ri.qty_requested) as total_qty,
+                COUNT(DISTINCT r.id) as relocations_count')
+            ->groupBy('ri.product_reference')
+            ->orderByDesc('total_qty')
+            ->limit(10)
+            ->get()
+            ->map(fn ($r) => [
+                'product_reference' => $r->product_reference,
+                'product_name' => $r->product_name,
+                'total_qty' => (int) $r->total_qty,
+                'relocations_count' => (int) $r->relocations_count,
+            ])
+            ->values();
+
+        // 7. Performance: tempo médio entre aprovação e despacho;
+        //    tempo médio de trânsito CIGAM (dispatched → received).
+        // TIMESTAMPDIFF é MySQL only; SQLite usa diferença de julianday * 24.
+        $hourDiff = fn (string $a, string $b) => $driver === 'sqlite'
+            ? "(julianday($b) - julianday($a)) * 24"
+            : "TIMESTAMPDIFF(HOUR, $a, $b)";
+
+        $performance = $baseQuery()
+            ->whereNotNull('approved_at')
+            ->whereNotNull('in_transit_at')
+            ->selectRaw('AVG('.$hourDiff('approved_at', 'in_transit_at').') as avg_hours_to_dispatch')
+            ->first();
+
+        $cigamTransit = $baseQuery()
+            ->whereNotNull('cigam_dispatched_at')
+            ->whereNotNull('cigam_received_at')
+            ->selectRaw('AVG('.$hourDiff('cigam_dispatched_at', 'cigam_received_at').') as avg_hours_transit')
+            ->first();
+
+        $inTransitCount = $baseQuery()
+            ->forStatus(RelocationStatus::IN_TRANSIT)
+            ->count();
+        $cigamMatchedBothCount = $baseQuery()
+            ->whereNotNull('cigam_dispatched_at')
+            ->whereNotNull('cigam_received_at')
+            ->count();
+        $totalActiveOrTerminal = $baseQuery()
+            ->whereIn('status', [
+                RelocationStatus::IN_TRANSIT->value,
+                RelocationStatus::COMPLETED->value,
+                RelocationStatus::PARTIAL->value,
+            ])
+            ->count();
+
+        return [
+            'timeline' => $timelineFull,
+            'by_status' => $byStatus,
+            'by_origin' => $byOrigin,
+            'by_destination' => $byDestination,
+            'by_type' => $byType,
+            'top_products' => $topProducts,
+            'performance' => [
+                'avg_hours_to_dispatch' => round((float) ($performance->avg_hours_to_dispatch ?? 0), 1),
+                'avg_days_to_dispatch' => round((float) ($performance->avg_hours_to_dispatch ?? 0) / 24, 1),
+                'avg_hours_cigam_transit' => round((float) ($cigamTransit->avg_hours_transit ?? 0), 1),
+                'cigam_matched_rate' => $totalActiveOrTerminal > 0
+                    ? round(($cigamMatchedBothCount / $totalActiveOrTerminal) * 100, 1)
+                    : 0.0,
+                'in_transit_count' => $inTransitCount,
+            ],
         ];
     }
 
