@@ -188,7 +188,7 @@ class RelocationSuggestionService
                 'product_reference' => $product['reference'] ?? null,
                 'product_name' => $product['description'] ?? null,
                 'product_color' => $product['color_name'] ?? null,
-                'size' => $row->ref_size,
+                'size' => $product['size_label'] ?? $row->ref_size,
                 'sales_qty' => (float) $row->sales_qty,
                 'sales_count' => (int) $row->sales_count,
                 'daily_average' => round($dailyAvg, 2),
@@ -358,9 +358,12 @@ class RelocationSuggestionService
     /**
      * Indexado por código que aparece nas vendas (barcode ou aux_reference).
      * `products.reference` é o SKU do produto-pai e não bate com o barcode da venda;
-     * a relação correta passa por `product_variants`.
+     * a relação correta passa por `product_variants`. JOIN adicional com
+     * `product_sizes` traduz o `size_cigam_code` da variante para o nome
+     * legível (ex: "35", "P", "U") — sem isso o front mostraria a chave
+     * composta bruta `{reference}{size_cigam_code}` que vem do CIGAM.
      *
-     * @return array<string, array{reference: string, description: string|null, color_name: string|null}>
+     * @return array<string, array{reference: string, description: string|null, color_name: string|null, size_label: string|null}>
      */
     protected function lookupProducts(array $barcodes): array
     {
@@ -369,6 +372,7 @@ class RelocationSuggestionService
         $rows = ProductVariant::query()
             ->join('products', 'products.id', '=', 'product_variants.product_id')
             ->leftJoin('product_colors', 'product_colors.cigam_code', '=', 'products.color_cigam_code')
+            ->leftJoin('product_sizes', 'product_sizes.cigam_code', '=', 'product_variants.size_cigam_code')
             ->where(function ($q) use ($barcodes) {
                 $q->whereIn('product_variants.barcode', $barcodes)
                     ->orWhereIn('product_variants.aux_reference', $barcodes);
@@ -376,9 +380,11 @@ class RelocationSuggestionService
             ->get([
                 'product_variants.barcode',
                 'product_variants.aux_reference',
+                'product_variants.size_cigam_code',
                 'products.reference',
                 'products.description',
                 'product_colors.name as color_name',
+                'product_sizes.name as size_label',
             ]);
 
         $byKey = [];
@@ -387,6 +393,7 @@ class RelocationSuggestionService
                 'reference' => $r->reference,
                 'description' => $r->description,
                 'color_name' => $r->color_name,
+                'size_label' => $r->size_label ?? $r->size_cigam_code,
             ];
             if ($r->barcode) $byKey[$r->barcode] = $entry;
             if ($r->aux_reference) $byKey[$r->aux_reference] = $entry;
@@ -398,7 +405,7 @@ class RelocationSuggestionService
     {
         if (isset($products[$salesRow->barcode])) return $products[$salesRow->barcode];
         if ($salesRow->ref_size && isset($products[$salesRow->ref_size])) return $products[$salesRow->ref_size];
-        return ['reference' => $salesRow->barcode, 'description' => null, 'color_name' => null];
+        return ['reference' => $salesRow->barcode, 'description' => null, 'color_name' => null, 'size_label' => null];
     }
 
     protected function formatOrigin(object $row, Collection $storesByCode): ?array
