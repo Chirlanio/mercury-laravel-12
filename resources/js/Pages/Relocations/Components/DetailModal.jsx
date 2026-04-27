@@ -145,14 +145,18 @@ export default function DetailModal({ show, onClose, ulid, permissions = {}, onT
             maxWidth="5xl"
             loading={loading}
             errorMessage={error}
-            headerActions={r && canPrintRomaneio ? [
-                {
-                    label: 'Imprimir Romaneio',
-                    icon: PrinterIcon,
-                    href: route('relocations.romaneio', r.ulid),
-                    target: '_blank',
-                },
-            ] : []}
+            headerActions={r && canPrintRomaneio ? (
+                <a
+                    href={route('relocations.romaneio', r.ulid)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Imprimir Romaneio"
+                    className="inline-flex items-center gap-1 text-white/90 hover:text-white text-sm font-medium px-2 py-1 rounded hover:bg-white/10 transition-colors"
+                >
+                    <PrinterIcon className="h-5 w-5" />
+                    <span className="hidden sm:inline">Romaneio</span>
+                </a>
+            ) : null}
         >
             {r && (
                 <>
