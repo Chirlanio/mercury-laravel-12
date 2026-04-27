@@ -226,19 +226,32 @@ class RelocationController extends Controller
 
     /**
      * Página de dashboard com analytics agregadas pra recharts.
+     * Aceita ?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD pra filtrar todas
+     * as agregações (statistics + analytics + timeline). Sem datas, mostra
+     * últimos 90 dias por padrão.
+     *
      * Métricas chave: aderência por origem (dispatched/requested via CIGAM),
      * tempo de trânsito CIGAM (received - dispatched), top produtos
-     * remanejados, distribuição por status/tipo/loja, timeline 12 meses.
+     * remanejados, distribuição por status/tipo/loja.
      */
     public function dashboard(Request $request): Response
     {
         $scopedStoreId = $this->resolveScopedStoreId($request->user());
 
+        $dateFrom = $request->query('date_from')
+            ?: now()->subDays(90)->toDateString();
+        $dateTo = $request->query('date_to')
+            ?: now()->toDateString();
+
         return Inertia::render('Relocations/Dashboard', [
-            'statistics' => $this->buildStatistics($scopedStoreId),
-            'analytics' => $this->buildAnalytics($scopedStoreId),
+            'statistics' => $this->buildStatistics($scopedStoreId, $dateFrom, $dateTo),
+            'analytics' => $this->buildAnalytics($scopedStoreId, $dateFrom, $dateTo),
             'isStoreScoped' => $scopedStoreId !== null,
             'scopedStoreId' => $scopedStoreId,
+            'filters' => [
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+            ],
         ]);
     }
 
@@ -684,11 +697,17 @@ class RelocationController extends Controller
         }
     }
 
-    protected function buildStatistics(?int $scopedStoreId): array
+    protected function buildStatistics(?int $scopedStoreId, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $base = Relocation::notDeleted();
         if ($scopedStoreId) {
             $base->forStore($scopedStoreId);
+        }
+        if ($dateFrom) {
+            $base->whereDate('created_at', '>=', $dateFrom);
+        }
+        if ($dateTo) {
+            $base->whereDate('created_at', '<=', $dateTo);
         }
 
         $total = (clone $base)->count();
@@ -718,26 +737,36 @@ class RelocationController extends Controller
      * batch (timeline, status, origem c/ aderência, destino, tipo, top
      * produtos, métricas de trânsito).
      *
+     * @param  string|null $dateFrom  YYYY-MM-DD inclusivo
+     * @param  string|null $dateTo    YYYY-MM-DD inclusivo
      * @return array<string, mixed>
      */
-    protected function buildAnalytics(?int $scopedStoreId): array
+    protected function buildAnalytics(?int $scopedStoreId, ?string $dateFrom = null, ?string $dateTo = null): array
     {
-        $baseQuery = function () use ($scopedStoreId) {
+        $baseQuery = function () use ($scopedStoreId, $dateFrom, $dateTo) {
             $q = Relocation::query()->notDeleted();
             if ($scopedStoreId) $q->forStore($scopedStoreId);
+            if ($dateFrom) $q->whereDate('created_at', '>=', $dateFrom);
+            if ($dateTo) $q->whereDate('created_at', '<=', $dateTo);
             return $q;
         };
 
-        // 1. Timeline — últimos 12 meses
+        // Timeline — agrupa por mês dentro do range. Default sem range = 12m.
         // DATE_FORMAT é MySQL only; SQLite usa strftime.
-        $twelveMonthsAgo = now()->subMonths(11)->startOfMonth();
-        $driver = \DB::connection()->getDriverName();
+        $driver = DB::connection()->getDriverName();
         $monthExpr = $driver === 'sqlite'
             ? "strftime('%Y-%m', created_at)"
             : "DATE_FORMAT(created_at, '%Y-%m')";
 
+        $timelineFrom = $dateFrom
+            ? \Carbon\Carbon::parse($dateFrom)->startOfMonth()
+            : now()->subMonths(11)->startOfMonth();
+        $timelineTo = $dateTo
+            ? \Carbon\Carbon::parse($dateTo)->endOfMonth()
+            : now();
+
         $timeline = $baseQuery()
-            ->where('created_at', '>=', $twelveMonthsAgo)
+            ->where('created_at', '>=', $timelineFrom)
             ->selectRaw("$monthExpr as month, COUNT(*) as count")
             ->groupBy('month')
             ->orderBy('month')
@@ -745,14 +774,19 @@ class RelocationController extends Controller
             ->keyBy('month');
 
         $timelineFull = [];
-        for ($i = 11; $i >= 0; $i--) {
-            $month = now()->subMonths($i);
-            $key = $month->format('Y-m');
+        $cursor = $timelineFrom->copy();
+        // Limita a até 24 meses pra UI não estourar
+        $maxBuckets = 24;
+        $count = 0;
+        while ($cursor->lessThanOrEqualTo($timelineTo) && $count < $maxBuckets) {
+            $key = $cursor->format('Y-m');
             $timelineFull[] = [
                 'month' => $key,
-                'label' => $month->locale('pt_BR')->isoFormat('MMM/YY'),
+                'label' => $cursor->locale('pt_BR')->isoFormat('MMM/YY'),
                 'count' => (int) ($timeline->get($key)?->count ?? 0),
             ];
+            $cursor->addMonth();
+            $count++;
         }
 
         // 2. Distribuição por status
@@ -778,6 +812,8 @@ class RelocationController extends Controller
             ->join('stores as s', 's.id', '=', 'r.origin_store_id')
             ->leftJoin('relocation_items as ri', 'ri.relocation_id', '=', 'r.id')
             ->whereNull('r.deleted_at')
+            ->when($dateFrom, fn ($q) => $q->whereDate('r.created_at', '>=', $dateFrom))
+            ->when($dateTo, fn ($q) => $q->whereDate('r.created_at', '<=', $dateTo))
             ->when($scopedStoreId, fn ($q) => $q->where(function ($q2) use ($scopedStoreId) {
                 $q2->where('r.origin_store_id', $scopedStoreId)
                     ->orWhere('r.destination_store_id', $scopedStoreId);
@@ -806,6 +842,8 @@ class RelocationController extends Controller
         $byDestination = DB::table('relocations as r')
             ->join('stores as s', 's.id', '=', 'r.destination_store_id')
             ->whereNull('r.deleted_at')
+            ->when($dateFrom, fn ($q) => $q->whereDate('r.created_at', '>=', $dateFrom))
+            ->when($dateTo, fn ($q) => $q->whereDate('r.created_at', '<=', $dateTo))
             ->when($scopedStoreId, fn ($q) => $q->where(function ($q2) use ($scopedStoreId) {
                 $q2->where('r.origin_store_id', $scopedStoreId)
                     ->orWhere('r.destination_store_id', $scopedStoreId);
@@ -826,6 +864,8 @@ class RelocationController extends Controller
         $byType = DB::table('relocations as r')
             ->leftJoin('relocation_types as rt', 'rt.id', '=', 'r.relocation_type_id')
             ->whereNull('r.deleted_at')
+            ->when($dateFrom, fn ($q) => $q->whereDate('r.created_at', '>=', $dateFrom))
+            ->when($dateTo, fn ($q) => $q->whereDate('r.created_at', '<=', $dateTo))
             ->when($scopedStoreId, fn ($q) => $q->where(function ($q2) use ($scopedStoreId) {
                 $q2->where('r.origin_store_id', $scopedStoreId)
                     ->orWhere('r.destination_store_id', $scopedStoreId);
@@ -844,6 +884,8 @@ class RelocationController extends Controller
         $topProducts = DB::table('relocation_items as ri')
             ->join('relocations as r', 'r.id', '=', 'ri.relocation_id')
             ->whereNull('r.deleted_at')
+            ->when($dateFrom, fn ($q) => $q->whereDate('r.created_at', '>=', $dateFrom))
+            ->when($dateTo, fn ($q) => $q->whereDate('r.created_at', '<=', $dateTo))
             ->when($scopedStoreId, fn ($q) => $q->where(function ($q2) use ($scopedStoreId) {
                 $q2->where('r.origin_store_id', $scopedStoreId)
                     ->orWhere('r.destination_store_id', $scopedStoreId);

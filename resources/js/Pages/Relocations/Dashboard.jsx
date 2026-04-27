@@ -1,4 +1,5 @@
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
+import { useMemo } from 'react';
 import {
     BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -11,10 +12,13 @@ import {
     CheckCircleIcon,
     ChartBarIcon,
     ArrowsRightLeftIcon,
+    CalendarDaysIcon,
 } from '@heroicons/react/24/outline';
 import PageHeader from '@/Components/Shared/PageHeader';
 import StatisticsGrid from '@/Components/Shared/StatisticsGrid';
 import EmptyState from '@/Components/Shared/EmptyState';
+import Button from '@/Components/Button';
+import InputLabel from '@/Components/InputLabel';
 
 const STATUS_HEX = {
     gray: '#9ca3af',
@@ -39,11 +43,87 @@ const adherenceColor = (pct) => {
     return '#ef4444';                   // vermelho
 };
 
+// Presets de período para os botões rápidos
+const PRESETS = [
+    { key: '30d', label: 'Últimos 30 dias', days: 30 },
+    { key: '60d', label: 'Últimos 60 dias', days: 60 },
+    { key: '90d', label: '90 dias', days: 90 },
+    { key: '180d', label: '180 dias', days: 180 },
+    { key: 'mtd', label: 'Mês atual' },
+    { key: 'lastMonth', label: 'Mês passado' },
+    { key: 'ytd', label: 'Ano atual' },
+];
+
+const fmtIso = (d) => d.toISOString().slice(0, 10);
+
+const computePresetRange = (key) => {
+    const today = new Date();
+    today.setHours(12, 0, 0, 0); // evita drift por timezone
+    if (key === 'mtd') {
+        const from = new Date(today.getFullYear(), today.getMonth(), 1);
+        return { date_from: fmtIso(from), date_to: fmtIso(today) };
+    }
+    if (key === 'lastMonth') {
+        const from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const to = new Date(today.getFullYear(), today.getMonth(), 0);
+        return { date_from: fmtIso(from), date_to: fmtIso(to) };
+    }
+    if (key === 'ytd') {
+        const from = new Date(today.getFullYear(), 0, 1);
+        return { date_from: fmtIso(from), date_to: fmtIso(today) };
+    }
+    const days = PRESETS.find((p) => p.key === key)?.days ?? 90;
+    const from = new Date(today);
+    from.setDate(from.getDate() - days + 1);
+    return { date_from: fmtIso(from), date_to: fmtIso(today) };
+};
+
 export default function Dashboard({
     statistics = {},
     analytics = {},
+    filters = {},
     isStoreScoped = false,
 }) {
+    const dateFrom = filters.date_from || '';
+    const dateTo = filters.date_to || '';
+
+    const applyFilters = (params) => {
+        router.get(route('relocations.dashboard'), params, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        });
+    };
+
+    const applyPreset = (presetKey) => applyFilters(computePresetRange(presetKey));
+
+    const onCustomChange = (key, value) => {
+        const params = { date_from: dateFrom, date_to: dateTo, [key]: value };
+        // Se trocar from > to, alinha
+        if (params.date_from && params.date_to && params.date_from > params.date_to) {
+            if (key === 'date_from') params.date_to = params.date_from;
+            else params.date_from = params.date_to;
+        }
+        applyFilters(params);
+    };
+
+    // Detecta qual preset está ativo (se houver)
+    const activePreset = useMemo(() => {
+        if (!dateFrom || !dateTo) return null;
+        for (const p of PRESETS) {
+            const range = computePresetRange(p.key);
+            if (range.date_from === dateFrom && range.date_to === dateTo) return p.key;
+        }
+        return null;
+    }, [dateFrom, dateTo]);
+
+    const periodLabel = useMemo(() => {
+        if (!dateFrom || !dateTo) return null;
+        const from = new Date(`${dateFrom}T00:00:00`).toLocaleDateString('pt-BR');
+        const to = new Date(`${dateTo}T00:00:00`).toLocaleDateString('pt-BR');
+        return `${from} a ${to}`;
+    }, [dateFrom, dateTo]);
+
     const timeline = analytics.timeline || [];
     const byStatus = analytics.by_status || [];
     const byOrigin = analytics.by_origin || [];
@@ -115,7 +195,10 @@ export default function Dashboard({
                 <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
                     <PageHeader
                         title="Dashboard de Remanejos"
-                        subtitle="Aderência das lojas, tempo de trânsito e ranking de produtos"
+                        subtitle={periodLabel
+                            ? `Período: ${periodLabel}`
+                            : 'Aderência das lojas, tempo de trânsito e ranking de produtos'
+                        }
                         icon={ChartBarIcon}
                         scopeBadge={isStoreScoped ? 'escopo: sua loja (origem ou destino)' : null}
                         actions={[
@@ -126,6 +209,60 @@ export default function Dashboard({
                             },
                         ]}
                     />
+
+                    {/* Filtro de período */}
+                    <div className="bg-white shadow-sm rounded-lg p-4">
+                        <div className="flex items-start justify-between gap-4 flex-wrap">
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <CalendarDaysIcon className="h-4 w-4 text-gray-500" />
+                                    <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                                        Período
+                                    </span>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {PRESETS.map((p) => {
+                                        const isActive = activePreset === p.key;
+                                        return (
+                                            <button
+                                                key={p.key}
+                                                type="button"
+                                                onClick={() => applyPreset(p.key)}
+                                                className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                                                    isActive
+                                                        ? 'bg-indigo-600 text-white border-indigo-600'
+                                                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                                                }`}
+                                            >
+                                                {p.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <div className="flex items-end gap-2 shrink-0">
+                                <div>
+                                    <InputLabel value="De" className="text-xs" />
+                                    <input
+                                        type="date"
+                                        value={dateFrom}
+                                        onChange={(e) => onCustomChange('date_from', e.target.value)}
+                                        className="block rounded-md border-gray-300 shadow-sm sm:text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <InputLabel value="Até" className="text-xs" />
+                                    <input
+                                        type="date"
+                                        value={dateTo}
+                                        onChange={(e) => onCustomChange('date_to', e.target.value)}
+                                        className="block rounded-md border-gray-300 shadow-sm sm:text-sm"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <StatisticsGrid cards={cards} cols={5} />
 
