@@ -64,7 +64,7 @@
 | 13 | **Delivery** (Entregas) | 🟡 MÉDIA | 🟥 COMPLEXO | ⚠️ PARCIAL | 43h | - | - | - | [ ] TODO |
 | 14 | **Users** (Usuários) | 🟡 MÉDIA | 🟨 MÉDIO | ⚠️ PARCIAL | 21h | - | - | - | [ ] TODO |
 | 15 | **EcommerceOrders** (Pedidos E-commerce) | 🟡 MÉDIA | 🟥 COMPLEXO | ⚠️ PARCIAL | 43h | - | - | - | [ ] TODO |
-| 16 | **Relocation** (Remanejamentos) | 🟡 MÉDIA | 🟥 COMPLEXO | ⚠️ PARCIAL | 43h | - | - | - | [ ] TODO |
+| 16 | **Relocation** (Remanejamentos) | 🟡 MÉDIA | 🟥 COMPLEXO | ✅ **CONCLUÍDO** | 43h+iter | Claude+Chirlanio | 2026-04-26 | 2026-04-28 | [x] **PRODUÇÃO** — 63 tests/198 assertions, 17 rotas, 4 commands, 7 services, Reverb realtime, dispatch validation, substituição similar, ranking aderência, import legado (211 reg + 2772 items) |
 | 17 | **PersonnelMovements** (Movimentações) | 🟡 MÉDIA | 🟥 COMPLEXO | ❌ LEGADO | 86h | - | - | - | [ ] TODO |
 | 18 | **TravelExpenses** (Despesas de Viagem) | 🟡 MÉDIA | 🟥 COMPLEXO | ❌ LEGADO | 86h | - | - | - | [ ] TODO |
 | 19 | **MedicalCertificate** (Atestados) | 🟡 MÉDIA | 🟨 MÉDIO | ❌ LEGADO | 41h | - | - | - | [ ] TODO |

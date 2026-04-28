@@ -1,7 +1,43 @@
 # Remanejos — Backlog pós-MVP
 
-Refinamentos ainda não implementados. Cada item tem prompt self-contained pra
-implementação isolada (basta colar no Claude e ele tem contexto suficiente).
+> **Status atualizado 2026-04-28**: Itens 1–8 ✅ **TODOS IMPLEMENTADOS** na 2ª iteração
+> da sessão. Detalhes em `memory/relocations_module.md` (seção "Iteração pós-MVP").
+> Arquivo mantido como referência histórica do escopo do trabalho.
+>
+> **Pendentes (não bloqueantes, baixa prioridade)**:
+> - Item 9: Eventos de auditoria detalhada (item-level) — RelocationStatusHistory
+>   já cobre status do header; granularidade item-a-item é refinamento de
+>   compliance se exigido por auditoria externa.
+> - Item 10: Comando de retroprocessamento CIGAM — re-roda matcher pra
+>   relocations antigos. Cron `relocations:cigam-match` already cobre o caso
+>   normal; comando manual seria pra cenários de re-sincronização emergencial.
+
+## Implementações concluídas (mapeamento item → commit)
+
+- ✅ #1 Curva ABC + sazonalidade — commit `a6b56c6` (sessão anterior)
+- ✅ #2 Substituição similar quando origem em ruptura — commit `d92ae70`
+- ✅ #3 Reverb realtime — commit `543a311`
+- ✅ #4 Validação saldo absoluto antes de approved — commit `303379a`
+  (também cobre saldo comprometido entre remanejos via `RelocationCommittedStockService`)
+- ✅ #5 QR code no romaneio — commit `2d4bab2`
+- ✅ #6 Ranking de aderência por loja — commit `a544d0e` (medalhas 🥇🥈🥉,
+  6 métricas: completed_count, delivery_rate, dispatch_accuracy,
+  avg_separation_hours, discrepancy_count, total_dispatched)
+- ✅ #7 Reabertura/clone — commit `1d27c35`
+- ✅ #8 Bulk approve — commit `5f900da`
+
+## Bonus implementado (fora do backlog original)
+
+- Validação NF on-demand contra movements (CIGAM) — `RelocationDispatchValidationService`
+- Notification + Helpdesk hook em divergência de despacho
+- Multi-origem em N remanejos no CreateModal (split automático)
+- Gráfico Solicitado×Enviado no Dashboard
+- Comando `relocations:import-from-legacy` (211 remanejos + 2.772 items
+  migrados do banco antigo `u401878354_meiaso26_bd_me`)
+
+---
+
+> Conteúdo abaixo preservado como histórico do briefing original.
 
 ---
 
