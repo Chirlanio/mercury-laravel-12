@@ -352,9 +352,9 @@ export default function Index({
                     {row.pending_matches_count > 0 && (
                         <ActionButtons.Custom
                             icon={LinkIcon}
-                            label="Matches"
+                            title="Matches"
                             onClick={() => openModal('matches', row)}
-                            color="purple"
+                            variant="info"
                         />
                     )}
                 </ActionButtons>
