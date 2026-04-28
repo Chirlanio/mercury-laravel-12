@@ -341,11 +341,19 @@ export default function Dashboard({
                                                 return (
                                                     <div className="bg-white border border-gray-200 rounded shadow p-2 text-xs">
                                                         <div className="font-semibold">{label} — {row.store_name}</div>
-                                                        <div className="text-gray-600 mt-1">
+                                                        <div className="text-gray-600 mt-1 space-y-0.5">
                                                             <div>Aderência: <span className="font-bold" style={{color: adherenceColor(row.adherence)}}>{row.adherence}%</span></div>
-                                                            <div>Solicitado: {row.total_requested}</div>
-                                                            <div>Despachado: {row.total_dispatched}</div>
-                                                            <div>Remanejos: {row.relocations_count}</div>
+                                                            <div>Entrega: <span className="font-medium">{row.delivery_rate ?? 0}%</span> ({row.completed_count}/{row.relocations_count})</div>
+                                                            {row.dispatch_accuracy !== null && (
+                                                                <div>Acurácia despacho: <span className="font-medium">{row.dispatch_accuracy}%</span></div>
+                                                            )}
+                                                            {row.avg_separation_hours !== null && (
+                                                                <div>Tempo médio separação: <span className="font-medium">{row.avg_separation_hours}h</span></div>
+                                                            )}
+                                                            <div className="border-t border-gray-100 pt-0.5 mt-1">
+                                                                <div>Solicitado: {row.total_requested} un</div>
+                                                                <div>Despachado: {row.total_dispatched} un</div>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 );
@@ -470,6 +478,86 @@ export default function Dashboard({
                             )}
                         </div>
                     </div>
+
+                    {/* Ranking detalhado de lojas origem */}
+                    {byOrigin.length > 0 && (
+                        <div className="bg-white rounded-lg shadow-sm p-4">
+                            <h3 className="text-sm font-semibold text-gray-700 mb-1">
+                                Performance da loja origem
+                            </h3>
+                            <p className="text-xs text-gray-500 mb-3">
+                                Aderência (% unidades despachadas), entrega (% remanejos completos),
+                                acurácia (% sem divergência de NF) e tempo médio de separação.
+                            </p>
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full text-sm">
+                                    <thead className="bg-gray-50 text-[11px] uppercase text-gray-600">
+                                        <tr>
+                                            <th className="px-3 py-2 text-left w-10">#</th>
+                                            <th className="px-3 py-2 text-left">Loja</th>
+                                            <th className="px-3 py-2 text-right">Total</th>
+                                            <th className="px-3 py-2 text-right">Entregues</th>
+                                            <th className="px-3 py-2 text-right">Aderência</th>
+                                            <th className="px-3 py-2 text-right">Acurácia despacho</th>
+                                            <th className="px-3 py-2 text-right">Tempo médio sep.</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {[...byOrigin]
+                                            .sort((a, b) => (b.adherence ?? 0) - (a.adherence ?? 0))
+                                            .map((row, idx) => {
+                                                const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '';
+                                                return (
+                                                    <tr key={row.store_code} className={idx < 3 ? 'bg-amber-50/30' : ''}>
+                                                        <td className="px-3 py-2 text-gray-500">
+                                                            {medal || `${idx + 1}º`}
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <div className="font-mono text-xs font-semibold">{row.store_code}</div>
+                                                            <div className="text-xs text-gray-500">{row.store_name}</div>
+                                                        </td>
+                                                        <td className="px-3 py-2 text-right tabular-nums text-gray-700">
+                                                            {row.relocations_count}
+                                                        </td>
+                                                        <td className="px-3 py-2 text-right tabular-nums text-gray-700">
+                                                            {row.completed_count}
+                                                            <span className="text-gray-400 text-[10px] ml-1">
+                                                                ({row.delivery_rate ?? 0}%)
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-3 py-2 text-right tabular-nums">
+                                                            <span className="font-bold" style={{ color: adherenceColor(row.adherence) }}>
+                                                                {row.adherence}%
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-3 py-2 text-right tabular-nums">
+                                                            {row.dispatch_accuracy !== null ? (
+                                                                <span className="font-medium" style={{ color: adherenceColor(row.dispatch_accuracy) }}>
+                                                                    {row.dispatch_accuracy}%
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-gray-400">—</span>
+                                                            )}
+                                                            {row.discrepancy_count > 0 && (
+                                                                <div className="text-[10px] text-amber-700">
+                                                                    {row.discrepancy_count} divergência(s)
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-3 py-2 text-right tabular-nums text-gray-700">
+                                                            {row.avg_separation_hours !== null
+                                                                ? `${row.avg_separation_hours}h`
+                                                                : <span className="text-gray-400">—</span>
+                                                            }
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Top destinos */}
                     {byDestination.length > 0 && (

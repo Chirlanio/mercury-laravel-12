@@ -1082,8 +1082,20 @@ class RelocationController extends Controller
             })
             ->values();
 
-        // 3. Top 10 lojas ORIGEM com aderência (dispatched / requested)
-        // Agrega via JOIN nos itens — evita carregar tudo em memória.
+        // 3. Top 10 lojas ORIGEM com métricas de performance
+        // Agrega via JOIN nos itens. Métricas calculadas:
+        //   - relocations_count: total criados pela origem no período
+        //   - completed_count: chegaram em completed/partial
+        //   - in_transit_count: despachados (in_transit ou subsequentes)
+        //   - dispatch_discrepancy_count: confirmaram com divergência de NF
+        //   - total_requested vs total_dispatched: aderência por unidades
+        //   - avg_separation_seconds: tempo médio approve→in_transit
+        //   - delivery_rate: % completed ou partial vs total
+        //   - dispatch_accuracy: 100% - (% com divergência de despacho)
+        $tsDiffExpr = $driver === 'sqlite'
+            ? "(julianday(r.in_transit_at) - julianday(r.approved_at)) * 86400"
+            : "TIMESTAMPDIFF(SECOND, r.approved_at, r.in_transit_at)";
+
         $byOrigin = DB::table('relocations as r')
             ->join('stores as s', 's.id', '=', 'r.origin_store_id')
             ->leftJoin('relocation_items as ri', 'ri.relocation_id', '=', 'r.id')
@@ -1094,24 +1106,51 @@ class RelocationController extends Controller
                 $q2->where('r.origin_store_id', $scopedStoreId)
                     ->orWhere('r.destination_store_id', $scopedStoreId);
             }))
-            ->selectRaw('s.code as store_code, s.name as store_name,
+            ->selectRaw("s.code as store_code, s.name as store_name,
                 COUNT(DISTINCT r.id) as relocations_count,
+                COUNT(DISTINCT CASE WHEN r.status IN ('completed','partial') THEN r.id END) as completed_count,
+                COUNT(DISTINCT CASE WHEN r.status IN ('in_transit','completed','partial') THEN r.id END) as in_transit_count,
+                COUNT(DISTINCT CASE WHEN r.dispatch_has_discrepancies = 1 THEN r.id END) as discrepancy_count,
                 COALESCE(SUM(ri.qty_requested), 0) as total_requested,
-                COALESCE(SUM(ri.dispatched_quantity), 0) as total_dispatched')
+                COALESCE(SUM(ri.dispatched_quantity), 0) as total_dispatched,
+                AVG(CASE WHEN r.approved_at IS NOT NULL AND r.in_transit_at IS NOT NULL
+                         THEN $tsDiffExpr END) as avg_separation_seconds")
             ->groupBy('s.code', 's.name')
             ->orderByDesc('relocations_count')
             ->limit(10)
             ->get()
-            ->map(fn ($r) => [
-                'store_code' => $r->store_code,
-                'store_name' => $r->store_name,
-                'relocations_count' => (int) $r->relocations_count,
-                'total_requested' => (int) $r->total_requested,
-                'total_dispatched' => (int) $r->total_dispatched,
-                'adherence' => $r->total_requested > 0
-                    ? round(($r->total_dispatched / $r->total_requested) * 100, 1)
-                    : 0.0,
-            ])
+            ->map(function ($r) {
+                $relocCount = (int) $r->relocations_count;
+                $inTransit = (int) $r->in_transit_count;
+                $discrepancies = (int) $r->discrepancy_count;
+                $secs = $r->avg_separation_seconds !== null ? (float) $r->avg_separation_seconds : null;
+
+                return [
+                    'store_code' => $r->store_code,
+                    'store_name' => $r->store_name,
+                    'relocations_count' => $relocCount,
+                    'completed_count' => (int) $r->completed_count,
+                    'in_transit_count' => $inTransit,
+                    'discrepancy_count' => $discrepancies,
+                    'total_requested' => (int) $r->total_requested,
+                    'total_dispatched' => (int) $r->total_dispatched,
+                    'adherence' => $r->total_requested > 0
+                        ? round(($r->total_dispatched / $r->total_requested) * 100, 1)
+                        : 0.0,
+                    // Quantos % dos remanejos chegaram a destino vs total criados
+                    'delivery_rate' => $relocCount > 0
+                        ? round(($r->completed_count / $relocCount) * 100, 1)
+                        : 0.0,
+                    // % de despachos sem divergência (sobre os que chegaram a in_transit)
+                    'dispatch_accuracy' => $inTransit > 0
+                        ? round((($inTransit - $discrepancies) / $inTransit) * 100, 1)
+                        : null,
+                    // Tempo médio approve → in_transit em horas (mais legível)
+                    'avg_separation_hours' => $secs !== null
+                        ? round($secs / 3600, 1)
+                        : null,
+                ];
+            })
             ->values();
 
         // 4. Top 10 lojas DESTINO
