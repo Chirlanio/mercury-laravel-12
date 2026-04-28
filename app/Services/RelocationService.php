@@ -94,6 +94,62 @@ class RelocationService
     }
 
     /**
+     * Clona um remanejo cancelado/rejeitado em novo DRAFT — útil pra
+     * reabrir solicitação que foi rejeitada por motivo já corrigido,
+     * ou pra refazer cancelamento acidental sem digitar tudo de novo.
+     *
+     * Copia: tipo, lojas, prioridade, título (com sufixo "(reaberto)"),
+     * observações, items (qty_requested e barcode/ref/size — qty_separated
+     * e qty_received começam zeradas).
+     *
+     * NÃO copia: status (sempre DRAFT), timestamps, transfer_id, NF,
+     * snapshot de divergência, helpdesk ticket, deleted_*, audit user ids.
+     *
+     * Aplica a validação de saldo comprometido (mesmo create) — pode
+     * falhar se origem não tem mais saldo do que tinha quando
+     * cancelou/rejeitou.
+     *
+     * @throws ValidationException
+     */
+    public function cloneFrom(Relocation $original, User $actor): Relocation
+    {
+        if (! in_array($original->status, [RelocationStatus::CANCELLED, RelocationStatus::REJECTED], true)) {
+            throw ValidationException::withMessages([
+                'status' => 'Apenas remanejos cancelados ou rejeitados podem ser reabertos.',
+            ]);
+        }
+
+        $original->loadMissing('items');
+
+        $items = $original->items->map(fn ($it) => [
+            'product_id' => $it->product_id,
+            'product_reference' => $it->product_reference,
+            'product_name' => $it->product_name,
+            'product_color' => $it->product_color,
+            'size' => $it->size,
+            'barcode' => $it->barcode,
+            'qty_requested' => $it->qty_requested,
+            'observations' => $it->observations,
+        ])->all();
+
+        $title = $original->title
+            ? "{$original->title} (reaberto)"
+            : "Reabertura do remanejo #{$original->id}";
+
+        return $this->create([
+            'relocation_type_id' => $original->relocation_type_id,
+            'origin_store_id' => $original->origin_store_id,
+            'destination_store_id' => $original->destination_store_id,
+            'title' => $title,
+            'observations' => $original->observations
+                ? "{$original->observations}\n\n[Reaberto a partir do remanejo #{$original->id} ({$original->status->label()}).]"
+                : "Reaberto a partir do remanejo #{$original->id} ({$original->status->label()}).",
+            'priority' => $original->priority->value,
+            'items' => $items,
+        ], $actor);
+    }
+
+    /**
      * Atualiza dados editáveis. Status só muda via TransitionService.
      * Edição completa permitida em draft/requested; após approved só
      * campos não-críticos (observations, deadline_days, priority).

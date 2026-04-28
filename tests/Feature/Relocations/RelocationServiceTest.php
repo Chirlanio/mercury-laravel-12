@@ -62,6 +62,52 @@ class RelocationServiceTest extends TestCase
         ]);
     }
 
+    public function test_clone_cria_novo_draft_a_partir_de_cancelado(): void
+    {
+        $original = $this->service->create([
+            'relocation_type_id' => $this->type->id,
+            'origin_store_id' => $this->origin->id,
+            'destination_store_id' => $this->destination->id,
+            'title' => 'Original',
+            'priority' => 'high',
+            'observations' => 'Notas originais',
+            'items' => [
+                ['product_reference' => 'A', 'qty_requested' => 5],
+                ['product_reference' => 'B', 'qty_requested' => 3],
+            ],
+        ], $this->adminUser);
+
+        // Marca como cancelled diretamente (skip transition pra simplificar setup)
+        $original->update(['status' => \App\Enums\RelocationStatus::CANCELLED->value]);
+
+        $clone = $this->service->cloneFrom($original->fresh(['items']), $this->adminUser);
+
+        $this->assertNotEquals($original->id, $clone->id);
+        $this->assertEquals('draft', $clone->status->value);
+        $this->assertEquals('high', $clone->priority->value);
+        $this->assertEquals($this->origin->id, $clone->origin_store_id);
+        $this->assertEquals($this->destination->id, $clone->destination_store_id);
+        $this->assertStringContainsString('reaberto', $clone->title);
+        $this->assertStringContainsString('Reaberto a partir do remanejo', $clone->observations);
+        $this->assertEquals(2, $clone->items()->count());
+        $this->assertEquals(8, $clone->items()->sum('qty_requested'));
+        $this->assertEquals(0, $clone->items()->sum('qty_separated'));
+    }
+
+    public function test_clone_rejeita_status_nao_terminal(): void
+    {
+        $original = $this->service->create([
+            'relocation_type_id' => $this->type->id,
+            'origin_store_id' => $this->origin->id,
+            'destination_store_id' => $this->destination->id,
+            'items' => [['product_reference' => 'A', 'qty_requested' => 1]],
+        ], $this->adminUser);
+
+        // status=draft (não-terminal)
+        $this->expectException(ValidationException::class);
+        $this->service->cloneFrom($original, $this->adminUser);
+    }
+
     public function test_create_rejeita_origem_igual_destino(): void
     {
         $this->expectException(ValidationException::class);

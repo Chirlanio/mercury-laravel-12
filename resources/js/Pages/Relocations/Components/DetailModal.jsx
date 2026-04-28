@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { router } from '@inertiajs/react';
 import {
     RectangleStackIcon,
     PaperAirplaneIcon,
@@ -12,6 +13,7 @@ import {
     CheckCircleIcon,
     ExclamationTriangleIcon,
     XCircleIcon,
+    ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import StandardModal from '@/Components/StandardModal';
 import Button from '@/Components/Button';
@@ -110,6 +112,30 @@ export default function DetailModal({ show, onClose, ulid, permissions = {}, onT
         'approved', 'in_separation', 'in_transit', 'completed', 'partial',
     ].includes(r.status);
 
+    // Reabrir/clonar — só faz sentido em estado terminal não-feliz
+    // (cancelled ou rejected) e exige permission de CREATE.
+    const canReopen = r && permissions.create && ['cancelled', 'rejected'].includes(r.status);
+
+    const handleReopen = async () => {
+        if (!r) return;
+        if (!confirm(`Reabrir o remanejo #${r.id}? Vai criar um novo em DRAFT com os mesmos itens.`)) {
+            return;
+        }
+        try {
+            window.axios.defaults.withCredentials = true;
+            await window.axios.post(route('relocations.clone', r.ulid));
+            onClose();
+            // Reload pra mostrar o novo na listagem.
+            // eslint-disable-next-line no-undef
+            router.reload({ only: ['relocations', 'statistics'] });
+        } catch (e) {
+            const msg = e.response?.data?.errors?.status?.[0]
+                ?? e.response?.data?.message
+                ?? 'Falha ao reabrir o remanejo.';
+            alert(msg);
+        }
+    };
+
     // Helpers de transição
     const handleTransition = (toStatus, payload = {}, note = null) => {
         if (!r) return;
@@ -198,17 +224,32 @@ export default function DetailModal({ show, onClose, ulid, permissions = {}, onT
             maxWidth="5xl"
             loading={loading}
             errorMessage={error}
-            headerActions={r && canPrintRomaneio ? (
-                <a
-                    href={route('relocations.romaneio', r.ulid)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="Imprimir Romaneio"
-                    className="inline-flex items-center gap-1 text-white/90 hover:text-white text-sm font-medium px-2 py-1 rounded hover:bg-white/10 transition-colors"
-                >
-                    <PrinterIcon className="h-5 w-5" />
-                    <span className="hidden sm:inline">Romaneio</span>
-                </a>
+            headerActions={r ? (
+                <div className="flex items-center gap-1">
+                    {canReopen && (
+                        <button
+                            type="button"
+                            onClick={handleReopen}
+                            title="Reabrir como novo remanejo"
+                            className="inline-flex items-center gap-1 text-white/90 hover:text-white text-sm font-medium px-2 py-1 rounded hover:bg-white/10 transition-colors"
+                        >
+                            <ArrowPathIcon className="h-5 w-5" />
+                            <span className="hidden sm:inline">Reabrir</span>
+                        </button>
+                    )}
+                    {canPrintRomaneio && (
+                        <a
+                            href={route('relocations.romaneio', r.ulid)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Imprimir Romaneio"
+                            className="inline-flex items-center gap-1 text-white/90 hover:text-white text-sm font-medium px-2 py-1 rounded hover:bg-white/10 transition-colors"
+                        >
+                            <PrinterIcon className="h-5 w-5" />
+                            <span className="hidden sm:inline">Romaneio</span>
+                        </a>
+                    )}
+                </div>
             ) : null}
         >
             {r && (

@@ -228,6 +228,30 @@ class RelocationController extends Controller
     }
 
     /**
+     * Reabre um remanejo cancelado/rejeitado clonando-o em um novo
+     * draft. Permite refazer rapidamente sem digitar tudo de novo.
+     */
+    public function clone(Relocation $relocation, Request $request): RedirectResponse
+    {
+        $this->ensureCanView($request->user(), $relocation);
+
+        if (! $request->user()->hasPermissionTo(Permission::CREATE_RELOCATIONS->value)) {
+            abort(403, 'Sem permissão pra criar remanejos.');
+        }
+
+        try {
+            $cloned = $this->service->cloneFrom($relocation, $request->user());
+            $this->bumpCacheVersion();
+        } catch (ValidationException $e) {
+            return redirect()->back()->withErrors($e->errors());
+        }
+
+        return redirect()
+            ->back()
+            ->with('success', "Remanejo reaberto como #{$cloned->id}. Ajuste os itens e solicite novamente.");
+    }
+
+    /**
      * Preview da validação de NF — compara items separados do remanejo
      * contra os items registrados em movements (CIGAM) pra a chave
      * (loja origem + invoice_number + movement_date). Não muta nada;
