@@ -1117,6 +1117,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/relocations/{relocation}/transition', [\App\Http\Controllers\RelocationController::class, 'transition'])->name('relocations.transition');
         Route::post('/relocations/{relocation}/dispatch/validate', [\App\Http\Controllers\RelocationController::class, 'dispatchValidate'])->name('relocations.dispatch.validate');
         Route::post('/relocations/{relocation}/clone', [\App\Http\Controllers\RelocationController::class, 'clone'])->name('relocations.clone');
+        Route::post('/relocations/bulk-approve', [\App\Http\Controllers\RelocationController::class, 'bulkApprove'])->name('relocations.bulk-approve');
 
         Route::middleware('permission:'.Permission::DELETE_RELOCATIONS->value)->group(function () {
             Route::delete('/relocations/{relocation}', [\App\Http\Controllers\RelocationController::class, 'destroy'])->name('relocations.destroy');

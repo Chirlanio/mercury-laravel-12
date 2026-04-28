@@ -79,6 +79,54 @@ export default function Index({
     ]);
 
     // ------------------------------------------------------------------
+    // Bulk approve — seleção de remanejos REQUESTED pra aprovação em lote.
+    // Só ativo pra users com APPROVE_RELOCATIONS. Checkbox aparece só na
+    // linhas com status='requested'.
+    // ------------------------------------------------------------------
+    const [selectedUlids, setSelectedUlids] = useState([]);
+    const [bulkApproving, setBulkApproving] = useState(false);
+
+    const toggleSelect = (ulid) => {
+        setSelectedUlids((prev) => prev.includes(ulid)
+            ? prev.filter((u) => u !== ulid)
+            : [...prev, ulid]);
+    };
+
+    const clearSelection = () => setSelectedUlids([]);
+
+    const handleBulkApprove = async () => {
+        if (selectedUlids.length === 0) return;
+        if (!confirm(`Aprovar ${selectedUlids.length} remanejo(s) selecionado(s)?`)) return;
+
+        setBulkApproving(true);
+        try {
+            const { data } = await window.axios.post(
+                route('relocations.bulk-approve'),
+                { ulids: selectedUlids },
+            );
+            const { approved_count, failed = [], missing = [] } = data;
+
+            if (approved_count > 0 && failed.length === 0 && missing.length === 0) {
+                toast.success(`${approved_count} remanejo(s) aprovado(s).`);
+            } else if (approved_count > 0) {
+                toast.warning(
+                    `${approved_count} aprovado(s), ${failed.length + missing.length} pulado(s).`,
+                    { autoClose: 6000 },
+                );
+            } else {
+                toast.error('Nenhum remanejo foi aprovado. Verifique os filtros e tente novamente.');
+            }
+
+            setSelectedUlids([]);
+            router.reload({ only: ['relocations', 'statistics'] });
+        } catch (e) {
+            toast.error(e.response?.data?.message ?? 'Falha ao aprovar em lote.');
+        } finally {
+            setBulkApproving(false);
+        }
+    };
+
+    // ------------------------------------------------------------------
     // Filtros (search debounced; selects/dates immediate)
     // ------------------------------------------------------------------
     const [filterState, setFilterState] = useState({
@@ -373,6 +421,19 @@ export default function Index({
     // Table columns
     // ------------------------------------------------------------------
     const columns = [
+        ...(canApprove ? [{
+            key: 'select',
+            label: '',
+            render: (row) => row.status === 'requested' ? (
+                <input
+                    type="checkbox"
+                    checked={selectedUlids.includes(row.ulid)}
+                    onChange={(e) => { e.stopPropagation(); toggleSelect(row.ulid); }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+            ) : null,
+        }] : []),
         {
             key: 'title',
             label: 'Identificação',
@@ -685,6 +746,34 @@ export default function Index({
                             </div>
                         )}
                     </div>
+
+                    {canApprove && selectedUlids.length > 0 && (
+                        <div className="mb-3 bg-indigo-50 border border-indigo-200 rounded-lg p-3 flex items-center justify-between gap-3">
+                            <div className="text-sm text-indigo-900">
+                                <strong>{selectedUlids.length}</strong> remanejo(s) selecionado(s) pra aprovação.
+                            </div>
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={clearSelection}
+                                    disabled={bulkApproving}
+                                >
+                                    Limpar seleção
+                                </Button>
+                                <Button
+                                    variant="success"
+                                    size="sm"
+                                    icon={HandThumbUpIcon}
+                                    onClick={handleBulkApprove}
+                                    disabled={bulkApproving}
+                                    loading={bulkApproving}
+                                >
+                                    Aprovar selecionados ({selectedUlids.length})
+                                </Button>
+                            </div>
+                        </div>
+                    )}
 
                     <DataTable
                         data={relocations}

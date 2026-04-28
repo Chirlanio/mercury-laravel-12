@@ -102,6 +102,53 @@ class RelocationControllerTest extends TestCase
         $this->assertEquals('requested', $r->fresh()->status->value);
     }
 
+    public function test_bulk_approve_aprova_lote_de_requested(): void
+    {
+        $r1 = $this->createRelocation();
+        $r2 = $this->createRelocation();
+        $r1->update(['status' => RelocationStatus::REQUESTED->value]);
+        $r2->update(['status' => RelocationStatus::REQUESTED->value]);
+
+        $response = $this->actingAs($this->adminUser)->postJson(
+            route('relocations.bulk-approve'),
+            ['ulids' => [$r1->ulid, $r2->ulid]],
+        );
+
+        $response->assertOk();
+        $this->assertEquals(2, $response->json('approved_count'));
+        $this->assertEmpty($response->json('failed'));
+        $this->assertEquals('approved', $r1->fresh()->status->value);
+        $this->assertEquals('approved', $r2->fresh()->status->value);
+    }
+
+    public function test_bulk_approve_pula_status_diferente_de_requested(): void
+    {
+        $approved = $this->createRelocation();
+        $approved->update(['status' => RelocationStatus::APPROVED->value]);
+        $requested = $this->createRelocation();
+        $requested->update(['status' => RelocationStatus::REQUESTED->value]);
+
+        $response = $this->actingAs($this->adminUser)->postJson(
+            route('relocations.bulk-approve'),
+            ['ulids' => [$approved->ulid, $requested->ulid]],
+        );
+
+        $response->assertOk();
+        $this->assertEquals(1, $response->json('approved_count'));
+        $this->assertContains($approved->ulid, $response->json('missing'));
+        $this->assertEquals('approved', $requested->fresh()->status->value);
+    }
+
+    public function test_bulk_approve_exige_permission(): void
+    {
+        $r = $this->createRelocation();
+        $r->update(['status' => RelocationStatus::REQUESTED->value]);
+
+        $this->actingAs($this->regularUser)
+            ->postJson(route('relocations.bulk-approve'), ['ulids' => [$r->ulid]])
+            ->assertStatus(403);
+    }
+
     public function test_transition_rejeita_status_invalido(): void
     {
         $r = $this->createRelocation();

@@ -228,6 +228,75 @@ class RelocationController extends Controller
     }
 
     /**
+     * Aprova vários remanejos em REQUESTED de uma vez. Usado pelo time
+     * de planejamento pra processar a fila do dia sem precisar abrir
+     * cada um individualmente.
+     *
+     * Falhas individuais não interrompem o lote — relata sucesso/falha
+     * por ulid pra UI mostrar resumo. Idempotente: remanejos que já
+     * foram aprovados são pulados silenciosamente.
+     */
+    public function bulkApprove(Request $request): JsonResponse
+    {
+        if (! $request->user()->hasPermissionTo(Permission::APPROVE_RELOCATIONS->value)) {
+            abort(403, 'Sem permissão pra aprovar remanejos.');
+        }
+
+        $data = $request->validate([
+            'ulids' => 'required|array|min:1|max:100',
+            'ulids.*' => 'required|string',
+            'note' => 'nullable|string|max:500',
+        ]);
+
+        $relocations = Relocation::whereIn('ulid', $data['ulids'])
+            ->where('status', RelocationStatus::REQUESTED->value)
+            ->get();
+
+        $found = $relocations->pluck('ulid')->all();
+        $missing = array_diff($data['ulids'], $found);
+
+        $approved = [];
+        $failed = [];
+
+        foreach ($relocations as $relocation) {
+            try {
+                $this->transitionService->transition(
+                    $relocation,
+                    RelocationStatus::APPROVED->value,
+                    $request->user(),
+                    $data['note'] ?? null,
+                );
+                $approved[] = $relocation->ulid;
+            } catch (ValidationException $e) {
+                $firstError = collect($e->errors())->flatten()->first() ?? 'Erro de validação.';
+                $failed[] = [
+                    'ulid' => $relocation->ulid,
+                    'id' => $relocation->id,
+                    'error' => $firstError,
+                ];
+            } catch (\Throwable $e) {
+                $failed[] = [
+                    'ulid' => $relocation->ulid,
+                    'id' => $relocation->id,
+                    'error' => 'Erro inesperado.',
+                ];
+            }
+        }
+
+        if (count($approved) > 0) {
+            $this->bumpCacheVersion();
+        }
+
+        return response()->json([
+            'approved_count' => count($approved),
+            'approved_ulids' => $approved,
+            'failed' => $failed,
+            'missing' => array_values($missing), // ulids não encontrados ou não-requested
+            'total_requested' => count($data['ulids']),
+        ]);
+    }
+
+    /**
      * Reabre um remanejo cancelado/rejeitado clonando-o em um novo
      * draft. Permite refazer rapidamente sem digitar tudo de novo.
      */
