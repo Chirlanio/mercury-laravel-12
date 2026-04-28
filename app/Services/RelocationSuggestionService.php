@@ -176,6 +176,7 @@ class RelocationSuggestionService
 
         $suggestions = [];
         $suppressed = 0;
+        $missingForSubstitution = [];
 
         foreach ($sales as $row) {
             // Stocks deste barcode (ou seu refauxiliar associado)
@@ -186,15 +187,26 @@ class RelocationSuggestionService
                 ->sortByDesc('saldo')
                 ->values();
 
+            $product = $this->matchProduct($products, $row);
+
             if ($candidates->isEmpty()) {
-                $suppressed++;
-                continue; // Nenhuma loja da rede tem saldo — pula
+                // Sem saldo na rede — anota pra tentar substituto. Substituição
+                // só faz sentido em busca aberta (origem não fixada pelo usuário).
+                if (! $originStore && $product['collection_cigam_code'] && $product['color_cigam_code']) {
+                    $missingForSubstitution[] = [
+                        'row' => $row,
+                        'product' => $product,
+                        'abc' => $abcByBarcode[$row->barcode] ?? ['curve' => 'C', 'cumulative_pct' => 100.0],
+                        'seasonality' => $seasonalityByKey[$row->barcode.'|'.($row->ref_size ?? '')] ?? null,
+                    ];
+                } else {
+                    $suppressed++;
+                }
+                continue;
             }
 
             $primary = $candidates->first();
             $others = $candidates->slice(1, 3)->values();
-
-            $product = $this->matchProduct($products, $row);
 
             $dailyAvg = (float) $row->sales_qty / $days;
             $idealQty = max(1, (int) ceil($dailyAvg * self::COVERAGE_DAYS));
@@ -222,6 +234,8 @@ class RelocationSuggestionService
                 'is_seasonal' => $seasonality['is_seasonal'] ?? false,
                 'seasonality_ratio' => $seasonality['ratio'] ?? null,
                 'prior_year_qty' => $seasonality['prior_qty'] ?? 0,
+                'is_substitute' => false,
+                'substitute_for_barcode' => null,
                 'suggested_origin' => $this->formatOrigin($primary, $storesByCode),
                 'other_origins' => $others
                     ->map(fn ($c) => $this->formatOrigin($c, $storesByCode))
@@ -229,6 +243,26 @@ class RelocationSuggestionService
                     ->values()
                     ->all(),
             ];
+        }
+
+        // Pass 2: tenta substitutos pros itens sem saldo na rede.
+        if (! empty($missingForSubstitution)) {
+            $substitutes = $this->findSubstitutes(
+                $missingForSubstitution,
+                $networkStoreCodes,
+                $destStore->code,
+                $committed,
+                $networkStoresIndex,
+                $days,
+            );
+            foreach ($missingForSubstitution as $missing) {
+                $sub = $substitutes[$missing['row']->barcode] ?? null;
+                if (! $sub) {
+                    $suppressed++;
+                    continue;
+                }
+                $suggestions[] = $sub;
+            }
         }
 
         // Ordena: A primeiro, depois B, depois C; dentro da curva por sales_qty desc
@@ -404,8 +438,11 @@ class RelocationSuggestionService
                 'product_variants.barcode',
                 'product_variants.aux_reference',
                 'product_variants.size_cigam_code',
+                'products.id as product_id',
                 'products.reference',
                 'products.description',
+                'products.collection_cigam_code',
+                'products.color_cigam_code',
                 'product_colors.name as color_name',
                 'product_sizes.name as size_label',
             ]);
@@ -413,9 +450,12 @@ class RelocationSuggestionService
         $byKey = [];
         foreach ($rows as $r) {
             $entry = [
+                'product_id' => $r->product_id,
                 'reference' => $r->reference,
                 'description' => $r->description,
                 'color_name' => $r->color_name,
+                'collection_cigam_code' => $r->collection_cigam_code,
+                'color_cigam_code' => $r->color_cigam_code,
                 'size_label' => $r->size_label ?? $r->size_cigam_code,
             ];
             if ($r->barcode) $byKey[$r->barcode] = $entry;
@@ -428,7 +468,193 @@ class RelocationSuggestionService
     {
         if (isset($products[$salesRow->barcode])) return $products[$salesRow->barcode];
         if ($salesRow->ref_size && isset($products[$salesRow->ref_size])) return $products[$salesRow->ref_size];
-        return ['reference' => $salesRow->barcode, 'description' => null, 'color_name' => null, 'size_label' => null];
+        return [
+            'product_id' => null,
+            'reference' => $salesRow->barcode,
+            'description' => null,
+            'color_name' => null,
+            'collection_cigam_code' => null,
+            'color_cigam_code' => null,
+            'size_label' => null,
+        ];
+    }
+
+    /**
+     * Pra cada item sem saldo na rede, busca um produto similar (mesma
+     * collection_cigam_code + color_cigam_code) que tenha saldo. Útil
+     * quando o produto exato esgotou em todas as lojas da rede mas há
+     * variantes/modelos parecidos disponíveis.
+     *
+     * Estratégia em 1 passada:
+     *  1. Coleta os pares (collection, color) únicos dos missing
+     *  2. Query: barcodes ativos das variantes que batem nesses pares
+     *     (excluindo o produto original do match — só sugere "outro")
+     *  3. Query CIGAM batch pra esses barcodes
+     *  4. Aplica desconto committed (mesmo padrão do fluxo principal)
+     *  5. Pra cada missing, escolhe o substituto com maior saldo
+     *
+     * @param  array  $missing  Items que não acharam saldo no produto original
+     * @return array<string, array>  Indexado pelo barcode original
+     */
+    protected function findSubstitutes(
+        array $missing,
+        array $networkStoreCodes,
+        string $excludeStoreCode,
+        array $committed,
+        Collection $networkStoresIndex,
+        int $days,
+    ): array {
+        if (empty($missing) || empty($networkStoreCodes)) {
+            return [];
+        }
+
+        // 1. Coleta pares (collection, color) únicos + product_ids originais
+        //    pra excluir do candidate set.
+        $pairs = []; // "$col|$color" => true
+        $originalProductIds = [];
+        foreach ($missing as $m) {
+            $col = $m['product']['collection_cigam_code'];
+            $color = $m['product']['color_cigam_code'];
+            if (! $col || ! $color) continue;
+            $pairs[$col.'|'.$color] = ['collection' => $col, 'color' => $color];
+            if (! empty($m['product']['product_id'])) {
+                $originalProductIds[] = $m['product']['product_id'];
+            }
+        }
+        if (empty($pairs)) return [];
+
+        // 2. Variantes candidatas: produtos com mesma collection+color,
+        //    excluindo os originais.
+        $candidateRows = ProductVariant::query()
+            ->join('products', 'products.id', '=', 'product_variants.product_id')
+            ->leftJoin('product_colors', 'product_colors.cigam_code', '=', 'products.color_cigam_code')
+            ->leftJoin('product_sizes', 'product_sizes.cigam_code', '=', 'product_variants.size_cigam_code')
+            ->where('product_variants.is_active', true)
+            ->whereNotNull('product_variants.barcode')
+            ->where(function ($q) use ($pairs) {
+                foreach ($pairs as $p) {
+                    $q->orWhere(function ($qq) use ($p) {
+                        $qq->where('products.collection_cigam_code', $p['collection'])
+                            ->where('products.color_cigam_code', $p['color']);
+                    });
+                }
+            })
+            ->when(! empty($originalProductIds), fn ($q) => $q->whereNotIn('products.id', $originalProductIds))
+            ->get([
+                'product_variants.barcode',
+                'products.id as product_id',
+                'products.reference',
+                'products.description',
+                'products.collection_cigam_code',
+                'products.color_cigam_code',
+                'product_colors.name as color_name',
+                'product_sizes.name as size_label',
+                'product_variants.size_cigam_code',
+            ]);
+
+        if ($candidateRows->isEmpty()) return [];
+
+        $candidateBarcodes = $candidateRows->pluck('barcode')->unique()->values()->all();
+
+        // 3. Saldo CIGAM dos candidatos
+        $stocks = $this->stock->availableForBarcodes(
+            $candidateBarcodes,
+            excludeStoreCode: $excludeStoreCode,
+            onlyStoreCodes: $networkStoreCodes,
+        );
+
+        // Atualiza committed do set ampliado (substituições podem ser de
+        // produtos não presentes no $committed do fluxo principal).
+        $networkStoreIds = $networkStoresIndex->pluck('id')->all();
+        $extraCommitted = $this->committedStock->committedByStoreAndBarcode($networkStoreIds, $candidateBarcodes);
+        $committed = array_merge($committed, $extraCommitted);
+
+        // 4. Aplica desconto committed (mesmo padrão do fluxo principal)
+        $stocks = $stocks->map(function ($s) use ($committed, $networkStoresIndex) {
+            $store = $networkStoresIndex->get($s->store_code);
+            if (! $store) return $s;
+            $clone = clone $s;
+            $committedQty = $committed[$store->id.'|'.$clone->cod_barra] ?? 0;
+            if (! empty($clone->refauxiliar) && $clone->refauxiliar !== $clone->cod_barra) {
+                $committedQty += $committed[$store->id.'|'.$clone->refauxiliar] ?? 0;
+            }
+            $clone->saldo = max(0, (int) $clone->saldo - $committedQty);
+            return $clone;
+        })->filter(fn ($s) => (int) $s->saldo > 0)->values();
+
+        if ($stocks->isEmpty()) return [];
+
+        // Index candidates por par (collection|color)
+        $candidatesByPair = [];
+        foreach ($candidateRows as $cr) {
+            $key = $cr->collection_cigam_code.'|'.$cr->color_cigam_code;
+            $candidatesByPair[$key][$cr->barcode] = $cr;
+        }
+
+        // Stores enrichment
+        $storesByCode = Store::whereIn('code', $stocks->pluck('store_code')->unique()->all())
+            ->get(['id', 'code', 'name'])
+            ->keyBy('code');
+
+        // 5. Pra cada missing, encontra o melhor substituto
+        $result = [];
+        foreach ($missing as $m) {
+            $col = $m['product']['collection_cigam_code'];
+            $color = $m['product']['color_cigam_code'];
+            if (! $col || ! $color) continue;
+            $key = $col.'|'.$color;
+            $candidatesForPair = $candidatesByPair[$key] ?? [];
+            if (empty($candidatesForPair)) continue;
+
+            $candidateBarcodesForPair = array_keys($candidatesForPair);
+            $stocksForPair = $stocks
+                ->whereIn('cod_barra', $candidateBarcodesForPair)
+                ->sortByDesc('saldo')
+                ->values();
+
+            if ($stocksForPair->isEmpty()) continue;
+
+            $primary = $stocksForPair->first();
+            $others = $stocksForPair->slice(1, 3)->values();
+            $subProductRow = $candidatesForPair[$primary->cod_barra] ?? null;
+            if (! $subProductRow) continue;
+
+            $row = $m['row'];
+            $dailyAvg = (float) $row->sales_qty / $days;
+            $idealQty = max(1, (int) ceil($dailyAvg * self::COVERAGE_DAYS));
+            $qtySuggested = min($idealQty, (int) $primary->saldo);
+
+            $result[$row->barcode] = [
+                'barcode' => $primary->cod_barra,
+                'ref_size' => null,
+                'product_reference' => $subProductRow->reference,
+                'product_name' => $subProductRow->description,
+                'product_color' => $subProductRow->color_name,
+                'size' => $subProductRow->size_label ?? $subProductRow->size_cigam_code,
+                'sales_qty' => (float) $row->sales_qty,
+                'sales_count' => (int) $row->sales_count,
+                'daily_average' => round($dailyAvg, 2),
+                'qty_suggested' => $qtySuggested,
+                'curve' => $m['abc']['curve'],
+                'curve_label' => 'Curva '.$m['abc']['curve'],
+                'cumulative_pct' => $m['abc']['cumulative_pct'],
+                'is_seasonal' => $m['seasonality']['is_seasonal'] ?? false,
+                'seasonality_ratio' => $m['seasonality']['ratio'] ?? null,
+                'prior_year_qty' => $m['seasonality']['prior_qty'] ?? 0,
+                'is_substitute' => true,
+                'substitute_for_barcode' => $row->barcode,
+                'substitute_for_name' => $m['product']['description'],
+                'substitute_for_reference' => $m['product']['reference'],
+                'suggested_origin' => $this->formatOrigin($primary, $storesByCode),
+                'other_origins' => $others
+                    ->map(fn ($c) => $this->formatOrigin($c, $storesByCode))
+                    ->filter()
+                    ->values()
+                    ->all(),
+            ];
+        }
+
+        return $result;
     }
 
     protected function formatOrigin(object $row, Collection $storesByCode): ?array

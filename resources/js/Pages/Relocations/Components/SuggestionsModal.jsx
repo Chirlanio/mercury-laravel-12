@@ -307,6 +307,12 @@ export default function SuggestionsModal({
                             <SeasonalBadge ratio={1.5} priorQty={3} />
                             <span className="text-gray-600">Sazonal — venda &gt; 1.5× ano anterior</span>
                         </span>
+                        <span className="inline-flex items-center gap-1">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                                ↪ subs
+                            </span>
+                            <span className="text-gray-600">Substituto similar (mesma coleção e cor)</span>
+                        </span>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="min-w-full text-sm">
@@ -326,8 +332,11 @@ export default function SuggestionsModal({
                             <tbody className="divide-y divide-gray-200">
                                 {data.suggestions.map((s, idx) => {
                                     const sel = selected[idx] ?? { checked: false, qty: s.qty_suggested };
+                                    const rowClass = sel.checked
+                                        ? 'bg-purple-50'
+                                        : s.is_substitute ? 'bg-amber-50/40' : '';
                                     return (
-                                        <tr key={idx} className={sel.checked ? 'bg-purple-50' : ''}>
+                                        <tr key={idx} className={rowClass}>
                                             <td className="px-2 py-2">
                                                 <input
                                                     type="checkbox"
@@ -341,16 +350,34 @@ export default function SuggestionsModal({
                                                 {s.is_seasonal && (
                                                     <SeasonalBadge ratio={s.seasonality_ratio} priorQty={s.prior_year_qty} />
                                                 )}
+                                                {s.is_substitute && (
+                                                    <span
+                                                        className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300"
+                                                        title="Produto similar (mesma coleção e cor) — original sem saldo na rede"
+                                                    >
+                                                        ↪ subs
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="px-2 py-2">
                                                 <div className="font-mono text-xs">{s.product_reference || s.barcode}</div>
                                                 {s.product_reference && s.product_reference !== s.barcode && (
                                                     <div className="text-xs text-gray-500 font-mono">EAN {s.barcode}</div>
                                                 )}
+                                                {s.is_substitute && s.substitute_for_reference && (
+                                                    <div className="text-[10px] text-amber-700 mt-0.5 italic">
+                                                        ↪ substitui <span className="font-mono">{s.substitute_for_reference}</span>
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-2 py-2">
                                                 <div>{s.product_name || <span className="text-gray-400">—</span>}</div>
                                                 {s.product_color && <div className="text-xs text-gray-500">{s.product_color}</div>}
+                                                {s.is_substitute && s.substitute_for_name && (
+                                                    <div className="text-[10px] text-amber-700 mt-0.5 italic line-through">
+                                                        original: {s.substitute_for_name}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-2 py-2 font-mono text-xs">{s.size || '—'}</td>
                                             <td className="px-2 py-2 text-right tabular-nums">{s.sales_qty}</td>
