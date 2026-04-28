@@ -1,5 +1,6 @@
 import { Head, router } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'react-toastify';
 import {
     RectangleStackIcon,
     ClockIcon,
@@ -121,6 +122,94 @@ export default function Index({
         return () => clearTimeout(searchDebounceRef.current);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filterState.search]);
+
+    // ------------------------------------------------------------------
+    // Reverb realtime — subscribe no canal privado da loja escopada.
+    // Vendedor/gerente (sem MANAGE/APPROVE) ouve só a própria loja.
+    // Admins/planejamento têm visão global e fazem refresh manual (não
+    // subscribe pra evitar enxurrada de toasts cross-tenant).
+    // Mesmo padrão de DamagedProducts: try/catch silencioso se Echo
+    // offline + debounce 500ms pra coalescer bursts de eventos.
+    // ------------------------------------------------------------------
+    const reloadTimerRef = useRef(null);
+    useEffect(() => {
+        if (!scopedStoreId || typeof window === 'undefined' || !window.Echo) {
+            return;
+        }
+
+        const scheduleReload = () => {
+            if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+            reloadTimerRef.current = setTimeout(() => {
+                router.reload({ only: ['relocations', 'statistics'] });
+            }, 500);
+        };
+
+        const channelName = `relocations.store.${scopedStoreId}`;
+        let channel;
+
+        try {
+            channel = window.Echo.private(channelName);
+
+            channel.listen('.relocation.status-changed', (payload) => {
+                const isOrigin = payload.origin_store_id === scopedStoreId;
+                const isDestination = payload.destination_store_id === scopedStoreId;
+                const otherCode = isOrigin
+                    ? (payload.destination_store_code ?? '—')
+                    : (payload.origin_store_code ?? '—');
+                const arrow = isOrigin ? '→' : '←';
+                const label = payload.to_status_label ?? payload.to_status;
+
+                // Toasts contextualizados pelas transições mais relevantes.
+                switch (payload.to_status) {
+                    case 'requested':
+                        if (isOrigin) toast.info(`Novo remanejo ${arrow} ${otherCode} solicitado.`);
+                        break;
+                    case 'approved':
+                        if (isOrigin) toast.success(`Remanejo ${arrow} ${otherCode} aprovado pelo planejamento.`);
+                        break;
+                    case 'in_separation':
+                        if (isOrigin) toast.info(`Separação iniciada — remanejo ${arrow} ${otherCode}.`);
+                        break;
+                    case 'in_transit':
+                        if (isDestination) {
+                            toast.success(
+                                `Remanejo despachado de ${otherCode} ${payload.invoice_number ? `(NF ${payload.invoice_number})` : ''} — aguardando recebimento.`,
+                                { autoClose: 6000 },
+                            );
+                        }
+                        break;
+                    case 'completed':
+                    case 'partial':
+                        if (isOrigin) {
+                            toast.success(`Remanejo ${arrow} ${otherCode} ${payload.to_status === 'partial' ? 'recebido parcialmente' : 'recebido'}.`);
+                        }
+                        break;
+                    case 'rejected':
+                        toast.warn(`Remanejo ${arrow} ${otherCode} rejeitado.`);
+                        break;
+                    case 'cancelled':
+                        toast.warn(`Remanejo ${arrow} ${otherCode} cancelado.`);
+                        break;
+                    default:
+                        toast.info(`Remanejo ${arrow} ${otherCode}: ${label}`);
+                }
+
+                scheduleReload();
+            });
+        } catch (e) {
+            // Echo não configurado ou auth falhou — silent no-op.
+        }
+
+        return () => {
+            if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+            try {
+                if (channel) channel.stopListening('.relocation.status-changed');
+                window.Echo.leave(`private-${channelName}`);
+            } catch (e) {
+                // noop
+            }
+        };
+    }, [scopedStoreId]);
 
     const handleSelectChange = (key, value) => {
         const next = { ...filterState, [key]: value };

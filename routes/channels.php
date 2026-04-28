@@ -87,3 +87,22 @@ Broadcast::channel('damaged-products.store.{storeId}', function ($user, $storeId
 
     return $userStoreId !== null && (int) $userStoreId === (int) $storeId;
 });
+
+// Private channel per-store for relocations module (status updates em tempo real
+// pra origem e destino). Mesmo padrão do damaged-products: MANAGE_RELOCATIONS
+// bypassa, demais só ouvem própria loja. APPROVE_RELOCATIONS (planejamento)
+// também bypassa pra ter visão global do que está em trânsito.
+Broadcast::channel('relocations.store.{storeId}', function ($user, $storeId) {
+    if ($user->hasPermissionTo(\App\Enums\Permission::MANAGE_RELOCATIONS->value)
+        || $user->hasPermissionTo(\App\Enums\Permission::APPROVE_RELOCATIONS->value)) {
+        return true;
+    }
+
+    if (! $user->store_id) {
+        return false;
+    }
+
+    $userStoreId = \App\Models\Store::where('code', $user->store_id)->value('id');
+
+    return $userStoreId !== null && (int) $userStoreId === (int) $storeId;
+});
