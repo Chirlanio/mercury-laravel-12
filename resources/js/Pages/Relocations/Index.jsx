@@ -784,6 +784,11 @@ export default function Index({
                                 ? 'Nenhum remanejo encontrado com os filtros atuais.'
                                 : 'Nenhum remanejo cadastrado ainda. Clique em "Novo remanejo" para começar.'
                         }
+                        onNavigate={(url) => router.visit(url, {
+                            preserveState: true,
+                            preserveScroll: true,
+                            only: ['relocations', 'statistics', 'filters'],
+                        })}
                     />
                 </div>
             </div>
