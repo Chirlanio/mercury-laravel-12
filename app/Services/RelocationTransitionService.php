@@ -47,6 +47,10 @@ use Illuminate\Validation\ValidationException;
  */
 class RelocationTransitionService
 {
+    public function __construct(
+        protected RelocationStockValidator $stockValidator,
+    ) {}
+
     /**
      * Executa uma transição de status.
      *
@@ -261,6 +265,26 @@ class RelocationTransitionService
                 throw ValidationException::withMessages([
                     'received_items' => 'Informe a quantidade recebida de pelo menos um item.',
                 ]);
+            }
+        }
+
+        // Aprovação valida saldo absoluto na origem — saldo pode ter mudado
+        // entre criação e aprovação (vendas paralelas, outros remanejos
+        // aprovados etc.). Override via force_approve_without_stock=true
+        // no payload pra casos onde o planejamento já avaliou a situação.
+        if ($from === RelocationStatus::REQUESTED && $to === RelocationStatus::APPROVED) {
+            $force = (bool) ($payload['force_approve_without_stock'] ?? false);
+            if (! $force) {
+                $items = $relocation->items->map(fn ($it) => [
+                    'barcode' => $it->barcode,
+                    'qty_requested' => (int) $it->qty_requested,
+                ])->all();
+
+                $this->stockValidator->validate(
+                    $relocation->origin_store_id,
+                    $items,
+                    $relocation->id, // exclui o próprio remanejo do committed
+                );
             }
         }
     }

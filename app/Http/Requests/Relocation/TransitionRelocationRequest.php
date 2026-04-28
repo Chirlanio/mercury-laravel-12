@@ -45,6 +45,11 @@ class TransitionRelocationRequest extends FormRequest
             // Estrutura validada no service (não aqui — é nested complexo).
             'dispatch_validation' => 'nullable|array',
 
+            // Override em → approved quando origem está sem saldo absoluto
+            // (ex: planejamento decide aprovar mesmo sabendo que a origem
+            // vai ter ruptura). Default false.
+            'force_approve_without_stock' => 'nullable|boolean',
+
             // Payload pra in_transit → completed/partial
             'receiver_name' => 'nullable|string|max:150',
             'received_items' => 'nullable|array',
