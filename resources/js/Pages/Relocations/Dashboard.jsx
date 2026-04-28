@@ -2,6 +2,7 @@ import { Head, router } from '@inertiajs/react';
 import { useMemo } from 'react';
 import {
     BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
+    ComposedChart,
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
     LabelList,
 } from 'recharts';
@@ -556,6 +557,98 @@ export default function Dashboard({
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+                    )}
+
+                    {/* Aderência por loja origem — colunas com solicitado/enviado + linha de % */}
+                    {byOrigin.length > 0 && (
+                        <div className="bg-white rounded-lg shadow-sm p-4">
+                            <h3 className="text-sm font-semibold text-gray-700 mb-1">
+                                Solicitado × Enviado por loja origem
+                            </h3>
+                            <p className="text-xs text-gray-500 mb-3">
+                                Quantidade de unidades solicitada e efetivamente despachada (CIGAM
+                                code=5+S) no período. A linha mostra o % de aderência.
+                            </p>
+                            <ResponsiveContainer width="100%" height={320}>
+                                <ComposedChart
+                                    data={byOrigin}
+                                    margin={{ top: 16, right: 16, bottom: 40, left: 8 }}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                    <XAxis
+                                        dataKey="store_code"
+                                        tick={{ fontSize: 11, fontFamily: 'monospace' }}
+                                        angle={-30}
+                                        textAnchor="end"
+                                    />
+                                    <YAxis
+                                        yAxisId="qty"
+                                        tick={{ fontSize: 11 }}
+                                        label={{ value: 'Unidades', angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: '#6b7280' } }}
+                                    />
+                                    <YAxis
+                                        yAxisId="pct"
+                                        orientation="right"
+                                        domain={[0, 100]}
+                                        tick={{ fontSize: 11 }}
+                                        unit="%"
+                                    />
+                                    <Tooltip
+                                        content={({ active, payload, label }) => {
+                                            if (!active || !payload?.length) return null;
+                                            const row = byOrigin.find((r) => r.store_code === label);
+                                            if (!row) return null;
+                                            return (
+                                                <div className="bg-white border border-gray-200 rounded shadow p-2 text-xs">
+                                                    <div className="font-semibold mb-1">{label} — {row.store_name}</div>
+                                                    <div className="space-y-0.5 text-gray-700">
+                                                        <div>Solicitado: <span className="font-medium tabular-nums">{row.total_requested.toLocaleString('pt-BR')} un</span></div>
+                                                        <div>Enviado: <span className="font-medium tabular-nums">{row.total_dispatched.toLocaleString('pt-BR')} un</span></div>
+                                                        <div className="border-t border-gray-100 pt-0.5 mt-1">
+                                                            Aderência: <span className="font-bold" style={{ color: adherenceColor(row.adherence) }}>{row.adherence}%</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }}
+                                    />
+                                    <Legend
+                                        wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                                        iconType="circle"
+                                    />
+                                    <Bar
+                                        yAxisId="qty"
+                                        dataKey="total_requested"
+                                        name="Solicitado"
+                                        fill="#a5b4fc"
+                                        radius={[4, 4, 0, 0]}
+                                    />
+                                    <Bar
+                                        yAxisId="qty"
+                                        dataKey="total_dispatched"
+                                        name="Enviado"
+                                        fill="#4338ca"
+                                        radius={[4, 4, 0, 0]}
+                                    />
+                                    <Line
+                                        yAxisId="pct"
+                                        type="monotone"
+                                        dataKey="adherence"
+                                        name="Aderência (%)"
+                                        stroke="#dc2626"
+                                        strokeWidth={2}
+                                        dot={{ r: 4, fill: '#dc2626' }}
+                                    >
+                                        <LabelList
+                                            dataKey="adherence"
+                                            position="top"
+                                            formatter={(v) => `${v}%`}
+                                            style={{ fontSize: 10, fill: '#991b1b', fontWeight: 600 }}
+                                        />
+                                    </Line>
+                                </ComposedChart>
+                            </ResponsiveContainer>
                         </div>
                     )}
 
