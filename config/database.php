@@ -98,6 +98,26 @@ return [
             'sslmode' => 'prefer',
         ],
 
+        // Banco MySQL legado (sistema antigo do Grupo Meia Sola). Usado por
+        // comandos de import histórico — relocations:import-from-legacy etc.
+        // Configurar via .env apontando pro dump u401878354_meiaso26_bd_me
+        // importado em MySQL local (ex: mercury_legacy).
+        'legacy' => [
+            'driver' => 'mysql',
+            'host' => env('LEGACY_DB_HOST', '127.0.0.1'),
+            'port' => env('LEGACY_DB_PORT', '3306'),
+            'database' => env('LEGACY_DB_DATABASE', 'mercury_legacy'),
+            'username' => env('LEGACY_DB_USERNAME', 'root'),
+            'password' => env('LEGACY_DB_PASSWORD', ''),
+            'unix_socket' => env('LEGACY_DB_SOCKET', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+        ],
+
         'cigam' => [
             'driver' => 'pgsql',
             'host' => env('CIGAM_DB_HOST', '127.0.0.1'),

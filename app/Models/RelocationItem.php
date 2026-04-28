@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class RelocationItem extends Model
 {
     protected $fillable = [
+        'legacy_id',
         'relocation_id',
         'product_id',
         'product_reference',

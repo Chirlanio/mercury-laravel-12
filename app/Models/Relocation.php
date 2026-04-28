@@ -27,6 +27,7 @@ class Relocation extends Model
     use Auditable;
 
     protected $fillable = [
+        'legacy_id',
         'ulid',
         'relocation_type_id',
         'origin_store_id',
