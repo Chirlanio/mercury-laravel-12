@@ -348,12 +348,16 @@ class RelocationController extends Controller
         $data = $request->validate([
             'invoice_number' => 'required|string|max:50',
             'invoice_date' => 'required|date',
+            'separated_items' => 'nullable|array',
+            'separated_items.*.id' => 'required_with:separated_items|integer',
+            'separated_items.*.qty_separated' => 'required_with:separated_items|integer|min:0',
         ]);
 
         $result = $service->validate(
             $relocation,
             trim($data['invoice_number']),
             $data['invoice_date'],
+            $data['separated_items'] ?? null,
         );
 
         return response()->json($result);

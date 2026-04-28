@@ -35,8 +35,18 @@ class RelocationDispatchValidationService
      *   has_discrepancies: bool,
      * }
      */
-    public function validate(Relocation $relocation, string $invoiceNumber, string $invoiceDate): array
-    {
+    /**
+     * @param  array<int, array{id: int, qty_separated: int}>|null  $separatedItemsOverride
+     *   Quando o usuário ajusta qty_separated na UI mas ainda não salvou,
+     *   o frontend envia esse snapshot pra que a validação use os valores
+     *   do form em vez dos persistidos no banco.
+     */
+    public function validate(
+        Relocation $relocation,
+        string $invoiceNumber,
+        string $invoiceDate,
+        ?array $separatedItemsOverride = null,
+    ): array {
         $relocation->loadMissing(['items', 'originStore']);
 
         $originCode = $relocation->originStore?->code;
@@ -48,7 +58,7 @@ class RelocationDispatchValidationService
 
         $invoiceByBarcode = $this->fetchInvoiceItems($originCode, $invoiceNumber, $invoiceDate);
 
-        $separatedByBarcode = $this->aggregateSeparated($relocation->items);
+        $separatedByBarcode = $this->aggregateSeparated($relocation->items, $separatedItemsOverride);
         $totalSeparated = array_sum($separatedByBarcode);
 
         if (empty($invoiceByBarcode)) {
@@ -150,15 +160,32 @@ class RelocationDispatchValidationService
     }
 
     /**
+     * Agrega qty_separated por barcode. Quando $override está presente
+     * (mapa item_id → qty_separated vindo do frontend), usa os valores
+     * do form em vez dos persistidos no banco — assim a validação
+     * reflete o snapshot atual da UI sem exigir save prévio.
+     *
      * @param  Collection  $items
+     * @param  array<int, array{id: int, qty_separated: int}>|null  $override
      * @return array<string, int>
      */
-    protected function aggregateSeparated(Collection $items): array
+    protected function aggregateSeparated(Collection $items, ?array $override = null): array
     {
+        $overrideById = [];
+        if (is_array($override)) {
+            foreach ($override as $entry) {
+                if (! isset($entry['id'])) continue;
+                $overrideById[(int) $entry['id']] = (int) ($entry['qty_separated'] ?? 0);
+            }
+        }
+
         $out = [];
         foreach ($items as $it) {
             if (! $it->barcode) continue;
-            $out[$it->barcode] = ($out[$it->barcode] ?? 0) + (int) $it->qty_separated;
+            $qty = array_key_exists($it->id, $overrideById)
+                ? $overrideById[$it->id]
+                : (int) $it->qty_separated;
+            $out[$it->barcode] = ($out[$it->barcode] ?? 0) + $qty;
         }
         return $out;
     }

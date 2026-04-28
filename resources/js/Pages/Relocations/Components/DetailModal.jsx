@@ -158,15 +158,21 @@ export default function DetailModal({ show, onClose, ulid, permissions = {}, onT
         setDispatchValidationError(null);
         setDispatchValidation(null);
         try {
-            // Antes de validar, persiste qty_separated localmente — backend
-            // compara contra o que está salvo no banco. Se o usuário ajustou
-            // os inputs sem salvar, validar com o snapshot atual seria errado.
-            // Pra simplificar nesse modal, assumimos qty_separated == qty_requested
-            // (caso default dos sugestionados); se mudou, vai ser refletido na
-            // próxima validação após dispatch.
+            // Envia separatedQty atual como snapshot pra que o backend valide
+            // contra os valores ajustados na UI (mesmo sem salvar). Sem isso,
+            // o backend usaria qty_separated do banco e divergiria do que o
+            // usuário está vendo na tabela.
+            const separatedItems = Object.entries(separatedQty).map(([id, qty]) => ({
+                id: parseInt(id, 10),
+                qty_separated: parseInt(qty, 10) || 0,
+            }));
             const { data } = await window.axios.post(
                 route('relocations.dispatch.validate', r.ulid),
-                { invoice_number: inv, invoice_date: dt },
+                {
+                    invoice_number: inv,
+                    invoice_date: dt,
+                    separated_items: separatedItems,
+                },
             );
             setDispatchValidation(data);
         } catch (e) {

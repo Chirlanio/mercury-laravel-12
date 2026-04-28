@@ -231,6 +231,35 @@ class RelocationDispatchValidationServiceTest extends TestCase
         $this->assertFalse($result['nf_found']);
     }
 
+    public function test_uses_separated_items_override_when_provided(): void
+    {
+        // Item no banco tem qty_separated=1 mas o user ajustou pra 5 na UI.
+        // Sem override, validação acharia divergência (NF=5 vs banco=1).
+        // Com override, validação compara NF=5 vs UI=5 → matched.
+        $reloc = $this->createRelocationInSeparation([
+            ['barcode' => 'EAN-OVR', 'qty_separated' => 1],
+        ]);
+        $itemId = $reloc->items->first()->id;
+
+        $this->insertMovement('Z424', 'NF-OVR', '2026-04-27', 'EAN-OVR', 5);
+
+        // Sem override: valor do banco (1) usado → divergente
+        $resultNoOverride = $this->service->validate($reloc, 'NF-OVR', '2026-04-27');
+        $this->assertTrue($resultNoOverride['has_discrepancies']);
+        $this->assertCount(1, $resultNoOverride['divergent']);
+
+        // Com override id=$itemId qty=5 → matched
+        $resultWithOverride = $this->service->validate(
+            $reloc,
+            'NF-OVR',
+            '2026-04-27',
+            [['id' => $itemId, 'qty_separated' => 5]],
+        );
+        $this->assertFalse($resultWithOverride['has_discrepancies']);
+        $this->assertCount(1, $resultWithOverride['matched']);
+        $this->assertSame(5, $resultWithOverride['matched'][0]['qty_separated']);
+    }
+
     public function test_aggregates_multiple_lines_per_barcode(): void
     {
         $reloc = $this->createRelocationInSeparation([
