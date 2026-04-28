@@ -71,9 +71,17 @@
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>Romaneio de Separação</h1>
-        <div class="subtitle">
+    <div class="header" style="position: relative;">
+        @if(! empty($qrDataUri))
+            <div style="position: absolute; top: 0; right: 0; text-align: center;">
+                <img src="{{ $qrDataUri }}" alt="QR Code" width="90" height="90" />
+                <div style="font-size: 8px; color: #6b7280; margin-top: 2px;">
+                    Escaneie pra abrir no app
+                </div>
+            </div>
+        @endif
+        <h1 style="margin: 0; padding-right: 110px;">Romaneio de Separação</h1>
+        <div class="subtitle" style="padding-right: 110px;">
             Remanejo #{{ $relocation->id }} · Gerado em {{ $generatedAt->format('d/m/Y H:i') }}
             · Grupo Meia Sola — Mercury
         </div>

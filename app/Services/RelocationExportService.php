@@ -57,9 +57,27 @@ class RelocationExportService
             'statusHistory.changedBy',
         ]);
 
+        // QR code com URL do remanejo — vendedora destino escaneia e abre
+        // direto a página de detalhes (atalho pro Receive). Falha silenciosa
+        // se o pacote endroid/qr-code não estiver disponível ou se a URL
+        // não puder ser gerada.
+        $qrDataUri = null;
+        try {
+            $url = route('relocations.show', $relocation->ulid);
+            $result = \Endroid\QrCode\Builder\Builder::create()
+                ->data($url)
+                ->size(110)
+                ->margin(2)
+                ->build();
+            $qrDataUri = $result->getDataUri();
+        } catch (\Throwable $e) {
+            // QR é opcional — sem ele o romaneio ainda funciona
+        }
+
         $pdf = Pdf::loadView('pdf.relocation-romaneio', [
             'relocation' => $relocation,
             'generatedAt' => now(),
+            'qrDataUri' => $qrDataUri,
         ])->setPaper('a4', 'portrait');
 
         $filename = sprintf(
